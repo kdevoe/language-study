@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Earthy Tones & Zen Aesthetics */
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8; /* Soft blue */
+  --accent-success: #dee5d5; /* Soft green */
+  --accent-danger: #fde2da; /* Soft red / coral */
+  --border-light: #e0e0d8;
+
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.serif {
+  font-family: var(--font-serif);
+}
+
+.sans {
+  font-family: var(--font-sans);
+}
+
+/* Minimalist Utilities */
+.shadow-sm {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Typography styles for reading */
+.reading-content {
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  line-height: 2 !important;
+  letter-spacing: 0.02em;
+}
+
+.reading-content p {
+  margin-bottom: 2em;
+}
+
+/* Furigana styles */
+ruby {
+  ruby-align: center;
+}
+rt {
+  font-size: 0.5em;
+  color: var(--text-muted);
+  user-select: none;
+}

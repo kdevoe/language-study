@@ -1,0 +1,10 @@
+This will be an web app to help with learning Japanese through reading news article summaries. It will fetch the latest news articles on the users prefered topics and generate
+summaries of them in Japanese using AI. When generating the news summaries the AI will try and use vocabulary, Kanji and grammar that the user is familiar with. To facilitate This
+there will need to be persistent storage within the App related words, Kanji, and grammar and what the users assessment of those is (hard, ok, known, unseen). When reading the app
+will allow clicking on any word to generate an english explanation of the word or sentence structure. Kanji will be shown with 'Remembering the Kanji' word definitions. Known Kanji 
+will come from 'Remembering the Kanji' study list, with 3 new learned Kanji assumed each day. 
+
+Upon statup there will be a quiz to gather the Japanese level of the user and initialize the default Japanese level for the app. In the settings the % new words introduced should be 
+available. 
+
+
