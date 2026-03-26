@@ -2,23 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { FuriganaText } from './FuriganaText';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
-import { fetchNewsFeed, mockLlmRewrite, NewsArticle } from '../services/api';
+import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinition, NewsArticle } from '../services/api';
 import { useAppStore } from '../services/store';
 
 export function Reader() {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
   const [article, setArticle] = useState<NewsArticle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isWordLoading, setIsWordLoading] = useState(false);
   
-  const { jlptLevel, rtkLevel, setWordMastery } = useAppStore();
+  // Memoize the Japanese segmenter so it's instantly ready
+  const segmenter = React.useMemo(() => {
+    try {
+      return new (Intl as any).Segmenter('ja-JP', { granularity: 'word' });
+    } catch {
+      return null;
+    }
+  }, []);
+  
+  const { jlptLevel, rtkLevel, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
 
   useEffect(() => {
     async function loadArticle() {
       setLoading(true);
-      const feed = await fetchNewsFeed();
+      // Fetching general news based on a topic
+      const feed = await fetchNewsFeed('Technology startups');
       if (feed.length > 0) {
         // Rewrite using LLM context
-        const rewrittenBlocks = await mockLlmRewrite(feed[0].originalUrl, jlptLevel, rtkLevel);
+        const snippet = feed[0].blocks[0].content?.[0]?.text || '';
+        const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel);
         setArticle({ ...feed[0], blocks: rewrittenBlocks });
       }
       setLoading(false);
@@ -27,7 +39,28 @@ export function Reader() {
   }, [jlptLevel, rtkLevel]);
 
   const handleWordClick = (details: WordDetails) => {
+    recordWordSeen(details.word);
     setSelectedWord(details);
+  };
+
+  const handleDictionaryLookup = async (word: string, contextSentence: string) => {
+    recordWordSeen(word);
+    
+    // Check local database first
+    const localData = wordDatabase[word];
+    if (localData && localData.meaning) {
+      setSelectedWord({ word, reading: localData.reading, meaning: localData.meaning, grammarNote: localData.grammarNote });
+      return;
+    }
+
+    // Open the modal immediately in loading state
+    setSelectedWord({ word, reading: '...', meaning: '' });
+    setIsWordLoading(true);
+    const def = await fetchWordDefinition(word, contextSentence);
+    
+    saveWordDefinition(word, { reading: def.reading, meaning: def.meaning, grammarNote: def.grammarNote });
+    setSelectedWord(def);
+    setIsWordLoading(false);
   };
 
   const handleSetMastery = (level: 'hard' | 'easy' | 'known') => {
@@ -64,8 +97,11 @@ export function Reader() {
 
         {article.blocks.map((block, i) => {
           if (block.type === 'paragraph') {
+            // Reconstruct the full paragraph text for context
+            const paragraphText = block.content!.map(s => s.text).join('');
+            
             return (
-              <p key={i}>
+              <p key={i} style={{ lineHeight: 2.2 }}>
                 {block.content!.map((segment, j) => {
                   if (segment.isInteractive) {
                     return (
@@ -77,6 +113,27 @@ export function Reader() {
                         onClick={() => handleWordClick(segment.details as WordDetails)}
                       />
                     );
+                  }
+                  
+                  // If it's pure Japanese text, let's tokenize it into clickable spans
+                  if (segmenter) {
+                    const words = Array.from((segmenter as any).segment(segment.text));
+                    return words.map((w: any, index: number) => {
+                      if (!w.isWordLike) {
+                        return <span key={`${j}-${index}`}>{w.segment}</span>;
+                      }
+                      return (
+                        <span 
+                          key={`${j}-${index}`}
+                          onClick={() => handleDictionaryLookup(w.segment, paragraphText)}
+                          style={{ cursor: 'pointer', borderBottom: '1px solid transparent' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.borderBottom = '1px dashed var(--border-light)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.borderBottom = '1px solid transparent')}
+                        >
+                          {w.segment}
+                        </span>
+                      );
+                    });
                   }
                   return <span key={j}>{segment.text}</span>;
                 })}
@@ -101,6 +158,7 @@ export function Reader() {
         onClose={() => setSelectedWord(null)} 
         wordData={selectedWord}
         onSetMastery={handleSetMastery}
+        isLoading={isWordLoading}
       />
     </>
   );

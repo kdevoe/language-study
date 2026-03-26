@@ -3,18 +3,30 @@ import { persist } from 'zustand/middleware';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'easy' | 'known';
 
+export interface WordData {
+  reading: string;
+  meaning: string;
+  grammarNote?: string;
+  mastery: MasteryLevel;
+  timesSeen: number;
+  uniqueDaysSeen: string[];
+}
+
 interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
   rtkLevel: number | null;
   furiganaMode: 'always' | 'never' | 'dynamic';
   
-  wordMastery: Record<string, MasteryLevel>;
+  wordDatabase: Record<string, WordData>;
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
   
   setOnboarded: (jlpt: number, rtk: number) => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
+  
+  saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
+  recordWordSeen: (word: string) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
 }
@@ -26,7 +38,7 @@ export const useAppStore = create<AppState>()(
       jlptLevel: null,
       rtkLevel: null,
       furiganaMode: 'dynamic',
-      wordMastery: {},
+      wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
 
@@ -34,10 +46,47 @@ export const useAppStore = create<AppState>()(
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       
+      saveWordDefinition: (word, def) => 
+        set((state) => {
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [] };
+          return {
+            wordDatabase: {
+              ...state.wordDatabase,
+              [word]: { ...current, ...def }
+            }
+          };
+        }),
+        
+      recordWordSeen: (word) => 
+        set((state) => {
+          const today = new Date().toISOString().split('T')[0];
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [] };
+          const newDays = current.uniqueDaysSeen.includes(today) 
+            ? current.uniqueDaysSeen 
+            : [...current.uniqueDaysSeen, today];
+            
+          return {
+            wordDatabase: {
+              ...state.wordDatabase,
+              [word]: { 
+                ...current, 
+                timesSeen: current.timesSeen + 1,
+                uniqueDaysSeen: newDays
+              }
+            }
+          };
+        }),
+
       setWordMastery: (word, level) => 
-        set((state) => ({
-          wordMastery: { ...state.wordMastery, [word]: level }
-        })),
+        set((state) => {
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [] };
+          return {
+            wordDatabase: {
+              ...state.wordDatabase,
+              [word]: { ...current, mastery: level }
+            }
+          };
+        }),
 
       checkDailyKanji: () => {
         const now = Date.now();

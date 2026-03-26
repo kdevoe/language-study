@@ -3,9 +3,10 @@ import { Newspaper, BarChart2, Settings } from 'lucide-react';
 interface Props {
   activeTab: 'news' | 'progress' | 'settings';
   onChange: (tab: 'news' | 'progress' | 'settings') => void;
+  isVisible?: boolean;
 }
 
-export function BottomNav({ activeTab, onChange }: Props) {
+export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
     { id: 'news', label: 'NEWS', icon: Newspaper },
     { id: 'progress', label: 'PROGRESS', icon: BarChart2 },
@@ -14,7 +15,9 @@ export function BottomNav({ activeTab, onChange }: Props) {
 
   return (
     <nav style={{
-      position: 'sticky',
+      position: 'fixed',
+      left: 0,
+      right: 0,
       bottom: 0,
       backgroundColor: 'var(--bg-pure)',
       display: 'flex',
@@ -22,7 +25,10 @@ export function BottomNav({ activeTab, onChange }: Props) {
       padding: '0.75rem 0',
       paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
       borderTop: '1px solid var(--border-light)',
-      zIndex: 20
+      zIndex: 20,
+      transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
+      transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
+      opacity: isVisible ? 1 : 0
     }}>
       {tabs.map(({ id, label, icon: Icon }) => {
         const isActive = activeTab === id;

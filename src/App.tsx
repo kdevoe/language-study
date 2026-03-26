@@ -11,12 +11,39 @@ function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
   const [activeTab, setActiveTab] = useState<'news' | 'progress' | 'settings'>('news');
+  const [showNav, setShowNav] = useState(true);
 
   useEffect(() => {
     if (isOnboarded) {
       checkDailyKanji();
     }
   }, [isOnboarded, checkDailyKanji]);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const updateNav = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setShowNav(false);
+      } else if (currentScrollY < lastScrollY) {
+        setShowNav(true);
+      }
+      lastScrollY = currentScrollY > 0 ? currentScrollY : 0;
+      ticking = false;
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateNav);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   if (!isOnboarded) {
     return <Onboarding />;
@@ -28,11 +55,14 @@ function App() {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
-        padding: '1.5rem 1.25rem',
+        padding: 'max(1.5rem, env(safe-area-inset-top)) 1.25rem 1.5rem',
         position: 'sticky',
         top: 0,
         backgroundColor: 'var(--bg-color)',
-        zIndex: 10
+        zIndex: 10,
+        transform: showNav ? 'translateY(0)' : 'translateY(-100%)',
+        transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
+        opacity: showNav ? 1 : 0
       }}>
         <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <ArrowLeft size={24} strokeWidth={1.5} />
@@ -57,7 +87,7 @@ function App() {
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav} />
     </div>
   )
 }
