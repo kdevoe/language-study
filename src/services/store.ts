@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { rtkKanjiList } from '../data/rtkKanji';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'easy' | 'known';
 
@@ -93,15 +94,18 @@ export const useAppStore = create<AppState>()(
         const state = get();
         // If it's the first time or 24 hours (86400000 ms) have passed
         if (!state.lastRtkUpdateTs || now - state.lastRtkUpdateTs > 86400000) {
-          // Mock adding 3 new kanji to study list
-          const newKanjiCount = 3;
-          // In a real app, this would pick the next 3 unlearned Kanji based on RTK index
-          const mockNewKanji = ['間', '言', '葉'].slice(0, newKanjiCount); 
+          let currentLevel = state.rtkLevel || 122;
+          if (currentLevel < 122) currentLevel = 122; // One-time alignment
+          const newLevel = Math.min(currentLevel + 3, rtkKanjiList.length);
           
-          set((s) => ({
-            studyKanji: Array.from(new Set([...s.studyKanji, ...mockNewKanji])),
+          // The newest 3 kanji become today's "Study Kanji"
+          const dailyTargets = rtkKanjiList.slice(currentLevel, newLevel);
+          
+          set({
+            rtkLevel: newLevel,
+            studyKanji: dailyTargets,
             lastRtkUpdateTs: now
-          }));
+          });
         }
       }
     }),

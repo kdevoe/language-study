@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, CheckCircle, Eye, BookOpen, Loader2 } from 'lucide-react';
 import { useAppStore } from '../services/store';
+import { rtkKanjiMap } from '../data/rtkKanji';
 
 export interface WordDetails {
   word: string;
@@ -23,6 +24,8 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
   
   if (!wordData) return null;
   const stats = wordDatabase[wordData.word];
+  
+  const wordKanjiArray = Array.from(new Set(wordData.word.split(''))).filter(char => !!rtkKanjiMap[char]);
 
   return (
     <AnimatePresence>
@@ -129,6 +132,35 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                   <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.25rem' }}>
                     {stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.85rem', fontWeight: 400}}>d</span>
                   </div>
+                </div>
+              </div>
+            )}
+            
+            {!isLoading && wordKanjiArray.length > 0 && (
+              <div style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
+                <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.15em' }}>
+                  KANJI BREAKDOWN (RTK)
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {wordKanjiArray.map(k => (
+                    <div key={k} style={{ 
+                      flex: '0 1 Calc(33% - 0.5rem)', 
+                      minWidth: '70px',
+                      backgroundColor: 'var(--bg-card)', 
+                      border: '1px solid var(--border-light)', 
+                      borderRadius: '12px', 
+                      padding: '0.75rem 0.5rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                    }}>
+                      <div className="serif" style={{ fontSize: '1.75rem', color: 'var(--text-main)', marginBottom: '0.25rem', lineHeight: 1.2 }}>{k}</div>
+                      <div className="sans" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', wordBreak: 'break-word' }}>
+                        {rtkKanjiMap[k] || 'Unknown'}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

@@ -98,6 +98,8 @@ Output EXACTLY JSON matching this interface:
   }
 }
 
+import { rtkKanjiList } from '../data/rtkKanji';
+
 // In the future this will call Google Gemini API
 export async function rewriteArticleWithGemini(title: string, snippet: string, jlpt: number | null, rtk: number | null): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -115,41 +117,84 @@ export async function rewriteArticleWithGemini(title: string, snippet: string, j
     });
 
     const jlptStr = jlpt ? `N${jlpt}` : 'N4';
-    const rtkStr = rtk ? `${rtk} Kanji` : '500 Kanji';
+    
+    const safeRtk = rtk || 122;
+    const knownKanji = rtkKanjiList.slice(0, Math.max(0, safeRtk - 15));
+    const recentKanji = rtkKanjiList.slice(Math.max(0, safeRtk - 15), safeRtk);
+    
+    // --- PASS 1: Content Generation (Plain Text) ---
+    const prompt1 = `
+You are a Japanese teacher. Write a 3-paragraph news article in Japanese based on this news.
+Language Level: JLPT ${jlptStr}. 
+Student known Kanji: [${knownKanji.join('')}].
+CRITICAL TARGETS: Prioritize using these Kanji: [${recentKanji.join('')}].
 
-    const prompt = `
-You are an expert Japanese teacher. I will give you a news headline and snippet.
-Write a 3-paragraph news article in Japanese based on this news.
-Target Audience: A student at JLPT ${jlptStr} level who knows roughly ${rtkStr}.
 Rules:
-1. Use appropriate grammar for JLPT ${jlptStr}.
-2. Use Kanji appropriate for someone who knows ${rtkStr}. For any difficult or new Kanji, provide Furigana.
-3. Keep the tone like a Japanese news broadcast.
-4. Pick out 1 or 2 important vocabulary words or grammar points and explain them in English as a "yugen-box" block.
-5. Create interactive words in the paragraphs with their readings, meanings, and a short grammarNote.
+1. Tone must be like a Japanese news broadcast.
+2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
+3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
 
 Output EXACTLY a JSON array matching this interface:
 [
   {
     "type": "paragraph" | "yugen-box",
-    "content": [ { "text": "...", "furigana": "...", "isInteractive": true|false, "details": { "word": "...", "reading": "...", "meaning": "...", "grammarNote": "..." } } ],
+    "text": "The full Japanese sentence string...",
     "keyword": "...",
     "reading": "...",
     "description": "..."
   }
 ]
-
 News Headline: ${title}
 News Snippet: ${snippet}
 `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const parsedBlocks = JSON.parse(text) as ArticleBlock[];
+    const result1 = await model.generateContent(prompt1);
+    let rawText1 = result1.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+    const rawBlocks = JSON.parse(rawText1);
+
+    // --- PASS 2: Tokenization & Furigana ---
+    const prompt2 = `
+You are a morphological analyzer. I am providing a JSON array containing Japanese text paragraphs.
+You MUST output the exact same JSON structure, BUT for every "text" field, replace it with a "content" array of individual Japanese tokens (verbs, nouns, particles).
+CRITICAL: For EVERY word token that contains Kanji, you MUST provide a "furigana" field showing its reading. 
+
+Input JSON:
+${JSON.stringify(rawBlocks, null, 2)}
+
+Output EXACTLY a JSON array matching this interface:
+[
+  {
+    "type": "paragraph" | "yugen-box",
+    "content": [ { "text": "...", "furigana": "..." } ],
+    "keyword": "...",
+    "reading": "...",
+    "description": "..."
+  }
+]
+`;
+
+    const result2 = await model.generateContent(prompt2);
+    let rawText2 = result2.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+    
+    // Aggressive debugging for the user
+    console.log("================ PASS 2 COMPLETE ================");
+    console.log("Raw LLM output length:", rawText2.length);
+    console.log("Raw LLM output snippet:", rawText2.substring(0, 300) + "...");
+    
+    const parsedBlocks = JSON.parse(rawText2) as ArticleBlock[];
+    
+    // Count furigana to verify feature works
+    let furiganaCount = 0;
+    parsedBlocks.forEach(b => {
+      if (b.content) b.content.forEach(w => { if (w.furigana) furiganaCount++; });
+    });
+    console.log(`Successfully parsed ${parsedBlocks.length} blocks containing ${furiganaCount} total furigana words.`);
+    console.log("==================================================");
+
     return parsedBlocks;
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error details:", error);
     return mockArticles[0].blocks;
   }
 }

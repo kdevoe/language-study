@@ -103,14 +103,19 @@ export function Reader() {
             return (
               <p key={i} style={{ lineHeight: 2.2 }}>
                 {block.content!.map((segment, j) => {
-                  if (segment.isInteractive) {
+                  if (segment.furigana || segment.isInteractive) {
                     return (
                       <FuriganaText
                         key={j}
                         word={segment.text}
                         furigana={segment.furigana}
-                        mode="always"
-                        onClick={() => handleWordClick(segment.details as WordDetails)}
+                        onClick={() => {
+                          if (segment.details) {
+                            handleWordClick(segment.details as WordDetails);
+                          } else {
+                            handleDictionaryLookup(segment.text, paragraphText);
+                          }
+                        }}
                       />
                     );
                   }

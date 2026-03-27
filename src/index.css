@@ -78,11 +78,39 @@ h1, h2, h3, h4, h5, h6 {
 /* Furigana styles */
 ruby {
   ruby-align: center;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.2s ease;
 }
+
+ruby:active {
+  border-bottom: 1px dashed var(--border-light);
+}
+
 rt {
-  font-size: 0.5em;
+  font-size: 0.55em;
   color: var(--text-muted);
   user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transform: translateY(4px);
+}
+
+@media (hover: hover) {
+  ruby:hover rt {
+    opacity: 1;
+    transform: translateY(0);
+    color: var(--text-main);
+  }
+}
+
+ruby.force-show rt {
+  opacity: 1;
+  transform: translateY(0);
+  background-color: var(--text-main);
+  color: var(--bg-pure);
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 @keyframes lucide-spin {

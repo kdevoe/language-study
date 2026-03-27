@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 
 type FuriganaMode = 'always' | 'never' | 'dynamic';
 
@@ -10,32 +10,51 @@ interface Props {
   onClick?: () => void;
 }
 
-export function FuriganaText({ word, furigana, mode = 'always', isKnown = false, onClick }: Props) {
-  const show = mode === 'always' || (mode === 'dynamic' && !isKnown);
+export function FuriganaText({ word, furigana, onClick }: Props) {
+  const [showFurigana, setShowFurigana] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const isLongPressRef = useRef(false);
 
-  const handleClick = (e: React.MouseEvent) => {
-    if (onClick) {
-      e.stopPropagation();
+  const handlePointerDown = () => {
+    isLongPressRef.current = false;
+    timerRef.current = window.setTimeout(() => {
+      isLongPressRef.current = true;
+      if (navigator.vibrate) navigator.vibrate(50);
+      if (onClick) onClick();
+    }, 450);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!isLongPressRef.current && furigana) {
+      e.preventDefault();
+      setShowFurigana(!showFurigana);
+    } else if (!isLongPressRef.current && !furigana && onClick) {
+      // It's a short tap but there is no furigana to show, so execute click handler directly
+      e.preventDefault();
       onClick();
     }
   };
 
-  const style: React.CSSProperties = {
-    cursor: onClick ? 'pointer' : 'auto',
-    borderBottom: onClick ? '1px dashed transparent' : 'none',
-    transition: 'border-color 0.2s ease',
+  const handlePointerLeave = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
   };
 
-  if (!furigana || !show) {
-    return (
-      <span onClick={handleClick} style={style} className="interactive-word">
-        {word}
-      </span>
-    );
+  if (!furigana) {
+    return <span 
+      onPointerDown={handlePointerDown} 
+      onPointerUp={handlePointerUp} 
+      onPointerLeave={handlePointerLeave}
+    >{word}</span>;
   }
 
   return (
-    <ruby onClick={handleClick} style={style} className="interactive-word">
+    <ruby 
+      className={showFurigana ? 'force-show' : ''}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
+    >
       {word}
       <rt>{furigana}</rt>
     </ruby>
