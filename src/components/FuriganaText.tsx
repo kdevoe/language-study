@@ -15,8 +15,11 @@ export function FuriganaText({ word, furigana, onClick }: Props) {
   const timerRef = useRef<number | null>(null);
   const isLongPressRef = useRef(false);
 
-  const handlePointerDown = () => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     isLongPressRef.current = false;
+    
+    if (e.pointerType === 'mouse') return;
+
     timerRef.current = window.setTimeout(() => {
       isLongPressRef.current = true;
       if (navigator.vibrate) navigator.vibrate(50);
@@ -26,11 +29,18 @@ export function FuriganaText({ word, furigana, onClick }: Props) {
 
   const handlePointerUp = (e: React.PointerEvent) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (e.pointerType === 'mouse') {
+      e.preventDefault();
+      if (onClick) onClick();
+      return;
+    }
+
     if (!isLongPressRef.current && furigana) {
       e.preventDefault();
       setShowFurigana(!showFurigana);
     } else if (!isLongPressRef.current && !furigana && onClick) {
-      // It's a short tap but there is no furigana to show, so execute click handler directly
+      // It's a short touch but there is no furigana to show, so execute click handler directly
       e.preventDefault();
       onClick();
     }
