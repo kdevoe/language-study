@@ -25,7 +25,7 @@ export function Settings() {
           Kanji Study Bias
         </label>
         
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem', height: '45px' }}>
+        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
           {(['Natural', 'Balanced', 'Study'] as const).map(mode => {
             const isSelected = studyMode === mode.toLowerCase();
             return (
@@ -34,19 +34,21 @@ export function Settings() {
                 onClick={() => setStudyMode(mode.toLowerCase() as any)}
                 style={{
                   flex: isSelected ? 2.5 : 1,
-                  borderRadius: '10px',
-                  border: isSelected ? '2px solid var(--text-main)' : '1px solid var(--border-light)',
-                  backgroundColor: isSelected ? 'var(--text-main)' : 'transparent',
-                  color: isSelected ? 'var(--bg-pure)' : 'var(--text-main)',
-                  fontWeight: 600,
+                  borderRadius: '100px',
+                  backgroundColor: isSelected ? 'var(--bg-pure)' : 'transparent',
+                  color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
+                  fontWeight: isSelected ? 700 : 600,
+                  border: 'none',
+                  outline: 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                   fontSize: isSelected ? '0.9rem' : '0.8rem',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
                   overflow: 'hidden',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
                 {mode}
@@ -66,21 +68,26 @@ export function Settings() {
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
           Grammar Level (JLPT)
         </label>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '45px' }}>
           {[5, 4, 3, 2, 1].map(n => (
             <button
               key={n}
               onClick={() => setJlptLevel(n)}
               style={{
                 flex: 1,
-                padding: '0.75rem 0',
-                borderRadius: '8px',
-                border: jlptLevel === n ? '2px solid var(--text-main)' : '1px solid var(--border-light)',
-                backgroundColor: jlptLevel === n ? 'var(--text-main)' : 'transparent',
-                color: jlptLevel === n ? 'var(--bg-pure)' : 'var(--text-main)',
-                fontWeight: 600,
+                borderRadius: '100px',
+                backgroundColor: jlptLevel === n ? 'var(--bg-pure)' : 'transparent',
+                color: jlptLevel === n ? 'var(--text-main)' : 'var(--text-muted)',
+                fontWeight: jlptLevel === n ? 700 : 600,
+                border: 'none',
+                outline: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.2s'
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                fontSize: '0.9rem',
+                boxShadow: jlptLevel === n ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
               }}
             >
               N{n}
