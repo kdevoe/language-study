@@ -24,16 +24,16 @@ export function Reader() {
     }
   }, []);
   
-  const { jlptLevel, rtkLevel, unknownKanjiDensity, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
+  const { jlptLevel, rtkLevel, kanjiBias, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
 
   const loadArticle = async () => {
     setLoading(true);
     setHasFinishedReading(false);
     setClickedWords(new Set());
     const feed = await fetchNewsFeed('Technology startups');
-    if (feed.length > 0) {
+      if (feed.length > 0) {
       const snippet = feed[0].blocks[0].content?.[0]?.text || '';
-      const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, unknownKanjiDensity);
+      const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, kanjiBias);
       setArticle({ ...feed[0], blocks: rewrittenBlocks });
     }
     setLoading(false);
@@ -41,7 +41,7 @@ export function Reader() {
 
   useEffect(() => {
     loadArticle();
-  }, [jlptLevel, rtkLevel, unknownKanjiDensity]);
+  }, [jlptLevel, rtkLevel, kanjiBias]);
 
   useEffect(() => {
     if (!bottomRef.current || loading || !article || hasFinishedReading) return;

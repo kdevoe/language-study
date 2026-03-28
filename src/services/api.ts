@@ -111,7 +111,7 @@ export async function rewriteArticleWithGemini(
   snippet: string, 
   jlpt: number | null, 
   rtk: number | null, 
-  unknownKanjiDensity: number = 10
+  kanjiBias: number = 50
 ): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
@@ -133,6 +133,13 @@ export async function rewriteArticleWithGemini(
     const knownKanji = rtkKanjiList.slice(0, Math.max(0, safeRtk - 15));
     const recentKanji = rtkKanjiList.slice(Math.max(0, safeRtk - 15), safeRtk);
     
+    let biasInstruction = `NATURAL READING BIAS: Prioritize fluid, authentic, natural Japanese over restricting yourself to studied Kanji. The text should read like a completely authentic native article.`;
+    if (kanjiBias > 75) {
+      biasInstruction = `MAXIMUM STUDIED BIAS: Whenever perfectly natural, choose vocabulary synonyms that use the "Student known Kanji" list. Strongly prefer the "CRITICAL TARGETS". You may slightly compromise ultra-natural phrasing if it means practicing a known Kanji.`;
+    } else if (kanjiBias > 40) {
+      biasInstruction = `MODERATE STUDIED BIAS: Write naturally, but if you have a choice between two equally common words, deliberately choose the one that uses Kanji from the "Student known Kanji". Prioritize "CRITICAL TARGETS" above all else.`;
+    }
+    
     // --- PASS 1: Content Generation (Plain Text) ---
     const prompt1 = `
 You are a Japanese teacher. Write a 3-paragraph news article in Japanese based on this news.
@@ -144,10 +151,8 @@ Rules:
 1. Tone must be like a Japanese news broadcast.
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
-4. KANJI REVIEW DENSITY: When writing the article, strictly control Kanji usage:
-   - The VAST MAJORITY of Kanji MUST come from the "Student known Kanji" list. (Strongly prioritize the "CRITICAL TARGETS" within this list to enforce Spaced Repetition).
-   - A MAXIMUM of ${unknownKanjiDensity}% of Kanji can be completely new/unknown Kanji not in either list. (You do not need to reach this limit; use as few unknown Kanji as naturally possible).
-   If a natural word requires a Kanji but you have exceeded your unknown limit, you MUST spell it phonetically in Hiragana.
+4. KANJI PREFERENCE: ${biasInstruction}
+   While you should keep "CRITICAL TARGETS" in mind as excellent candidate words, do not force them into sentences un-naturally.
 
 Output EXACTLY a JSON array matching this interface:
 [

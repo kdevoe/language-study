@@ -6,7 +6,7 @@ export function Settings() {
   const { 
     jlptLevel, setJlptLevel, 
     rtkLevel, setRtkLevel, 
-    unknownKanjiDensity, setUnknownKanjiDensity
+    kanjiBias, setKanjiBias
   } = useAppStore();
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,12 +22,12 @@ export function Settings() {
 
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-          Allowed Unknown Kanji
+          Vocabulary Style Bias
         </label>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Purely Known Kanji</span>
-          <span style={{ color: 'var(--text-muted)' }}>Max {unknownKanjiDensity}% Unknown</span>
+          <span style={{ color: 'var(--text-muted)' }}>Natural Reading</span>
+          <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Studied Kanji</span>
         </div>
         
         <input 
@@ -35,13 +35,13 @@ export function Settings() {
           min="0" 
           max="100" 
           step="5"
-          value={unknownKanjiDensity}
-          onChange={(e) => setUnknownKanjiDensity(parseInt(e.target.value, 10))}
+          value={kanjiBias}
+          onChange={(e) => setKanjiBias(parseInt(e.target.value, 10))}
           style={{ width: '100%', accentColor: 'var(--text-main)', marginBottom: '1rem' }} 
         />
         
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Determines the maximum allowance of completely unknown Kanji the AI is permitted to introduce into the text. You do not need to reach this limit.
+          Higher bias prompts the AI to substitute common words with synonyms that leverage the Kanji you have studied, at the slight expense of perfectly natural journalistic prose.
         </p>
       </div>
 
