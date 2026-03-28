@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { X, BookOpen, Loader2 } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
@@ -79,9 +79,23 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
             }}
             onDragEnd={(_, info) => {
               if (Math.abs(info.offset.x) > 160) {
-                onClose();
+                // Determine fly-away direction
+                const targetX = info.offset.x > 0 ? 600 : -600;
+                
+                // Snap it away quickly, then trigger logical close
+                animate(x, targetX, { 
+                  duration: 0.2,
+                  ease: "easeOut"
+                }).then(() => {
+                  onClose();
+                });
               } else {
-                x.set(0); // Snap back if threshold not met
+                // Snappy snap-back to center
+                animate(x, 0, { 
+                  type: 'spring', 
+                  damping: 18, 
+                  stiffness: 350 
+                });
               }
             }}
             initial={{ y: '100%' }}
