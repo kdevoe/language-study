@@ -165,16 +165,58 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
 
             {!isLoading && (
               <div style={{ marginBottom: '2.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => { onSetMastery?.('hard'); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: activeMastery === 'hard' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: activeMastery === 'hard' ? 'var(--text-main)' : 'transparent', color: activeMastery === 'hard' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
-                    Hard
-                  </button>
-                  <button onClick={() => { onSetMastery?.('medium'); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: activeMastery === 'medium' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: activeMastery === 'medium' ? 'var(--text-main)' : 'transparent', color: activeMastery === 'medium' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
-                    Medium
-                  </button>
-                  <button onClick={() => { onSetMastery?.('easy'); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: activeMastery === 'easy' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: activeMastery === 'easy' ? 'var(--text-main)' : 'transparent', color: activeMastery === 'easy' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
-                    Easy
-                  </button>
+                <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '45px', position: 'relative' }}>
+                  {(() => {
+                    const levels = ['easy', 'medium', 'hard'] as const;
+                    const activeIndex = levels.indexOf((activeMastery || 'medium') as any);
+                    
+                    return (
+                      <>
+                        <div style={{
+                          position: 'absolute',
+                          top: '4px',
+                          bottom: '4px',
+                          left: `calc(4px + ${activeIndex} * (100% - 8px) / 3)`,
+                          width: `calc((100% - 8px) / 3)`,
+                          backgroundColor: 'var(--bg-pure)',
+                          borderRadius: '100px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                          zIndex: 0
+                        }} />
+
+                        {levels.map(level => {
+                          const isSelected = activeMastery === level;
+                          return (
+                            <button
+                              key={level}
+                              onClick={() => { onSetMastery?.(level); }}
+                              style={{
+                                flex: 1,
+                                borderRadius: '100px',
+                                backgroundColor: 'transparent',
+                                color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
+                                fontWeight: isSelected ? 700 : 600,
+                                border: 'none',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                fontSize: '0.95rem',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                position: 'relative',
+                                zIndex: 1,
+                                textTransform: 'capitalize'
+                              }}
+                            >
+                              {level}
+                            </button>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
