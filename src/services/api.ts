@@ -111,7 +111,7 @@ export async function rewriteArticleWithGemini(
   snippet: string, 
   jlpt: number | null, 
   rtk: number | null, 
-  kanjiBias: number = 50,
+  studyMode: 'natural' | 'balanced' | 'study' = 'balanced',
   onProgress?: (status: string) => void
 ): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -134,11 +134,11 @@ export async function rewriteArticleWithGemini(
     const knownKanji = rtkKanjiList.slice(0, Math.max(0, safeRtk - 15));
     const recentKanji = rtkKanjiList.slice(Math.max(0, safeRtk - 15), safeRtk);
     
-    let biasInstruction = `NATURAL READING BIAS: Prioritize fluid, authentic, natural Japanese over restricting yourself to studied Kanji. The text should read like a completely authentic native article.`;
-    if (kanjiBias > 75) {
-      biasInstruction = `MAXIMUM STUDIED BIAS: Whenever perfectly natural, choose vocabulary synonyms that use the "Student known Kanji" list. Strongly prefer the "CRITICAL TARGETS". You may slightly compromise ultra-natural phrasing if it means practicing a known Kanji.`;
-    } else if (kanjiBias > 40) {
-      biasInstruction = `MODERATE STUDIED BIAS: Write naturally, but if you have a choice between two equally common words, deliberately choose the one that uses Kanji from the "Student known Kanji". Prioritize "CRITICAL TARGETS" above all else.`;
+    let biasInstruction = `NATURAL READING: Prioritize fluid, authentic, natural Japanese over restricting yourself to studied Kanji. The text should read exactly like a standard native news article without arbitrarily forcing known Kanji.`;
+    if (studyMode === 'study') {
+      biasInstruction = `EXTREME STUDIED BIAS: You MUST drastically alter the summary's phrasing and wording specifically to maximize the usage of the "Student known Kanji" list. CRITICAL TARGETS are your highest priority. It is actively encouraged to sacrifice perfectly natural/authentic journalistic prose if it means you can replace an unknown compound word with a synonym that utilizes the student's known Kanji. Do whatever it takes to aggressively incorporate the student's Kanji into the text.`;
+    } else if (studyMode === 'balanced') {
+      biasInstruction = `BALANCED BIAS: Write naturally, but whenever there are multiple valid word choices to express an idea, deliberately choose the synonym that utilizes Kanji from the "Student known Kanji" list (especially CRITICAL TARGETS) rather than an unknown Kanji. Allow minor deviations from strict journalistic style to accommodate these known characters.`;
     }
     
     // --- PASS 1: Content Generation (Plain Text) ---

@@ -18,7 +18,7 @@ interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
   rtkLevel: number | null;
-  kanjiBias: number; // 0 (natural) to 100 (studied bias)
+  studyMode: 'natural' | 'balanced' | 'study';
   furiganaMode: 'always' | 'never' | 'dynamic';
   
   wordDatabase: Record<string, WordData>;
@@ -28,7 +28,7 @@ interface AppState {
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
   setRtkLevel: (level: number) => void;
-  setKanjiBias: (bias: number) => void;
+  setStudyMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   resetProgress: () => void;
   
@@ -44,7 +44,7 @@ export const useAppStore = create<AppState>()(
       isOnboarded: false,
       jlptLevel: null,
       rtkLevel: null,
-      kanjiBias: 50,
+      studyMode: 'balanced',
       furiganaMode: 'dynamic',
       wordDatabase: {},
       studyKanji: [],
@@ -54,7 +54,7 @@ export const useAppStore = create<AppState>()(
       
       setJlptLevel: (level) => set({ jlptLevel: level }),
       setRtkLevel: (level) => set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() }),
-      setKanjiBias: (bias) => set({ kanjiBias: bias }),
+      setStudyMode: (mode) => set({ studyMode: mode }),
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       

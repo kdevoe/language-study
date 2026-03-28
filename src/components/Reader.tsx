@@ -26,7 +26,7 @@ export function Reader() {
     }
   }, []);
   
-  const { jlptLevel, rtkLevel, kanjiBias, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
+  const { jlptLevel, rtkLevel, studyMode, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
 
   const loadArticle = async () => {
     setLoading(true);
@@ -42,7 +42,7 @@ export function Reader() {
         snippet, 
         jlptLevel, 
         rtkLevel, 
-        kanjiBias,
+        studyMode,
         (step) => setLoadingStep(step)
       );
       setArticle({ ...feed[0], blocks: rewrittenBlocks });
@@ -52,7 +52,7 @@ export function Reader() {
 
   useEffect(() => {
     loadArticle();
-  }, [jlptLevel, rtkLevel, kanjiBias]);
+  }, [jlptLevel, rtkLevel, studyMode]);
 
   useEffect(() => {
     if (!bottomRef.current || loading || !article || hasFinishedReading) return;

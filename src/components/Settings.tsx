@@ -6,7 +6,7 @@ export function Settings() {
   const { 
     jlptLevel, setJlptLevel, 
     rtkLevel, setRtkLevel, 
-    kanjiBias, setKanjiBias
+    studyMode, setStudyMode
   } = useAppStore();
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,23 +25,40 @@ export function Settings() {
           Kanji Study Bias
         </label>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: 'var(--text-muted)' }}>Natural Reading</span>
-          <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Studied Kanji</span>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem', height: '45px' }}>
+          {(['Natural', 'Balanced', 'Study'] as const).map(mode => {
+            const isSelected = studyMode === mode.toLowerCase();
+            return (
+              <button
+                key={mode}
+                onClick={() => setStudyMode(mode.toLowerCase() as any)}
+                style={{
+                  flex: isSelected ? 2.5 : 1,
+                  borderRadius: '10px',
+                  border: isSelected ? '2px solid var(--text-main)' : '1px solid var(--border-light)',
+                  backgroundColor: isSelected ? 'var(--text-main)' : 'transparent',
+                  color: isSelected ? 'var(--bg-pure)' : 'var(--text-main)',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontSize: isSelected ? '0.9rem' : '0.8rem',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {mode}
+              </button>
+            );
+          })}
         </div>
         
-        <input 
-          type="range" 
-          min="0" 
-          max="100" 
-          step="5"
-          value={kanjiBias}
-          onChange={(e) => setKanjiBias(parseInt(e.target.value, 10))}
-          style={{ width: '100%', accentColor: 'var(--text-main)', marginBottom: '1rem' }} 
-        />
-        
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Higher bias prompts the AI to substitute common words with synonyms that leverage the Kanji you have studied, at the slight expense of perfectly natural journalistic prose.
+          {studyMode === 'natural' && "Prioritize totally authentic and colloquial phrasing over forcing specific Kanji targets."}
+          {studyMode === 'balanced' && "Prioritize authentic reading but actively substitute common synonyms that leverage your targeted Kanji pool."}
+          {studyMode === 'study' && "Significantly bias the LLM to warp the article's phrasing specifically around enforcing Spaced Repetition targets, even if it feels slightly unnatural."}
         </p>
       </div>
 
