@@ -25,6 +25,7 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
   
   if (!wordData) return null;
   const stats = wordDatabase[wordData.word];
+  const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
   
   const wordKanjiArray = Array.from(new Set(wordData.word.split(''))).filter(char => !!rtkKanjiMap[char]);
 
@@ -165,13 +166,13 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
             {!isLoading && (
               <div style={{ marginBottom: '2.5rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => { onSetMastery?.('hard'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: stats?.mastery === 'hard' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: stats?.mastery === 'hard' ? 'var(--text-main)' : 'transparent', color: stats?.mastery === 'hard' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                  <button onClick={() => { onSetMastery?.('hard'); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: activeMastery === 'hard' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: activeMastery === 'hard' ? 'var(--text-main)' : 'transparent', color: activeMastery === 'hard' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
                     Hard
                   </button>
-                  <button onClick={() => { onSetMastery?.('medium'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: stats?.mastery === 'medium' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: stats?.mastery === 'medium' ? 'var(--text-main)' : 'transparent', color: stats?.mastery === 'medium' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                  <button onClick={() => { onSetMastery?.('medium'); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: activeMastery === 'medium' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: activeMastery === 'medium' ? 'var(--text-main)' : 'transparent', color: activeMastery === 'medium' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
                     Medium
                   </button>
-                  <button onClick={() => { onSetMastery?.('easy'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: stats?.mastery === 'easy' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: stats?.mastery === 'easy' ? 'var(--accent-success)' : 'transparent', color: stats?.mastery === 'easy' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                  <button onClick={() => { onSetMastery?.('easy'); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: activeMastery === 'easy' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: activeMastery === 'easy' ? 'var(--text-main)' : 'transparent', color: activeMastery === 'easy' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
                     Easy
                   </button>
                 </div>
@@ -197,7 +198,7 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>STATUS</div>
                   <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.5rem', textTransform: 'capitalize' }}>
-                    {stats.mastery}
+                    {activeMastery}
                   </div>
                 </div>
               </div>
