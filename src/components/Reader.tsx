@@ -20,7 +20,7 @@ export function Reader() {
     }
   }, []);
   
-  const { jlptLevel, rtkLevel, targetDensity, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
+  const { jlptLevel, rtkLevel, kanjiProportions, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
 
   useEffect(() => {
     async function loadArticle() {
@@ -30,13 +30,13 @@ export function Reader() {
       if (feed.length > 0) {
         // Rewrite using LLM context
         const snippet = feed[0].blocks[0].content?.[0]?.text || '';
-        const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, targetDensity);
+        const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, kanjiProportions);
         setArticle({ ...feed[0], blocks: rewrittenBlocks });
       }
       setLoading(false);
     }
     loadArticle();
-  }, [jlptLevel, rtkLevel, targetDensity]);
+  }, [jlptLevel, rtkLevel, kanjiProportions]);
 
   const handleWordClick = (details: WordDetails) => {
     recordWordSeen(details.word);

@@ -6,9 +6,21 @@ export function Settings() {
   const { 
     jlptLevel, setJlptLevel, 
     rtkLevel, setRtkLevel, 
-    targetDensity, setTargetDensity,
-    resetProgress
+    kanjiProportions, setKanjiProportions
   } = useAppStore();
+
+  const handlePropChange = (type: 'known' | 'review' | 'unknown', val: number) => {
+    const newProps = { ...kanjiProportions, [type]: val };
+    const total = newProps.known + newProps.review + newProps.unknown;
+    
+    if (total === 0) return; // Prevent dividing by zero
+    
+    const kPct = Math.round((newProps.known / total) * 100);
+    const rPct = Math.round((newProps.review / total) * 100);
+    const uPct = 100 - kPct - rPct; // Force exact 100 sum
+    
+    setKanjiProportions({ known: kPct, review: rPct, unknown: uPct });
+  };
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
@@ -17,36 +29,49 @@ export function Settings() {
     }
   };
 
-  const confirmReset = () => {
-    if (window.confirm("Are you entirely sure you want to nuke your spaced repetition memory and start from scratch? This cannot be undone.")) {
-      resetProgress();
-    }
-  };
-
   return (
     <div className="fade-in" style={{ paddingBottom: '6rem' }}>
       <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '2.5rem', color: 'var(--text-main)' }}>Settings</h2>
 
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1rem', textTransform: 'uppercase' }}>
-          Vocabulary Density
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
+          Kanji Review Density
         </label>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>Light (5%)</span>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 600 }}>{targetDensity || 15}%</span>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>Intense (50%)</span>
+        
+        {/* Visual Bar */}
+        <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+          <div style={{ width: `${kanjiProportions.known}%`, backgroundColor: 'var(--text-muted)', opacity: 0.5, transition: 'width 0.2s' }}></div>
+          <div style={{ width: `${kanjiProportions.review}%`, backgroundColor: 'var(--text-main)', transition: 'width 0.2s' }}></div>
+          <div style={{ width: `${kanjiProportions.unknown}%`, backgroundColor: '#ef4444', transition: 'width 0.2s' }}></div>
         </div>
-        <input 
-          type="range" 
-          min="5" 
-          max="50" 
-          step="5"
-          value={targetDensity || 15}
-          onChange={(e) => setTargetDensity(parseInt(e.target.value, 10))}
-          style={{ width: '100%', accentColor: 'var(--text-main)', marginBottom: '0.5rem' }}
-        />
+
+        {/* Sliders */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Known Kanji</span>
+              <span style={{ fontWeight: 600 }}>{kanjiProportions.known}%</span>
+            </div>
+            <input type="range" min="0" max="100" value={kanjiProportions.known} onChange={(e) => handlePropChange('known', parseInt(e.target.value))} style={{ width: '100%' }} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+              <span style={{ color: 'var(--text-main)' }}>Reviewing Targets</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{kanjiProportions.review}%</span>
+            </div>
+            <input type="range" min="0" max="100" value={kanjiProportions.review} onChange={(e) => handlePropChange('review', parseInt(e.target.value))} style={{ width: '100%', accentColor: 'var(--text-main)' }} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+              <span style={{ color: '#ef4444' }}>Unknown Kanji</span>
+              <span style={{ fontWeight: 600, color: '#ef4444' }}>{kanjiProportions.unknown}%</span>
+            </div>
+            <input type="range" min="0" max="100" value={kanjiProportions.unknown} onChange={(e) => handlePropChange('unknown', parseInt(e.target.value))} style={{ width: '100%', accentColor: '#ef4444' }} />
+          </div>
+        </div>
+        
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Determines what percentage of the news article is injected with your critical Target Kanji. Higher density means a harder, denser text.
+          Adjusts the ratio of Kanji character origins the AI is permitted to use in stories.
         </p>
       </div>
 
@@ -112,23 +137,6 @@ export function Settings() {
         </p>
       </div>
       
-      <div style={{ textAlign: 'center', marginTop: '4rem' }}>
-        <button 
-          onClick={confirmReset}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: '#ef4444', 
-            fontSize: '0.9rem', 
-            fontWeight: 600, 
-            letterSpacing: '0.05em', 
-            textDecoration: 'underline', 
-            cursor: 'pointer' 
-          }}
-        >
-          RESET ALL PROGRESS
-        </button>
-      </div>
     </div>
   );
 }

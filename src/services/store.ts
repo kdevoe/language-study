@@ -11,13 +11,14 @@ export interface WordData {
   mastery: MasteryLevel;
   timesSeen: number;
   uniqueDaysSeen: string[];
+  lastSeenTs: number;
 }
 
 interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
   rtkLevel: number | null;
-  targetDensity: number; // Percentage 5-50
+  kanjiProportions: { known: number; review: number; unknown: number };
   furiganaMode: 'always' | 'never' | 'dynamic';
   
   wordDatabase: Record<string, WordData>;
@@ -27,7 +28,7 @@ interface AppState {
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
   setRtkLevel: (level: number) => void;
-  setTargetDensity: (density: number) => void;
+  setKanjiProportions: (props: { known: number; review: number; unknown: number }) => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   resetProgress: () => void;
   
@@ -43,7 +44,7 @@ export const useAppStore = create<AppState>()(
       isOnboarded: false,
       jlptLevel: null,
       rtkLevel: null,
-      targetDensity: 15,
+      kanjiProportions: { known: 70, review: 20, unknown: 10 },
       furiganaMode: 'dynamic',
       wordDatabase: {},
       studyKanji: [],
@@ -53,7 +54,7 @@ export const useAppStore = create<AppState>()(
       
       setJlptLevel: (level) => set({ jlptLevel: level }),
       setRtkLevel: (level) => set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() }),
-      setTargetDensity: (density) => set({ targetDensity: density }),
+      setKanjiProportions: (props) => set({ kanjiProportions: props }),
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       
@@ -68,7 +69,7 @@ export const useAppStore = create<AppState>()(
       
       saveWordDefinition: (word, def) => 
         set((state) => {
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [] };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
           return {
             wordDatabase: {
               ...state.wordDatabase,
@@ -80,7 +81,7 @@ export const useAppStore = create<AppState>()(
       recordWordSeen: (word) => 
         set((state) => {
           const today = new Date().toISOString().split('T')[0];
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [] };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
           const newDays = current.uniqueDaysSeen.includes(today) 
             ? current.uniqueDaysSeen 
             : [...current.uniqueDaysSeen, today];
@@ -91,7 +92,8 @@ export const useAppStore = create<AppState>()(
               [word]: { 
                 ...current, 
                 timesSeen: current.timesSeen + 1,
-                uniqueDaysSeen: newDays
+                uniqueDaysSeen: newDays,
+                lastSeenTs: Date.now()
               }
             }
           };
@@ -99,7 +101,7 @@ export const useAppStore = create<AppState>()(
 
       setWordMastery: (word, level) => 
         set((state) => {
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [] };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
           return {
             wordDatabase: {
               ...state.wordDatabase,

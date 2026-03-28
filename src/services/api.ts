@@ -106,7 +106,13 @@ Output EXACTLY JSON matching this interface:
 import { rtkKanjiList } from '../data/rtkKanji';
 
 // In the future this will call Google Gemini API
-export async function rewriteArticleWithGemini(title: string, snippet: string, jlpt: number | null, rtk: number | null, targetDensity: number = 15): Promise<ArticleBlock[]> {
+export async function rewriteArticleWithGemini(
+  title: string, 
+  snippet: string, 
+  jlpt: number | null, 
+  rtk: number | null, 
+  kanjiProportions: { known: number; review: number; unknown: number } = { known: 70, review: 20, unknown: 10 }
+): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("⚠️ Gemini API key not found in .env. Returning mock blocks.");
@@ -138,7 +144,11 @@ Rules:
 1. Tone must be like a Japanese news broadcast.
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
-4. TARGET VOCABULARY DENSITY: Ensure roughly ${targetDensity}% of the vocabulary words used in the text contain our "CRITICAL TARGETS". Do not over-saturate, but ensure they are organically represented.
+4. KANJI REVIEW DENSITY: When writing the article, use the following ratio for Kanji selection:
+   - ~${kanjiProportions.known}% of Kanji used should come from the Student "known Kanji" list.
+   - ~${kanjiProportions.review}% of Kanji used should come from the "CRITICAL TARGETS" list.
+   - ~${kanjiProportions.unknown}% of Kanji used can be completely new/unknown Kanji not in either list.
+   If a natural word requires a Kanji but you have exceeded your unknown limit, you MUST spell it phonetically in Hiragana.
 
 Output EXACTLY a JSON array matching this interface:
 [
