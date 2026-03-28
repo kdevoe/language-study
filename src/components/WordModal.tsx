@@ -47,10 +47,22 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
             }}
           />
           <motion.div
+            drag
+            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+            dragElastic={0.8}
+            onDragEnd={(_, info) => {
+              const threshold = 80;
+              if (
+                Math.abs(info.offset.y) > threshold || 
+                Math.abs(info.offset.x) > threshold
+              ) {
+                onClose();
+              }
+            }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 250 }}
             style={{
               position: 'fixed',
               bottom: 0, left: 0, right: 0,
@@ -62,7 +74,8 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
               zIndex: 50,
               boxShadow: '0 -10px 40px rgba(0,0,0,0.06)',
               maxHeight: '92vh',
-              overflowY: 'auto'
+              overflowY: 'auto',
+              touchAction: 'none' // Essential for smooth drag gestures
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
@@ -81,24 +94,24 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                     <span className="serif">辞書を引いています...</span>
                   </div>
                 ) : (
-                  <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.2rem' }}>
+                  <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {wordData.furiganaMap ? (
                       wordData.furiganaMap.map((fm, idx) => (
                         <ruby key={idx} style={{ rubyAlign: 'center', cursor: 'default', borderBottom: 'none' }}>
-                          <span className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>
+                          <span className="serif" style={{ fontSize: '3rem', lineHeight: 1.5, color: 'var(--text-main)', fontWeight: 500 }}>
                             {fm.kanji}
                           </span>
-                          <rt style={{ opacity: 1, transform: 'none', fontSize: '1.1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', paddingBottom: '0.25rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>
+                          <rt style={{ opacity: 1, transform: 'none', fontSize: '1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>
                             {fm.kana}
                           </rt>
                         </ruby>
                       ))
                     ) : (
                       <ruby style={{ rubyAlign: 'center', cursor: 'default', borderBottom: 'none' }}>
-                        <span className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>
+                        <span className="serif" style={{ fontSize: '3rem', lineHeight: 1.5, color: 'var(--text-main)', fontWeight: 500 }}>
                           {wordData.word}
                         </span>
-                        <rt style={{ opacity: 1, transform: 'none', fontSize: '1.1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', paddingBottom: '0.25rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>
+                        <rt style={{ opacity: 1, transform: 'none', fontSize: '1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>
                           {wordData.reading}
                         </rt>
                       </ruby>
