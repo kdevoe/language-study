@@ -2,6 +2,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import { X, BookOpen, Loader2 } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
+import { useEffect } from 'react';
 
 export interface WordDetails {
   word: string;
@@ -22,8 +23,15 @@ interface Props {
 export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-300, 0, 300], [-10, 0, 10]);
-  const opacityModal = useTransform(x, [-300, -150, 0, 150, 300], [0, 0.5, 1, 0.5, 0]);
+  const rotate = useTransform(x, [-400, 0, 400], [-15, 0, 15]);
+  const opacityModal = useTransform(x, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
+
+  // CRITICAL: Reset motion values when modal is toggled so it doesn't stay 'dismissed' (invisible off-screen) 
+  useEffect(() => {
+    if (isOpen) {
+      x.set(0);
+    }
+  }, [isOpen, x]);
   
   if (!wordData) return null;
   const stats = wordDatabase[wordData.word];
@@ -70,8 +78,10 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
               touchAction: 'pan-y'
             }}
             onDragEnd={(_, info) => {
-              if (Math.abs(info.offset.x) > 100) {
+              if (Math.abs(info.offset.x) > 160) {
                 onClose();
+              } else {
+                x.set(0); // Snap back if threshold not met
               }
             }}
             initial={{ y: '100%' }}

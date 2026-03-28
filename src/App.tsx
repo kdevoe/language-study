@@ -47,7 +47,7 @@ function App() {
       const currentScrollY = window.scrollY;
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
         setShowNav(false);
-      } else if (currentScrollY < lastScrollY) {
+      } else if (lastScrollY - currentScrollY > 15) {
         setShowNav(true);
       }
       lastScrollY = currentScrollY > 0 ? currentScrollY : 0;
