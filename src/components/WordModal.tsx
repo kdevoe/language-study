@@ -26,11 +26,17 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
   const rotate = useTransform(x, [-400, 0, 400], [-15, 0, 15]);
   const opacityModal = useTransform(x, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
 
-  // CRITICAL: Reset motion values when modal is toggled so it doesn't stay 'dismissed' (invisible off-screen) 
+  // CRITICAL: Prevent background body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      x.set(0);
+      document.body.style.overflow = 'hidden';
+      x.set(0); 
+    } else {
+      document.body.style.overflow = 'auto';
     }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
   }, [isOpen, x]);
   
   if (!wordData) return null;
@@ -58,6 +64,7 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
           />
           <motion.div
             drag="x"
+            dragDirectionLock={true}
             dragConstraints={{ left: -1000, right: 1000, top: 0, bottom: 0 }}
             dragElastic={0.9}
             style={{
