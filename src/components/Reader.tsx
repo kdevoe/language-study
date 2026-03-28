@@ -302,7 +302,7 @@ export function Reader() {
                   fontSize: '0.9rem',
                 }}
               >
-               Next Article &rarr;
+                <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.2rem' }}>次へ</span> &rarr;
              </button>
           </div>
         )}
