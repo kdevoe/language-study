@@ -138,7 +138,7 @@ ruby:active {
   -webkit-tap-highlight-color: transparent;
 }
 
-ruby, span[onClick], .FuriganaText {
+ruby, span[onClick], .FuriganaText, button {
   -webkit-tap-highlight-color: transparent;
 }
 
