@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { FuriganaText } from './FuriganaText';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
-import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinition, NewsArticle } from '../services/api';
+import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinition } from '../services/api';
 import { useAppStore } from '../services/store';
 
 export function Reader() {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
-  const [article, setArticle] = useState<NewsArticle | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
   const [loadingArticleTitle, setLoadingArticleTitle] = useState<string>("");
   const [isWordLoading, setIsWordLoading] = useState(false);
@@ -26,13 +25,21 @@ export function Reader() {
     }
   }, []);
   
-  const { jlptLevel, rtkLevel, studyMode, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
+  const { 
+    jlptLevel, rtkLevel, studyMode, 
+    wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
+    currentArticle, setCurrentArticle
+  } = useAppStore();
 
   const loadArticle = async () => {
     setLoading(true);
     setLoadingStep("Fetching latest news...");
     setHasFinishedReading(false);
     setClickedWords(new Set());
+    
+    // Clear the current article layout to show loading screen
+    setCurrentArticle(null);
+    
     const feed = await fetchNewsFeed('Technology startups');
     if (feed.length > 0) {
       setLoadingArticleTitle(feed[0].title);
@@ -45,17 +52,19 @@ export function Reader() {
         studyMode,
         (step) => setLoadingStep(step)
       );
-      setArticle({ ...feed[0], blocks: rewrittenBlocks });
+      setCurrentArticle({ ...feed[0], blocks: rewrittenBlocks });
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    loadArticle();
-  }, [jlptLevel, rtkLevel, studyMode]);
+    if (!currentArticle && !loading) {
+      loadArticle();
+    }
+  }, []); // Only fetch manually or on extreme start when nothing is loaded
 
   useEffect(() => {
-    if (!bottomRef.current || loading || !article || hasFinishedReading) return;
+    if (!bottomRef.current || loading || !currentArticle || hasFinishedReading) return;
     
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && !hasFinishedReading) {
@@ -65,14 +74,14 @@ export function Reader() {
     
     observer.observe(bottomRef.current);
     return () => observer.disconnect();
-  }, [loading, article, hasFinishedReading]);
+  }, [loading, currentArticle, hasFinishedReading]);
 
   const handleFinishArticle = () => {
     setHasFinishedReading(true);
     
     // Auto-bump unseen words natively to SRS memory
     const articleWords = new Set<string>();
-    article?.blocks.forEach(b => {
+    currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => {
          if (w.furigana) articleWords.add(w.text);
       });
@@ -126,7 +135,7 @@ export function Reader() {
     }
   };
 
-  if (loading || !article) {
+  if (loading || !currentArticle) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', textAlign: 'center', padding: '0 2rem' }}>
         <div className="lucide-spin" style={{ color: 'var(--text-main)', marginBottom: '1.5rem', width: '32px', height: '32px', border: '3px solid var(--border-light)', borderTopColor: 'var(--text-main)', borderRadius: '50%' }} />
@@ -139,9 +148,25 @@ export function Reader() {
               読書家
             </h2>
         )}
-        <p className="fade-in" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', letterSpacing: '0.05em' }}>
-          {loadingStep}
-        </p>
+        <div className="fade-in" style={{ 
+          marginTop: '1rem',
+          padding: '1rem 1.5rem', 
+          backgroundColor: 'var(--bg-card)', 
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: '400px'
+        }}>
+          <p style={{ 
+            color: 'var(--text-main)', 
+            fontSize: '0.9rem', 
+            letterSpacing: '0.05em', 
+            fontWeight: 600,
+            transition: 'all 0.2s',
+            fontFamily: 'monospace'
+          }}>
+            {loadingStep}
+          </p>
+        </div>
       </div>
     );
   }
@@ -151,11 +176,11 @@ export function Reader() {
       <div className="reading-content fade-in" style={{ paddingBottom: '6rem' }}>
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem', letterSpacing: '0.05em' }}>
-            <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{article.category}</span>
-            <span style={{ display: 'flex', alignItems: 'center' }}>{article.readTime}</span>
+            <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>
+            <span style={{ display: 'flex', alignItems: 'center' }}>{currentArticle.readTime}</span>
           </div>
           <h1 className="serif" style={{ fontSize: '2.5rem', lineHeight: 1.3, marginBottom: '2rem', color: 'var(--text-main)' }}>
-            {article.title.split('：').map((part, i, arr) => (
+            {currentArticle.title.split('：').map((part, i, arr) => (
               <React.Fragment key={i}>
                 {part}{i < arr.length - 1 && '：'}<br/>
               </React.Fragment>
@@ -164,7 +189,7 @@ export function Reader() {
           <div style={{ width: '40px', height: '1px', backgroundColor: 'var(--text-muted)', marginBottom: '2rem' }} />
         </div>
 
-        {article.blocks.map((block, i) => {
+        {currentArticle.blocks.map((block, i) => {
           if (block.type === 'paragraph') {
             // Reconstruct the full paragraph text for context
             const paragraphText = block.content!.map(s => s.text).join('');

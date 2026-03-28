@@ -194,9 +194,14 @@ Output EXACTLY a JSON array matching this interface:
 ]
 `;
 
-    onProgress?.("Analyzing morphology & attaching Furigana...");
-    const result2 = await model.generateContent(prompt2);
-    let rawText2 = result2.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+    onProgress?.("Analyzing morphology & attaching Furigana (0 bytes)...");
+    const result2 = await model.generateContentStream(prompt2);
+    let rawText2 = '';
+    for await (const chunk of result2.stream) {
+      rawText2 += chunk.text();
+      onProgress?.(`Analyzing morphology & attaching Furigana (${rawText2.length} bytes)...`);
+    }
+    rawText2 = rawText2.replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     
     // Aggressive debugging for the user
     console.log("================ PASS 2 COMPLETE ================");

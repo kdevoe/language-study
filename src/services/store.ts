@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
+import { NewsArticle } from './api';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -24,12 +25,14 @@ interface AppState {
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
+  currentArticle: NewsArticle | null;
   
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
   setRtkLevel: (level: number) => void;
   setStudyMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
+  setCurrentArticle: (article: NewsArticle | null) => void;
   resetProgress: () => void;
   
   saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
@@ -49,6 +52,7 @@ export const useAppStore = create<AppState>()(
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
+      currentArticle: null,
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
       
@@ -57,6 +61,7 @@ export const useAppStore = create<AppState>()(
       setStudyMode: (mode) => set({ studyMode: mode }),
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
+      setCurrentArticle: (article) => set({ currentArticle: article }),
       
       resetProgress: () => set({ 
         isOnboarded: false, 
