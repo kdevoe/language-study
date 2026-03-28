@@ -30,8 +30,13 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
 
   try {
     const query = encodeURIComponent(topic);
-    // NewsAPI 'everything' endpoint searches all articles for the given topic
-    const url = `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${apiKey}`;
+    
+    // NewsAPI completely blocks browsers on their Developer (free) tier unless running strictly on localhost. 
+    // We actively reroute the traffic securely through Vercel's backend serverless proxy when hosted in reality.
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const url = isLocalhost 
+      ? `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${apiKey}`
+      : `/api/news?topic=${query}`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error(`NewsAPI failed: ${response.statusText}`);
