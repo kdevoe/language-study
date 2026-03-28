@@ -28,7 +28,7 @@ export function Reader() {
   const { 
     jlptLevel, rtkLevel, studyMode, 
     wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
-    currentArticle, setCurrentArticle
+    currentArticle, setCurrentArticle, srsAutoBumpThreshold
   } = useAppStore();
 
   const loadArticle = async () => {
@@ -98,8 +98,8 @@ export function Reader() {
         const newConsecutive = (stats?.consecutiveUnseen || 0) + 1;
 
         if (stats && stats.mastery !== 'easy') {
-          // Drops a level every 5th time read without looking it up!
-          if (newConsecutive % 5 === 0) {
+          // Drops a level every Nth time read without looking it up!
+          if (newConsecutive > 0 && newConsecutive % (srsAutoBumpThreshold || 5) === 0) {
             const nextLevel = stats.mastery === 'hard' ? 'medium' : 'easy';
             setWordMastery(word, nextLevel);
           }

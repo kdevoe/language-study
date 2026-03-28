@@ -6,7 +6,8 @@ export function Settings() {
   const { 
     jlptLevel, setJlptLevel, 
     rtkLevel, setRtkLevel, 
-    studyMode, setStudyMode
+    studyMode, setStudyMode,
+    srsAutoBumpThreshold, setSrsAutoBumpThreshold
   } = useAppStore();
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,7 +134,7 @@ export function Settings() {
         </p>
       </div>
 
-      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '3rem' }}>
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1rem', textTransform: 'uppercase' }}>
           RTK Progression Level
         </label>
@@ -164,6 +165,53 @@ export function Settings() {
           Automatically scales up by 3 every 24 hours. Manually jump your progression index here.
         </p>
       </div>
+
+      <details 
+        style={{ 
+          backgroundColor: 'var(--bg-card)', 
+          padding: '1.5rem', 
+          borderRadius: '16px', 
+          marginBottom: '3rem',
+          border: '1px solid var(--border-light)'
+        }}
+      >
+        <summary style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', outline: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          Advanced Settings
+        </summary>
+        
+        <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+            SRS Auto-Bump Threshold
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            <input 
+              type="number" 
+              value={srsAutoBumpThreshold || 5} 
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val) && val > 0) {
+                  setSrsAutoBumpThreshold(val);
+                }
+              }}
+              min={1}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border-light)',
+                backgroundColor: 'var(--bg-pure)',
+                color: 'var(--text-main)',
+                fontSize: '1.1rem',
+                width: '80px',
+                textAlign: 'center',
+                fontWeight: 600
+              }}
+            />
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+              Consecutive unclicked reads required<br/>to progress a word's mastery level
+            </span>
+          </div>
+        </div>
+      </details>
       
     </div>
   );

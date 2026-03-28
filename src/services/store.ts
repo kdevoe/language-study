@@ -27,6 +27,7 @@ interface AppState {
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
   currentArticle: NewsArticle | null;
+  srsAutoBumpThreshold: number;
   
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
@@ -34,6 +35,7 @@ interface AppState {
   setStudyMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
+  setSrsAutoBumpThreshold: (count: number) => void;
   resetProgress: () => void;
   
   saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
@@ -54,6 +56,7 @@ export const useAppStore = create<AppState>()(
       studyKanji: [],
       lastRtkUpdateTs: null,
       currentArticle: null,
+      srsAutoBumpThreshold: 5,
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
       
@@ -63,6 +66,7 @@ export const useAppStore = create<AppState>()(
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
+      setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
       
       resetProgress: () => set({ 
         isOnboarded: false, 
