@@ -4,6 +4,7 @@ import './App.css'
 import { Reader } from './components/Reader'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
+import { Settings } from './components/Settings'
 import { useAppStore } from './services/store'
 import { useEffect, useState } from 'react'
 
@@ -80,11 +81,7 @@ function App() {
             <p>Progress dashboard placeholder.</p>
           </div>
         )}
-        {activeTab === 'settings' && (
-          <div className="fade-in" style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--text-muted)' }}>
-            <p>Settings placeholder.</p>
-          </div>
-        )}
+        {activeTab === 'settings' && <Settings />}
       </main>
 
       <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav} />

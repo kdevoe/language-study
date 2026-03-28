@@ -17,6 +17,7 @@ interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
   rtkLevel: number | null;
+  targetDensity: number; // Percentage 5-50
   furiganaMode: 'always' | 'never' | 'dynamic';
   
   wordDatabase: Record<string, WordData>;
@@ -24,7 +25,11 @@ interface AppState {
   lastRtkUpdateTs: number | null;
   
   setOnboarded: (jlpt: number, rtk: number) => void;
+  setJlptLevel: (level: number) => void;
+  setRtkLevel: (level: number) => void;
+  setTargetDensity: (density: number) => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
+  resetProgress: () => void;
   
   saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
   recordWordSeen: (word: string) => void;
@@ -38,6 +43,7 @@ export const useAppStore = create<AppState>()(
       isOnboarded: false,
       jlptLevel: null,
       rtkLevel: null,
+      targetDensity: 15,
       furiganaMode: 'dynamic',
       wordDatabase: {},
       studyKanji: [],
@@ -45,7 +51,20 @@ export const useAppStore = create<AppState>()(
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
       
+      setJlptLevel: (level) => set({ jlptLevel: level }),
+      setRtkLevel: (level) => set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() }),
+      setTargetDensity: (density) => set({ targetDensity: density }),
+      
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
+      
+      resetProgress: () => set({ 
+        isOnboarded: false, 
+        jlptLevel: null, 
+        rtkLevel: null, 
+        wordDatabase: {}, 
+        studyKanji: [], 
+        lastRtkUpdateTs: null 
+      }),
       
       saveWordDefinition: (word, def) => 
         set((state) => {

@@ -106,7 +106,7 @@ Output EXACTLY JSON matching this interface:
 import { rtkKanjiList } from '../data/rtkKanji';
 
 // In the future this will call Google Gemini API
-export async function rewriteArticleWithGemini(title: string, snippet: string, jlpt: number | null, rtk: number | null): Promise<ArticleBlock[]> {
+export async function rewriteArticleWithGemini(title: string, snippet: string, jlpt: number | null, rtk: number | null, targetDensity: number = 15): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("⚠️ Gemini API key not found in .env. Returning mock blocks.");
@@ -138,6 +138,7 @@ Rules:
 1. Tone must be like a Japanese news broadcast.
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
+4. TARGET VOCABULARY DENSITY: Ensure roughly ${targetDensity}% of the vocabulary words used in the text contain our "CRITICAL TARGETS". Do not over-saturate, but ensure they are organically represented.
 
 Output EXACTLY a JSON array matching this interface:
 [
