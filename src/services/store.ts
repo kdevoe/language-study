@@ -13,6 +13,7 @@ export interface WordData {
   timesSeen: number;
   uniqueDaysSeen: string[];
   lastSeenTs: number;
+  consecutiveUnseen?: number;
 }
 
 interface AppState {
@@ -36,7 +37,7 @@ interface AppState {
   resetProgress: () => void;
   
   saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
-  recordWordSeen: (word: string) => void;
+  recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
 }
@@ -83,13 +84,15 @@ export const useAppStore = create<AppState>()(
           };
         }),
         
-      recordWordSeen: (word) => 
+      recordWordSeen: (word, withoutLookup = false) => 
         set((state) => {
           const today = new Date().toISOString().split('T')[0];
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, consecutiveUnseen: 0 };
           const newDays = current.uniqueDaysSeen.includes(today) 
             ? current.uniqueDaysSeen 
             : [...current.uniqueDaysSeen, today];
+            
+          const newConsecutive = withoutLookup ? (current.consecutiveUnseen || 0) + 1 : 0;
             
           return {
             wordDatabase: {
@@ -98,7 +101,8 @@ export const useAppStore = create<AppState>()(
                 ...current, 
                 timesSeen: current.timesSeen + 1,
                 uniqueDaysSeen: newDays,
-                lastSeenTs: Date.now()
+                lastSeenTs: Date.now(),
+                consecutiveUnseen: newConsecutive
               }
             }
           };

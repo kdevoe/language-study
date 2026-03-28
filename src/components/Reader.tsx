@@ -90,13 +90,23 @@ export function Reader() {
     articleWords.forEach(word => {
       if (!clickedWords.has(word)) {
         const stats = wordDatabase[word];
+        
+        // Log the unclicked sight which instantly increments 'consecutiveUnseen' behind the scenes
+        recordWordSeen(word, true);
+        
+        // Because global state updates async in React, calculate what consecutiveUnseen literally is right now
+        const newConsecutive = (stats?.consecutiveUnseen || 0) + 1;
+
         if (stats && stats.mastery !== 'easy') {
-          const nextLevel = stats.mastery === 'hard' ? 'medium' : 'easy';
-          setWordMastery(word, nextLevel);
+          // Drops a level every 5th time read without looking it up!
+          if (newConsecutive % 5 === 0) {
+            const nextLevel = stats.mastery === 'hard' ? 'medium' : 'easy';
+            setWordMastery(word, nextLevel);
+          }
         } else if (!stats) {
           saveWordDefinition(word, { reading: '...', meaning: 'Implicitly parsed context' });
-          recordWordSeen(word);
-          setWordMastery(word, 'easy');
+          // Begin newly encountered unclicked words as Medium, meaning it takes 5 untriaged reads to become Easy
+          setWordMastery(word, 'medium');
         }
       }
     });
