@@ -106,6 +106,13 @@ export function Reader() {
     recordWordSeen(details.word);
     setClickedWords(prev => new Set(prev).add(details.word));
     setSelectedWord(details);
+    
+    // Make sure we overwrite any "Implicitly parsed context" that may have been previously assigned
+    saveWordDefinition(details.word, { 
+      reading: details.reading, 
+      meaning: details.meaning, 
+      grammarNote: details.grammarNote 
+    });
   };
 
   const handleDictionaryLookup = async (word: string, contextSentence: string) => {
@@ -114,7 +121,8 @@ export function Reader() {
     
     // Check local database first
     const localData = wordDatabase[word];
-    if (localData && localData.meaning) {
+    const isImplicit = localData && localData.meaning === 'Implicitly parsed context';
+    if (localData && localData.meaning && !isImplicit) {
       setSelectedWord({ word, reading: localData.reading, meaning: localData.meaning, grammarNote: localData.grammarNote });
       return;
     }
