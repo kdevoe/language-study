@@ -28,7 +28,7 @@ export function Settings() {
 
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-          Kanji Study Bias
+          Kanji Use
         </label>
         
         <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
