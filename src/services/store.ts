@@ -29,6 +29,8 @@ interface AppState {
   lastRtkUpdateTs: number | null;
   currentArticle: NewsArticle | null;
   srsAutoBumpThreshold: number;
+  readerFontSize: number;
+  readerFontWeight: number;
   
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
@@ -38,6 +40,8 @@ interface AppState {
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   setSrsAutoBumpThreshold: (count: number) => void;
+  setReaderFontSize: (size: number) => void;
+  setReaderFontWeight: (weight: number) => void;
   resetProgress: () => void;
   
   saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
@@ -60,6 +64,8 @@ export const useAppStore = create<AppState>()(
       lastRtkUpdateTs: null,
       currentArticle: null,
       srsAutoBumpThreshold: 5,
+      readerFontSize: 18,
+      readerFontWeight: 400,
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
       
@@ -71,6 +77,8 @@ export const useAppStore = create<AppState>()(
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
       setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
+      setReaderFontSize: (size) => set({ readerFontSize: size }),
+      setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
       
       resetProgress: () => set({ 
         isOnboarded: false, 

@@ -8,7 +8,9 @@ export function Settings() {
     jlptLevel, setJlptLevel, 
     rtkLevel, setRtkLevel, 
     studyMode, setStudyMode,
-    srsAutoBumpThreshold, setSrsAutoBumpThreshold
+    srsAutoBumpThreshold, setSrsAutoBumpThreshold,
+    readerFontSize, setReaderFontSize,
+    readerFontWeight, setReaderFontWeight
   } = useAppStore();
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,6 +284,39 @@ export function Settings() {
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
               Consecutive unclicked reads required<br/>to progress a word's mastery level
             </span>
+          </div>
+
+          <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', margin: '2rem 0' }} />
+
+          {/* Reader Font Size */}
+          <div style={{ marginBottom: '2rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+              Base Reading Font Size ({readerFontSize}px)
+            </label>
+            <input 
+              type="range" 
+              min={14} 
+              max={32} 
+              value={readerFontSize} 
+              onChange={(e) => setReaderFontSize(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--text-main)' }}
+            />
+          </div>
+
+          {/* Reader Bold level */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+              Font Weight ({readerFontWeight})
+            </label>
+            <input 
+              type="range" 
+              min={300} 
+              max={700} 
+              step={100}
+              value={readerFontWeight} 
+              onChange={(e) => setReaderFontWeight(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--text-main)' }}
+            />
           </div>
         </div>
       </details>

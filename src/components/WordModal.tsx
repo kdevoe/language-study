@@ -85,7 +85,10 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
               touchAction: 'pan-y'
             }}
             onDragEnd={(_, info) => {
-              if (Math.abs(info.offset.x) > 160) {
+              const isFlick = Math.abs(info.velocity.x) > 500;
+              const isDragged = Math.abs(info.offset.x) > 160;
+
+              if (isFlick || isDragged) {
                 // Determine fly-away direction
                 const targetX = info.offset.x > 0 ? 600 : -600;
                 

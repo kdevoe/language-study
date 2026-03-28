@@ -28,7 +28,8 @@ export function Reader() {
   const { 
     jlptLevel, rtkLevel, studyMode, vocabMode,
     wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
-    currentArticle, setCurrentArticle, srsAutoBumpThreshold
+    currentArticle, setCurrentArticle, srsAutoBumpThreshold,
+    readerFontSize, readerFontWeight
   } = useAppStore();
 
   const loadArticle = async () => {
@@ -204,7 +205,11 @@ export function Reader() {
 
   return (
     <>
-      <div className="reading-content fade-in" style={{ paddingBottom: '6rem' }}>
+      <div className="reading-content fade-in" style={{ 
+        paddingBottom: '6rem', 
+        fontSize: `${readerFontSize || 18}px`,
+        fontWeight: readerFontWeight || 400
+      }}>
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem', letterSpacing: '0.05em' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>

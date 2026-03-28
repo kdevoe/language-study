@@ -123,6 +123,11 @@ ruby:active {
   -ms-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+ruby, span[onClick], .FuriganaText {
+  -webkit-tap-highlight-color: transparent;
 }
 
 @keyframes lucide-spin {
