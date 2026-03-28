@@ -112,6 +112,8 @@ export async function rewriteArticleWithGemini(
   jlpt: number | null, 
   rtk: number | null, 
   studyMode: 'natural' | 'balanced' | 'study' = 'balanced',
+  vocabMode: 'natural' | 'balanced' | 'study' = 'balanced',
+  vocabTargets: string[] = [],
   onProgress?: (status: string) => void
 ): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -134,11 +136,18 @@ export async function rewriteArticleWithGemini(
     const knownKanji = rtkKanjiList.slice(0, Math.max(0, safeRtk - 15));
     const recentKanji = rtkKanjiList.slice(Math.max(0, safeRtk - 15), safeRtk);
     
-    let biasInstruction = `NATURAL READING: Prioritize fluid, authentic, natural Japanese over restricting yourself to studied Kanji. The text should read exactly like a standard native news article without arbitrarily forcing known Kanji.`;
+    let biasInstruction = `NATURAL KANJI READING: Prioritize fluid, authentic, natural Japanese over restricting yourself to studied Kanji. The text should read exactly like a standard native news article without arbitrarily forcing known Kanji.`;
     if (studyMode === 'study') {
-      biasInstruction = `EXTREME STUDIED BIAS: You MUST drastically alter the summary's phrasing and wording specifically to maximize the usage of the "Student known Kanji" list. CRITICAL TARGETS are your highest priority. It is actively encouraged to sacrifice perfectly natural/authentic journalistic prose if it means you can replace an unknown compound word with a synonym that utilizes the student's known Kanji. Do whatever it takes to aggressively incorporate the student's Kanji into the text.`;
+      biasInstruction = `EXTREME STUDIED KANJI BIAS: You MUST drastically alter the summary's phrasing and wording specifically to maximize the usage of the "Student known Kanji" list. CRITICAL TARGETS are your highest priority. It is actively encouraged to sacrifice perfectly natural/authentic journalistic prose if it means you can replace an unknown compound word with a synonym that utilizes the student's known Kanji. Do whatever it takes to aggressively incorporate the student's Kanji into the text.`;
     } else if (studyMode === 'balanced') {
-      biasInstruction = `BALANCED BIAS: Write naturally, but whenever there are multiple valid word choices to express an idea, deliberately choose the synonym that utilizes Kanji from the "Student known Kanji" list (especially CRITICAL TARGETS) rather than an unknown Kanji. Allow minor deviations from strict journalistic style to accommodate these known characters.`;
+      biasInstruction = `BALANCED KANJI BIAS: Write naturally, but whenever there are multiple valid word choices to express an idea, deliberately choose the synonym that utilizes Kanji from the "Student known Kanji" list (especially CRITICAL TARGETS) rather than an unknown Kanji. Allow minor deviations from strict journalistic style to accommodate these known characters.`;
+    }
+
+    let vocabInstruction = `NATURAL VOCABULARY READING: Ignore the "Student Target Vocabulary". Just use the most fitting authentic Japanese syntax for a standard news article.`;
+    if (vocabMode === 'study') {
+      vocabInstruction = `EXTREME STUDIED VOCABULARY BIAS: You MUST weave as many precise words from the "Student Target Vocabulary" list into your article as logically possible. Restructure sentences, add tangential observations, or substitute common wording entirely if it allows you to hit these target vocabulary words. This takes priority over fluid journalism.`;
+    } else if (vocabMode === 'balanced') {
+      vocabInstruction = `BALANCED VOCABULARY BIAS: Write naturally, but keep the "Student Target Vocabulary" list in mind. If a target vocabulary word is an adjacent synonym to what you were originally going to write, prefer the target vocabulary word to give the student review exposure.`;
     }
     
     // --- PASS 1: Content Generation (Plain Text) ---
@@ -147,13 +156,15 @@ You are a Japanese teacher. Write a 3-paragraph news article in Japanese based o
 Language Level: JLPT ${jlptStr}. 
 Student known Kanji: [${knownKanji.join('')}].
 CRITICAL TARGETS: Prioritize using these Kanji: [${recentKanji.join('')}].
+Student Target Vocabulary: [${vocabTargets.join(', ')}].
 
 Rules:
 1. Tone must be like a Japanese news broadcast.
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
 4. KANJI PREFERENCE: ${biasInstruction}
-   While you should keep "CRITICAL TARGETS" in mind as excellent candidate words, do not force them into sentences un-naturally.
+5. VOCABULARY PREFERENCE: ${vocabInstruction}
+   While you should keep "CRITICAL TARGETS" and "Target Vocabulary" in mind as excellent candidate words, do not force them into sentences un-naturally unless explicitly told to in the preference rules.
 
 Output EXACTLY a JSON array matching this interface:
 [

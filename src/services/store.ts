@@ -21,6 +21,7 @@ interface AppState {
   jlptLevel: number | null;
   rtkLevel: number | null;
   studyMode: 'natural' | 'balanced' | 'study';
+  vocabMode: 'natural' | 'balanced' | 'study';
   furiganaMode: 'always' | 'never' | 'dynamic';
   
   wordDatabase: Record<string, WordData>;
@@ -33,6 +34,7 @@ interface AppState {
   setJlptLevel: (level: number) => void;
   setRtkLevel: (level: number) => void;
   setStudyMode: (mode: 'natural' | 'balanced' | 'study') => void;
+  setVocabMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   setSrsAutoBumpThreshold: (count: number) => void;
@@ -51,6 +53,7 @@ export const useAppStore = create<AppState>()(
       jlptLevel: null,
       rtkLevel: null,
       studyMode: 'balanced',
+      vocabMode: 'balanced',
       furiganaMode: 'dynamic',
       wordDatabase: {},
       studyKanji: [],
@@ -63,6 +66,7 @@ export const useAppStore = create<AppState>()(
       setJlptLevel: (level) => set({ jlptLevel: level }),
       setRtkLevel: (level) => set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() }),
       setStudyMode: (mode) => set({ studyMode: mode }),
+      setVocabMode: (mode) => set({ vocabMode: mode }),
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),

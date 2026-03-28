@@ -28,63 +28,7 @@ export function Settings() {
     <div className="fade-in" style={{ paddingBottom: '6rem' }}>
       <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '2.5rem', color: 'var(--text-main)' }}>Settings</h2>
 
-      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-          Kanji Use
-        </label>
-        
-        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
-          
-          <div style={{
-            position: 'absolute',
-            top: '4px',
-            bottom: '4px',
-            left: `calc(4px + ${activeModeIndex} * (100% - 8px) / 3)`,
-            width: `calc((100% - 8px) / 3)`,
-            backgroundColor: 'var(--bg-pure)',
-            borderRadius: '100px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            zIndex: 0
-          }} />
-
-          {modes.map((mode) => {
-            const isSelected = studyMode === mode.toLowerCase();
-            return (
-              <button
-                key={mode}
-                onClick={() => setStudyMode(mode.toLowerCase() as any)}
-                style={{
-                  flex: 1,
-                  borderRadius: '100px',
-                  backgroundColor: 'transparent',
-                  color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
-                  fontWeight: isSelected ? 700 : 600,
-                  border: 'none',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  fontSize: '0.85rem',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  position: 'relative',
-                  zIndex: 1
-                }}
-              >
-                {mode}
-              </button>
-            );
-          })}
-        </div>
-        
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          {studyMode === 'natural' && "Prioritize totally authentic and colloquial phrasing over forcing specific Kanji targets."}
-          {studyMode === 'balanced' && "Prioritize authentic reading but actively substitute common synonyms that leverage your targeted Kanji pool."}
-          {studyMode === 'study' && "Significantly bias the LLM to warp the article's phrasing specifically around enforcing Spaced Repetition targets, even if it feels slightly unnatural."}
-        </p>
-      </div>
-
+      {/* 1. Grammar Level (JLPT) */}
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
           Grammar Level (JLPT)
@@ -135,35 +79,118 @@ export function Settings() {
         </p>
       </div>
 
+      {/* 2. Vocab Use */}
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
-         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1rem', textTransform: 'uppercase' }}>
-          RTK Progression Level
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
+          Vocab Use
         </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-          <input 
-            type="number" 
-            value={rtkLevel || 1} 
-            onChange={handleRtkChange}
-            min={1}
-            max={rtkKanjiList.length}
-            style={{
-              padding: '0.75rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-light)',
-              backgroundColor: 'var(--bg-pure)',
-              color: 'var(--text-main)',
-              fontSize: '1.25rem',
-              width: '100px',
-              textAlign: 'center',
-              fontWeight: 600
-            }}
-          />
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            / {rtkKanjiList.length} Kanji
-          </span>
+        
+        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
+          <div style={{
+            position: 'absolute',
+            top: '4px',
+            bottom: '4px',
+            left: `calc(4px + ${(modes.findIndex(m => m.toLowerCase() === useAppStore.getState().vocabMode) === -1 ? 1 : modes.findIndex(m => m.toLowerCase() === useAppStore.getState().vocabMode))} * (100% - 8px) / 3)`,
+            width: `calc((100% - 8px) / 3)`,
+            backgroundColor: 'var(--bg-pure)',
+            borderRadius: '100px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 0
+          }} />
+
+          {modes.map((mode) => {
+            const isSelected = useAppStore.getState().vocabMode === mode.toLowerCase();
+            return (
+              <button
+                key={`v-${mode}`}
+                onClick={() => useAppStore.getState().setVocabMode(mode.toLowerCase() as any)}
+                style={{
+                  flex: 1,
+                  borderRadius: '100px',
+                  backgroundColor: 'transparent',
+                  color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
+                  fontWeight: isSelected ? 700 : 600,
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  position: 'relative',
+                  zIndex: 1
+                }}
+              >
+                {mode}
+              </button>
+            );
+          })}
         </div>
+        
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Automatically scales up by 3 every 24 hours. Manually jump your progression index here.
+          {useAppStore.getState().vocabMode === 'natural' && "Ignore priority lists. Use the most natural vocabulary for the context."}
+          {useAppStore.getState().vocabMode === 'balanced' && "Prioritize natural vocabulary, but use recent study words if they are close synonyms."}
+          {useAppStore.getState().vocabMode === 'study' && "Actively morph sentences to forcibly inject currently un-mastered and struggled words."}
+        </p>
+      </div>
+
+      {/* 3. Kanji Use */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
+          Kanji Use
+        </label>
+        
+        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
+          
+          <div style={{
+            position: 'absolute',
+            top: '4px',
+            bottom: '4px',
+            left: `calc(4px + ${activeModeIndex} * (100% - 8px) / 3)`,
+            width: `calc((100% - 8px) / 3)`,
+            backgroundColor: 'var(--bg-pure)',
+            borderRadius: '100px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 0
+          }} />
+
+          {modes.map((mode) => {
+            const isSelected = studyMode === mode.toLowerCase();
+            return (
+              <button
+                key={`k-${mode}`}
+                onClick={() => setStudyMode(mode.toLowerCase() as any)}
+                style={{
+                  flex: 1,
+                  borderRadius: '100px',
+                  backgroundColor: 'transparent',
+                  color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
+                  fontWeight: isSelected ? 700 : 600,
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  position: 'relative',
+                  zIndex: 1
+                }}
+              >
+                {mode}
+              </button>
+            );
+          })}
+        </div>
+        
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          {studyMode === 'natural' && "Prioritize totally authentic and colloquial phrasing over forcing specific Kanji targets."}
+          {studyMode === 'balanced' && "Prioritize authentic reading but actively substitute common synonyms that leverage your targeted Kanji pool."}
+          {studyMode === 'study' && "Significantly bias the LLM to warp the article's phrasing specifically around enforcing Spaced Repetition targets, even if it feels slightly unnatural."}
         </p>
       </div>
 
@@ -176,6 +203,7 @@ export function Settings() {
         }
       `}</style>
 
+      {/* 4. Advanced Settings */}
       <details 
         style={{ 
           backgroundColor: 'var(--bg-card)', 
@@ -191,6 +219,40 @@ export function Settings() {
         </summary>
         
         <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
+          
+          {/* RTK Progression Level (Moved) */}
+          <div style={{ marginBottom: '2rem' }}>
+             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+              RTK Progression Level
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+              <input 
+                type="number" 
+                value={rtkLevel || 1} 
+                onChange={handleRtkChange}
+                min={1}
+                max={rtkKanjiList.length}
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-light)',
+                  backgroundColor: 'var(--bg-pure)',
+                  color: 'var(--text-main)',
+                  fontSize: '1.1rem',
+                  width: '80px',
+                  textAlign: 'center',
+                  fontWeight: 600
+                }}
+              />
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                / {rtkKanjiList.length} Kanji<br/>Automatically scales up daily
+              </span>
+            </div>
+          </div>
+
+          <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', marginBottom: '2rem' }} />
+
+          {/* SRS Auto Bump threshold */}
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
             SRS Auto-Bump Threshold
           </label>

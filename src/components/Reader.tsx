@@ -26,7 +26,7 @@ export function Reader() {
   }, []);
   
   const { 
-    jlptLevel, rtkLevel, studyMode, 
+    jlptLevel, rtkLevel, studyMode, vocabMode,
     wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
     currentArticle, setCurrentArticle, srsAutoBumpThreshold
   } = useAppStore();
@@ -40,6 +40,17 @@ export function Reader() {
     // Clear the current article layout to show loading screen
     setCurrentArticle(null);
     
+    const vocabTargets = Object.entries(wordDatabase)
+      .filter(([_, data]) => data.mastery === 'hard' || data.mastery === 'medium')
+      .sort((a, b) => {
+         // evaluate hard over medium, then by unseen count
+         if (a[1].mastery === 'hard' && b[1].mastery === 'medium') return -1;
+         if (a[1].mastery === 'medium' && b[1].mastery === 'hard') return 1;
+         return (b[1].consecutiveUnseen || 0) - (a[1].consecutiveUnseen || 0);
+      })
+      .slice(0, 40)
+      .map(([word]) => word);
+      
     const feed = await fetchNewsFeed('Technology startups');
     if (feed.length > 0) {
       setLoadingArticleTitle(feed[0].title);
@@ -50,6 +61,8 @@ export function Reader() {
         jlptLevel, 
         rtkLevel, 
         studyMode,
+        vocabMode,
+        vocabTargets,
         (step) => setLoadingStep(step)
       );
       setCurrentArticle({ ...feed[0], blocks: rewrittenBlocks });
