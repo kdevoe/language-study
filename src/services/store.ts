@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 
-export type MasteryLevel = 'unseen' | 'hard' | 'easy' | 'known';
+export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
 export interface WordData {
   reading: string;

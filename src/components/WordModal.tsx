@@ -15,7 +15,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   wordData: WordDetails | null;
-  onSetMastery?: (level: 'hard' | 'easy' | 'known') => void;
+  onSetMastery?: (level: 'hard' | 'medium' | 'easy') => void;
   isLoading?: boolean;
 }
 
@@ -79,14 +79,24 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                     <span className="serif">辞書を引いています...</span>
                   </div>
                 ) : (
-                  <div style={{ color: 'var(--text-muted)', letterSpacing: '0.15em', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                    {wordData.reading}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <ruby style={{ rubyAlign: 'center', cursor: 'default', borderBottom: 'none' }}>
+                      <span className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>
+                        {wordData.word}
+                      </span>
+                      <rt style={{ 
+                        opacity: 1, 
+                        transform: 'none', 
+                        fontSize: '1.1rem', 
+                        color: 'var(--text-muted)', 
+                        letterSpacing: '0.05em', 
+                        paddingBottom: '0.25rem',
+                        fontFamily: 'var(--font-sans)',
+                        fontWeight: 400
+                      }}>{wordData.reading}</rt>
+                    </ruby>
                   </div>
                 )}
-                
-                <h2 className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, marginBottom: '1.5rem', color: 'var(--text-main)', fontWeight: 500 }}>
-                  {wordData.word}
-                </h2>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '0.5rem', marginTop: '-0.5rem', marginRight: '-0.5rem' }}>
                 <X size={24} strokeWidth={1.5} />
@@ -151,8 +161,8 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                   <button onClick={() => { onSetMastery?.('hard'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
                     <Star size={16} /> Hard
                   </button>
-                  <button onClick={() => { onSetMastery?.('known'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
-                    <Eye size={16} /> Known
+                  <button onClick={() => { onSetMastery?.('medium'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
+                    <Eye size={16} /> Medium
                   </button>
                   <button onClick={() => { onSetMastery?.('easy'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: 'none', backgroundColor: 'var(--accent-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'opacity 0.2s' }}>
                     <CheckCircle size={16} /> Easy

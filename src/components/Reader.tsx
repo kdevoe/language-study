@@ -63,7 +63,7 @@ export function Reader() {
     setIsWordLoading(false);
   };
 
-  const handleSetMastery = (level: 'hard' | 'easy' | 'known') => {
+  const handleSetMastery = (level: 'hard' | 'medium' | 'easy') => {
     if (selectedWord) {
       setWordMastery(selectedWord.word, level);
     }
