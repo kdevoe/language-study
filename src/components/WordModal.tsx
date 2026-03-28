@@ -69,27 +69,26 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.15em', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 500 }}>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.15em', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: 500 }}>
                   WORD DETAILS
                 </div>
-                <h2 className="serif" style={{ fontSize: '3rem', lineHeight: 1.1, marginBottom: '0.5rem', color: 'var(--text-main)', fontWeight: 500 }}>
-                  {wordData.word}
-                </h2>
                 
                 {isLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)', marginTop: '1rem', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                     <Loader2 className="lucide-spin" size={20} />
                     <span className="serif">辞書を引いています...</span>
                   </div>
                 ) : (
-                  <>
-                    <div style={{ color: 'var(--text-muted)', letterSpacing: '0.15em', fontSize: '0.85rem', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-                      {wordData.reading}
-                    </div>
-                  </>
+                  <div style={{ color: 'var(--text-muted)', letterSpacing: '0.15em', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                    {wordData.reading}
+                  </div>
                 )}
+                
+                <h2 className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, marginBottom: '1.5rem', color: 'var(--text-main)', fontWeight: 500 }}>
+                  {wordData.word}
+                </h2>
               </div>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '0.5rem' }}>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '0.5rem', marginTop: '-0.5rem', marginRight: '-0.5rem' }}>
                 <X size={24} strokeWidth={1.5} />
               </button>
             </div>
@@ -107,7 +106,7 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                 padding: '1.5rem', 
                 borderRadius: '16px',
                 borderLeft: '4px solid var(--text-main)',
-                marginBottom: '2.5rem'
+                marginBottom: '2rem'
               }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>
                   <BookOpen size={14} /> GRAMMAR NOTE
@@ -118,27 +117,9 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
               </div>
             )}
             
-            {!isLoading && stats && stats.timesSeen > 0 && (
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'var(--bg-card)', borderRadius: '12px' }}>
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>SEEN</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.25rem' }}>
-                    {stats.timesSeen} <span style={{fontSize: '0.85rem', fontWeight: 400}}>x</span>
-                  </div>
-                </div>
-                <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>DAYS STUDIED</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.25rem' }}>
-                    {stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.85rem', fontWeight: 400}}>d</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             {!isLoading && wordKanjiArray.length > 0 && (
-              <div style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
-                <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.15em' }}>
+              <div style={{ marginBottom: '2.5rem' }}>
+                <div style={{ textAlign: 'center', fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '1.25rem', letterSpacing: '0.15em' }}>
                   KANJI BREAKDOWN (RTK)
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -149,13 +130,12 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                       backgroundColor: 'var(--bg-card)', 
                       border: '1px solid var(--border-light)', 
                       borderRadius: '12px', 
-                      padding: '0.75rem 0.5rem', 
+                      padding: '1rem 0.5rem', 
                       display: 'flex', 
                       flexDirection: 'column', 
                       alignItems: 'center',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
                     }}>
-                      <div className="serif" style={{ fontSize: '1.75rem', color: 'var(--text-main)', marginBottom: '0.25rem', lineHeight: 1.2 }}>{k}</div>
+                      <div className="serif" style={{ fontSize: '1.75rem', color: 'var(--text-main)', marginBottom: '0.5rem', lineHeight: 1.2 }}>{k}</div>
                       <div className="sans" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', wordBreak: 'break-word' }}>
                         {rtkKanjiMap[k] || 'Unknown'}
                       </div>
@@ -166,24 +146,44 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
             )}
 
             {!isLoading && (
-              <div style={{ marginTop: '2rem' }}>
-                <div style={{ textAlign: 'center', fontSize: '0.75rem', letterSpacing: '0.15em', color: 'var(--text-muted)', marginBottom: '1.25rem', fontWeight: 500 }}>
-                  SET MASTERY
-                </div>
-              <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
-                <button onClick={() => { onSetMastery?.('hard'); onClose(); }} style={{ padding: '1.125rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
-                  <Star size={18} /> Hard
-                </button>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button onClick={() => { onSetMastery?.('easy'); onClose(); }} style={{ flex: 1, padding: '1.125rem', borderRadius: '100px', border: 'none', backgroundColor: 'var(--accent-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'opacity 0.2s' }}>
-                    <CheckCircle size={18} /> Easy
+              <div style={{ marginBottom: '2.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={() => { onSetMastery?.('hard'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
+                    <Star size={16} /> Hard
                   </button>
-                  <button onClick={() => { onSetMastery?.('known'); onClose(); }} style={{ flex: 1, padding: '1.125rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
-                    <Eye size={18} /> Known
+                  <button onClick={() => { onSetMastery?.('known'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
+                    <Eye size={16} /> Known
+                  </button>
+                  <button onClick={() => { onSetMastery?.('easy'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: 'none', backgroundColor: 'var(--accent-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'opacity 0.2s' }}>
+                    <CheckCircle size={16} /> Easy
                   </button>
                 </div>
               </div>
-            </div>
+            )}
+
+            {!isLoading && stats && stats.timesSeen > 0 && (
+              <div style={{ display: 'flex', gap: '1rem', padding: '1.25rem 1rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>SEEN</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.25rem' }}>
+                    {stats.timesSeen} <span style={{fontSize: '0.85rem', fontWeight: 400}}>x</span>
+                  </div>
+                </div>
+                <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>DAYS</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.25rem' }}>
+                    {stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.85rem', fontWeight: 400}}>d</span>
+                  </div>
+                </div>
+                <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>STATUS</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginTop: '0.5rem', textTransform: 'capitalize' }}>
+                    {stats.mastery}
+                  </div>
+                </div>
+              </div>
             )}
             
           </motion.div>
