@@ -145,8 +145,8 @@ Rules:
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
 4. KANJI REVIEW DENSITY: When writing the article, strictly control Kanji usage:
-   - ~${100 - unknownKanjiDensity}% of Kanji MUST come from the "Student known Kanji" list. (Strongly prioritize the "CRITICAL TARGETS" within this list to enforce Spaced Repetition).
-   - ~${unknownKanjiDensity}% of Kanji can be completely new/unknown Kanji not in either list.
+   - The VAST MAJORITY of Kanji MUST come from the "Student known Kanji" list. (Strongly prioritize the "CRITICAL TARGETS" within this list to enforce Spaced Repetition).
+   - A MAXIMUM of ${unknownKanjiDensity}% of Kanji can be completely new/unknown Kanji not in either list. (You do not need to reach this limit; use as few unknown Kanji as naturally possible).
    If a natural word requires a Kanji but you have exceeded your unknown limit, you MUST spell it phonetically in Hiragana.
 
 Output EXACTLY a JSON array matching this interface:

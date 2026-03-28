@@ -18,7 +18,7 @@ interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
   rtkLevel: number | null;
-  unknownKanjiDensity: number; // Percentage 0-50
+  unknownKanjiDensity: number; // Percentage 0-100
   furiganaMode: 'always' | 'never' | 'dynamic';
   
   wordDatabase: Record<string, WordData>;

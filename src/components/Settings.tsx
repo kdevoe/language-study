@@ -22,18 +22,18 @@ export function Settings() {
 
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-          Vocabulary Novelty
+          Allowed Unknown Kanji
         </label>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
           <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Purely Known Kanji</span>
-          <span style={{ color: 'var(--text-muted)' }}>{unknownKanjiDensity}% Unknown</span>
+          <span style={{ color: 'var(--text-muted)' }}>Max {unknownKanjiDensity}% Unknown</span>
         </div>
         
         <input 
           type="range" 
           min="0" 
-          max="50" 
+          max="100" 
           step="5"
           value={unknownKanjiDensity}
           onChange={(e) => setUnknownKanjiDensity(parseInt(e.target.value, 10))}
@@ -41,7 +41,7 @@ export function Settings() {
         />
         
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Determines how much completely unknown Kanji the AI introduces into the text. (The AI will heavily bias "Known Kanji" towards characters you are currently reviewing).
+          Determines the maximum allowance of completely unknown Kanji the AI is permitted to introduce into the text. You do not need to reach this limit.
         </p>
       </div>
 
