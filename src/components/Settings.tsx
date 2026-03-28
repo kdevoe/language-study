@@ -16,6 +16,12 @@ export function Settings() {
     }
   };
 
+  const modes = ['Natural', 'Balanced', 'Study'] as const;
+  const activeModeIndex = modes.findIndex(m => m.toLowerCase() === studyMode);
+
+  const jlptLevels = [5, 4, 3, 2, 1];
+  const activeJlptIndex = jlptLevels.indexOf(jlptLevel || 4);
+
   return (
     <div className="fade-in" style={{ paddingBottom: '6rem' }}>
       <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '2.5rem', color: 'var(--text-main)' }}>Settings</h2>
@@ -26,29 +32,42 @@ export function Settings() {
         </label>
         
         <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
-          {(['Natural', 'Balanced', 'Study'] as const).map(mode => {
+          
+          <div style={{
+            position: 'absolute',
+            top: '4px',
+            bottom: '4px',
+            left: `calc(4px + ${activeModeIndex} * (100% - 8px) / 3)`,
+            width: `calc((100% - 8px) / 3)`,
+            backgroundColor: 'var(--bg-pure)',
+            borderRadius: '100px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 0
+          }} />
+
+          {modes.map((mode) => {
             const isSelected = studyMode === mode.toLowerCase();
             return (
               <button
                 key={mode}
                 onClick={() => setStudyMode(mode.toLowerCase() as any)}
                 style={{
-                  flex: isSelected ? 2.5 : 1,
+                  flex: 1,
                   borderRadius: '100px',
-                  backgroundColor: isSelected ? 'var(--bg-pure)' : 'transparent',
+                  backgroundColor: 'transparent',
                   color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
                   fontWeight: isSelected ? 700 : 600,
                   border: 'none',
                   outline: 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  fontSize: isSelected ? '0.9rem' : '0.8rem',
+                  transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontSize: '0.85rem',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
+                  position: 'relative',
+                  zIndex: 1
                 }}
               >
                 {mode}
@@ -68,26 +87,41 @@ export function Settings() {
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
           Grammar Level (JLPT)
         </label>
-        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '45px' }}>
-          {[5, 4, 3, 2, 1].map(n => (
+        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '45px', position: 'relative' }}>
+          
+          <div style={{
+            position: 'absolute',
+            top: '4px',
+            bottom: '4px',
+            left: `calc(4px + ${activeJlptIndex} * (100% - 8px) / 5)`,
+            width: `calc((100% - 8px) / 5)`,
+            backgroundColor: 'var(--bg-pure)',
+            borderRadius: '100px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 0
+          }} />
+
+          {jlptLevels.map(n => (
             <button
               key={n}
               onClick={() => setJlptLevel(n)}
               style={{
                 flex: 1,
                 borderRadius: '100px',
-                backgroundColor: jlptLevel === n ? 'var(--bg-pure)' : 'transparent',
+                backgroundColor: 'transparent',
                 color: jlptLevel === n ? 'var(--text-main)' : 'var(--text-muted)',
                 fontWeight: jlptLevel === n ? 700 : 600,
                 border: 'none',
                 outline: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
                 fontSize: '0.9rem',
-                boxShadow: jlptLevel === n ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
+                position: 'relative',
+                zIndex: 1
               }}
             >
               N{n}
