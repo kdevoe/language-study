@@ -9,6 +9,8 @@ export function Reader() {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
   const [article, setArticle] = useState<NewsArticle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
+  const [loadingArticleTitle, setLoadingArticleTitle] = useState<string>("");
   const [isWordLoading, setIsWordLoading] = useState(false);
   
   const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
@@ -28,12 +30,21 @@ export function Reader() {
 
   const loadArticle = async () => {
     setLoading(true);
+    setLoadingStep("Fetching latest news...");
     setHasFinishedReading(false);
     setClickedWords(new Set());
     const feed = await fetchNewsFeed('Technology startups');
-      if (feed.length > 0) {
+    if (feed.length > 0) {
+      setLoadingArticleTitle(feed[0].title);
       const snippet = feed[0].blocks[0].content?.[0]?.text || '';
-      const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, kanjiBias);
+      const rewrittenBlocks = await rewriteArticleWithGemini(
+        feed[0].title, 
+        snippet, 
+        jlptLevel, 
+        rtkLevel, 
+        kanjiBias,
+        (step) => setLoadingStep(step)
+      );
       setArticle({ ...feed[0], blocks: rewrittenBlocks });
     }
     setLoading(false);
@@ -117,8 +128,20 @@ export function Reader() {
 
   if (loading || !article) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh', color: 'var(--text-muted)' }}>
-        <p className="fade-in">読込中... (Loading...)</p>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', textAlign: 'center', padding: '0 2rem' }}>
+        <div className="lucide-spin" style={{ color: 'var(--text-main)', marginBottom: '1.5rem', width: '32px', height: '32px', border: '3px solid var(--border-light)', borderTopColor: 'var(--text-main)', borderRadius: '50%' }} />
+        {loadingArticleTitle ? (
+            <h2 className="serif fade-in" style={{ fontSize: '1.25rem', color: 'var(--text-main)', marginBottom: '1rem', lineHeight: 1.4 }}>
+              {loadingArticleTitle}
+            </h2>
+        ) : (
+            <h2 className="serif fade-in" style={{ fontSize: '1.25rem', color: 'var(--text-main)', marginBottom: '1rem', lineHeight: 1.4 }}>
+              読書家
+            </h2>
+        )}
+        <p className="fade-in" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', letterSpacing: '0.05em' }}>
+          {loadingStep}
+        </p>
       </div>
     );
   }
@@ -204,27 +227,21 @@ export function Reader() {
         })}
 
         {hasFinishedReading && (
-          <div className="fade-in" style={{ textAlign: 'center', marginTop: '4rem', marginBottom: '2rem', padding: '2rem', backgroundColor: 'var(--bg-card)', borderRadius: '16px' }}>
-             <p style={{ color: 'var(--text-main)', fontWeight: 600, letterSpacing: '0.1em', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--accent-success)' }}>✓</span> ARTICLE COMPLETED
-             </p>
-             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-                Your reading comprehension has been logged. Unclicked target vocabulary was automatically upgraded.
-             </p>
+          <div className="fade-in" style={{ textAlign: 'center', marginTop: '4rem', marginBottom: '2rem' }}>
              <button 
                 onClick={loadArticle} 
                 style={{ 
-                  backgroundColor: 'var(--text-main)', 
-                  color: 'var(--bg-pure)', 
-                  padding: '1rem 2rem', 
+                  backgroundColor: 'transparent', 
+                  color: 'var(--text-muted)', 
+                  padding: '0.75rem 2rem', 
                   borderRadius: '100px', 
                   fontWeight: 600, 
-                  border: 'none', 
+                  border: '1px solid var(--border-light)', 
                   cursor: 'pointer',
-                  fontSize: '0.95rem'
+                  fontSize: '0.9rem',
                 }}
               >
-               Read Next Article
+               Next Article &rarr;
              </button>
           </div>
         )}

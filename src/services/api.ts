@@ -111,7 +111,8 @@ export async function rewriteArticleWithGemini(
   snippet: string, 
   jlpt: number | null, 
   rtk: number | null, 
-  kanjiBias: number = 50
+  kanjiBias: number = 50,
+  onProgress?: (status: string) => void
 ): Promise<ArticleBlock[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
@@ -193,6 +194,7 @@ Output EXACTLY a JSON array matching this interface:
 ]
 `;
 
+    onProgress?.("Analyzing morphology & attaching Furigana...");
     const result2 = await model.generateContent(prompt2);
     let rawText2 = result2.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     
