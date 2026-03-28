@@ -83,8 +83,13 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
 Output EXACTLY JSON matching this interface:
 {
   "word": "${word}",
-  "reading": "the kana reading",
-  "meaning": "Short concise English meaning"
+  "reading": "the entire kana reading",
+  "meaning": "Short concise English meaning",
+  "grammarNote": "Any quick contextual grammar notes",
+  "furiganaMap": [
+    { "kanji": "first character", "kana": "reading of first character" },
+    { "kanji": "second character", "kana": "reading of second character" }
+  ] // You MUST include this array mapping exactly how the reading breaks down per character in the word. For pure Kana words, just put the whole word as one character map.
 }`;
 
     const result = await model.generateContent(prompt);

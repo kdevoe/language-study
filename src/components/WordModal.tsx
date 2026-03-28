@@ -1,6 +1,6 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, CheckCircle, Eye, BookOpen, Loader2 } from 'lucide-react';
+import { X, BookOpen, Loader2 } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
 
@@ -9,6 +9,7 @@ export interface WordDetails {
   reading: string;
   meaning: string;
   grammarNote?: string;
+  furiganaMap?: { kanji: string; kana: string }[];
 }
 
 interface Props {
@@ -79,22 +80,28 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
                     <span className="serif">辞書を引いています...</span>
                   </div>
                 ) : (
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <ruby style={{ rubyAlign: 'center', cursor: 'default', borderBottom: 'none' }}>
-                      <span className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>
-                        {wordData.word}
-                      </span>
-                      <rt style={{ 
-                        opacity: 1, 
-                        transform: 'none', 
-                        fontSize: '1.1rem', 
-                        color: 'var(--text-muted)', 
-                        letterSpacing: '0.05em', 
-                        paddingBottom: '0.25rem',
-                        fontFamily: 'var(--font-sans)',
-                        fontWeight: 400
-                      }}>{wordData.reading}</rt>
-                    </ruby>
+                  <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.2rem' }}>
+                    {wordData.furiganaMap ? (
+                      wordData.furiganaMap.map((fm, idx) => (
+                        <ruby key={idx} style={{ rubyAlign: 'center', cursor: 'default', borderBottom: 'none' }}>
+                          <span className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>
+                            {fm.kanji}
+                          </span>
+                          <rt style={{ opacity: 1, transform: 'none', fontSize: '1.1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', paddingBottom: '0.25rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>
+                            {fm.kana}
+                          </rt>
+                        </ruby>
+                      ))
+                    ) : (
+                      <ruby style={{ rubyAlign: 'center', cursor: 'default', borderBottom: 'none' }}>
+                        <span className="serif" style={{ fontSize: '3.5rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>
+                          {wordData.word}
+                        </span>
+                        <rt style={{ opacity: 1, transform: 'none', fontSize: '1.1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', paddingBottom: '0.25rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>
+                          {wordData.reading}
+                        </rt>
+                      </ruby>
+                    )}
                   </div>
                 )}
               </div>
@@ -158,14 +165,14 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
             {!isLoading && (
               <div style={{ marginBottom: '2.5rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => { onSetMastery?.('hard'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
-                    <Star size={16} /> Hard
+                  <button onClick={() => { onSetMastery?.('hard'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: stats?.mastery === 'hard' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: stats?.mastery === 'hard' ? 'var(--text-main)' : 'transparent', color: stats?.mastery === 'hard' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                    Hard
                   </button>
-                  <button onClick={() => { onSetMastery?.('medium'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'background-color 0.2s' }}>
-                    <Eye size={16} /> Medium
+                  <button onClick={() => { onSetMastery?.('medium'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: stats?.mastery === 'medium' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: stats?.mastery === 'medium' ? 'var(--text-main)' : 'transparent', color: stats?.mastery === 'medium' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                    Medium
                   </button>
-                  <button onClick={() => { onSetMastery?.('easy'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: 'none', backgroundColor: 'var(--accent-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main)', transition: 'opacity 0.2s' }}>
-                    <CheckCircle size={16} /> Easy
+                  <button onClick={() => { onSetMastery?.('easy'); onClose(); }} style={{ flex: 1, padding: '1rem 0.25rem', borderRadius: '100px', border: stats?.mastery === 'easy' ? '2px solid var(--text-main)' : '1px solid var(--border-light)', backgroundColor: stats?.mastery === 'easy' ? 'var(--accent-success)' : 'transparent', color: stats?.mastery === 'easy' ? 'var(--bg-pure)' : 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                    Easy
                   </button>
                 </div>
               </div>
