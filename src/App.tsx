@@ -5,7 +5,9 @@ import { Reader } from './components/Reader'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
 import { Settings } from './components/Settings'
+import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
+import { supabase } from './services/supabase'
 import { useEffect, useState } from 'react'
 
 function App() {
@@ -13,12 +15,29 @@ function App() {
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
   const [activeTab, setActiveTab] = useState<'news' | 'progress' | 'settings'>('news');
   const [showNav, setShowNav] = useState(true);
+  const [session, setSession] = useState<any>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    if (isOnboarded) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsInitializing(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isOnboarded && session) {
       checkDailyKanji();
     }
-  }, [isOnboarded, checkDailyKanji]);
+  }, [isOnboarded, session, checkDailyKanji]);
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -45,6 +64,14 @@ function App() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  if (isInitializing) {
+    return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }} />;
+  }
+
+  if (!session) {
+    return <LandingPage />;
+  }
 
   if (!isOnboarded) {
     return <Onboarding />;
