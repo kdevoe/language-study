@@ -18,7 +18,7 @@ interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
   rtkLevel: number | null;
-  kanjiProportions: { known: number; review: number; unknown: number };
+  unknownKanjiDensity: number; // Percentage 0-50
   furiganaMode: 'always' | 'never' | 'dynamic';
   
   wordDatabase: Record<string, WordData>;
@@ -28,7 +28,7 @@ interface AppState {
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
   setRtkLevel: (level: number) => void;
-  setKanjiProportions: (props: { known: number; review: number; unknown: number }) => void;
+  setUnknownKanjiDensity: (density: number) => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   resetProgress: () => void;
   
@@ -44,7 +44,7 @@ export const useAppStore = create<AppState>()(
       isOnboarded: false,
       jlptLevel: null,
       rtkLevel: null,
-      kanjiProportions: { known: 70, review: 20, unknown: 10 },
+      unknownKanjiDensity: 15,
       furiganaMode: 'dynamic',
       wordDatabase: {},
       studyKanji: [],
@@ -54,7 +54,7 @@ export const useAppStore = create<AppState>()(
       
       setJlptLevel: (level) => set({ jlptLevel: level }),
       setRtkLevel: (level) => set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() }),
-      setKanjiProportions: (props) => set({ kanjiProportions: props }),
+      setUnknownKanjiDensity: (density) => set({ unknownKanjiDensity: density }),
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       

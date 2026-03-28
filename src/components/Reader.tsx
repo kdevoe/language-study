@@ -11,6 +11,10 @@ export function Reader() {
   const [loading, setLoading] = useState(true);
   const [isWordLoading, setIsWordLoading] = useState(false);
   
+  const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
+  const [hasFinishedReading, setHasFinishedReading] = useState(false);
+  const bottomRef = React.useRef<HTMLDivElement>(null);
+  
   // Memoize the Japanese segmenter so it's instantly ready
   const segmenter = React.useMemo(() => {
     try {
@@ -20,31 +24,73 @@ export function Reader() {
     }
   }, []);
   
-  const { jlptLevel, rtkLevel, kanjiProportions, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
+  const { jlptLevel, rtkLevel, unknownKanjiDensity, wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery } = useAppStore();
+
+  const loadArticle = async () => {
+    setLoading(true);
+    setHasFinishedReading(false);
+    setClickedWords(new Set());
+    const feed = await fetchNewsFeed('Technology startups');
+    if (feed.length > 0) {
+      const snippet = feed[0].blocks[0].content?.[0]?.text || '';
+      const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, unknownKanjiDensity);
+      setArticle({ ...feed[0], blocks: rewrittenBlocks });
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function loadArticle() {
-      setLoading(true);
-      // Fetching general news based on a topic
-      const feed = await fetchNewsFeed('Technology startups');
-      if (feed.length > 0) {
-        // Rewrite using LLM context
-        const snippet = feed[0].blocks[0].content?.[0]?.text || '';
-        const rewrittenBlocks = await rewriteArticleWithGemini(feed[0].title, snippet, jlptLevel, rtkLevel, kanjiProportions);
-        setArticle({ ...feed[0], blocks: rewrittenBlocks });
-      }
-      setLoading(false);
-    }
     loadArticle();
-  }, [jlptLevel, rtkLevel, kanjiProportions]);
+  }, [jlptLevel, rtkLevel, unknownKanjiDensity]);
+
+  useEffect(() => {
+    if (!bottomRef.current || loading || !article || hasFinishedReading) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !hasFinishedReading) {
+        handleFinishArticle();
+      }
+    }, { threshold: 0.1 });
+    
+    observer.observe(bottomRef.current);
+    return () => observer.disconnect();
+  }, [loading, article, hasFinishedReading]);
+
+  const handleFinishArticle = () => {
+    setHasFinishedReading(true);
+    
+    // Auto-bump unseen words natively to SRS memory
+    const articleWords = new Set<string>();
+    article?.blocks.forEach(b => {
+      if (b.content) b.content.forEach(w => {
+         if (w.furigana) articleWords.add(w.text);
+      });
+    });
+
+    articleWords.forEach(word => {
+      if (!clickedWords.has(word)) {
+        const stats = wordDatabase[word];
+        if (stats && stats.mastery !== 'easy') {
+          const nextLevel = stats.mastery === 'hard' ? 'medium' : 'easy';
+          setWordMastery(word, nextLevel);
+        } else if (!stats) {
+          saveWordDefinition(word, { reading: '...', meaning: 'Implicitly parsed context' });
+          recordWordSeen(word);
+          setWordMastery(word, 'easy');
+        }
+      }
+    });
+  };
 
   const handleWordClick = (details: WordDetails) => {
     recordWordSeen(details.word);
+    setClickedWords(prev => new Set(prev).add(details.word));
     setSelectedWord(details);
   };
 
   const handleDictionaryLookup = async (word: string, contextSentence: string) => {
     recordWordSeen(word);
+    setClickedWords(prev => new Set(prev).add(word));
     
     // Check local database first
     const localData = wordDatabase[word];
@@ -156,6 +202,33 @@ export function Reader() {
           }
           return null;
         })}
+
+        {hasFinishedReading && (
+          <div className="fade-in" style={{ textAlign: 'center', marginTop: '4rem', marginBottom: '2rem', padding: '2rem', backgroundColor: 'var(--bg-card)', borderRadius: '16px' }}>
+             <p style={{ color: 'var(--text-main)', fontWeight: 600, letterSpacing: '0.1em', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <span style={{ color: 'var(--accent-success)' }}>✓</span> ARTICLE COMPLETED
+             </p>
+             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+                Your reading comprehension has been logged. Unclicked target vocabulary was automatically upgraded.
+             </p>
+             <button 
+                onClick={loadArticle} 
+                style={{ 
+                  backgroundColor: 'var(--text-main)', 
+                  color: 'var(--bg-pure)', 
+                  padding: '1rem 2rem', 
+                  borderRadius: '100px', 
+                  fontWeight: 600, 
+                  border: 'none', 
+                  cursor: 'pointer',
+                  fontSize: '0.95rem'
+                }}
+              >
+               Read Next Article
+             </button>
+          </div>
+        )}
+        <div ref={bottomRef} style={{ height: '10px' }} />
       </div>
 
       <WordModal 

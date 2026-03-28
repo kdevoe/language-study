@@ -6,21 +6,8 @@ export function Settings() {
   const { 
     jlptLevel, setJlptLevel, 
     rtkLevel, setRtkLevel, 
-    kanjiProportions, setKanjiProportions
+    unknownKanjiDensity, setUnknownKanjiDensity
   } = useAppStore();
-
-  const handlePropChange = (type: 'known' | 'review' | 'unknown', val: number) => {
-    const newProps = { ...kanjiProportions, [type]: val };
-    const total = newProps.known + newProps.review + newProps.unknown;
-    
-    if (total === 0) return; // Prevent dividing by zero
-    
-    const kPct = Math.round((newProps.known / total) * 100);
-    const rPct = Math.round((newProps.review / total) * 100);
-    const uPct = 100 - kPct - rPct; // Force exact 100 sum
-    
-    setKanjiProportions({ known: kPct, review: rPct, unknown: uPct });
-  };
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
@@ -35,43 +22,26 @@ export function Settings() {
 
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-          Kanji Review Density
+          Vocabulary Novelty
         </label>
         
-        {/* Visual Bar */}
-        <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1.5rem' }}>
-          <div style={{ width: `${kanjiProportions.known}%`, backgroundColor: 'var(--text-muted)', opacity: 0.5, transition: 'width 0.2s' }}></div>
-          <div style={{ width: `${kanjiProportions.review}%`, backgroundColor: 'var(--text-main)', transition: 'width 0.2s' }}></div>
-          <div style={{ width: `${kanjiProportions.unknown}%`, backgroundColor: '#ef4444', transition: 'width 0.2s' }}></div>
-        </div>
-
-        {/* Sliders */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Known Kanji</span>
-              <span style={{ fontWeight: 600 }}>{kanjiProportions.known}%</span>
-            </div>
-            <input type="range" min="0" max="100" value={kanjiProportions.known} onChange={(e) => handlePropChange('known', parseInt(e.target.value))} style={{ width: '100%' }} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-main)' }}>Reviewing Targets</span>
-              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{kanjiProportions.review}%</span>
-            </div>
-            <input type="range" min="0" max="100" value={kanjiProportions.review} onChange={(e) => handlePropChange('review', parseInt(e.target.value))} style={{ width: '100%', accentColor: 'var(--text-main)' }} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-              <span style={{ color: '#ef4444' }}>Unknown Kanji</span>
-              <span style={{ fontWeight: 600, color: '#ef4444' }}>{kanjiProportions.unknown}%</span>
-            </div>
-            <input type="range" min="0" max="100" value={kanjiProportions.unknown} onChange={(e) => handlePropChange('unknown', parseInt(e.target.value))} style={{ width: '100%', accentColor: '#ef4444' }} />
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+          <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Purely Known Kanji</span>
+          <span style={{ color: 'var(--text-muted)' }}>{unknownKanjiDensity}% Unknown</span>
         </div>
         
+        <input 
+          type="range" 
+          min="0" 
+          max="50" 
+          step="5"
+          value={unknownKanjiDensity}
+          onChange={(e) => setUnknownKanjiDensity(parseInt(e.target.value, 10))}
+          style={{ width: '100%', accentColor: 'var(--text-main)', marginBottom: '1rem' }} 
+        />
+        
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Adjusts the ratio of Kanji character origins the AI is permitted to use in stories.
+          Determines how much completely unknown Kanji the AI introduces into the text. (The AI will heavily bias "Known Kanji" towards characters you are currently reviewing).
         </p>
       </div>
 
