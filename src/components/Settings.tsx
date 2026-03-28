@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiList } from '../data/rtkKanji';
 
@@ -166,6 +167,15 @@ export function Settings() {
         </p>
       </div>
 
+      <style>{`
+        details[open] .advanced-chevron {
+          transform: rotate(-180deg);
+        }
+        details summary::-webkit-details-marker {
+          display: none;
+        }
+      `}</style>
+
       <details 
         style={{ 
           backgroundColor: 'var(--bg-card)', 
@@ -175,8 +185,9 @@ export function Settings() {
           border: '1px solid var(--border-light)'
         }}
       >
-        <summary style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', outline: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+        <summary style={{ fontSize: '0.85rem', listStyle: 'none', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', outline: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           Advanced Settings
+          <ChevronDown size={18} className="advanced-chevron" style={{ transition: 'transform 0.3s ease' }} />
         </summary>
         
         <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
