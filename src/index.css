@@ -107,9 +107,14 @@ rt {
 ruby.force-show rt {
   opacity: 1;
   transform: translateY(0);
-  background-color: var(--text-main);
-  color: var(--bg-pure);
-  padding: 0 4px;
+  background-color: transparent;
+  color: var(--text-main);
+  padding: 0;
+  border-bottom: 2px solid var(--border-light);
+}
+
+ruby:active {
+  background-color: rgba(0, 0, 0, 0.05);
   border-radius: 4px;
 }
 
