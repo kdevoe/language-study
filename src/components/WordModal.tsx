@@ -1,5 +1,4 @@
-
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { X, BookOpen, Loader2 } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
@@ -22,6 +21,9 @@ interface Props {
 
 export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-300, 0, 300], [-10, 0, 10]);
+  const opacityModal = useTransform(x, [-300, -150, 0, 150, 300], [0, 0.5, 1, 0.5, 0]);
   
   if (!wordData) return null;
   const stats = wordDatabase[wordData.word];
@@ -48,18 +50,12 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
           />
           <motion.div
             drag="x"
-            dragConstraints={{ left: -1000, right: 0, top: 0, bottom: 0 }}
-            dragElastic={{ left: 0.1, right: 0 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.x < -100) {
-                onClose();
-              }
-            }}
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 250 }}
+            dragConstraints={{ left: -1000, right: 1000, top: 0, bottom: 0 }}
+            dragElastic={0.9}
             style={{
+              x,
+              rotate,
+              opacity: opacityModal,
               position: 'fixed',
               bottom: 0, left: 0, right: 0,
               backgroundColor: 'var(--bg-pure)',
@@ -71,8 +67,17 @@ export function WordModal({ isOpen, onClose, wordData, onSetMastery, isLoading }
               boxShadow: '0 -10px 40px rgba(0,0,0,0.06)',
               maxHeight: '92vh',
               overflowY: 'auto',
-              touchAction: 'pan-y' // Allow vertical scrolling, but handle X-drags manually
+              touchAction: 'pan-y'
             }}
+            onDragEnd={(_, info) => {
+              if (Math.abs(info.offset.x) > 100) {
+                onClose();
+              }
+            }}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 250 }}
           >
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
               <div style={{ width: '48px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
