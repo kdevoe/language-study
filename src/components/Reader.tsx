@@ -4,6 +4,7 @@ import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
 import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinition, fetchSentenceTranslation } from '../services/api';
 import { useAppStore } from '../services/store';
+import { touchLock } from '../services/touchLock';
 
 export function Reader() {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
@@ -108,6 +109,7 @@ export function Reader() {
   };
 
   const handleWordClick = (details: WordDetails, e: any) => {
+    if (touchLock.isLocked()) return;
     if (selectedWord?.word === details.word) {
       setSelectedWord(null);
       return;
@@ -121,6 +123,7 @@ export function Reader() {
   };
 
   const handleDictionaryLookup = async (word: string, contextSentence: string, e: any) => {
+    if (touchLock.isLocked()) return;
     if (selectedWord?.word === word) {
       setSelectedWord(null);
       return;
@@ -145,6 +148,7 @@ export function Reader() {
   };
 
   const handleSentenceTranslate = async (sentence: string, sentenceId: string, e: any) => {
+    if (touchLock.isLocked()) return;
     if (selectedSentence?.id === sentenceId) {
       setSelectedSentence(null);
       return;
@@ -268,7 +272,11 @@ export function Reader() {
 
       <WordModal 
         isOpen={!!selectedWord || !!selectedSentence} 
-        onClose={() => { setSelectedWord(null); setSelectedSentence(null); }} 
+        onClose={() => { 
+          setSelectedWord(null); 
+          setSelectedSentence(null); 
+          touchLock.lock();
+        }} 
         mode={selectedSentence ? 'sentence' : 'word'}
         wordData={selectedWord}
         sentenceText={selectedSentence?.text}

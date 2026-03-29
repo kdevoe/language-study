@@ -40,7 +40,8 @@ export function WordModal({
       document.body.style.overflow = 'hidden';
       x.set(0); 
       // Auto-scroll to bottom if anchored at top, so header is immediately visible
-      if (anchor === 'top' && scrollRef.current) {
+      // We check this on open AND when loading finishes
+      if (anchor === 'top' && !isLoading && scrollRef.current) {
         setTimeout(() => {
            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }, 50);
@@ -49,7 +50,7 @@ export function WordModal({
       document.body.style.overflow = 'auto';
     }
     return () => { document.body.style.overflow = 'auto'; };
-  }, [isOpen, anchor, x]);
+  }, [isOpen, anchor, x, isLoading, wordData]);
   
   // Determine sections based on mode
   const renderContent = () => {
