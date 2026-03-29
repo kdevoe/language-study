@@ -34,31 +34,26 @@ export function WordModal({
   const opacityModal = useTransform(y, [-600, -300, 0, 300, 600], [0, 0.5, 1, 0.5, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Sync animation speeds as requested
   const SYNC_DURATION = 0.65;
-  const SYNC_EASE = [0.22, 1, 0.36, 1]; // Gentle, high-end glide
+  const SYNC_EASE = [0.22, 1, 0.36, 1]; 
 
-  // ELIMINATE FLASH: Use LayoutEffect to force scroll position before paint
   useLayoutEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      // Preset position to far screen edge
       const startPos = anchor === 'bottom' ? 800 : -800;
       y.set(startPos);
       
-      // FORCED SYMMETRICAL ENTRANCE
-      animate(y, 0, { duration: SYNC_DURATION, ease: SYNC_EASE as any });
-
-      // Immediate scroll setup to prevent flash of status bar
+      const controls = animate(y, 0, { duration: SYNC_DURATION, ease: SYNC_EASE as any });
+      
       if (anchor === 'top' && !isLoading && scrollRef.current) {
-        scrollRef.current.scrollTop = 9999;
+        scrollRef.current.scrollTop = 9999; // word is at bottom edge
       }
+      return () => controls.stop();
     } else {
       document.body.style.overflow = 'auto';
     }
-  }, [isOpen, anchor, y, isLoading, wordData]);
+  }, [isOpen, anchor, y, isLoading]);
 
-  // Secondary effect to catch async content loading
   useEffect(() => {
     if (isOpen && anchor === 'top' && !isLoading && scrollRef.current) {
        scrollRef.current.scrollTop = 9999;
@@ -202,6 +197,11 @@ export function WordModal({
     );
   };
 
+  const handleManualClose = () => {
+     const targetY = anchor === 'bottom' ? 800 : -800;
+     animate(y, targetY, { duration: SYNC_DURATION, ease: SYNC_EASE as any }).then(() => onClose());
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -210,8 +210,8 @@ export function WordModal({
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            onClick={onClose}
-            transition={{ duration: 0.6 }}
+            onClick={handleManualClose}
+            transition={{ duration: SYNC_DURATION }}
             style={{ 
               position: 'fixed', 
               top: 0, left: 0, right: 0, bottom: 0, 
@@ -231,20 +231,16 @@ export function WordModal({
             onDragEnd={(_, info) => {
               const vy = info.velocity.y;
               const dy = info.offset.y;
-
               const shouldClose = anchor === 'bottom' 
                 ? (vy > 250 || dy > 40) 
                 : (vy < -250 || dy < -40);
 
               if (shouldClose) {
-                const targetY = anchor === 'bottom' ? 800 : -800;
-                animate(y, targetY, { duration: SYNC_DURATION, ease: SYNC_EASE as any }).then(() => onClose());
+                handleManualClose();
               } else {
                 animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
               }
             }}
-            exit={{ y: anchor === 'bottom' ? 800 : -800 }}
-            transition={{ duration: SYNC_DURATION, ease: SYNC_EASE as any }}
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
@@ -265,9 +261,12 @@ export function WordModal({
               flexDirection: 'column'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
-              <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
-            </div>
+            {/* Grab Bar at Bottom for Dropdown, Top for Popup */}
+            {anchor === 'bottom' && (
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
+                 <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
+               </div>
+            )}
 
             <div 
               ref={scrollRef}
@@ -277,7 +276,6 @@ export function WordModal({
                 overflowY: 'auto', 
                 touchAction: 'pan-y',
                 WebkitOverflowScrolling: 'touch',
-                // Padded to ensure highlight spills don't clip at top/bottom of scroll
                 padding: '0 4px'
               }}
               onPointerDown={(e) => {
@@ -297,6 +295,12 @@ export function WordModal({
                   </div>
               ) : renderContent()}
             </div>
+
+            {anchor === 'top' && (
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
+                 <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
+               </div>
+            )}
           </motion.div>
         </>
       )}
