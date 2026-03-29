@@ -83,9 +83,14 @@ export function WordModal({
         <div key="header" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           {wordData.furiganaMap ? (
             wordData.furiganaMap.map((fm, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center' }}>
-                <span className="serif" style={{ fontSize: '3rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
-                <span style={{ fontSize: '1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.4rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>{fm.kana}</span>
+              <div key={idx} style={{ 
+                display: 'flex', 
+                flexDirection: 'column-reverse', 
+                alignItems: 'center',
+                marginRight: idx < wordData.furiganaMap!.length - 1 ? '0.2rem' : 0
+              }}>
+                <span className="serif" style={{ fontSize: '3rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
+                <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{fm.kana}</span>
               </div>
             ))
           ) : (
@@ -168,7 +173,16 @@ export function WordModal({
     };
 
     const orderedList = [sections.header, sections.translation, sections.mastery, sections.kanji, sections.grammar, sections.status];
-    return anchor === 'bottom' ? orderedList : [...orderedList].reverse();
+    
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: anchor === 'bottom' ? 'column' : 'column-reverse',
+        gap: '0.5rem'
+      }}>
+        {orderedList.map(s => s)}
+      </div>
+    );
   };
 
   return (

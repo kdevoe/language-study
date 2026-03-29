@@ -149,22 +149,21 @@ ruby.peek-furigana {
 
 ruby.peek-furigana rt {
   opacity: 1 !important;
-  transform: scale(1.15) !important;
   display: block;
   position: absolute;
-  bottom: 110%;
+  bottom: 150%;
   left: 50%;
   transform-origin: bottom center;
-  transform: translateX(-50%) translateY(-4px) !important;
+  transform: translateX(-50%) translateY(-10px) scale(1.1) !important;
   background-color: var(--bg-pure);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.22);
   color: var(--text-main);
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
   border: 1px solid var(--border-light);
   z-index: 1000;
   pointer-events: none;
-  font-size: 0.9rem !important;
+  font-size: 1rem !important;
   font-weight: 600;
   white-space: nowrap;
 }
