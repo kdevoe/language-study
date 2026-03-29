@@ -34,14 +34,23 @@ export function WordModal({
   const opacityModal = useTransform(y, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // CONTEXT-AWARE LUXURY DURATION
+  const LUXE_DURATION = 0.65;
+  const LUXE_EASE = [0.22, 1, 0.36, 1]; // Quint/Quart out style
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      y.set(0); 
+      // Reset position instantly before the entrance animation start
+      y.set(anchor === 'bottom' ? 800 : -800);
+      
+      // FORCED SLOW ENTRANCE
+      animate(y, 0, { duration: LUXE_DURATION, ease: LUXE_EASE as any });
+
       if (anchor === 'top' && !isLoading && scrollRef.current) {
         setTimeout(() => {
            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }, 50);
+        }, LUXE_DURATION * 1000 + 50);
       }
     } else {
       document.body.style.overflow = 'auto';
@@ -195,11 +204,11 @@ export function WordModal({
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
             onClick={onClose}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.6 }}
             style={{ 
               position: 'fixed', 
               top: 0, left: 0, right: 0, bottom: 0, 
-              backgroundColor: 'transparent', // NO BACKGROUND DIMMING
+              backgroundColor: 'transparent',
               zIndex: 40 
             }}
           />
@@ -211,27 +220,25 @@ export function WordModal({
               bottom: anchor === 'bottom' ? 1000 : 0,
               left: 0, right: 0
             }} 
-            dragElastic={0.08} // Stiffer elastic for more direct "swipe-to-close" feedback
+            dragElastic={0.08}
             onDragEnd={(_, info) => {
               const vy = info.velocity.y;
               const dy = info.offset.y;
 
-              // Sensitized dismissal: Any significant drag in the closing direction
               const shouldClose = anchor === 'bottom' 
                 ? (vy > 250 || dy > 40) 
                 : (vy < -250 || dy < -40);
 
               if (shouldClose) {
                 const targetY = anchor === 'bottom' ? 800 : -800;
-                animate(y, targetY, { duration: 0.35, ease: [0.33, 1, 0.68, 1] }).then(() => onClose());
+                animate(y, targetY, { duration: LUXE_DURATION, ease: LUXE_EASE as any }).then(() => onClose());
               } else {
                 animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
               }
             }}
-            initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
-            transition={{ duration: 0.55, ease: [0.33, 1, 0.68, 1] } as any} // Slower, luxurious easing
+            // No initial/animate here for Y, handled via useEffect for forced symmetry
+            exit={{ y: anchor === 'bottom' ? 800 : -800 }}
+            transition={{ duration: LUXE_DURATION, ease: LUXE_EASE as any }}
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
@@ -268,11 +275,8 @@ export function WordModal({
               onPointerDown={(e) => {
                  const isAtStart = scrollRef.current?.scrollTop === 0;
                  const isAtEnd = Math.abs((scrollRef.current?.scrollHeight || 0) - (scrollRef.current?.scrollTop || 0) - (scrollRef.current?.clientHeight || 0)) < 1;
-
-                 // Allow drag to bubble for dismiss if we are at the boundaries
                  if (anchor === 'bottom' && isAtStart) return;
                  if (anchor === 'top' && isAtEnd) return;
-                 
                  e.stopPropagation();
               }}
             >
