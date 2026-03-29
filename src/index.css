@@ -169,13 +169,13 @@ ruby.peek-furigana rt {
 }
 
 .word-highlight {
-  background-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 2px var(--accent-primary);
+  background-color: #dcfce7 !important;
+  box-shadow: 0 0 0 2px #dcfce7;
   border-radius: 2px;
 }
 
 .sentence-highlight {
-  background-color: rgba(212, 224, 232, 0.4) !important;
+  background-color: rgba(74, 222, 128, 0.15) !important;
   border-radius: 4px;
 }
 

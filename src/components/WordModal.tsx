@@ -4,6 +4,7 @@ import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
 
+
 export interface WordDetails {
   word: string;
   reading: string;
@@ -30,17 +31,14 @@ export function WordModal({
   anchor, onSetMastery, isLoading 
 }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-400, 0, 400], [-10, 0, 10]);
-  const opacityModal = useTransform(x, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
+  const y = useMotionValue(0);
+  const opacityModal = useTransform(y, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      x.set(0); 
-      // Auto-scroll to bottom if anchored at top, so header is immediately visible
-      // We check this on open AND when loading finishes
+      y.set(0); 
       if (anchor === 'top' && !isLoading && scrollRef.current) {
         setTimeout(() => {
            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -50,9 +48,8 @@ export function WordModal({
       document.body.style.overflow = 'auto';
     }
     return () => { document.body.style.overflow = 'auto'; };
-  }, [isOpen, anchor, x, isLoading, wordData]);
+  }, [isOpen, anchor, y, isLoading, wordData]);
   
-  // Determine sections based on mode
   const renderContent = () => {
     if (mode === 'sentence') {
       return (
@@ -83,7 +80,6 @@ export function WordModal({
     const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
     const wordKanjiArray = Array.from(new Set(wordData.word.split(''))).filter(char => !!rtkKanjiMap[char]);
 
-    // Define dictionary sections
     const sections = {
       header: (
         <div key="header" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
@@ -209,16 +205,25 @@ export function WordModal({
           />
           <motion.div
             ref={scrollRef}
-            drag="x" 
+            drag="y" 
             dragDirectionLock={true} 
-            dragConstraints={{ left: -1000, right: 1000, top: 0, bottom: 0 }} 
+            dragConstraints={{ 
+              top: anchor === 'top' ? -1000 : 0, 
+              bottom: anchor === 'bottom' ? 1000 : 0 
+            }} 
             dragElastic={0.9}
             onDragEnd={(_, info) => {
-              if (Math.abs(info.velocity.x) > 500 || Math.abs(info.offset.x) > 160) {
-                const targetX = info.offset.x > 0 ? 600 : -600;
-                animate(x, targetX, { duration: 0.2, ease: "easeOut" }).then(() => onClose());
+              const velocity = info.velocity.y;
+              const offset = info.offset.y;
+              const shouldClose = anchor === 'bottom' 
+                ? (velocity > 500 || offset > 150) 
+                : (velocity < -500 || offset < -150);
+
+              if (shouldClose) {
+                const targetY = anchor === 'bottom' ? 600 : -600;
+                animate(y, targetY, { duration: 0.2, ease: "easeOut" }).then(() => onClose());
               } else {
-                animate(x, 0, { type: 'spring', damping: 18, stiffness: 350 });
+                animate(y, 0, { type: 'spring', damping: 18, stiffness: 350 });
               }
             }}
             initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
@@ -226,7 +231,7 @@ export function WordModal({
             exit={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 220 }}
             style={{
-              x, rotate, opacity: opacityModal,
+              y, opacity: opacityModal,
               position: 'fixed',
               [anchor === 'bottom' ? 'bottom' : 'top']: 0, left: 0, right: 0,
               backgroundColor: 'var(--bg-pure)',

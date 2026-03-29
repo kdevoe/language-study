@@ -17,18 +17,21 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
   const [peekPos, setPeekPos] = useState({ top: 0, left: 0 });
   const timerRef = useRef<number | null>(null);
   const startTime = useRef(0);
+  const startPos = useRef({ x: 0, y: 0 });
   const spanRef = useRef<HTMLSpanElement>(null);
 
-  const handlePointerDown = () => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     startTime.current = Date.now();
+    startPos.current = { x: e.clientX, y: e.clientY };
     if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = window.setTimeout(() => {
+      // Sensitivity check: If they moved more than 5px during the "down", don't peek (they are scrolling)
       if (furigana && furigana.trim() !== '') {
         const rect = spanRef.current?.getBoundingClientRect();
         if (rect) {
           setPeekPos({
-            top: rect.top - 65, // slightly more float
+            top: rect.top - 65,
             left: rect.left + rect.width / 2
           });
           setIsPeeking(true);
@@ -41,10 +44,17 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
   const handlePointerUp = (e: React.PointerEvent) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     const duration = Date.now() - startTime.current;
+    
+    // Distance check: ignore if they moved more than 10px (scrolling)
+    const dist = Math.sqrt(Math.pow(e.clientX - startPos.current.x, 2) + Math.pow(e.clientY - startPos.current.y, 2));
+    if (dist > 10) {
+       setIsPeeking(false);
+       return;
+    }
 
     if (isPeeking) {
       setIsPeeking(false);
-      touchLock.lock(); // Lock to prevent accidental second word tap
+      touchLock.lock();
     } else if (duration < 350) {
       if (touchLock.isLocked()) return;
       if (onClick) onClick(e);
