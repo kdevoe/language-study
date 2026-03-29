@@ -2,7 +2,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from '
 import { BookOpen, Loader2, Sparkles } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useLayoutEffect } from 'react';
 
 export interface WordDetails {
   word: string;
@@ -31,33 +31,40 @@ export function WordModal({
 }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
   const y = useMotionValue(0);
-  const opacityModal = useTransform(y, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
+  const opacityModal = useTransform(y, [-600, -300, 0, 300, 600], [0, 0.5, 1, 0.5, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // CONTEXT-AWARE LUXURY DURATION
-  const LUXE_DURATION = 0.65;
-  const LUXE_EASE = [0.22, 1, 0.36, 1]; // Quint/Quart out style
+  // Sync animation speeds as requested
+  const SYNC_DURATION = 0.65;
+  const SYNC_EASE = [0.22, 1, 0.36, 1]; // Gentle, high-end glide
 
-  useEffect(() => {
+  // ELIMINATE FLASH: Use LayoutEffect to force scroll position before paint
+  useLayoutEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      // Reset position instantly before the entrance animation start
-      y.set(anchor === 'bottom' ? 800 : -800);
+      // Preset position to far screen edge
+      const startPos = anchor === 'bottom' ? 800 : -800;
+      y.set(startPos);
       
-      // FORCED SLOW ENTRANCE
-      animate(y, 0, { duration: LUXE_DURATION, ease: LUXE_EASE as any });
+      // FORCED SYMMETRICAL ENTRANCE
+      animate(y, 0, { duration: SYNC_DURATION, ease: SYNC_EASE as any });
 
+      // Immediate scroll setup to prevent flash of status bar
       if (anchor === 'top' && !isLoading && scrollRef.current) {
-        setTimeout(() => {
-           if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }, LUXE_DURATION * 1000 + 50);
+        scrollRef.current.scrollTop = 9999;
       }
     } else {
       document.body.style.overflow = 'auto';
     }
-    return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen, anchor, y, isLoading, wordData]);
-  
+
+  // Secondary effect to catch async content loading
+  useEffect(() => {
+    if (isOpen && anchor === 'top' && !isLoading && scrollRef.current) {
+       scrollRef.current.scrollTop = 9999;
+    }
+  }, [isLoading, wordData, isOpen, anchor]);
+
   const renderContent = () => {
     if (mode === 'sentence') {
       return (
@@ -231,14 +238,13 @@ export function WordModal({
 
               if (shouldClose) {
                 const targetY = anchor === 'bottom' ? 800 : -800;
-                animate(y, targetY, { duration: LUXE_DURATION, ease: LUXE_EASE as any }).then(() => onClose());
+                animate(y, targetY, { duration: SYNC_DURATION, ease: SYNC_EASE as any }).then(() => onClose());
               } else {
                 animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
               }
             }}
-            // No initial/animate here for Y, handled via useEffect for forced symmetry
             exit={{ y: anchor === 'bottom' ? 800 : -800 }}
-            transition={{ duration: LUXE_DURATION, ease: LUXE_EASE as any }}
+            transition={{ duration: SYNC_DURATION, ease: SYNC_EASE as any }}
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
@@ -270,7 +276,9 @@ export function WordModal({
                 flex: 1, 
                 overflowY: 'auto', 
                 touchAction: 'pan-y',
-                WebkitOverflowScrolling: 'touch'
+                WebkitOverflowScrolling: 'touch',
+                // Padded to ensure highlight spills don't clip at top/bottom of scroll
+                padding: '0 4px'
               }}
               onPointerDown={(e) => {
                  const isAtStart = scrollRef.current?.scrollTop === 0;

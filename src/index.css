@@ -170,24 +170,28 @@ ruby.peek-furigana rt {
 
 .word-highlight {
   background: linear-gradient(
-    transparent 45%, 
-    rgba(74, 93, 35, 0.18) 45%, 
-    rgba(74, 93, 35, 0.18) 85%, 
-    transparent 85%
+    transparent 55%, 
+    rgba(74, 93, 35, 0.16) 55%, 
+    rgba(74, 93, 35, 0.16) 88%, 
+    transparent 88%
   ) !important;
   color: var(--text-main) !important;
-  border-radius: 100px;
-  padding: 0 6px;
-  margin: 0 -2px;
+  border-radius: 999px;
+  /* Use Box Shadow for spill to prevent "Pushing" words */
+  box-shadow: 6px 0 0 rgba(74, 93, 35, 0.16), -6px 0 0 rgba(74, 93, 35, 0.16);
+  padding: 0;
+  margin: 0; 
   display: inline;
+  position: relative;
+  z-index: 1;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
 
 .sentence-highlight {
-  background-color: rgba(74, 93, 35, 0.06) !important;
-  border-radius: 8px;
-  padding: 2px 4px;
+  background-color: rgba(74, 93, 35, 0.05) !important;
+  border-radius: 12px;
+  padding: 2px 0;
 }
 
 @keyframes lucide-spin {
