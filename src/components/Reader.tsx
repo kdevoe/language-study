@@ -7,7 +7,7 @@ import { useAppStore } from '../services/store';
 
 export function Reader() {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
-  const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string } | null>(null);
+  const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string, id: string } | null>(null);
   const [drawerAnchor, setDrawerAnchor] = useState<'top' | 'bottom'>('bottom');
   
   const [loading, setLoading] = useState(false);
@@ -38,6 +38,8 @@ export function Reader() {
     setHasFinishedReading(false);
     setClickedWords(new Set());
     setCurrentArticle(null);
+    setSelectedWord(null);
+    setSelectedSentence(null);
     
     const vocabTargets = Object.entries(wordDatabase)
       .filter(([_, data]) => data.mastery === 'hard' || data.mastery === 'medium')
@@ -97,23 +99,36 @@ export function Reader() {
     });
   };
 
-  const determineAnchor = (e: React.MouseEvent | React.TouchEvent | any) => {
+  const determineAnchor = (e: any) => {
     const y = 'clientY' in e ? e.clientY : (e.touches?.[0]?.clientY || 0);
-    setDrawerAnchor(y > window.innerHeight / 2 ? 'bottom' : 'top');
+    // USER: "If the word is at the top the drawer should come up from the bottom"
+    // So if y is small (Top), anchor is Bottom.
+    // If y is large (Bottom), anchor is Top.
+    setDrawerAnchor(y < window.innerHeight / 2 ? 'bottom' : 'top');
   };
 
   const handleWordClick = (details: WordDetails, e: any) => {
+    if (selectedWord?.word === details.word) {
+      setSelectedWord(null);
+      return;
+    }
     determineAnchor(e);
     recordWordSeen(details.word);
     setClickedWords(prev => new Set(prev).add(details.word));
     setSelectedWord(details);
+    setSelectedSentence(null);
     saveWordDefinition(details.word, details);
   };
 
   const handleDictionaryLookup = async (word: string, contextSentence: string, e: any) => {
+    if (selectedWord?.word === word) {
+      setSelectedWord(null);
+      return;
+    }
     determineAnchor(e);
     recordWordSeen(word);
     setClickedWords(prev => new Set(prev).add(word));
+    setSelectedSentence(null);
     
     const localData = wordDatabase[word];
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context') {
@@ -129,12 +144,17 @@ export function Reader() {
     setIsModalLoading(false);
   };
 
-  const handleSentenceTranslate = async (sentence: string, e: any) => {
+  const handleSentenceTranslate = async (sentence: string, sentenceId: string, e: any) => {
+    if (selectedSentence?.id === sentenceId) {
+      setSelectedSentence(null);
+      return;
+    }
     determineAnchor(e);
-    setSelectedSentence({ text: sentence, translation: '' });
+    setSelectedWord(null);
+    setSelectedSentence({ text: sentence, translation: '', id: sentenceId });
     setIsModalLoading(true);
     const translation = await fetchSentenceTranslation(sentence, currentArticle?.blocks.map(b => b.content?.map(c => c.text).join('')).join('\n') || '');
-    setSelectedSentence({ text: sentence, translation });
+    setSelectedSentence({ text: sentence, translation, id: sentenceId });
     setIsModalLoading(false);
   };
 
@@ -142,61 +162,62 @@ export function Reader() {
     if (selectedWord) setWordMastery(selectedWord.word, level);
   };
 
-  const renderParagraphWithSentences = (block: any, blockIdx: number) => {
-    const fullText = block.content!.map((s: any) => s.text).join('');
-    // Split into sentences including the punctuation
-    const sentences = fullText.split(/([。！？\n])/g).reduce((acc: string[], cur: string, i: number) => {
-      if (i % 2 === 0) acc.push(cur);
-      else if (acc.length > 0) acc[acc.length - 1] += cur;
-      return acc;
-    }, []).filter((s: string) => s.trim().length > 0);
+  const renderParagraph = (block: any, blockIdx: number) => {
+    // 1. Group tokens into sentences
+    const sentences: any[][] = [];
+    let currentSent: any[] = [];
+    block.content.forEach((seg: any) => {
+      currentSent.push(seg);
+      if (seg.text.match(/[。！？\n]/)) {
+        sentences.push(currentSent);
+        currentSent = [];
+      }
+    });
+    if (currentSent.length > 0) sentences.push(currentSent);
 
-    return sentences.map((sent: string, sIdx: number) => {
-      const isSelected = selectedSentence?.text === sent;
+    return sentences.map((sentTokens, sIdx) => {
+      const sentText = sentTokens.map(t => t.text).join('');
+      const sentenceId = `${blockIdx}-${sIdx}`;
+      const isSentenceSelected = selectedSentence?.id === sentenceId;
+
       return (
         <span 
-          key={`${blockIdx}-${sIdx}`} 
-          className={isSelected ? 'sentence-highlight' : ''}
-          onDoubleClick={(e) => handleSentenceTranslate(sent, e)}
+          key={sentenceId} 
+          className={isSentenceSelected ? 'sentence-highlight' : ''}
+          onDoubleClick={(e) => handleSentenceTranslate(sentText, sentenceId, e)}
         >
-          {/* We will map segments and if the segment's string is in this sentence, render it */}
-          {block.content.map((segment: any, j: number) => {
-             // For now, if the sentence contains the segment or vice versa, wrap it.
-             // This is a rough estimation but works for tokenized text.
-             if (sent.includes(segment.text)) {
-                if (segment.furigana || segment.isInteractive) {
-                  return (
-                    <FuriganaText
-                      key={`${blockIdx}-${sIdx}-${j}`}
-                      word={segment.text}
-                      furigana={segment.furigana}
-                      isSelected={selectedWord?.word === segment.text}
-                      onClick={(e) => {
-                        if (segment.details) handleWordClick(segment.details as WordDetails, e);
-                        else handleDictionaryLookup(segment.text, sent, e);
-                      }}
-                    />
-                  );
-                }
-                if (segmenter) {
-                  const words = Array.from((segmenter as any).segment(segment.text));
-                  return words.map((w: any, index: number) => {
-                    if (!w.isWordLike) return <span key={`${blockIdx}-${sIdx}-${j}-${index}`}>{w.segment}</span>;
-                    return (
-                      <span 
-                        key={`${blockIdx}-${sIdx}-${j}-${index}`}
-                        className={selectedWord?.word === w.segment ? 'word-highlight' : ''}
-                        onClick={(e) => handleDictionaryLookup(w.segment, sent, e)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {w.segment}
-                      </span>
-                    );
-                  });
-                }
-                return <span key={`${blockIdx}-${sIdx}-${j}`}>{segment.text}</span>;
-             }
-             return null;
+          {sentTokens.map((segment, j) => {
+            if (segment.furigana || segment.isInteractive) {
+              return (
+                <FuriganaText
+                  key={`${sentenceId}-${j}`}
+                  word={segment.text}
+                  furigana={segment.furigana}
+                  isSelected={selectedWord?.word === segment.text}
+                  onClick={(e) => {
+                    if (segment.details) handleWordClick(segment.details as WordDetails, e);
+                    else handleDictionaryLookup(segment.text, sentText, e);
+                  }}
+                />
+              );
+            }
+            if (segmenter) {
+              const words = Array.from((segmenter as any).segment(segment.text));
+              return words.map((w: any, index: number) => {
+                if (!w.isWordLike) return <span key={`${sentenceId}-${j}-${index}`}>{w.segment}</span>;
+                return (
+                  <span 
+                    key={`${sentenceId}-${j}-${index}`}
+                    className={selectedWord?.word === w.segment ? 'word-highlight' : ''}
+                    onClick={(e) => handleDictionaryLookup(w.segment, sentText, e)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {w.segment}
+                  </span>
+                );
+              });
+            }
+            return <span key={`${sentenceId}-${j}`}>{segment.text}</span>;
           })}
         </span>
       );
@@ -230,7 +251,7 @@ export function Reader() {
         </div>
 
         {currentArticle.blocks.map((block, i) => {
-          if (block.type === 'paragraph') return <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraphWithSentences(block, i)}</p>;
+          if (block.type === 'paragraph') return <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
           if (block.type === 'yugen-box') return <YugenBox key={i} keyword={block.keyword!} reading={block.reading} description={block.description!} />;
           return null;
         })}

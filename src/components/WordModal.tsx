@@ -175,11 +175,23 @@ export function WordModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(245, 245, 240, 0.4)', backdropFilter: 'blur(3px)', zIndex: 40 }}
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            onClick={onClose}
+            style={{ 
+              position: 'fixed', 
+              top: 0, left: 0, right: 0, bottom: 0, 
+              backgroundColor: 'transparent',
+              zIndex: 40 
+            }}
           />
           <motion.div
-            drag="x" dragDirectionLock={true} dragConstraints={{ left: -1000, right: 1000, top: 0, bottom: 0 }} dragElastic={0.9}
+            drag="x" 
+            dragDirectionLock={true} 
+            dragConstraints={{ left: -1000, right: 1000, top: 0, bottom: 0 }} 
+            dragElastic={0.9}
             onDragEnd={(_, info) => {
               if (Math.abs(info.velocity.x) > 500 || Math.abs(info.offset.x) > 160) {
                 const targetX = info.offset.x > 0 ? 600 : -600;
@@ -199,9 +211,13 @@ export function WordModal({
               backgroundColor: 'var(--bg-pure)',
               [anchor === 'bottom' ? 'borderTopLeftRadius' : 'borderBottomLeftRadius']: '32px',
               [anchor === 'bottom' ? 'borderTopRightRadius' : 'borderBottomRightRadius']: '32px',
-              padding: '2rem 1.75rem', paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
-              zIndex: 50, boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.06)' : '0 10px 40px rgba(0,0,0,0.06)',
-              maxHeight: '90vh', overflowY: 'auto', touchAction: 'pan-y'
+              padding: '2rem 1.75rem', 
+              paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
+              zIndex: 50, 
+              boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
+              maxHeight: '42vh', 
+              overflowY: 'auto', 
+              touchAction: 'pan-y'
             }}
           >
             {anchor === 'bottom' && (

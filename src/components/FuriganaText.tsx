@@ -43,7 +43,7 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
     setIsPeeking(false);
   };
 
-  if (!furigana) {
+  if (!furigana || furigana.trim() === '') {
     return <span 
       className={isSelected ? 'word-highlight' : ''}
       onPointerDown={handlePointerDown} 
