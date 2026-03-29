@@ -195,10 +195,12 @@ export function WordModal({
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
             onClick={onClose}
+            transition={{ duration: 0.3 }}
             style={{ 
               position: 'fixed', 
               top: 0, left: 0, right: 0, bottom: 0, 
-              backgroundColor: 'transparent',
+              backgroundColor: 'rgba(245, 245, 240, 0.4)',
+              backdropFilter: 'blur(2px)', 
               zIndex: 40 
             }}
           />
@@ -207,37 +209,39 @@ export function WordModal({
             dragDirectionLock={true} 
             dragConstraints={{ 
               top: anchor === 'top' ? -1000 : 0, 
-              bottom: anchor === 'bottom' ? 1000 : -1000,
+              bottom: anchor === 'bottom' ? 1000 : 0,
               left: 0, right: 0
             }} 
-            dragElastic={0.4}
+            dragElastic={0.5}
             onDragEnd={(_, info) => {
               const vy = info.velocity.y;
               const dy = info.offset.y;
 
               const shouldClose = anchor === 'bottom' 
-                ? (vy > 500 || dy > 120) 
-                : (vy < -500 || dy < -120);
+                ? (vy > 300 || dy > 90) 
+                : (vy < -300 || dy < -90);
 
               if (shouldClose) {
-                const targetY = anchor === 'bottom' ? 600 : -600;
-                animate(y, targetY, { duration: 0.25, ease: "easeOut" }).then(() => onClose());
+                const targetY = anchor === 'bottom' ? 800 : -800;
+                animate(y, targetY, { duration: 0.3, ease: "easeOut" }).then(() => onClose());
               } else {
-                animate(y, 0, { type: 'spring', damping: 25, stiffness: 400 });
+                animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
               }
             }}
             initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
             animate={{ y: 0 }}
             exit={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} // Smooth circ-style ease for entrance
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] } as any}
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
               [anchor === 'bottom' ? 'bottom' : 'top']: 0, left: 0, right: 0,
               backgroundColor: 'var(--bg-pure)',
-              [anchor === 'bottom' ? 'borderTopLeftRadius' : 'borderBottomLeftRadius']: '32px',
-              [anchor === 'bottom' ? 'borderTopRightRadius' : 'borderBottomRightRadius']: '32px',
-              padding: '1.25rem 1.75rem', 
+              borderBottomLeftRadius: anchor === 'top' ? '32px' : 0,
+              borderBottomRightRadius: anchor === 'top' ? '32px' : 0,
+              borderTopLeftRadius: anchor === 'bottom' ? '32px' : 0,
+              borderTopRightRadius: anchor === 'bottom' ? '32px' : 0,
+              padding: '1rem 1.75rem', 
               paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
@@ -248,7 +252,8 @@ export function WordModal({
               flexDirection: 'column'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.4rem 0', cursor: 'grab', flexShrink: 0 }}>
+            {/* Expanded Drag Handover Area */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
               <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
             </div>
 
@@ -259,10 +264,12 @@ export function WordModal({
                 flex: 1, 
                 overflowY: 'auto', 
                 touchAction: 'pan-y',
-                WebkitOverflowScrolling: 'touch',
-                paddingTop: anchor === 'bottom' ? 0 : '1rem'
+                WebkitOverflowScrolling: 'touch'
               }}
-              onPointerDown={(e) => e.stopPropagation()} 
+              onPointerDown={(e) => {
+                 const isAtStart = scrollRef.current?.scrollTop === 0;
+                 if (!isAtStart) e.stopPropagation();
+              }}
             >
               {isLoading && mode === 'word' ? (
                   <div style={{ padding: '2rem' }}>
