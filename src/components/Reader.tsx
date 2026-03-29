@@ -272,6 +272,10 @@ export function Reader() {
 
       <WordModal 
         isOpen={!!selectedWord || !!selectedSentence} 
+        onDismissStart={() => {
+          setSelectedWord(null);
+          setSelectedSentence(null);
+        }}
         onClose={() => { 
           setSelectedWord(null); 
           setSelectedSentence(null); 

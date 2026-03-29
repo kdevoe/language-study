@@ -15,6 +15,7 @@ export interface WordDetails {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onDismissStart?: () => void; // New callback to clear highlights instantly
   mode: 'word' | 'sentence';
   wordData: WordDetails | null;
   sentenceText?: string;
@@ -25,7 +26,7 @@ interface Props {
 }
 
 export function WordModal({ 
-  isOpen, onClose, mode, wordData, 
+  isOpen, onClose, onDismissStart, mode, wordData, 
   sentenceText, sentenceTranslation, 
   anchor, onSetMastery, isLoading 
 }: Props) {
@@ -34,7 +35,8 @@ export function WordModal({
   const opacityModal = useTransform(y, [-600, -300, 0, 300, 600], [0, 0.5, 1, 0.5, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const SYNC_DURATION = 0.65;
+  // EXTRA LUXE DURATION - VERY SLOW AND SYMMETRIC
+  const SYNC_DURATION = 0.8;
   const SYNC_EASE = [0.22, 1, 0.36, 1]; 
 
   useLayoutEffect(() => {
@@ -46,7 +48,7 @@ export function WordModal({
       const controls = animate(y, 0, { duration: SYNC_DURATION, ease: SYNC_EASE as any });
       
       if (anchor === 'top' && !isLoading && scrollRef.current) {
-        scrollRef.current.scrollTop = 9999; // word is at bottom edge
+        scrollRef.current.scrollTop = 9999; 
       }
       return () => controls.stop();
     } else {
@@ -198,6 +200,7 @@ export function WordModal({
   };
 
   const handleManualClose = () => {
+     if (onDismissStart) onDismissStart();
      const targetY = anchor === 'bottom' ? 800 : -800;
      animate(y, targetY, { duration: SYNC_DURATION, ease: SYNC_EASE as any }).then(() => onClose());
   };
@@ -241,6 +244,8 @@ export function WordModal({
                 animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
               }
             }}
+            exit={{ y: anchor === 'bottom' ? 800 : -800 }}
+            transition={{ duration: SYNC_DURATION, ease: SYNC_EASE as any }}
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
@@ -261,7 +266,6 @@ export function WordModal({
               flexDirection: 'column'
             }}
           >
-            {/* Grab Bar at Bottom for Dropdown, Top for Popup */}
             {anchor === 'bottom' && (
                <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
                  <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
