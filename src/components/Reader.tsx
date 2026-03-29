@@ -102,10 +102,10 @@ export function Reader() {
 
   const determineAnchor = (e: any) => {
     const y = 'clientY' in e ? e.clientY : (e.touches?.[0]?.clientY || 0);
-    // USER: "If the word is at the top the drawer should come up from the bottom"
-    // So if y is small (Top), anchor is Bottom.
-    // If y is large (Bottom), anchor is Top.
-    setDrawerAnchor(y < window.innerHeight / 2 ? 'bottom' : 'top');
+    // USER: "prefereably drop down from the top unless there is not enough space"
+    // We favor Top anchor (Word at bottom half)
+    // Threshold biased towards Top: if word is below 38vh, use Top.
+    setDrawerAnchor(y > window.innerHeight * 0.38 ? 'top' : 'bottom');
   };
 
   const handleWordClick = (details: WordDetails, e: any) => {

@@ -169,13 +169,15 @@ ruby.peek-furigana rt {
 }
 
 .word-highlight {
-  background-color: #dcfce7 !important;
-  box-shadow: 0 0 0 2px #dcfce7;
+  background-color: #4a5d23 !important; /* Dark Olive */
+  color: #f5f5f0 !important; /* Off-white / Ivory */
+  box-shadow: 0 0 0 2px #4a5d23;
   border-radius: 2px;
+  padding: 0 2px;
 }
 
 .sentence-highlight {
-  background-color: rgba(74, 222, 128, 0.15) !important;
+  background-color: rgba(74, 93, 35, 0.2) !important;
   border-radius: 4px;
 }
 

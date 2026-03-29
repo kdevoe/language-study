@@ -4,7 +4,6 @@ import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
 
-
 export interface WordDetails {
   word: string;
   reading: string;
@@ -67,7 +66,7 @@ export function WordModal({
                 <span>AI 翻訳中...</span>
              </div>
           ) : (
-            <p className="sans" style={{ fontSize: '1.2rem', lineHeight: 1.6, color: 'var(--text-main)', paddingLeft: '0.5rem', borderLeft: '3px solid var(--accent-primary)' }}>
+            <p className="sans" style={{ fontSize: '1.2rem', lineHeight: 1.6, color: 'var(--text-main)', paddingLeft: '0.5rem', borderLeft: '3px solid #4a5d23' }}>
               {sentenceTranslation}
             </p>
           )}
@@ -105,7 +104,7 @@ export function WordModal({
       ),
       translation: (
         <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '2rem', color: 'var(--text-main)', lineHeight: 1.7, textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          <span className="sans" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.5rem' }}>文</span> {wordData.meaning}
+          <span className="sans" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.5rem', color: '#4a5d23' }}>文</span> {wordData.meaning}
         </p>
       ),
       mastery: (
@@ -149,8 +148,8 @@ export function WordModal({
         </div>
       ),
       grammar: wordData.grammarNote && (
-        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', borderLeft: '4px solid var(--text-main)', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', letterSpacing: '0.05em' }}><BookOpen size={14} /> GRAMMAR NOTE</div>
+        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', borderLeft: '4px solid #4a5d23', marginBottom: '2rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', letterSpacing: '0.05em' }}><BookOpen size={14} /> GRAMMAR NOTE</div>
           <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.05rem', lineHeight: 1.8 }}>{wordData.grammarNote}</p>
         </div>
       ),
@@ -204,32 +203,33 @@ export function WordModal({
             }}
           />
           <motion.div
-            ref={scrollRef}
             drag="y" 
             dragDirectionLock={true} 
             dragConstraints={{ 
               top: anchor === 'top' ? -1000 : 0, 
-              bottom: anchor === 'bottom' ? 1000 : 0 
+              bottom: anchor === 'bottom' ? 1000 : -1000,
+              left: 0, right: 0
             }} 
-            dragElastic={0.9}
+            dragElastic={0.4}
             onDragEnd={(_, info) => {
-              const velocity = info.velocity.y;
-              const offset = info.offset.y;
+              const vy = info.velocity.y;
+              const dy = info.offset.y;
+
               const shouldClose = anchor === 'bottom' 
-                ? (velocity > 500 || offset > 150) 
-                : (velocity < -500 || offset < -150);
+                ? (vy > 500 || dy > 120) 
+                : (vy < -500 || dy < -120);
 
               if (shouldClose) {
                 const targetY = anchor === 'bottom' ? 600 : -600;
-                animate(y, targetY, { duration: 0.2, ease: "easeOut" }).then(() => onClose());
+                animate(y, targetY, { duration: 0.25, ease: "easeOut" }).then(() => onClose());
               } else {
-                animate(y, 0, { type: 'spring', damping: 18, stiffness: 350 });
+                animate(y, 0, { type: 'spring', damping: 25, stiffness: 400 });
               }
             }}
             initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
             animate={{ y: 0 }}
             exit={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} // Smooth circ-style ease for entrance
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
@@ -237,24 +237,33 @@ export function WordModal({
               backgroundColor: 'var(--bg-pure)',
               [anchor === 'bottom' ? 'borderTopLeftRadius' : 'borderBottomLeftRadius']: '32px',
               [anchor === 'bottom' ? 'borderTopRightRadius' : 'borderBottomRightRadius']: '32px',
-              padding: '2rem 1.75rem', 
+              padding: '1.25rem 1.75rem', 
               paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
-              maxHeight: '42vh', 
-              overflowY: 'auto', 
-              touchAction: 'pan-y',
+              maxHeight: '45vh', 
+              overflowY: 'hidden', 
+              touchAction: 'none',
               display: 'flex',
               flexDirection: 'column'
             }}
           >
-            {anchor === 'bottom' && (
-               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', flexShrink: 0 }}>
-                 <div style={{ width: '48px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
-               </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.4rem 0', cursor: 'grab', flexShrink: 0 }}>
+              <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
+            </div>
 
-            <div style={{ flex: 1 }}>
+            <div 
+              ref={scrollRef}
+              className="modal-content-scroller"
+              style={{ 
+                flex: 1, 
+                overflowY: 'auto', 
+                touchAction: 'pan-y',
+                WebkitOverflowScrolling: 'touch',
+                paddingTop: anchor === 'bottom' ? 0 : '1rem'
+              }}
+              onPointerDown={(e) => e.stopPropagation()} 
+            >
               {isLoading && mode === 'word' ? (
                   <div style={{ padding: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)' }}>
@@ -264,12 +273,6 @@ export function WordModal({
                   </div>
               ) : renderContent()}
             </div>
-
-            {anchor === 'top' && (
-               <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', flexShrink: 0 }}>
-                 <div style={{ width: '48px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
-               </div>
-            )}
           </motion.div>
         </>
       )}
