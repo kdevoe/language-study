@@ -108,6 +108,26 @@ Output EXACTLY JSON matching this interface:
   }
 }
 
+export async function fetchSentenceTranslation(sentence: string, contextArticle: string): Promise<string> {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) return "API Key missing.";
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `Translate this Japanese sentence into natural, elegant English: "${sentence}"
+    Context of the article: "${contextArticle.substring(0, 500)}..."
+    Just provide the English translation, no other text.`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (error) {
+    console.error("Translation Error:", error);
+    return "Failed to translate sentence.";
+  }
+}
+
 import { rtkKanjiList } from '../data/rtkKanji';
 
 // In the future this will call Google Gemini API

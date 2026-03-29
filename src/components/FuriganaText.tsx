@@ -6,52 +6,46 @@ interface Props {
   word: string;
   furigana?: string;
   mode?: FuriganaMode;
-  isKnown?: boolean;
-  onClick?: () => void;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent | React.TouchEvent) => void;
 }
 
-export function FuriganaText({ word, furigana, onClick }: Props) {
-  const [showFurigana, setShowFurigana] = useState(false);
+export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
+  const [isPeeking, setIsPeeking] = useState(false);
   const timerRef = useRef<number | null>(null);
-  const isLongPressRef = useRef(false);
+  const startTime = useRef(0);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    isLongPressRef.current = false;
-    
-    if (e.pointerType === 'mouse') return;
+  const handlePointerDown = () => {
+    startTime.current = Date.now();
+    if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = window.setTimeout(() => {
-      isLongPressRef.current = true;
-      if (navigator.vibrate) navigator.vibrate(50);
-      if (onClick) onClick();
-    }, 450);
+      if (furigana) {
+        setIsPeeking(true);
+        if (navigator.vibrate) navigator.vibrate(40);
+      }
+    }, 350);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    const duration = Date.now() - startTime.current;
 
-    if (e.pointerType === 'mouse') {
-      e.preventDefault();
-      if (onClick) onClick();
-      return;
-    }
-
-    if (!isLongPressRef.current && furigana) {
-      e.preventDefault();
-      setShowFurigana(!showFurigana);
-    } else if (!isLongPressRef.current && !furigana && onClick) {
-      // It's a short touch but there is no furigana to show, so execute click handler directly
-      e.preventDefault();
-      onClick();
+    if (isPeeking) {
+      setIsPeeking(false);
+    } else if (duration < 350) {
+      if (onClick) onClick(e);
     }
   };
 
   const handlePointerLeave = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    setIsPeeking(false);
   };
 
   if (!furigana) {
     return <span 
+      className={isSelected ? 'word-highlight' : ''}
       onPointerDown={handlePointerDown} 
       onPointerUp={handlePointerUp} 
       onPointerLeave={handlePointerLeave}
@@ -60,7 +54,7 @@ export function FuriganaText({ word, furigana, onClick }: Props) {
 
   return (
     <ruby 
-      className={showFurigana ? 'force-show' : ''}
+      className={`${isPeeking ? 'peek-furigana' : ''} ${isSelected ? 'word-highlight' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerLeave}

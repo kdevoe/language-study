@@ -142,6 +142,44 @@ ruby, span[onClick], .FuriganaText, button {
   -webkit-tap-highlight-color: transparent;
 }
 
+ruby.peek-furigana {
+  position: relative;
+  z-index: 100;
+}
+
+ruby.peek-furigana rt {
+  opacity: 1 !important;
+  transform: scale(1.15) !important;
+  display: block;
+  position: absolute;
+  bottom: 110%;
+  left: 50%;
+  transform-origin: bottom center;
+  transform: translateX(-50%) translateY(-4px) !important;
+  background-color: var(--bg-pure);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  z-index: 1000;
+  pointer-events: none;
+  font-size: 0.9rem !important;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.word-highlight {
+  background-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px var(--accent-primary);
+  border-radius: 2px;
+}
+
+.sentence-highlight {
+  background-color: rgba(212, 224, 232, 0.4) !important;
+  border-radius: 4px;
+}
+
 @keyframes lucide-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
