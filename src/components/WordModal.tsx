@@ -33,18 +33,17 @@ export function WordModal({
   const wordDatabase = useAppStore(state => state.wordDatabase);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // UNIVERSAL PHYSICS - Deliberate, Luxurious, Symmetric
-  const SYNC_DURATION = 0.85;
-  const SYNC_EASE = [0.22, 1, 0.36, 1]; // Quart/Quint out
+  // EXTREME LUXE DURATION - VERY SLOW AND SYMMETRIC (1.05s)
+  const SYNC_DURATION = 1.05;
+  const SYNC_EASE = [0.16, 1, 0.3, 1]; // Gentle, iOS-style heavy deceleration
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      // Word is at bottom edge for dropdowns
       if (anchor === 'top' && !isLoading && scrollRef.current) {
         setTimeout(() => {
           if (scrollRef.current) scrollRef.current.scrollTop = 9999;
-        }, 30);
+        }, 50);
       }
     } else {
       document.body.style.overflow = 'auto';
@@ -236,11 +235,10 @@ export function WordModal({
               if (shouldClose) {
                 executeClose();
               }
-              // Framer Motion automatically spring-backs if we don't unmount
             }}
-            initial={{ y: anchor === 'bottom' ? '100%' : '-100%', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: anchor === 'bottom' ? '110%' : '-110%', opacity: 0 }}
+            initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: anchor === 'bottom' ? '120%' : '-120%' }} // NO OPACITY ON EXIT
             transition={{ duration: SYNC_DURATION, ease: SYNC_EASE as any }}
             style={{
               position: 'fixed',
