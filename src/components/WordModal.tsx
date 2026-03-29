@@ -1,8 +1,8 @@
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Loader2, Sparkles } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
-import { useEffect, useRef, useLayoutEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface WordDetails {
   word: string;
@@ -15,7 +15,7 @@ export interface WordDetails {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onDismissStart?: () => void; // New callback to clear highlights instantly
+  onDismissStart?: () => void; 
   mode: 'word' | 'sentence';
   wordData: WordDetails | null;
   sentenceText?: string;
@@ -31,30 +31,26 @@ export function WordModal({
   anchor, onSetMastery, isLoading 
 }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
-  const y = useMotionValue(0);
-  const opacityModal = useTransform(y, [-600, -300, 0, 300, 600], [0, 0.5, 1, 0.5, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // EXTRA LUXE DURATION - VERY SLOW AND SYMMETRIC
-  const SYNC_DURATION = 0.8;
-  const SYNC_EASE = [0.22, 1, 0.36, 1]; 
+  // UNIVERSAL PHYSICS - Deliberate, Luxurious, Symmetric
+  const SYNC_DURATION = 0.85;
+  const SYNC_EASE = [0.22, 1, 0.36, 1]; // Quart/Quint out
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      const startPos = anchor === 'bottom' ? 800 : -800;
-      y.set(startPos);
-      
-      const controls = animate(y, 0, { duration: SYNC_DURATION, ease: SYNC_EASE as any });
-      
+      // Word is at bottom edge for dropdowns
       if (anchor === 'top' && !isLoading && scrollRef.current) {
-        scrollRef.current.scrollTop = 9999; 
+        setTimeout(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = 9999;
+        }, 30);
       }
-      return () => controls.stop();
     } else {
       document.body.style.overflow = 'auto';
     }
-  }, [isOpen, anchor, y, isLoading]);
+    return () => { document.body.style.overflow = 'auto'; };
+  }, [isOpen, anchor, isLoading]);
 
   useEffect(() => {
     if (isOpen && anchor === 'top' && !isLoading && scrollRef.current) {
@@ -199,10 +195,9 @@ export function WordModal({
     );
   };
 
-  const handleManualClose = () => {
-     if (onDismissStart) onDismissStart();
-     const targetY = anchor === 'bottom' ? 800 : -800;
-     animate(y, targetY, { duration: SYNC_DURATION, ease: SYNC_EASE as any }).then(() => onClose());
+  const executeClose = () => {
+    if (onDismissStart) onDismissStart();
+    onClose();
   };
 
   return (
@@ -213,7 +208,7 @@ export function WordModal({
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            onClick={handleManualClose}
+            onClick={executeClose}
             transition={{ duration: SYNC_DURATION }}
             style={{ 
               position: 'fixed', 
@@ -239,15 +234,15 @@ export function WordModal({
                 : (vy < -250 || dy < -40);
 
               if (shouldClose) {
-                handleManualClose();
-              } else {
-                animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
+                executeClose();
               }
+              // Framer Motion automatically spring-backs if we don't unmount
             }}
-            exit={{ y: anchor === 'bottom' ? 800 : -800 }}
+            initial={{ y: anchor === 'bottom' ? '100%' : '-100%', opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: anchor === 'bottom' ? '110%' : '-110%', opacity: 0 }}
             transition={{ duration: SYNC_DURATION, ease: SYNC_EASE as any }}
             style={{
-              y, opacity: opacityModal,
               position: 'fixed',
               [anchor === 'bottom' ? 'bottom' : 'top']: 0, left: 0, right: 0,
               backgroundColor: 'var(--bg-pure)',
