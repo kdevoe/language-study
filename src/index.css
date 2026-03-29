@@ -169,16 +169,25 @@ ruby.peek-furigana rt {
 }
 
 .word-highlight {
-  background-color: rgba(74, 93, 35, 0.12) !important; 
+  background: linear-gradient(
+    transparent 45%, 
+    rgba(74, 93, 35, 0.18) 45%, 
+    rgba(74, 93, 35, 0.18) 85%, 
+    transparent 85%
+  ) !important;
   color: var(--text-main) !important;
-  box-shadow: 0 0 0 1px rgba(74, 93, 35, 0.2);
-  border-radius: 4px;
-  padding: 0 2px;
+  border-radius: 100px;
+  padding: 0 6px;
+  margin: 0 -2px;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .sentence-highlight {
-  background-color: rgba(74, 93, 35, 0.08) !important;
-  border-radius: 6px;
+  background-color: rgba(74, 93, 35, 0.06) !important;
+  border-radius: 8px;
+  padding: 2px 4px;
 }
 
 @keyframes lucide-spin {

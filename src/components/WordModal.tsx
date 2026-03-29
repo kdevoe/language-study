@@ -195,12 +195,11 @@ export function WordModal({
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
             onClick={onClose}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.4 }}
             style={{ 
               position: 'fixed', 
               top: 0, left: 0, right: 0, bottom: 0, 
-              backgroundColor: 'rgba(245, 245, 240, 0.4)',
-              backdropFilter: 'blur(2px)', 
+              backgroundColor: 'transparent', // NO BACKGROUND DIMMING
               zIndex: 40 
             }}
           />
@@ -212,18 +211,19 @@ export function WordModal({
               bottom: anchor === 'bottom' ? 1000 : 0,
               left: 0, right: 0
             }} 
-            dragElastic={0.5}
+            dragElastic={0.08} // Stiffer elastic for more direct "swipe-to-close" feedback
             onDragEnd={(_, info) => {
               const vy = info.velocity.y;
               const dy = info.offset.y;
 
+              // Sensitized dismissal: Any significant drag in the closing direction
               const shouldClose = anchor === 'bottom' 
-                ? (vy > 300 || dy > 90) 
-                : (vy < -300 || dy < -90);
+                ? (vy > 250 || dy > 40) 
+                : (vy < -250 || dy < -40);
 
               if (shouldClose) {
                 const targetY = anchor === 'bottom' ? 800 : -800;
-                animate(y, targetY, { duration: 0.3, ease: "easeOut" }).then(() => onClose());
+                animate(y, targetY, { duration: 0.35, ease: [0.33, 1, 0.68, 1] }).then(() => onClose());
               } else {
                 animate(y, 0, { type: 'spring', damping: 25, stiffness: 350 });
               }
@@ -231,7 +231,7 @@ export function WordModal({
             initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
             animate={{ y: 0 }}
             exit={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] } as any}
+            transition={{ duration: 0.55, ease: [0.33, 1, 0.68, 1] } as any} // Slower, luxurious easing
             style={{
               y, opacity: opacityModal,
               position: 'fixed',
@@ -252,7 +252,6 @@ export function WordModal({
               flexDirection: 'column'
             }}
           >
-            {/* Expanded Drag Handover Area */}
             <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
               <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
             </div>
@@ -268,7 +267,13 @@ export function WordModal({
               }}
               onPointerDown={(e) => {
                  const isAtStart = scrollRef.current?.scrollTop === 0;
-                 if (!isAtStart) e.stopPropagation();
+                 const isAtEnd = Math.abs((scrollRef.current?.scrollHeight || 0) - (scrollRef.current?.scrollTop || 0) - (scrollRef.current?.clientHeight || 0)) < 1;
+
+                 // Allow drag to bubble for dismiss if we are at the boundaries
+                 if (anchor === 'bottom' && isAtStart) return;
+                 if (anchor === 'top' && isAtEnd) return;
+                 
+                 e.stopPropagation();
               }}
             >
               {isLoading && mode === 'word' ? (
