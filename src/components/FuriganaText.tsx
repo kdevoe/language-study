@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 type FuriganaMode = 'always' | 'never' | 'dynamic';
 
@@ -12,17 +13,28 @@ interface Props {
 
 export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
   const [isPeeking, setIsPeeking] = useState(false);
+  const [peekPos, setPeekPos] = useState({ top: 0, left: 0 });
   const timerRef = useRef<number | null>(null);
   const startTime = useRef(0);
+  const spanRef = useRef<HTMLSpanElement>(null);
 
   const handlePointerDown = () => {
     startTime.current = Date.now();
     if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = window.setTimeout(() => {
-      if (furigana) {
-        setIsPeeking(true);
-        if (navigator.vibrate) navigator.vibrate(40);
+      if (furigana && furigana.trim() !== '') {
+        const rect = spanRef.current?.getBoundingClientRect();
+        if (rect) {
+          // USER: "overlapping the row above... my finger is usually in the way"
+          // We'll put it 50px above the word top
+          setPeekPos({
+            top: rect.top - 55,
+            left: rect.left + rect.width / 2
+          });
+          setIsPeeking(true);
+          if (navigator.vibrate) navigator.vibrate(40);
+        }
       }
     }, 350);
   };
@@ -43,24 +55,47 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
     setIsPeeking(false);
   };
 
-  if (!furigana || furigana.trim() === '') {
-    return <span 
-      className={isSelected ? 'word-highlight' : ''}
-      onPointerDown={handlePointerDown} 
-      onPointerUp={handlePointerUp} 
-      onPointerLeave={handlePointerLeave}
-    >{word}</span>;
-  }
-
   return (
-    <ruby 
-      className={`${isPeeking ? 'peek-furigana' : ''} ${isSelected ? 'word-highlight' : ''}`}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerLeave}
-    >
-      {word}
-      <rt>{furigana}</rt>
-    </ruby>
+    <>
+      <span 
+        ref={spanRef}
+        className={isSelected ? 'word-highlight' : ''}
+        onPointerDown={handlePointerDown} 
+        onPointerUp={handlePointerUp} 
+        onPointerLeave={handlePointerLeave}
+        style={{ cursor: 'pointer', touchAction: 'none' }}
+      >
+        {word}
+      </span>
+
+      {isPeeking && furigana && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: peekPos.top,
+          left: peekPos.left,
+          transform: 'translateX(-50%)',
+          backgroundColor: 'var(--bg-pure)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+          color: 'var(--text-main)',
+          padding: '10px 16px',
+          borderRadius: '12px',
+          border: '1px solid var(--border-light)',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          fontSize: '1.2rem',
+          fontWeight: 700,
+          whiteSpace: 'nowrap',
+          lineHeight: 1,
+          fontFamily: 'var(--font-sans)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          animation: 'peekFadeIn 0.15s ease-out forwards'
+        }}>
+          {furigana}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }

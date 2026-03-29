@@ -2,7 +2,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from '
 import { BookOpen, Loader2, Sparkles } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface WordDetails {
   word: string;
@@ -33,19 +33,24 @@ export function WordModal({
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-400, 0, 400], [-10, 0, 10]);
   const opacityModal = useTransform(x, [-400, -200, 0, 200, 400], [0, 0.5, 1, 0.5, 0]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       x.set(0); 
+      // Auto-scroll to bottom if anchored at top, so header is immediately visible
+      if (anchor === 'top' && scrollRef.current) {
+        setTimeout(() => {
+           if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }, 50);
+      }
     } else {
       document.body.style.overflow = 'auto';
     }
     return () => { document.body.style.overflow = 'auto'; };
-  }, [isOpen, x]);
+  }, [isOpen, anchor, x]);
   
-  if (!isOpen) return null;
-
   // Determine sections based on mode
   const renderContent = () => {
     if (mode === 'sentence') {
@@ -80,7 +85,7 @@ export function WordModal({
     // Define dictionary sections
     const sections = {
       header: (
-        <div key="header" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div key="header" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
           {wordData.furiganaMap ? (
             wordData.furiganaMap.map((fm, idx) => (
               <div key={idx} style={{ 
@@ -102,7 +107,7 @@ export function WordModal({
         </div>
       ),
       translation: (
-        <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '2rem', color: 'var(--text-main)', lineHeight: 1.7 }}>
+        <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '2rem', color: 'var(--text-main)', lineHeight: 1.7, textAlign: anchor === 'top' ? 'center' : 'left' }}>
           <span className="sans" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.5rem' }}>文</span> {wordData.meaning}
         </p>
       ),
@@ -202,6 +207,7 @@ export function WordModal({
             }}
           />
           <motion.div
+            ref={scrollRef}
             drag="x" 
             dragDirectionLock={true} 
             dragConstraints={{ left: -1000, right: 1000, top: 0, bottom: 0 }} 
@@ -231,26 +237,30 @@ export function WordModal({
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
               maxHeight: '42vh', 
               overflowY: 'auto', 
-              touchAction: 'pan-y'
+              touchAction: 'pan-y',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
             {anchor === 'bottom' && (
-               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', flexShrink: 0 }}>
                  <div style={{ width: '48px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
 
-            {isLoading && mode === 'word' ? (
-                <div style={{ padding: '2rem' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)' }}>
-                    <Loader2 className="lucide-spin" size={24} />
-                    <span className="serif" style={{ fontSize: '1.1rem' }}>辞書を引いています...</span>
+            <div style={{ flex: 1 }}>
+              {isLoading && mode === 'word' ? (
+                  <div style={{ padding: '2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)' }}>
+                      <Loader2 className="lucide-spin" size={24} />
+                      <span className="serif" style={{ fontSize: '1.1rem' }}>辞書を引いています...</span>
+                    </div>
                   </div>
-                </div>
-            ) : renderContent()}
+              ) : renderContent()}
+            </div>
 
             {anchor === 'top' && (
-               <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
+               <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', flexShrink: 0 }}>
                  <div style={{ width: '48px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
