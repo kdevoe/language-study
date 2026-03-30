@@ -59,7 +59,7 @@ export function WordModal({
   const renderContent = () => {
     if (mode === 'sentence') {
       return (
-        <div style={{ padding: '0.15rem 0' }}>
+        <div style={{ padding: '0.1rem 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
             <Sparkles size={13} color="var(--text-muted)" />
             <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>SENTENCE TRANSLATION</span>
@@ -87,35 +87,42 @@ export function WordModal({
 
     const sections = {
       header: (
-        <div key="header" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.2rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
+        <div key="header" style={{ 
+          marginBottom: '0.6rem', 
+          display: 'flex', 
+          gap: '1.25rem', // LARGE HORIZONTAL SPREAD
+          flexWrap: 'wrap', 
+          alignItems: 'flex-end', 
+          justifyContent: anchor === 'top' ? 'center' : 'flex-start' 
+        }}>
           {wordData.furiganaMap ? (
             wordData.furiganaMap.map((fm, idx) => (
               <div key={idx} style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 
-                alignItems: 'center',
-                marginRight: idx < wordData.furiganaMap!.length - 1 ? '0.1rem' : 0
+                alignItems: 'center'
               }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '0.05rem', fontFamily: 'var(--font-sans)', fontWeight: 700 }}>{fm.kana}</span>
-                <span className="serif" style={{ fontSize: '2.5rem', lineHeight: 0.9, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '0.05rem', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{fm.kana}</span>
+                <span className="serif" style={{ fontSize: '2.6rem', lineHeight: 0.9, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
                 {rtkKanjiMap[fm.kanji] && (
-                  <span style={{ fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.15rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
                     {rtkKanjiMap[fm.kanji]}
                   </span>
                 )}
               </div>
             ))
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{wordData.reading}</span>
-              <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', letterSpacing: '0.2em', marginBottom: '0.15rem', fontFamily: 'var(--font-sans)', fontWeight: 700, textAlign: 'center' }}>{wordData.reading}</span>
+              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-end', justifyContent: 'center' }}>
                 {Array.from(wordData.word).map((char, i) => {
                   const keyword = rtkKanjiMap[char];
-                  if (!keyword) return <span key={i} className="serif" style={{ fontSize: '2.5rem', lineHeight: 0.9, color: 'var(--text-main)', fontWeight: 500 }}>{char}</span>;
                   return (
                     <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <span className="serif" style={{ fontSize: '2.5rem', lineHeight: 0.9, color: 'var(--text-main)', fontWeight: 500 }}>{char}</span>
-                      <span style={{ fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.15rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>{keyword}</span>
+                      <span className="serif" style={{ fontSize: '2.6rem', lineHeight: 0.9, color: 'var(--text-main)', fontWeight: 500 }}>{char}</span>
+                      {keyword && (
+                        <span style={{ fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>{keyword}</span>
+                      )}
                     </div>
                   );
                 })}
@@ -125,8 +132,8 @@ export function WordModal({
         </div>
       ),
       translation: (
-        <p key="translation" className="serif" style={{ fontSize: '1.2rem', marginBottom: '0.75rem', color: 'var(--text-main)', lineHeight: 1.4, textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          <span className="sans" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.3rem', color: '#4a5d23', fontWeight: 800 }}>文</span> {wordData.meaning}
+        <p key="translation" className="serif" style={{ fontSize: '1.15rem', marginBottom: '0.85rem', color: 'var(--text-main)', lineHeight: 1.4, textAlign: anchor === 'top' ? 'center' : 'left' }}>
+          <span className="sans" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 800 }}>文</span> {wordData.meaning}
         </p>
       ),
       mastery: (
@@ -163,7 +170,7 @@ export function WordModal({
         </div>
       ),
       status: stats && stats.timesSeen > 0 && (
-        <div key="status" style={{ display: 'flex', gap: '0.5rem', padding: '0.4rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '6px', marginBottom: '0.1rem' }}>
+        <div key="status" style={{ display: 'flex', gap: '0.4rem', padding: '0.3rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '6px', marginBottom: '0.1rem' }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)' }}>SEEN</div>
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>{stats.timesSeen} <span style={{fontSize: '0.65rem', fontWeight: 400}}>x</span></div>
@@ -188,7 +195,7 @@ export function WordModal({
       <div style={{ 
         display: 'flex', 
         flexDirection: anchor === 'bottom' ? 'column' : 'column-reverse',
-        gap: '0.15rem'
+        gap: '0.1rem'
       }}>
         {orderedList.map(s => s)}
       </div>
@@ -249,7 +256,7 @@ export function WordModal({
               borderBottomRightRadius: anchor === 'top' ? '20px' : 0,
               borderTopLeftRadius: anchor === 'bottom' ? '20px' : 0,
               borderTopRightRadius: anchor === 'bottom' ? '20px' : 0,
-              padding: '0.3rem 1.25rem', 
+              padding: '0.2rem 1.25rem', 
               paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom))',
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
@@ -261,7 +268,7 @@ export function WordModal({
             }}
           >
             {anchor === 'bottom' && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.15rem 0 0.3rem 0', cursor: 'grab', flexShrink: 0 }}>
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.1rem 0 0.2rem 0', cursor: 'grab', flexShrink: 0 }}>
                  <div style={{ width: '28px', height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
@@ -295,7 +302,7 @@ export function WordModal({
             </div>
 
             {anchor === 'top' && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.3rem 0 0.15rem 0', cursor: 'grab', flexShrink: 0 }}>
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.2rem 0 0.1rem 0', cursor: 'grab', flexShrink: 0 }}>
                  <div style={{ width: '28px', height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
