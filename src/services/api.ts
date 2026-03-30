@@ -80,7 +80,7 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash", 
+      model: "gemini-2.0-flash", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
@@ -121,7 +121,7 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Translate this Japanese sentence into natural, elegant English: "${sentence}"
     Context of the article: "${contextArticle.substring(0, 500)}..."
@@ -158,7 +158,7 @@ export async function rewriteArticleWithGemini(
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", 
+      model: "gemini-2.0-flash", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
