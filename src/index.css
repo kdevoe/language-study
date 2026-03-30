@@ -170,24 +170,30 @@ ruby.peek-furigana rt {
 
 .word-highlight {
   position: relative;
-  display: inline;
+  display: inline-block; 
   color: var(--text-main) !important;
-  z-index: 1;
+  z-index: 10;
+  transform: scale(1.15) translateY(-1px);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0 2px;
 }
 
 .word-highlight::after {
   content: "";
   position: absolute;
-  /* Fixed vertical offsets in EM to prevent vertical 'shield' stretching */
-  top: 0.22em; 
-  bottom: 0.15em; 
-  left: -1px; 
-  right: -1px;
-  background-color: rgba(74, 93, 35, 0.12);
-  border-radius: 100px;
+  /* Horizontal pill with generous spill for Frosted Glass blur */
+  top: 0.18em; 
+  bottom: 0.12em; 
+  left: -14px; 
+  right: -14px;
+  background-color: rgba(245, 245, 240, 0.45); /* "Glass" frosted tint */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 999px;
   z-index: -1;
-  /* Subtle 3D base-line */
-  border-bottom: 1px solid rgba(74, 93, 35, 0.2);
+  /* Premium finish shadow */
+  border: 1px solid rgba(74, 93, 35, 0.15);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
   pointer-events: none;
 }
 
