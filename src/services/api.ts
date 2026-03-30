@@ -80,22 +80,29 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", 
+      model: "gemini-1.5-flash", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
-    const prompt = `You are a Japanese dictionary. Define the precise word "${word}" based on this context: "${contextSentence}".
-Output EXACTLY JSON matching this interface:
-{
-  "word": "${word}",
-  "reading": "the entire kana reading",
-  "meaning": "Short concise English meaning",
-  "grammarNote": "Any quick contextual grammar notes",
-  "furiganaMap": [
-    { "kanji": "first character", "kana": "reading of first character" },
-    { "kanji": "second character", "kana": "reading of second character" }
-  ] // You MUST include this array mapping exactly how the reading breaks down per character in the word. For pure Kana words, just put the whole word as one character map.
-}`;
+    const prompt = `You are a high-fidelity Japanese dictionary. Define the exact word "${word}" based on this context: "${contextSentence}".
+    
+    CRITICAL INSTRUCTION: You MUST provide a 1:1 "furiganaMap" that segments the word into individual characters. 
+    - Kanji: provide the specific kana reading for that kanji.
+    - Kana (Okurigana): provide the kana itself.
+    - Every character in the "word" must be accounted for in the map.
+
+    Example for "安全": [{"kanji": "安", "kana": "あん"}, {"kanji": "全", "kana": "ぜん"}]
+    Example for "早い": [{"kanji": "早", "kana": "はや"}, {"kanji": "い", "kana": "い"}]
+    Example for "食べる": [{"kanji": "食", "kana": "た"}, {"kanji": "べ", "kana": "べ"}, {"kanji": "る", "kana": "る"}]
+
+    Output EXACTLY JSON:
+    {
+      "word": "${word}",
+      "reading": "the full reading",
+      "meaning": "Concise English translation",
+      "grammarNote": "Brief usage/grammar note",
+      "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
+    }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();

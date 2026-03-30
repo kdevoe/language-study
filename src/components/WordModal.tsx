@@ -62,9 +62,9 @@ export function WordModal({
         <div style={{ padding: '0.1rem 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
             <Sparkles size={13} color="var(--text-muted)" />
-            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>SENTENCE ANALYSIS</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>AI SENTENCE ANALYSIS</span>
           </div>
-          <p className="serif" style={{ fontSize: '1.2rem', lineHeight: 1.45, color: 'var(--text-main)', marginBottom: '0.85rem', backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px' }}>
+          <p className="serif" style={{ fontSize: '1.25rem', lineHeight: 1.45, color: 'var(--text-main)', marginBottom: '0.85rem', backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px' }}>
             {sentenceText}
           </p>
           {isLoading ? (
@@ -85,41 +85,69 @@ export function WordModal({
     const stats = wordDatabase[wordData.word];
     const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
 
+    // TRACKING BRAIN: Heuristic fallback for words without an explicit LLM map
+    const getTrackedSegments = () => {
+      if (wordData.furiganaMap && wordData.furiganaMap.length > 0) return wordData.furiganaMap;
+      
+      const chars = Array.from(wordData.word);
+      const r = wordData.reading;
+      
+      // RULE 1: Exact 2:1 or 1:1 fits (Anzen, MA)
+      if (chars.length > 1 && r.length === chars.length * 2) {
+         return chars.map((c, i) => ({ kanji: c, kana: r.substr(i*2, 2) }));
+      }
+      if (chars.length > 1 && r.length === chars.length) {
+         return chars.map((c, i) => ({ kanji: c, kana: r[i] }));
+      }
+
+      // RULE 2: Simple Mixed Script Split (Kanji + Okurigana trailing)
+      const isKana = (c: string) => !!c.match(/[\u3040-\u309f\u30a0-\u30ff]/);
+      if (chars.length === 2 && !isKana(chars[0]) && isKana(chars[1])) {
+         return [
+           { kanji: chars[0], kana: r.slice(0, Math.max(0, r.length - 1)) },
+           { kanji: chars[1], kana: r.slice(-1) }
+         ];
+      }
+      
+      return null;
+    };
+
+    const segments = getTrackedSegments();
+
     const sections = {
       header: (
         <div key="header" style={{ 
           marginBottom: '0.85rem', 
           display: 'flex', 
-          gap: '1.5rem', 
+          gap: '1.25rem', 
           flexWrap: 'wrap', 
-          alignItems: 'baseline', // STABLE HORIZONTAL BASELINE
+          alignItems: 'baseline', 
           justifyContent: anchor === 'top' ? 'center' : 'flex-start' 
         }}>
-          {wordData.furiganaMap ? (
-            wordData.furiganaMap.map((fm, idx) => (
-              <div key={idx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                {/* Fixed height containers for Kana/RTK to prevent "dropping" of raw characters */}
-                <span style={{ height: '0.9rem', fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{fm.kana || ''}</span>
-                <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
+          {segments ? (
+            segments.map((s, idx) => (
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ height: '0.9rem', fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{s.kana}</span>
+                <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{s.kanji}</span>
                 <span style={{ height: '0.8rem', fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
-                  {rtkKanjiMap[fm.kanji] || ''}
+                  {rtkKanjiMap[s.kanji] || ''}
                 </span>
               </div>
             ))
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', letterSpacing: '0.35rem', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{wordData.reading}</span>
-              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'baseline', justifyContent: 'center' }}>
-                {Array.from(wordData.word).map((char, i) => (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{char}</span>
-                    <span style={{ height: '0.8rem', fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
-                      {rtkKanjiMap[char] || ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '0.25em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{wordData.reading}</span>
+                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'baseline', justifyContent: 'center' }}>
+                  {Array.from(wordData.word).map((char, i) => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{char}</span>
+                      <span style={{ height: '0.8rem', fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
+                        {rtkKanjiMap[char] || ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+             </div>
           )}
         </div>
       ),
@@ -253,7 +281,7 @@ export function WordModal({
               borderTopRightRadius: anchor === 'bottom' ? '24px' : 0,
               padding: '0.1rem 1.5rem', 
               paddingBottom: anchor === 'bottom' ? 'max(0.75rem, env(safe-area-inset-bottom))' : '0.1rem',
-              paddingTop: anchor === 'top' ? '0.1rem' : '0.2rem',
+              paddingTop: anchor === 'top' ? '0.1rem' : '0.1rem',
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
               height: 'auto',
