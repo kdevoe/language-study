@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { touchLock } from '../services/touchLock';
 
@@ -9,7 +9,7 @@ interface Props {
   furigana?: string;
   mode?: FuriganaMode;
   isSelected?: boolean;
-  onClick?: (e: React.MouseEvent | React.TouchEvent) => void;
+  onClick?: (e: any) => void;
 }
 
 export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
@@ -21,14 +21,11 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
   const spanRef = useRef<HTMLSpanElement>(null);
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    // We REMOVED touchAction: none to restore system scrolling. 
-    // We use user-select: none in CSS to prevent blue boxes.
     startTime.current = Date.now();
     startPos.current = { x: e.clientX, y: e.clientY };
     if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = window.setTimeout(() => {
-      // Sensitivity check: don't peek if they started a drag
       const curRect = spanRef.current?.getBoundingClientRect();
       if (curRect && furigana && furigana.trim() !== '') {
         setPeekPos({
@@ -45,8 +42,7 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
     if (timerRef.current) clearTimeout(timerRef.current);
     const duration = Date.now() - startTime.current;
     
-    // Distance check: ignore if they moved more than 25px (scrolling)
-    // We increased this threshold to allow slight "jitters" during tap
+    // Distance check
     const dist = Math.sqrt(Math.pow(e.clientX - startPos.current.x, 2) + Math.pow(e.clientY - startPos.current.y, 2));
     
     if (isPeeking) {
@@ -55,7 +51,7 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
       return;
     }
 
-    if (dist > 15) return; // User is scrolling, not tapping
+    if (dist > 15) return; 
 
     if (duration < 350) {
       if (touchLock.isLocked()) return;
@@ -81,12 +77,30 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
         onPointerLeave={handlePointerLeave}
         style={{ 
           cursor: 'pointer',
-          display: 'inline-block',
+          display: isSelected ? 'inline-block' : 'inline', // matches CSS but keeps baseline stable
           userSelect: 'none',
           WebkitUserSelect: 'none',
-          WebkitTouchCallout: 'none'
+          WebkitTouchCallout: 'none',
+          position: 'relative'
         }}
       >
+        {/* ENLARGED FURIGANA FOR THE PILL VERSION */}
+        {isSelected && furigana && (
+          <span style={{ 
+            position: 'absolute',
+            top: '-0.8em',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '0.5em',
+            fontWeight: 800,
+            color: 'var(--text-muted)',
+            letterSpacing: '0.05em',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none'
+          }}>
+            {furigana}
+          </span>
+        )}
         {word}
       </span>
 
