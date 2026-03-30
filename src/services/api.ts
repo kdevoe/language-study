@@ -80,7 +80,7 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash", 
+      model: "gemini-3.1-flash", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
@@ -121,7 +121,7 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash" });
 
     const prompt = `Translate this Japanese sentence into natural, elegant English: "${sentence}"
     Context of the article: "${contextArticle.substring(0, 500)}..."
@@ -158,7 +158,7 @@ export async function rewriteArticleWithGemini(
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash", 
+      model: "gemini-3.1-flash", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
@@ -184,7 +184,7 @@ export async function rewriteArticleWithGemini(
     
     // --- PASS 1: Content Generation (Plain Text) ---
     const prompt1 = `
-You are a Japanese teacher. Write a 3-paragraph news article in Japanese based on this news.
+You are a Japanese teacher. Imagine you are writing a 3-paragraph news article in Japanese for a learner.
 Language Level: JLPT ${jlptStr}. 
 Student known Kanji: [${knownKanji.join('')}].
 CRITICAL TARGETS: Prioritize using these Kanji: [${recentKanji.join('')}].
@@ -246,21 +246,7 @@ Output EXACTLY a JSON array matching this interface:
     }
     rawText2 = rawText2.replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     
-    // Aggressive debugging for the user
-    console.log("================ PASS 2 COMPLETE ================");
-    console.log("Raw LLM output length:", rawText2.length);
-    console.log("Raw LLM output snippet:", rawText2.substring(0, 300) + "...");
-    
     const parsedBlocks = JSON.parse(rawText2) as ArticleBlock[];
-    
-    // Count furigana to verify feature works
-    let furiganaCount = 0;
-    parsedBlocks.forEach(b => {
-      if (b.content) b.content.forEach(w => { if (w.furigana) furiganaCount++; });
-    });
-    console.log(`Successfully parsed ${parsedBlocks.length} blocks containing ${furiganaCount} total furigana words.`);
-    console.log("==================================================");
-
     return parsedBlocks;
 
   } catch (error) {
