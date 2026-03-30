@@ -80,7 +80,7 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", 
+      model: "gemini-3-flash-preview", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
@@ -121,7 +121,7 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
     const prompt = `Translate this Japanese sentence into natural, elegant English: "${sentence}"
     Context of the article: "${contextArticle.substring(0, 500)}..."
@@ -158,7 +158,7 @@ export async function rewriteArticleWithGemini(
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",  
+      model: "gemini-3-flash-preview", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
@@ -280,7 +280,7 @@ const mockArticles: NewsArticle[] = [
         type: 'yugen-box',
         keyword: '幽玄',
         reading: 'Yūgen',
-        description: '言葉に尽くせない深遠な趣。かすかな兆しの中に美を感じ取る感性。'
+        description: '言葉に尽くせない深遠な趣. かすかな兆しの中に美を感じ取る感性.'
       },
       {
         type: 'paragraph',
