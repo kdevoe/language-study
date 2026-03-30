@@ -197,6 +197,7 @@ Rules:
 4. KANJI PREFERENCE: ${biasInstruction}
 5. VOCABULARY PREFERENCE: ${vocabInstruction}
    While you should keep "CRITICAL TARGETS" and "Target Vocabulary" in mind as excellent candidate words, do not force them into sentences un-naturally unless explicitly told to in the preference rules.
+6. NO MARKUP: DO NOT use brackets [ ], parentheses ( ), or ANY other special characters/formatting around any Japanese words even if they were in your list. 
 
 Output EXACTLY a JSON array matching this interface:
 [
@@ -221,6 +222,7 @@ News Snippet: ${snippet}
 You are a morphological analyzer. I am providing a JSON array containing Japanese text paragraphs.
 You MUST output the exact same JSON structure, BUT for every "text" field, replace it with a "content" array of individual Japanese tokens (verbs, nouns, particles).
 CRITICAL: For EVERY word token that contains Kanji, you MUST provide a "furigana" field showing its reading. 
+CRITICAL: DO NOT keep any brackets [ ] or special markup in the text. Strip all formatting.
 
 Input JSON:
 ${JSON.stringify(rawBlocks, null, 2)}
@@ -269,7 +271,7 @@ const mockArticles: NewsArticle[] = [
         content: [
           { text: '日本文化の根底には、形あるものと同じくらい、形なきものが重要視されるという考え方があります。それが「' },
           { text: '間', furigana: 'ま', isInteractive: true, details: { word: '間', reading: 'MA', meaning: 'Space, interval, pause. The negative space or silence that gives shape to the whole.', grammarNote: 'A critical concept in Japanese aesthetics.' } },
-          { text: '」です。建築、庭園、音楽、そして日常の' },
+          { text: '」です。建築、庭園、音楽、器具、日常の' },
           { text: '言葉', furigana: 'ことば', isInteractive: true, details: { word: '言葉', reading: 'KO-TO-BA', meaning: 'Word, language, or speech. In Japanese aesthetics, the word often carries the weight of "Koto-dama" (the spirit of language).', grammarNote: 'Refers to both individual words and the concept of language in general. Often used to describe the "power of words" (kotodama).' } },
           { text: 'の中に、この静かな空白が息づいています。' },
         ]
