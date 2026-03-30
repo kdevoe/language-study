@@ -35,7 +35,7 @@ export function WordModal({
 
   // EXTREME LUXE DURATION - VERY SLOW AND SYMMETRIC (1.05s)
   const SYNC_DURATION = 1.05;
-  const SYNC_EASE = [0.16, 1, 0.3, 1]; // Gentle, iOS-style heavy deceleration
+  const SYNC_EASE = [0.16, 1, 0.3, 1]; 
 
   useEffect(() => {
     if (isOpen) {
@@ -60,21 +60,21 @@ export function WordModal({
   const renderContent = () => {
     if (mode === 'sentence') {
       return (
-        <div style={{ padding: '0.5rem 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-            <Sparkles size={16} color="var(--text-muted)" />
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>SENTENCE TRANSLATION</span>
+        <div style={{ padding: '0.25rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
+            <Sparkles size={14} color="var(--text-muted)" />
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>SENTENCE TRANSLATION</span>
           </div>
-          <p className="serif" style={{ fontSize: '1.4rem', lineHeight: 1.6, color: 'var(--text-main)', marginBottom: '1.5rem', backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '12px' }}>
+          <p className="serif" style={{ fontSize: '1.25rem', lineHeight: 1.5, color: 'var(--text-main)', marginBottom: '1rem', backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px' }}>
             {sentenceText}
           </p>
           {isLoading ? (
-             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)' }}>
-                <Loader2 className="lucide-spin" size={20} />
-                <span>AI 翻訳中...</span>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-muted)' }}>
+                <Loader2 className="lucide-spin" size={18} />
+                <span style={{ fontSize: '0.9rem' }}>AI 翻訳中...</span>
              </div>
           ) : (
-            <p className="sans" style={{ fontSize: '1.2rem', lineHeight: 1.6, color: 'var(--text-main)', paddingLeft: '0.5rem', borderLeft: '3px solid #4a5d23' }}>
+            <p className="sans" style={{ fontSize: '1.1rem', lineHeight: 1.5, color: 'var(--text-main)', paddingLeft: '0.5rem', borderLeft: '3px solid #4a5d23' }}>
               {sentenceTranslation}
             </p>
           )}
@@ -89,50 +89,50 @@ export function WordModal({
 
     const sections = {
       header: (
-        <div key="header" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
+        <div key="header" style={{ marginBottom: '1rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
           {wordData.furiganaMap ? (
             wordData.furiganaMap.map((fm, idx) => (
               <div key={idx} style={{ 
                 display: 'flex', 
                 flexDirection: 'column-reverse', 
                 alignItems: 'center',
-                marginRight: idx < wordData.furiganaMap!.length - 1 ? '0.2rem' : 0
+                marginRight: idx < wordData.furiganaMap!.length - 1 ? '0.15rem' : 0
               }}>
-                <span className="serif" style={{ fontSize: '3rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
-                <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{fm.kana}</span>
+                <span className="serif" style={{ fontSize: '2.4rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.15rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{fm.kana}</span>
               </div>
             ))
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center' }}>
-              <span className="serif" style={{ fontSize: '3rem', lineHeight: 1.1, color: 'var(--text-main)', fontWeight: 500 }}>{wordData.word}</span>
-              <span style={{ fontSize: '1rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.4rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>{wordData.reading}</span>
+              <span className="serif" style={{ fontSize: '2.4rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{wordData.word}</span>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>{wordData.reading}</span>
             </div>
           )}
         </div>
       ),
       translation: (
-        <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '2rem', color: 'var(--text-main)', lineHeight: 1.7, textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          <span className="sans" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.5rem', color: '#4a5d23' }}>文</span> {wordData.meaning}
+        <p key="translation" className="serif" style={{ fontSize: '1.1rem', marginBottom: '1.25rem', color: 'var(--text-main)', lineHeight: 1.6, textAlign: anchor === 'top' ? 'center' : 'left' }}>
+          <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23' }}>文</span> {wordData.meaning}
         </p>
       ),
       mastery: (
-        <div key="mastery" style={{ marginBottom: '2.5rem' }}>
-          <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '45px', position: 'relative' }}>
+        <div key="mastery" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '3px', height: '38px', position: 'relative' }}>
             {(() => {
               const levels = ['easy', 'medium', 'hard'] as const;
               const activeIndex = levels.indexOf((activeMastery || 'medium') as any);
               return (
                 <>
                   <div style={{
-                    position: 'absolute', top: '4px', bottom: '4px',
-                    left: `calc(4px + ${activeIndex} * (100% - 8px) / 3)`,
-                    width: `calc((100% - 8px) / 3)`,
+                    position: 'absolute', top: '3px', bottom: '3px',
+                    left: `calc(3px + ${activeIndex} * (100% - 6px) / 3)`,
+                    width: `calc((100% - 6px) / 3)`,
                     backgroundColor: 'var(--bg-pure)', borderRadius: '100px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0
                   }} />
                   {levels.map(level => (
-                    <button key={level} onClick={() => onSetMastery?.(level)} style={{ flex: 1, borderRadius: '100px', backgroundColor: 'transparent', color: activeMastery === level ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: activeMastery === level ? 700 : 600, border: 'none', cursor: 'pointer', fontSize: '0.95rem', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, textTransform: 'capitalize' }}>
+                    <button key={level} onClick={() => onSetMastery?.(level)} style={{ flex: 1, borderRadius: '100px', backgroundColor: 'transparent', color: activeMastery === level ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: activeMastery === level ? 700 : 600, border: 'none', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, textTransform: 'capitalize' }}>
                       {level}
                     </button>
                   ))}
@@ -143,39 +143,39 @@ export function WordModal({
         </div>
       ),
       kanji: wordKanjiArray.length > 0 && (
-        <div key="kanji" style={{ marginBottom: '2.5rem' }}>
-          <div style={{ textAlign: 'center', fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '1.25rem', letterSpacing: '0.15em' }}>KANJI BREAKDOWN (RTK)</div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div key="kanji" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.12em' }}>KANJI BREAKDOWN (RTK)</div>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             {wordKanjiArray.map(k => (
-              <div key={k} style={{ flex: '0 1 Calc(33% - 0.5rem)', minWidth: '70px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '1rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div className="serif" style={{ fontSize: '1.75rem', color: 'var(--text-main)', marginBottom: '0.5rem', lineHeight: 1.2 }}>{k}</div>
-                <div className="sans" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', wordBreak: 'break-word' }}>{rtkKanjiMap[k] || 'Unknown'}</div>
+              <div key={k} style={{ flex: '0 1 Calc(33% - 0.4rem)', minWidth: '60px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: '10px', padding: '0.75rem 0.4rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div className="serif" style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.3rem', lineHeight: 1.1 }}>{k}</div>
+                <div className="sans" style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', wordBreak: 'break-word' }}>{rtkKanjiMap[k] || 'Unknown'}</div>
               </div>
             ))}
           </div>
         </div>
       ),
       grammar: wordData.grammarNote && (
-        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', borderLeft: '4px solid #4a5d23', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', letterSpacing: '0.05em' }}><BookOpen size={14} /> GRAMMAR NOTE</div>
-          <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.05rem', lineHeight: 1.8 }}>{wordData.grammarNote}</p>
+        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem 1.25rem', borderRadius: '14px', borderLeft: '4px solid #4a5d23', marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', letterSpacing: '0.04em' }}><BookOpen size={13} /> GRAMMAR NOTE</div>
+          <p className="serif" style={{ color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: 1.6 }}>{wordData.grammarNote}</p>
         </div>
       ),
       status: stats && stats.timesSeen > 0 && (
-        <div key="status" style={{ display: 'flex', gap: '1rem', padding: '1.25rem 1rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '12px', marginBottom: '1rem' }}>
+        <div key="status" style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '10px', marginBottom: '0.5rem' }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>SEEN</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>{stats.timesSeen} <span style={{fontSize: '0.85rem', fontWeight: 400}}>x</span></div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>SEEN</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.timesSeen} <span style={{fontSize: '0.75rem', fontWeight: 400}}>x</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>DAYS</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.85rem', fontWeight: 400}}>d</span></div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>DAYS</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.75rem', fontWeight: 400}}>d</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>STATUS</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.5rem', textTransform: 'capitalize' }}>{activeMastery}</div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>STATUS</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.35rem', textTransform: 'capitalize' }}>{activeMastery}</div>
           </div>
         </div>
       )
@@ -187,7 +187,7 @@ export function WordModal({
       <div style={{ 
         display: 'flex', 
         flexDirection: anchor === 'bottom' ? 'column' : 'column-reverse',
-        gap: '0.5rem'
+        gap: '0.25rem'
       }}>
         {orderedList.map(s => s)}
       </div>
@@ -238,7 +238,7 @@ export function WordModal({
             }}
             initial={{ y: anchor === 'bottom' ? '100%' : '-100%' }}
             animate={{ y: 0 }}
-            exit={{ y: anchor === 'bottom' ? '120%' : '-120%' }} // NO OPACITY ON EXIT
+            exit={{ y: anchor === 'bottom' ? '120%' : '-120%' }} 
             transition={{ duration: SYNC_DURATION, ease: SYNC_EASE as any }}
             style={{
               position: 'fixed',
@@ -248,11 +248,11 @@ export function WordModal({
               borderBottomRightRadius: anchor === 'top' ? '32px' : 0,
               borderTopLeftRadius: anchor === 'bottom' ? '32px' : 0,
               borderTopRightRadius: anchor === 'bottom' ? '32px' : 0,
-              padding: '1rem 1.75rem', 
-              paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
+              padding: '0.5rem 1.5rem', 
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
-              maxHeight: '45vh', 
+              maxHeight: '48vh', 
               overflowY: 'hidden', 
               touchAction: 'none',
               display: 'flex',
@@ -260,7 +260,7 @@ export function WordModal({
             }}
           >
             {anchor === 'bottom' && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0', cursor: 'grab', flexShrink: 0 }}>
                  <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
@@ -284,17 +284,17 @@ export function WordModal({
               }}
             >
               {isLoading && mode === 'word' ? (
-                  <div style={{ padding: '2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)' }}>
-                      <Loader2 className="lucide-spin" size={24} />
-                      <span className="serif" style={{ fontSize: '1.1rem' }}>辞書を引いています...</span>
+                  <div style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-muted)' }}>
+                      <Loader2 className="lucide-spin" size={20} />
+                      <span className="serif" style={{ fontSize: '1rem' }}>辞書を引いています...</span>
                     </div>
                   </div>
               ) : renderContent()}
             </div>
 
             {anchor === 'top' && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0', cursor: 'grab', flexShrink: 0 }}>
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0', cursor: 'grab', flexShrink: 0 }}>
                  <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
