@@ -178,15 +178,15 @@ ruby.peek-furigana rt {
 .word-highlight::after {
   content: "";
   position: absolute;
-  /* Tight hugging: centered pill that fits closely to characters */
-  top: 15%; 
-  bottom: 12%; 
-  left: -2px; 
-  right: -2px;
+  /* Fixed vertical offsets in EM to prevent vertical 'shield' stretching */
+  top: 0.22em; 
+  bottom: 0.15em; 
+  left: -1px; 
+  right: -1px;
   background-color: rgba(74, 93, 35, 0.12);
   border-radius: 100px;
   z-index: -1;
-  /* Subtle bottom-line for 3D structure */
+  /* Subtle 3D base-line */
   border-bottom: 1px solid rgba(74, 93, 35, 0.2);
   pointer-events: none;
 }

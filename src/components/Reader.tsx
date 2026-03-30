@@ -110,9 +110,10 @@ export function Reader() {
     setDrawerAnchor(y > window.innerHeight * 0.38 ? 'top' : 'bottom');
   };
 
-  const handleWordClick = (details: WordDetails, e: any) => {
+  const handleWordClick = (details: WordDetails, e: any, tokenId: string) => {
     if (touchLock.isLocked()) return;
-    if (selectedWord?.word === details.word) {
+    if (activeHighlightId === tokenId) {
+      setActiveHighlightId(null);
       setSelectedWord(null);
       return;
     }
@@ -121,13 +122,14 @@ export function Reader() {
     setClickedWords(prev => new Set(prev).add(details.word));
     setSelectedWord(details);
     setSelectedSentence(null);
-    setActiveHighlightId(e.tokenId || null);
+    setActiveHighlightId(tokenId);
     saveWordDefinition(details.word, details);
   };
 
-  const handleDictionaryLookup = async (word: string, contextSentence: string, e: any) => {
+  const handleDictionaryLookup = async (word: string, contextSentence: string, e: any, tokenId: string) => {
     if (touchLock.isLocked()) return;
-    if (selectedWord?.word === word) {
+    if (activeHighlightId === tokenId) {
+      setActiveHighlightId(null);
       setSelectedWord(null);
       return;
     }
@@ -139,11 +141,12 @@ export function Reader() {
     const localData = wordDatabase[word];
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context') {
       setSelectedWord({ word, reading: localData.reading, meaning: localData.meaning, grammarNote: localData.grammarNote });
+      setActiveHighlightId(tokenId);
       return;
     }
 
     setSelectedWord({ word, reading: '...', meaning: '' });
-    setActiveHighlightId(e.tokenId || null);
+    setActiveHighlightId(tokenId);
     setIsModalLoading(true);
     const def = await fetchWordDefinition(word, contextSentence);
     saveWordDefinition(word, def);
@@ -202,10 +205,10 @@ export function Reader() {
                   word={segment.text}
                   furigana={segment.furigana}
                   isSelected={activeHighlightId === `${sentenceId}-${j}`}
-                  onClick={(e: any) => {
-                    const evt = { ...e, tokenId: `${sentenceId}-${j}` };
-                    if (segment.details) handleWordClick(segment.details as WordDetails, evt);
-                    else handleDictionaryLookup(segment.text, sentText, evt);
+                  onClick={(e) => {
+                    const tid = `${sentenceId}-${j}`;
+                    if (segment.details) handleWordClick(segment.details as WordDetails, e, tid);
+                    else handleDictionaryLookup(segment.text, sentText, e, tid);
                   }}
                 />
               );
@@ -218,7 +221,7 @@ export function Reader() {
                   <span 
                     key={`${sentenceId}-${j}-${index}`}
                     className={activeHighlightId === `${sentenceId}-${j}-${index}` ? 'word-highlight' : ''}
-                    onClick={(e) => handleDictionaryLookup(w.segment, sentText, { ...e, tokenId: `${sentenceId}-${j}-${index}` })}
+                    onClick={(e) => handleDictionaryLookup(w.segment, sentText, e, `${sentenceId}-${j}-${index}`)}
                     style={{ cursor: 'pointer' }}
                   >
                     {w.segment}
