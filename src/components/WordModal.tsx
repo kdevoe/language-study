@@ -64,7 +64,7 @@ export function WordModal({
             <Sparkles size={13} color="var(--text-muted)" />
             <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>AI SENTENCE ANALYSIS</span>
           </div>
-          <p className="serif" style={{ fontSize: '1.25rem', lineHeight: 1.45, color: 'var(--text-main)', marginBottom: '0.85rem', backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px' }}>
+          <p className="serif" style={{ fontSize: '1.25rem', lineHeight: 1.45, color: 'var(--text-main)', marginBottom: '0.75rem', backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px' }}>
             {sentenceText}
           </p>
           {isLoading ? (
@@ -85,22 +85,16 @@ export function WordModal({
     const stats = wordDatabase[wordData.word];
     const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
 
-    // TRACKING BRAIN: Heuristic fallback for words without an explicit LLM map
     const getTrackedSegments = () => {
       if (wordData.furiganaMap && wordData.furiganaMap.length > 0) return wordData.furiganaMap;
-      
       const chars = Array.from(wordData.word);
       const r = wordData.reading;
-      
-      // RULE 1: Exact 2:1 or 1:1 fits (Anzen, MA)
       if (chars.length > 1 && r.length === chars.length * 2) {
          return chars.map((c, i) => ({ kanji: c, kana: r.substr(i*2, 2) }));
       }
       if (chars.length > 1 && r.length === chars.length) {
          return chars.map((c, i) => ({ kanji: c, kana: r[i] }));
       }
-
-      // RULE 2: Simple Mixed Script Split (Kanji + Okurigana trailing)
       const isKana = (c: string) => !!c.match(/[\u3040-\u309f\u30a0-\u30ff]/);
       if (chars.length === 2 && !isKana(chars[0]) && isKana(chars[1])) {
          return [
@@ -108,7 +102,6 @@ export function WordModal({
            { kanji: chars[1], kana: r.slice(-1) }
          ];
       }
-      
       return null;
     };
 
@@ -188,25 +181,27 @@ export function WordModal({
         </div>
       ),
       grammar: wordData.grammarNote && (
-        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '1.25rem' }}>
+        /* INCREASED MARGIN BOTTOM HERE TO 2.5rem */
+        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
           <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
         </div>
       ),
       status: stats && stats.timesSeen > 0 && (
-        <div key="status" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '10px', marginBottom: '0.5rem' }}>
+        /* REDUCED OPACITY STATUS BAR TO REDUCE CLUTTER */
+        <div key="status" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem', backgroundColor: 'var(--bg-card)', opacity: 0.65, border: '1px solid var(--border-light)', borderRadius: '10px', marginBottom: '0.5rem' }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 700 }}>SEEN</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.timesSeen} <span style={{fontSize: '0.8rem', fontWeight: 400}}>x</span></div>
+            <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>SEEN</div>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.timesSeen} <span style={{fontSize: '0.8rem', fontWeight: 400}}>x</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 700 }}>DAYS</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.8rem', fontWeight: 400}}>d</span></div>
+            <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>DAYS</div>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.8rem', fontWeight: 400}}>d</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 700 }}>RANK</div>
+            <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>RANK</div>
             <div style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.3rem', textTransform: 'capitalize' }}>{activeMastery}</div>
           </div>
         </div>
