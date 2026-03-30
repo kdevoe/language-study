@@ -23,12 +23,13 @@ interface Props {
   anchor: 'top' | 'bottom';
   onSetMastery?: (level: 'hard' | 'medium' | 'easy') => void;
   isLoading?: boolean;
+  targetRect?: DOMRect | null;
 }
 
 export function WordModal({ 
   isOpen, onClose, onDismissStart, mode, wordData, 
   sentenceText, sentenceTranslation, 
-  anchor, onSetMastery, isLoading 
+  anchor, onSetMastery, isLoading, targetRect
 }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -145,7 +146,7 @@ export function WordModal({
         </div>
       ),
       translation: (
-        <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5, textAlign: anchor === 'top' ? 'center' : 'left' }}>
+        <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--text-main)', lineHeight: 1.5, textAlign: anchor === 'top' ? 'center' : 'left' }}>
           <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span> {wordData.meaning}
         </p>
       ),
@@ -181,14 +182,12 @@ export function WordModal({
         </div>
       ),
       grammar: wordData.grammarNote && (
-        /* INCREASED MARGIN BOTTOM HERE TO 2.5rem */
         <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
           <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
         </div>
       ),
       status: stats && stats.timesSeen > 0 && (
-        /* REDUCED OPACITY STATUS BAR TO REDUCE CLUTTER */
         <div key="status" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem', backgroundColor: 'var(--bg-card)', opacity: 0.65, border: '1px solid var(--border-light)', borderRadius: '10px', marginBottom: '0.5rem' }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>SEEN</div>
@@ -224,6 +223,19 @@ export function WordModal({
     if (onDismissStart) onDismissStart();
     onClose();
   };
+
+  // COLLISION AVOIDANCE: Logic to stop drawer before it covers the word
+  const getDynamicMaxHeight = () => {
+    const vh52 = window.innerHeight * 0.52;
+    if (anchor === 'top' && targetRect) {
+      // Gap of 2rem (32px) from the word
+      const available = targetRect.top - 32;
+      return Math.min(vh52, Math.max(120, available)); 
+    }
+    return vh52;
+  };
+
+  const dynamicMaxHeight = getDynamicMaxHeight();
 
   return (
     <AnimatePresence>
@@ -280,7 +292,7 @@ export function WordModal({
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
               height: 'auto',
-              maxHeight: '52vh', 
+              maxHeight: dynamicMaxHeight, 
               overflowY: 'hidden', 
               touchAction: 'none',
               display: 'flex',

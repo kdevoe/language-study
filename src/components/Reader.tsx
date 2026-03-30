@@ -11,6 +11,7 @@ export function Reader() {
   const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string, id: string } | null>(null);
   const [drawerAnchor, setDrawerAnchor] = useState<'top' | 'bottom'>('bottom');
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
@@ -123,6 +124,7 @@ export function Reader() {
     setSelectedWord(details);
     setSelectedSentence(null);
     setActiveHighlightId(tokenId);
+    setTargetRect(e.currentTarget.getBoundingClientRect());
     saveWordDefinition(details.word, details);
   };
 
@@ -142,11 +144,13 @@ export function Reader() {
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context') {
       setSelectedWord({ word, reading: localData.reading, meaning: localData.meaning, grammarNote: localData.grammarNote });
       setActiveHighlightId(tokenId);
+      setTargetRect(e.currentTarget.getBoundingClientRect());
       return;
     }
 
     setSelectedWord({ word, reading: '...', meaning: '' });
     setActiveHighlightId(tokenId);
+    setTargetRect(e.currentTarget.getBoundingClientRect());
     setIsModalLoading(true);
     const def = await fetchWordDefinition(word, contextSentence);
     saveWordDefinition(word, def);
@@ -163,6 +167,7 @@ export function Reader() {
     determineAnchor(e);
     setSelectedWord(null);
     setSelectedSentence({ text: sentence, translation: '', id: sentenceId });
+    setTargetRect(e.currentTarget.getBoundingClientRect());
     setActiveHighlightId(sentenceId);
     setIsModalLoading(true);
     const translation = await fetchSentenceTranslation(sentence, currentArticle?.blocks.map(b => b.content?.map(c => c.text).join('')).join('\n') || '');
@@ -298,6 +303,7 @@ export function Reader() {
         anchor={drawerAnchor}
         onSetMastery={handleSetMastery}
         isLoading={isModalLoading}
+        targetRect={targetRect}
       />
     </>
   );
