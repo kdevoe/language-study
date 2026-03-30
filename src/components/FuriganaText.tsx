@@ -71,7 +71,7 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
     <>
       <span 
         ref={spanRef}
-        className={`${isSelected ? 'word-highlight' : ''} ${isSelected && furigana ? 'has-furigana' : ''}`}
+        className={isSelected ? 'word-highlight' : ''}
         onPointerDown={handlePointerDown} 
         onPointerUp={handlePointerUp} 
         onPointerLeave={handlePointerLeave}
@@ -84,22 +84,6 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
           position: 'relative'
         }}
       >
-        {isSelected && furigana && (
-          <span style={{ 
-            position: 'absolute',
-            top: '-0.65em',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: '0.45em',
-            fontWeight: 900,
-            color: 'var(--text-muted)',
-            letterSpacing: '0.05em',
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none'
-          }}>
-            {furigana}
-          </span>
-        )}
         {word}
       </span>
 

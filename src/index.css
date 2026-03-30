@@ -174,36 +174,28 @@ ruby.peek-furigana rt {
   vertical-align: baseline; 
   color: var(--text-main) !important;
   z-index: 10;
-  transform: scale(1.15) translateY(-1px);
+  transform: scale(1.15) translateY(-2px);
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .word-highlight::after {
   content: "";
   position: absolute;
-  /* Centered for pure text */
+  /* Centered Focus Pill with precise vertical fit */
   top: 0.15em; 
   bottom: 0.15em; 
-  left: -16px; 
-  right: -16px;
-  /* Ultra-transparent glass with heavy blur */
-  background-color: rgba(255, 255, 255, 0.05); 
-  backdrop-filter: blur(12px) contrast(1.1);
-  -webkit-backdrop-filter: blur(12px) contrast(1.1);
+  left: -12px; 
+  right: -12px;
+  /* FROSTED OLIVE GLASS: Using an olive tint ensures visibility against the paper background */
+  background-color: rgba(74, 93, 35, 0.08); 
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 999px;
   z-index: -1;
-  /* Premium glass finish */
-  border: 1px solid rgba(74, 93, 35, 0.1);
-  box-shadow: 
-    0 4px 20px rgba(0,0,0,0.1),
-    inset 0 0 12px rgba(255,255,255,0.4); /* Inner glass glow */
+  /* Focus depth finish */
+  border: 1px solid rgba(74, 93, 35, 0.14);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
   pointer-events: none;
-}
-
-/* Encompassing the floating furigana when present */
-.word-highlight.has-furigana::after {
-  top: -1em;
-  bottom: 0.1em;
 }
 
 .sentence-highlight {
