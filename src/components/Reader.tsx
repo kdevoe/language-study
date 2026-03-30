@@ -10,6 +10,7 @@ export function Reader() {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
   const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string, id: string } | null>(null);
   const [drawerAnchor, setDrawerAnchor] = useState<'top' | 'bottom'>('bottom');
+  const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
@@ -41,6 +42,7 @@ export function Reader() {
     setCurrentArticle(null);
     setSelectedWord(null);
     setSelectedSentence(null);
+    setActiveHighlightId(null);
     
     const vocabTargets = Object.entries(wordDatabase)
       .filter(([_, data]) => data.mastery === 'hard' || data.mastery === 'medium')
@@ -119,6 +121,7 @@ export function Reader() {
     setClickedWords(prev => new Set(prev).add(details.word));
     setSelectedWord(details);
     setSelectedSentence(null);
+    setActiveHighlightId(e.tokenId || null);
     saveWordDefinition(details.word, details);
   };
 
@@ -140,6 +143,7 @@ export function Reader() {
     }
 
     setSelectedWord({ word, reading: '...', meaning: '' });
+    setActiveHighlightId(e.tokenId || null);
     setIsModalLoading(true);
     const def = await fetchWordDefinition(word, contextSentence);
     saveWordDefinition(word, def);
@@ -156,6 +160,7 @@ export function Reader() {
     determineAnchor(e);
     setSelectedWord(null);
     setSelectedSentence({ text: sentence, translation: '', id: sentenceId });
+    setActiveHighlightId(sentenceId);
     setIsModalLoading(true);
     const translation = await fetchSentenceTranslation(sentence, currentArticle?.blocks.map(b => b.content?.map(c => c.text).join('')).join('\n') || '');
     setSelectedSentence({ text: sentence, translation, id: sentenceId });
@@ -182,12 +187,11 @@ export function Reader() {
     return sentences.map((sentTokens, sIdx) => {
       const sentText = sentTokens.map(t => t.text).join('');
       const sentenceId = `${blockIdx}-${sIdx}`;
-      const isSentenceSelected = selectedSentence?.id === sentenceId;
 
       return (
         <span 
           key={sentenceId} 
-          className={isSentenceSelected ? 'sentence-highlight' : ''}
+          className={activeHighlightId === sentenceId ? 'sentence-highlight' : ''}
           onDoubleClick={(e) => handleSentenceTranslate(sentText, sentenceId, e)}
         >
           {sentTokens.map((segment, j) => {
@@ -197,10 +201,11 @@ export function Reader() {
                   key={`${sentenceId}-${j}`}
                   word={segment.text}
                   furigana={segment.furigana}
-                  isSelected={selectedWord?.word === segment.text}
-                  onClick={(e) => {
-                    if (segment.details) handleWordClick(segment.details as WordDetails, e);
-                    else handleDictionaryLookup(segment.text, sentText, e);
+                  isSelected={activeHighlightId === `${sentenceId}-${j}`}
+                  onClick={(e: any) => {
+                    const evt = { ...e, tokenId: `${sentenceId}-${j}` };
+                    if (segment.details) handleWordClick(segment.details as WordDetails, evt);
+                    else handleDictionaryLookup(segment.text, sentText, evt);
                   }}
                 />
               );
@@ -212,8 +217,8 @@ export function Reader() {
                 return (
                   <span 
                     key={`${sentenceId}-${j}-${index}`}
-                    className={selectedWord?.word === w.segment ? 'word-highlight' : ''}
-                    onClick={(e) => handleDictionaryLookup(w.segment, sentText, e)}
+                    className={activeHighlightId === `${sentenceId}-${j}-${index}` ? 'word-highlight' : ''}
+                    onClick={(e) => handleDictionaryLookup(w.segment, sentText, { ...e, tokenId: `${sentenceId}-${j}-${index}` })}
                     style={{ cursor: 'pointer' }}
                   >
                     {w.segment}
@@ -275,10 +280,12 @@ export function Reader() {
         onDismissStart={() => {
           setSelectedWord(null);
           setSelectedSentence(null);
+          setActiveHighlightId(null);
         }}
         onClose={() => { 
           setSelectedWord(null); 
           setSelectedSentence(null); 
+          setActiveHighlightId(null);
           touchLock.lock();
         }} 
         mode={selectedSentence ? 'sentence' : 'word'}
