@@ -33,7 +33,6 @@ export function WordModal({
   const wordDatabase = useAppStore(state => state.wordDatabase);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // EXTREME LUXE DURATION - VERY SLOW AND SYMMETRIC (1.05s)
   const SYNC_DURATION = 1.05;
   const SYNC_EASE = [0.16, 1, 0.3, 1]; 
 
@@ -60,21 +59,21 @@ export function WordModal({
   const renderContent = () => {
     if (mode === 'sentence') {
       return (
-        <div style={{ padding: '0.25rem 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
-            <Sparkles size={14} color="var(--text-muted)" />
-            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>SENTENCE TRANSLATION</span>
+        <div style={{ padding: '0.15rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+            <Sparkles size={13} color="var(--text-muted)" />
+            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>SENTENCE TRANSLATION</span>
           </div>
-          <p className="serif" style={{ fontSize: '1.25rem', lineHeight: 1.5, color: 'var(--text-main)', marginBottom: '1rem', backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px' }}>
+          <p className="serif" style={{ fontSize: '1.2rem', lineHeight: 1.4, color: 'var(--text-main)', marginBottom: '0.75rem', backgroundColor: 'var(--bg-card)', padding: '0.6rem 0.85rem', borderRadius: '10px' }}>
             {sentenceText}
           </p>
           {isLoading ? (
-             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-muted)' }}>
-                <Loader2 className="lucide-spin" size={18} />
-                <span style={{ fontSize: '0.9rem' }}>AI 翻訳中...</span>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
+                <Loader2 className="lucide-spin" size={16} />
+                <span style={{ fontSize: '0.85rem' }}>AI 翻訳中...</span>
              </div>
           ) : (
-            <p className="sans" style={{ fontSize: '1.1rem', lineHeight: 1.5, color: 'var(--text-main)', paddingLeft: '0.5rem', borderLeft: '3px solid #4a5d23' }}>
+            <p className="sans" style={{ fontSize: '1.05rem', lineHeight: 1.4, color: 'var(--text-main)', paddingLeft: '0.5rem', borderLeft: '3px solid #4a5d23' }}>
               {sentenceTranslation}
             </p>
           )}
@@ -85,39 +84,43 @@ export function WordModal({
     if (!wordData) return null;
     const stats = wordDatabase[wordData.word];
     const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
-    const wordKanjiArray = Array.from(new Set(wordData.word.split(''))).filter(char => !!rtkKanjiMap[char]);
 
     const sections = {
       header: (
-        <div key="header" style={{ marginBottom: '1rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
+        <div key="header" style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
           {wordData.furiganaMap ? (
             wordData.furiganaMap.map((fm, idx) => (
               <div key={idx} style={{ 
                 display: 'flex', 
-                flexDirection: 'column-reverse', 
+                flexDirection: 'column', 
                 alignItems: 'center',
                 marginRight: idx < wordData.furiganaMap!.length - 1 ? '0.15rem' : 0
               }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{fm.kana}</span>
                 <span className="serif" style={{ fontSize: '2.4rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{fm.kanji}</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.15rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{fm.kana}</span>
+                {rtkKanjiMap[fm.kanji] && (
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '0.04em' }}>
+                    {rtkKanjiMap[fm.kanji]}
+                  </span>
+                )}
               </div>
             ))
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{wordData.reading}</span>
               <span className="serif" style={{ fontSize: '2.4rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{wordData.word}</span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 400 }}>{wordData.reading}</span>
             </div>
           )}
         </div>
       ),
       translation: (
-        <p key="translation" className="serif" style={{ fontSize: '1.1rem', marginBottom: '1.25rem', color: 'var(--text-main)', lineHeight: 1.6, textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23' }}>文</span> {wordData.meaning}
+        <p key="translation" className="serif" style={{ fontSize: '1.05rem', marginBottom: '1rem', color: 'var(--text-main)', lineHeight: 1.5, textAlign: anchor === 'top' ? 'center' : 'left' }}>
+          <span className="sans" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 600 }}>文</span> {wordData.meaning}
         </p>
       ),
       mastery: (
-        <div key="mastery" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '3px', height: '38px', position: 'relative' }}>
+        <div key="mastery" style={{ marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '3px', height: '36px', position: 'relative' }}>
             {(() => {
               const levels = ['easy', 'medium', 'hard'] as const;
               const activeIndex = levels.indexOf((activeMastery || 'medium') as any);
@@ -132,7 +135,7 @@ export function WordModal({
                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0
                   }} />
                   {levels.map(level => (
-                    <button key={level} onClick={() => onSetMastery?.(level)} style={{ flex: 1, borderRadius: '100px', backgroundColor: 'transparent', color: activeMastery === level ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: activeMastery === level ? 700 : 600, border: 'none', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, textTransform: 'capitalize' }}>
+                    <button key={level} onClick={() => onSetMastery?.(level)} style={{ flex: 1, borderRadius: '100px', backgroundColor: 'transparent', color: activeMastery === level ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: activeMastery === level ? 700 : 700, border: 'none', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, textTransform: 'capitalize' }}>
                       {level}
                     </button>
                   ))}
@@ -142,46 +145,33 @@ export function WordModal({
           </div>
         </div>
       ),
-      kanji: wordKanjiArray.length > 0 && (
-        <div key="kanji" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'center', fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.12em' }}>KANJI BREAKDOWN (RTK)</div>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            {wordKanjiArray.map(k => (
-              <div key={k} style={{ flex: '0 1 Calc(33% - 0.4rem)', minWidth: '60px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: '10px', padding: '0.75rem 0.4rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div className="serif" style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.3rem', lineHeight: 1.1 }}>{k}</div>
-                <div className="sans" style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', wordBreak: 'break-word' }}>{rtkKanjiMap[k] || 'Unknown'}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
       grammar: wordData.grammarNote && (
-        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem 1.25rem', borderRadius: '14px', borderLeft: '4px solid #4a5d23', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', letterSpacing: '0.04em' }}><BookOpen size={13} /> GRAMMAR NOTE</div>
-          <p className="serif" style={{ color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: 1.6 }}>{wordData.grammarNote}</p>
+        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '12px', borderLeft: '4px solid #4a5d23', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', letterSpacing: '0.04em' }}><BookOpen size={12} /> GRAMMAR</div>
+          <p className="serif" style={{ color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.5 }}>{wordData.grammarNote}</p>
         </div>
       ),
       status: stats && stats.timesSeen > 0 && (
-        <div key="status" style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '10px', marginBottom: '0.5rem' }}>
+        <div key="status" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem', backgroundColor: 'var(--bg-pure)', border: '1px solid var(--border-light)', borderRadius: '8px', marginBottom: '0.25rem' }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>SEEN</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.timesSeen} <span style={{fontSize: '0.75rem', fontWeight: 400}}>x</span></div>
+            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>SEEN</div>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.timesSeen} <span style={{fontSize: '0.7rem', fontWeight: 400}}>x</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>DAYS</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.75rem', fontWeight: 400}}>d</span></div>
+            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>DAYS</div>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.7rem', fontWeight: 400}}>d</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>STATUS</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.35rem', textTransform: 'capitalize' }}>{activeMastery}</div>
+            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>STATUS</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.25rem', textTransform: 'capitalize' }}>{activeMastery}</div>
           </div>
         </div>
       )
     };
 
-    const orderedList = [sections.header, sections.translation, sections.mastery, sections.kanji, sections.grammar, sections.status];
+    const orderedList = [sections.header, sections.translation, sections.mastery, sections.grammar, sections.status];
     
     return (
       <div style={{ 
@@ -244,15 +234,15 @@ export function WordModal({
               position: 'fixed',
               [anchor === 'bottom' ? 'bottom' : 'top']: 0, left: 0, right: 0,
               backgroundColor: 'var(--bg-pure)',
-              borderBottomLeftRadius: anchor === 'top' ? '32px' : 0,
-              borderBottomRightRadius: anchor === 'top' ? '32px' : 0,
-              borderTopLeftRadius: anchor === 'bottom' ? '32px' : 0,
-              borderTopRightRadius: anchor === 'bottom' ? '32px' : 0,
-              padding: '0.5rem 1.5rem', 
-              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              borderBottomLeftRadius: anchor === 'top' ? '24px' : 0,
+              borderBottomRightRadius: anchor === 'top' ? '24px' : 0,
+              borderTopLeftRadius: anchor === 'bottom' ? '24px' : 0,
+              borderTopRightRadius: anchor === 'bottom' ? '24px' : 0,
+              padding: '0.4rem 1.25rem', 
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
               zIndex: 50, 
               boxShadow: anchor === 'bottom' ? '0 -10px 40px rgba(0,0,0,0.12)' : '0 10px 40px rgba(0,0,0,0.12)',
-              maxHeight: '48vh', 
+              maxHeight: '45vh', 
               overflowY: 'hidden', 
               touchAction: 'none',
               display: 'flex',
@@ -260,8 +250,8 @@ export function WordModal({
             }}
           >
             {anchor === 'bottom' && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0', cursor: 'grab', flexShrink: 0 }}>
-                 <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.25rem 0 0.5rem 0', cursor: 'grab', flexShrink: 0 }}>
+                 <div style={{ width: '32px', height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
 
@@ -284,18 +274,18 @@ export function WordModal({
               }}
             >
               {isLoading && mode === 'word' ? (
-                  <div style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-muted)' }}>
-                      <Loader2 className="lucide-spin" size={20} />
-                      <span className="serif" style={{ fontSize: '1rem' }}>辞書を引いています...</span>
+                  <div style={{ padding: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
+                      <Loader2 className="lucide-spin" size={18} />
+                      <span className="serif" style={{ fontSize: '0.9rem' }}>辞書を引いています...</span>
                     </div>
                   </div>
               ) : renderContent()}
             </div>
 
             {anchor === 'top' && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0', cursor: 'grab', flexShrink: 0 }}>
-                 <div style={{ width: '40px', height: '4px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
+               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0 0.25rem 0', cursor: 'grab', flexShrink: 0 }}>
+                 <div style={{ width: '32px', height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px' }} />
                </div>
             )}
           </motion.div>
