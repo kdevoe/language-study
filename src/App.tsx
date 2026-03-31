@@ -95,7 +95,10 @@ function App() {
         <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <ArrowLeft size={24} strokeWidth={1.5} />
         </button>
-        <h1 className="serif" style={{ fontSize: '1.25rem', letterSpacing: '0.1em' }}>読書家</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <img src="/logo.png" alt="Yūgen Logo" style={{ height: '24px', width: '24px', borderRadius: '6px' }} />
+          <h1 className="serif" style={{ fontSize: '1.25rem', letterSpacing: '0.1em' }}>読書家</h1>
+        </div>
         <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <MoreVertical size={24} strokeWidth={1.5} />
         </button>
