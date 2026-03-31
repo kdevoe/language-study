@@ -95,8 +95,7 @@ function App() {
         <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <ArrowLeft size={24} strokeWidth={1.5} />
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <img src="/logo.png" alt="Yūgen Logo" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'contain' }} />
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <h1 className="serif" translate="no" style={{ fontSize: '1.4rem', letterSpacing: '0.05em', color: 'var(--text-main)' }}>Yūgen News</h1>
         </div>
         <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
