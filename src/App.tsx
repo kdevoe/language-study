@@ -96,7 +96,7 @@ function App() {
           <ArrowLeft size={24} strokeWidth={1.5} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h1 className="serif" translate="no" style={{ fontSize: '1.4rem', letterSpacing: '0.05em', color: 'var(--text-main)' }}>Yūgen News</h1>
+          <h1 className="serif" translate="no" style={{ fontSize: '1.4rem', letterSpacing: '0.1em', color: 'var(--text-main)' }}>読書家</h1>
         </div>
         <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <MoreVertical size={24} strokeWidth={1.5} />
