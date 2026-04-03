@@ -84,9 +84,16 @@ export function WordModal({
                 <Skeleton width="60%" height="1.1rem" />
              </div>
           ) : (
-            <p className="sans" style={{ fontSize: '1.1rem', lineHeight: 1.45, color: 'var(--text-main)', paddingLeft: '0.6rem', borderLeft: '4px solid #4a5d23' }}>
+            <motion.p 
+              key={sentenceTranslation}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="sans" 
+              style={{ fontSize: '1.1rem', lineHeight: 1.45, color: 'var(--text-main)', paddingLeft: '0.6rem', borderLeft: '4px solid #4a5d23' }}
+            >
               {sentenceTranslation}
-            </p>
+            </motion.p>
           )}
         </div>
       );
@@ -157,14 +164,21 @@ export function WordModal({
       ),
       translation: (
         <div key="translation" style={{ marginBottom: '1.5rem', textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          {isLoading && !wordData.meaning ? (
+          {(!wordData.meaning || (isLoading && wordData.meaning === '...')) ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: anchor === 'top' ? 'center' : 'flex-start', gap: '0.4rem' }}>
               <Skeleton width="80%" height="1.25rem" />
             </div>
           ) : (
-            <p className="serif" style={{ fontSize: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+            <motion.p 
+              key={wordData.meaning}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="serif" 
+              style={{ fontSize: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5 }}
+            >
               <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span> {wordData.meaning}
-            </p>
+            </motion.p>
           )}
         </div>
       ),
@@ -199,17 +213,23 @@ export function WordModal({
           </div>
         </div>
       ),
-      grammar: (isLoading && !wordData.grammarNote) ? (
+      grammar: (!wordData.grammarNote) ? (
         <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
            <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
            <Skeleton width="100%" height="1rem" />
            <Skeleton width="70%" height="1rem" />
         </div>
-      ) : wordData.grammarNote && (
-        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
+      ) : (
+        <motion.div 
+          key={wordData.grammarNote}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}
+        >
           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
           <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
-        </div>
+        </motion.div>
       ),
       status: stats && stats.timesSeen > 0 && (
         <div key="status" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem', backgroundColor: 'var(--bg-card)', opacity: 0.65, border: '1px solid var(--border-light)', borderRadius: '10px', marginBottom: '0.5rem' }}>
