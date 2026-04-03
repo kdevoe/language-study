@@ -177,6 +177,23 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          return {
+            ...persistedState,
+            processingArticles: [],
+            dismissedArticleIds: [],
+            currentArticle: null
+          };
+        }
+        return persistedState;
+      },
+      onRehydrateStorage: () => (state) => {
+        // Post-hydration cleanup
+        if (state && !Array.isArray(state.processingArticles)) state.processingArticles = [];
+        if (state && !Array.isArray(state.dismissedArticleIds)) state.dismissedArticleIds = [];
+      }
     }
   )
 );
