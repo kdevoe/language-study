@@ -19,6 +19,37 @@ export interface NewsArticle {
   category: string;
 }
 
+// GROQ CONFIG: llama3-70b-8192 is ideal for high-speed Japanese JSON processing
+const GROQ_MODEL = "llama3-70b-8192";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+async function fetchGroq(prompt: string, jsonMode: boolean = false): Promise<string> {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) throw new Error("Groq API Key missing.");
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      response_format: jsonMode ? { type: "json_object" } : undefined
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(`Groq API Error: ${err.error?.message || response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
 export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<NewsArticle[]> {
   const apiKey = import.meta.env.VITE_NEWS_API_KEY;
 
@@ -31,8 +62,6 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
   try {
     const query = encodeURIComponent(topic);
     
-    // NewsAPI completely blocks browsers on their Developer (free) tier unless running strictly on localhost. 
-    // We actively reroute the traffic securely through Vercel's backend serverless proxy when hosted in reality.
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const url = isLocalhost 
       ? `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${apiKey}`
@@ -55,7 +84,6 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
       date: item.publishedAt || new Date().toISOString(), 
       readTime: 'TBD',
       category: 'Recent News',
-      // We map the description/content here temporarily until Gemini rewrites it
       blocks: [
         {
           type: 'paragraph',
@@ -72,43 +100,52 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
 }
 
 export async function fetchWordDefinition(word: string, contextSentence: string): Promise<WordDetails> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    return { word, reading: 'Unknown', meaning: 'API Key missing.' };
+  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+  const prompt = `You are a high-fidelity Japanese dictionary. Define the exact word "${word}" based on this context: "${contextSentence}".
+    
+  CRITICAL INSTRUCTION: You MUST provide a 1:1 "furiganaMap" that segments the word into individual characters. 
+  - Kanji: provide the specific kana reading for that kanji.
+  - Kana (Okurigana): provide the kana itself.
+  - Every character in the "word" must be accounted for in the map.
+
+  Example for "安全": [{"kanji": "安", "kana": "あん"}, {"kanji": "全", "kana": "ぜん"}]
+  Example for "早い": [{"kanji": "早", "kana": "はや"}, {"kanji": "い", "kana": "い"}]
+  Example for "食べる": [{"kanji": "食", "kana": "た"}, {"kanji": "べ", "kana": "べ"}, {"kanji": "る", "kana": "る"}]
+
+  Output EXACTLY JSON:
+  {
+    "word": "${word}",
+    "reading": "the full reading",
+    "meaning": "Concise English translation",
+    "grammarNote": "Brief usage/grammar note",
+    "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
+  }`;
+
+  // PRIMARY: Try Groq for ultra-low latency lookups
+  if (groqKey) {
+    try {
+      const text = await fetchGroq(prompt, true);
+      return JSON.parse(text) as WordDetails;
+    } catch (e) {
+      console.warn("Groq failed, falling back to Gemini:", e);
+    }
   }
 
+  // SECONDARY/FALLBACK: Gemini 3 Flash
+  if (!geminiKey) return { word, reading: 'Unknown', meaning: 'API Key missing.' };
+
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
       generationConfig: { responseMimeType: "application/json" } 
     });
 
-    const prompt = `You are a high-fidelity Japanese dictionary. Define the exact word "${word}" based on this context: "${contextSentence}".
-    
-    CRITICAL INSTRUCTION: You MUST provide a 1:1 "furiganaMap" that segments the word into individual characters. 
-    - Kanji: provide the specific kana reading for that kanji.
-    - Kana (Okurigana): provide the kana itself.
-    - Every character in the "word" must be accounted for in the map.
-
-    Example for "安全": [{"kanji": "安", "kana": "あん"}, {"kanji": "全", "kana": "ぜん"}]
-    Example for "早い": [{"kanji": "早", "kana": "はや"}, {"kanji": "い", "kana": "い"}]
-    Example for "食べる": [{"kanji": "食", "kana": "た"}, {"kanji": "べ", "kana": "べ"}, {"kanji": "る", "kana": "る"}]
-
-    Output EXACTLY JSON:
-    {
-      "word": "${word}",
-      "reading": "the full reading",
-      "meaning": "Concise English translation",
-      "grammarNote": "Brief usage/grammar note",
-      "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
-    }`;
-
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    const parsed = JSON.parse(text) as WordDetails;
-    
-    return parsed;
+    return JSON.parse(text) as WordDetails;
   } catch (error) {
     console.error("Dictionary API Error:", error);
     return { word, reading: 'Error', meaning: 'Failed to look up word.' };
@@ -116,17 +153,28 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
 }
 
 export async function fetchSentenceTranslation(sentence: string, contextArticle: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) return "API Key missing.";
+  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+  const prompt = `Translate this Japanese sentence into natural, elegant English: "${sentence}"
+  Context of the article: "${contextArticle.substring(0, 500)}..."
+  Just provide the English translation, no other text.`;
+
+  // PRIMARY: Groq for instantaneous translation
+  if (groqKey) {
+    try {
+      return await fetchGroq(prompt);
+    } catch (e) {
+      console.warn("Groq failed, falling back to Gemini:", e);
+    }
+  }
+
+  // SECONDARY/FALLBACK: Gemini 3 Flash
+  if (!geminiKey) return "API Key missing.";
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-    const prompt = `Translate this Japanese sentence into natural, elegant English: "${sentence}"
-    Context of the article: "${contextArticle.substring(0, 500)}..."
-    Just provide the English translation, no other text.`;
-
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
   } catch (error) {
@@ -137,7 +185,6 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
 
 import { rtkKanjiList } from '../data/rtkKanji';
 
-// In the future this will call Google Gemini API
 export async function rewriteArticleWithGemini(
   title: string, 
   snippet: string, 
@@ -182,7 +229,6 @@ export async function rewriteArticleWithGemini(
       vocabInstruction = `BALANCED VOCABULARY BIAS: Write naturally, but keep the "Student Target Vocabulary" list in mind. If a target vocabulary word is an adjacent synonym to what you were originally going to write, prefer the target vocabulary word to give the student review exposure.`;
     }
     
-    // --- PASS 1: Content Generation (Plain Text) ---
     const prompt1 = `
 You are a Japanese teacher. Imagine you are writing a 3-paragraph news article in Japanese for a learner.
 Language Level: JLPT ${jlptStr}. 
@@ -217,7 +263,6 @@ News Snippet: ${snippet}
     let rawText1 = result1.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     const rawBlocks = JSON.parse(rawText1);
 
-    // --- PASS 2: Tokenization & Furigana ---
     const prompt2 = `
 You are a morphological analyzer. I am providing a JSON array containing Japanese text paragraphs.
 You MUST output the exact same JSON structure, BUT for every "text" field, replace it with a "content" array of individual Japanese tokens (verbs, nouns, particles).
