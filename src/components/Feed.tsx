@@ -7,8 +7,8 @@ interface Props {
   onSelect: (article: NewsArticle) => void;
   onDismiss: (id: string) => void;
   isLoading: boolean;
-  processingIds: Set<string>;
-  cachedIds: Set<string>;
+  processingIds: string[];
+  cachedIds: string[];
 }
 
 export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, cachedIds }: Props) {
@@ -45,8 +45,9 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
     >
       <AnimatePresence mode="popLayout">
         {articles.map((article) => {
-          const isProcessing = article.id && processingIds.has(article.id);
-          const isCached = article.id && cachedIds.has(article.id);
+          const isProcessing = article.id && (processingIds || []).includes(article.id);
+          const isCached = article.id && (cachedIds || []).includes(article.id);
+
 
           return (
             <motion.div

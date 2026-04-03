@@ -62,7 +62,7 @@ function App() {
   const dismissArticle = useAppStore(state => state.dismissArticle);
 
   const handleProcessArticle = async (article: NewsArticle) => {
-    if (!article.id || articlesCache[article.id] || processingArticles.has(article.id)) return;
+    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id)) return;
     
     setProcessing(article.id, true);
     try {
@@ -88,8 +88,7 @@ function App() {
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
     
-    // ATOMIC FLUSH: Clear the store's currentArticle immediately 
-    // to prevent the Reader from showing the "last seen" article.
+    // ATOMIC FLUSH: Clear store's currentArticle immediately
     useAppStore.getState().setCurrentArticle(null);
 
     if (articlesCache[article.id]) {
@@ -180,12 +179,12 @@ function App() {
         {activeTab === 'news' && (
           newsView === 'hub' ? (
             <Feed 
-              articles={articles.filter(a => !dismissedArticleIds.has(a.id))} 
+              articles={articles.filter(a => !(dismissedArticleIds || []).includes(a.id))} 
               isLoading={isLoadingFeed} 
               onSelect={handleSelectArticle} 
               onDismiss={dismissArticle}
-              processingIds={processingArticles}
-              cachedIds={new Set(Object.keys(articlesCache))}
+              processingIds={processingArticles || []}
+              cachedIds={Object.keys(articlesCache)}
             />
           ) : (
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleBackToHub} />

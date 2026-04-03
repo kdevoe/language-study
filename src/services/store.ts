@@ -29,8 +29,8 @@ interface AppState {
   lastRtkUpdateTs: number | null;
   currentArticle: NewsArticle | null;
   articlesCache: Record<string, NewsArticle>;
-  processingArticles: Set<string>;
-  dismissedArticleIds: Set<string>;
+  processingArticles: string[];
+  dismissedArticleIds: string[];
   srsAutoBumpThreshold: number;
   readerFontSize: number;
   readerFontWeight: number;
@@ -70,8 +70,8 @@ export const useAppStore = create<AppState>()(
       lastRtkUpdateTs: null,
       currentArticle: null,
       articlesCache: {},
-      processingArticles: new Set(),
-      dismissedArticleIds: new Set(),
+      processingArticles: [],
+      dismissedArticleIds: [],
       srsAutoBumpThreshold: 5,
       readerFontSize: 18,
       readerFontWeight: 400,
@@ -89,12 +89,12 @@ export const useAppStore = create<AppState>()(
         articlesCache: { ...state.articlesCache, [id]: article } 
       })),
       dismissArticle: (id) => set((state) => ({
-        dismissedArticleIds: new Set(state.dismissedArticleIds).add(id)
+        dismissedArticleIds: Array.from(new Set([...state.dismissedArticleIds, id]))
       })),
       setProcessing: (id, isP) => set((state) => {
-        const next = new Set(state.processingArticles);
+        const next = new Set(state.processingArticles || []);
         if (isP) next.add(id); else next.delete(id);
-        return { processingArticles: next };
+        return { processingArticles: Array.from(next) };
       }),
       setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
