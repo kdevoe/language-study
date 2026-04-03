@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { FuriganaText } from './FuriganaText';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
 import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchSentenceTranslation } from '../services/api';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
+import { CheckCircle, ChevronRight } from 'lucide-react';
 
 interface ReaderProps {
   initialArticle?: any;
@@ -66,34 +68,26 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       .map(([word]) => word);
       
     const feed = await fetchNewsFeed('Technology startups');
-    if (feed.length > 0) {
-      setLoadingArticleTitle(feed[0].title);
-      const snippet = feed[0].blocks[0].content?.[0]?.text || '';
+    const selectedRaw = initialArticle || (feed.length > 0 ? feed[0] : null);
+
+    if (selectedRaw) {
+      setLoadingArticleTitle(selectedRaw.title);
+      const snippet = selectedRaw.blocks[0].content?.[0]?.text || '';
       const rewrittenBlocks = await rewriteArticleWithGemini(
-        feed[0].title, snippet, jlptLevel, rtkLevel, studyMode, vocabMode, vocabTargets,
+        selectedRaw.title, snippet, jlptLevel, rtkLevel, studyMode, vocabMode, vocabTargets,
         (step) => setLoadingStep(step)
       );
-      setCurrentArticle({ ...feed[0], blocks: rewrittenBlocks });
+      setCurrentArticle({ ...selectedRaw, blocks: rewrittenBlocks });
     }
     setLoading(false);
   };
 
   useEffect(() => {
     if (!currentArticle && !loading) loadArticle();
-  }, []);
-
-  useEffect(() => {
-    if (!bottomRef.current || loading || !currentArticle || hasFinishedReading) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !hasFinishedReading) handleFinishArticle();
-    }, { threshold: 0.1 });
-    observer.observe(bottomRef.current);
-    return () => observer.disconnect();
-  }, [loading, currentArticle, hasFinishedReading]);
+  }, [initialArticle]);
 
   const handleFinishArticle = () => {
     setHasFinishedReading(true);
-    if (onComplete) onComplete();
     const articleWords = new Set<string>();
     currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => { if (w.furigana) articleWords.add(w.text); });
@@ -310,14 +304,58 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return null;
         })}
 
-        {hasFinishedReading && (
+        {/* Deliberate Finish Button */}
+        {!hasFinishedReading ? (
           <div style={{ textAlign: 'center', marginTop: '4rem' }}>
-             <button onClick={loadArticle} style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', padding: '0.75rem 2rem', borderRadius: '100px', fontWeight: 600, border: '1px solid var(--border-light)', cursor: 'pointer' }}>
-               <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.2rem' }}>次へ</span> &rarr;
+             <button 
+               onClick={handleFinishArticle} 
+               style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', padding: '0.75rem 2rem', borderRadius: '100px', fontWeight: 600, border: '1px solid var(--border-light)', cursor: 'pointer' }}
+             >
+               <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.2rem' }}>読了</span> (Finish Reading)
              </button>
           </div>
+        ) : (
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ 
+              marginTop: '4rem', 
+              padding: '2.5rem 1.5rem', 
+              backgroundColor: 'var(--bg-pure)', 
+              borderRadius: '28px', 
+              border: '1px solid var(--border-light)',
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
+            }}
+          >
+            <div style={{ color: '#4a5d23', marginBottom: '1rem', opacity: 0.7 }}>
+              <CheckCircle size={40} strokeWidth={1} />
+            </div>
+            <h2 className="serif" style={{ fontSize: '1.6rem', marginBottom: '1.5rem', color: 'var(--text-main)' }}>読了おめでとう!</h2>
+            
+            <button
+              onClick={() => onComplete?.()}
+              style={{
+                backgroundColor: '#4a5d23',
+                color: 'white',
+                border: 'none',
+                padding: '1.1rem 2.2rem',
+                borderRadius: '16px',
+                fontSize: '1rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                margin: '0 auto'
+              }}
+            >
+              <span>Back to Library</span>
+              <ChevronRight size={18} />
+            </button>
+          </motion.div>
         )}
-        <div ref={bottomRef} style={{ height: '10px' }} />
+        <div ref={bottomRef} style={{ height: '20vh' }} />
       </div>
 
       <WordModal 
