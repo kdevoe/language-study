@@ -127,8 +127,8 @@ export async function fetchWordGrammarInsight(word: string, contextSentence: str
   if (!geminiKey) return "Set Gemini API key for deep insights.";
 
   const prompt = `Analyze the word "${word}" in this sentence: "${contextSentence}".
-  MANDATORY: Provide ONLY 2 brief sentences in English explaining its specific usage or grammar in this context.
-  Do not provide general definitions. Be extremely concise.`;
+  MANDATORY: Provide ONLY 1 SINGLE brief sentence in English explaining its specific usage or grammar in this context.
+  Be extremely concise.`;
 
   try {
     console.log(`🧠 LLM DEEP (Gemini) -> gemini-3-flash-preview`);
