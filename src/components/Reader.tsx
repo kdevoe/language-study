@@ -5,7 +5,9 @@ import { WordModal, WordDetails } from './WordModal';
 import { rewriteArticleWithGemini, fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchSentenceTranslation } from '../services/api';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
-import { ChevronLeft } from 'lucide-react';
+import { } from 'lucide-react'; // Empty block to show we're using icons elsewhere if needed, or just clear it.
+// Actually, let's just remove the line if no icons are used.
+
 
 interface ReaderProps {
   initialArticle?: any;
@@ -40,15 +42,14 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   } = useAppStore();
 
   const loadArticle = async () => {
-    if (initialArticle) {
-      setCurrentArticle(initialArticle);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setLoadingStep("Fetching latest news...");
     setClickedWords(new Set());
-    setCurrentArticle(null);
+    setCurrentArticle(null); // Clear previous content to avoid "stuck" view
+    setSelectedWord(null);
+    setSelectedSentence(null);
+    setActiveHighlightId(null);
+
     setSelectedWord(null);
     setSelectedSentence(null);
     setActiveHighlightId(null);
@@ -63,18 +64,22 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       .slice(0, 40)
       .map(([word]) => word);
       
+      
     // Use the specific article passed from the Hub
     const selectedRaw = initialArticle;
 
     if (selectedRaw) {
       setLoadingArticleTitle(selectedRaw.title);
       // Snippet for rewriting (limit to first block for speed)
-      const snippet = selectedRaw.blocks[0].content?.[0]?.text || '';
+      const snippet = selectedRaw.blocks?.[0]?.content?.[0]?.text || '';
       const rewrittenBlocks = await rewriteArticleWithGemini(
         selectedRaw.title, snippet, jlptLevel, rtkLevel, studyMode, vocabMode, vocabTargets,
         (step) => setLoadingStep(step)
       );
       setCurrentArticle({ ...selectedRaw, blocks: rewrittenBlocks });
+    } else {
+      // Emergency Fallback
+      setLoading(false);
     }
     setLoading(false);
   };
@@ -300,31 +305,28 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return null;
         })}
 
-        {/* Finish & Back Button */}
-        <div style={{ textAlign: 'center', marginTop: '4rem', paddingBottom: '4rem' }}>
+        {/* Ultra-Minimalist Finish */}
+        <div style={{ textAlign: 'center', marginTop: '6rem', marginBottom: '4rem' }}>
            <button 
              onClick={() => {
                handleFinishArticle();
                onComplete?.();
              }} 
              style={{ 
-               backgroundColor: 'var(--bg-pure)', 
-               color: '#4a5d23', 
-               padding: '1rem 2.5rem', 
-               borderRadius: '100px', 
-               fontWeight: 700, 
-               fontSize: '1rem',
-               border: '1.5px solid #4a5d23', 
+               background: 'none',
+               border: 'none',
+               color: 'var(--text-muted)', 
                cursor: 'pointer',
                display: 'flex',
+               flexDirection: 'column',
                alignItems: 'center',
-               gap: '0.6rem',
+               gap: '0.4rem',
                margin: '0 auto',
-               boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+               opacity: 0.6
              }}
            >
-             <ChevronLeft size={18} />
-             <span>Finish & Back to Hub</span>
+             <span className="serif" style={{ fontSize: '1.2rem', color: 'var(--text-main)' }}>完了</span>
+             <span className="sans" style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em' }}>BACK TO HUB</span>
            </button>
         </div>
       </div>
