@@ -20,7 +20,7 @@ export interface NewsArticle {
 }
 
 // GROQ CONFIG: llama3-70b-8192 is ideal for high-speed Japanese JSON processing
-const GROQ_MODEL = "llama3-70b-8192";
+const GROQ_MODEL = "openai/gpt-oss-20b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 async function fetchGroq(prompt: string, jsonMode: boolean = false): Promise<string> {
