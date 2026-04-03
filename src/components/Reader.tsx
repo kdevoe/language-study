@@ -45,7 +45,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     // 1. Atomic state clearing
     setCurrentArticle(null);
     setLoading(true);
-    setLoadingStep("Fetching latest news...");
+    setLoadingStep("Initializing reader...");
+    setLoadingArticleTitle(initialArticle?.title || "読書家");
     setClickedWords(new Set());
     setSelectedWord(null);
     setSelectedSentence(null);
@@ -307,30 +308,24 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return null;
         })}
 
-        {/* Minimalist But Defined Finish */}
-        <div style={{ textAlign: 'center', marginTop: '6rem', marginBottom: '4rem' }}>
+        {/* Restored Tsugihe Capsule Button */}
+        <div style={{ textAlign: 'center', marginTop: '6rem', marginBottom: '6rem' }}>
            <button 
              onClick={() => {
                handleFinishArticle();
                onComplete?.();
              }} 
              style={{ 
-               background: 'var(--bg-pure)',
-               border: '1.5px solid var(--text-main)',
-               color: 'var(--text-main)', 
-               padding: '0.8rem 2.2rem',
-               borderRadius: '12px',
-               cursor: 'pointer',
-               display: 'flex',
-               flexDirection: 'column',
-               alignItems: 'center',
-               gap: '0.4rem',
-               margin: '0 auto',
-               transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)'
+               backgroundColor: 'transparent', 
+               color: 'var(--text-muted)', 
+               padding: '0.75rem 2.5rem', 
+               borderRadius: '100px', 
+               fontWeight: 600, 
+               border: '1px solid var(--border-light)', 
+               cursor: 'pointer'
              }}
            >
-             <span className="serif" style={{ fontSize: '1.4rem', fontWeight: 600 }}>完了</span>
-             <span className="sans" style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.7 }}>BACK TO HUB</span>
+             <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.2rem' }}>次へ</span> &rarr;
            </button>
         </div>
       </div>
