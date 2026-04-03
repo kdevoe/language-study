@@ -42,13 +42,15 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   } = useAppStore();
 
   const loadArticle = async () => {
+    // 1. Atomic state clearing
+    setCurrentArticle(null);
     setLoading(true);
     setLoadingStep("Fetching latest news...");
     setClickedWords(new Set());
-    setCurrentArticle(null); // Clear previous content to avoid "stuck" view
     setSelectedWord(null);
     setSelectedSentence(null);
     setActiveHighlightId(null);
+
 
     setSelectedWord(null);
     setSelectedSentence(null);
@@ -305,7 +307,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return null;
         })}
 
-        {/* Ultra-Minimalist Finish */}
+        {/* Minimalist But Defined Finish */}
         <div style={{ textAlign: 'center', marginTop: '6rem', marginBottom: '4rem' }}>
            <button 
              onClick={() => {
@@ -313,20 +315,22 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                onComplete?.();
              }} 
              style={{ 
-               background: 'none',
-               border: 'none',
-               color: 'var(--text-muted)', 
+               background: 'var(--bg-pure)',
+               border: '1.5px solid var(--text-main)',
+               color: 'var(--text-main)', 
+               padding: '0.8rem 2.2rem',
+               borderRadius: '12px',
                cursor: 'pointer',
                display: 'flex',
                flexDirection: 'column',
                alignItems: 'center',
                gap: '0.4rem',
                margin: '0 auto',
-               opacity: 0.6
+               transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)'
              }}
            >
-             <span className="serif" style={{ fontSize: '1.2rem', color: 'var(--text-main)' }}>完了</span>
-             <span className="sans" style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em' }}>BACK TO HUB</span>
+             <span className="serif" style={{ fontSize: '1.4rem', fontWeight: 600 }}>完了</span>
+             <span className="sans" style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.7 }}>BACK TO HUB</span>
            </button>
         </div>
       </div>

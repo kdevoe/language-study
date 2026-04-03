@@ -56,6 +56,8 @@ function App() {
 
   const handleSelectArticle = (article: NewsArticle) => {
     setActiveArticle(article);
+    // Explicitly clear currentArticle in store to force a fresh Reader mount
+    useAppStore.getState().setCurrentArticle(null);
     setNewsView('reading');
     setShowNav(false); // Hide nav when reading for focus
   };
