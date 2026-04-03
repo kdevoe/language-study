@@ -19,9 +19,8 @@ export interface NewsArticle {
   category: string;
 }
 
-// GROQ CONFIG: We use 20b for fast definitions and 120b for deep grammar analysis
+// GROQ CONFIG
 const GROQ_MODEL_QUICK = "openai/gpt-oss-20b";
-const GROQ_MODEL_DEEP = "openai/gpt-oss-120b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 async function fetchGroq(prompt: string, model: string, jsonMode: boolean = false): Promise<string> {
@@ -100,40 +99,61 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
   }
 }
 
-export async function fetchWordDefinition(word: string, contextSentence: string): Promise<WordDetails> {
+export async function fetchWordDefinitionQuick(word: string, contextSentence: string): Promise<Partial<WordDetails>> {
   const groqKey = import.meta.env.VITE_GROQ_API_KEY;
-  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!groqKey) throw new Error("Groq key missing for quick lookup.");
 
-  const prompt = `You are a professional high-fidelity Japanese dictionary.
-  Define: "${word}"
-  Context: "${contextSentence}"
-
-  OUTPUT CONSTRAINTS:
-  - Meaning MUST be in natural English.
-  - grammarNote MUST be a concise insight in English explaining why this word was used in this specific context.
-  - furiganaMap MUST segment the word into 1:1 Kanji/Kana blocks.
-
-  Output EXACTLY JSON:
+  const prompt = `Define "${word}" for context: "${contextSentence}".
+  Output JSON:
   {
     "word": "${word}",
     "reading": "full reading",
-    "meaning": "Concise English translation",
-    "grammarNote": "English explanation of usage in context",
+    "meaning": "English translation",
     "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
   }`;
 
-  // PRIMARY: Groq 120B for high-fidelity single-pass lookup
-  if (groqKey) {
-    try {
-      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL_DEEP} (Unified Lookup)`);
-      const text = await fetchGroq(prompt, GROQ_MODEL_DEEP, true);
-      return JSON.parse(text) as WordDetails;
-    } catch (e) {
-      console.warn("Groq 120B lookup failed, falling back to Gemini:", e);
-    }
+  try {
+    console.log(`🧠 LLM QUICK (Groq) -> ${GROQ_MODEL_QUICK}`);
+    const text = await fetchGroq(prompt, GROQ_MODEL_QUICK, true);
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Groq Quick Lookup failed:", e);
+    throw e;
   }
+}
 
-  // SECONDARY/FALLBACK: Gemini 3 Flash
+export async function fetchWordGrammarInsight(word: string, contextSentence: string): Promise<string> {
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!geminiKey) return "Set Gemini API key for deep insights.";
+
+  const prompt = `Analze the word "${word}" in this sentence: "${contextSentence}".
+  Provide a concise, high-fidelity grammar insight in English explaining its specific usage or conjugation here.
+  2 sentences maximum, return ONLY text.`;
+
+  try {
+    console.log(`🧠 LLM DEEP (Gemini) -> gemini-3-flash-preview`);
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (e) {
+    console.error("Gemini Deep Lookup failed:", e);
+    return "Grammar analysis unavailable.";
+  }
+}
+
+export async function fetchWordDefinition(word: string, contextSentence: string): Promise<WordDetails> {
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const prompt = `You are a high-fidelity Japanese dictionary. Define the exact word "${word}" based on this context: "${contextSentence}".
+  Output EXACTLY JSON:
+  {
+    "word": "${word}",
+    "reading": "the full reading",
+    "meaning": "Concise English translation",
+    "grammarNote": "Brief usage/grammar note",
+    "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
+  }`;
+
   if (!geminiKey) return { word, reading: 'Unknown', meaning: 'API Key missing.' };
 
   try {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FuriganaText } from './FuriganaText';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
-import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinition, fetchSentenceTranslation } from '../services/api';
+import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchSentenceTranslation } from '../services/api';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
 
@@ -155,12 +155,31 @@ export function Reader() {
     setIsModalLoading(true);
 
     try {
-      const def = await fetchWordDefinition(word, contextSentence);
-      saveWordDefinition(word, def);
-      setSelectedWord(def);
+      // 1. QUICK PATH (Groq 20B)
+      const quickDef = await fetchWordDefinitionQuick(word, contextSentence);
+      const combinedInitial: WordDetails = {
+        word,
+        reading: quickDef.reading || '...',
+        meaning: quickDef.meaning || 'Looking up...',
+        furiganaMap: quickDef.furiganaMap
+      };
+      setSelectedWord(combinedInitial);
+      
+      // 2. SMART PATH (Gemini 3 Flash) - Parallel Context Analysis
+      fetchWordGrammarInsight(word, contextSentence).then((insight) => {
+        setSelectedWord(prev => {
+          if (!prev || prev.word !== word) return prev;
+          return { ...prev, grammarNote: insight };
+        });
+        // Cache the full enriched result
+        saveWordDefinition(word, { ...combinedInitial, grammarNote: insight });
+      });
+
+      // Cache initial quick data
+      saveWordDefinition(word, combinedInitial);
       setIsModalLoading(false);
     } catch (err) {
-      console.warn("Lookup failed:", err);
+      console.warn("Hybrid lookup failed, falling back to manual or Gemini-only.");
       setIsModalLoading(false);
     }
   };
