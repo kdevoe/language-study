@@ -100,68 +100,44 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
   }
 }
 
-export async function fetchWordDefinitionQuick(word: string, contextSentence: string): Promise<Partial<WordDetails>> {
-  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
-  if (!groqKey) throw new Error("Groq key missing for quick lookup.");
-
-  const prompt = `You are an instant high-fidelity Japanese dictionary. Define "${word}" for: "${contextSentence}".
-  Output JSON:
-  {
-    "word": "${word}",
-    "reading": "full reading",
-    "meaning": "English translation",
-    "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
-  }`;
-
-  try {
-    console.log(`🧠 LLM QUICK (Groq) -> ${GROQ_MODEL_QUICK}`);
-    const text = await fetchGroq(prompt, GROQ_MODEL_QUICK, true);
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("Groq Quick Lookup failed:", e);
-    throw e;
-  }
-}
-
-export async function fetchWordGrammarInsight(word: string, contextSentence: string): Promise<string> {
-  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
-  if (!groqKey) return "Groq API key required for grammar insights.";
-
-  const prompt = `You are a Japanese linguistics expert. Explain the grammar usage of "${word}" in: "${contextSentence}".
-  Focus on why this specific form or particle is used here. 
-  Keep it as a concise insight (2 sentences max). 
-  Just return the text, no other formatting.`;
-
-  try {
-    console.log(`🧠 LLM DEEP (Groq) -> ${GROQ_MODEL_DEEP}`);
-    return await fetchGroq(prompt, GROQ_MODEL_DEEP);
-  } catch (e) {
-    console.error("Groq Deep Grammar Insight failed:", e);
-    return "Grammar analysis unavailable.";
-  }
-}
-
 export async function fetchWordDefinition(word: string, contextSentence: string): Promise<WordDetails> {
+  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const prompt = `You are a high-fidelity Japanese dictionary. Define the exact word "${word}" based on this context: "${contextSentence}".
-  
-  CRITICAL INSTRUCTION: You MUST provide a 1:1 "furiganaMap" that segments the word into individual characters. 
-  Example for "安全": [{"kanji": "安", "kana": "あん"}, {"kanji": "全", "kana": "ぜん"}]
+
+  const prompt = `You are a professional high-fidelity Japanese dictionary.
+  Define: "${word}"
+  Context: "${contextSentence}"
+
+  OUTPUT CONSTRAINTS:
+  - Meaning MUST be in natural English.
+  - grammarNote MUST be a concise insight in English explaining why this word was used in this specific context.
+  - furiganaMap MUST segment the word into 1:1 Kanji/Kana blocks.
 
   Output EXACTLY JSON:
   {
     "word": "${word}",
-    "reading": "the full reading",
+    "reading": "full reading",
     "meaning": "Concise English translation",
-    "grammarNote": "Brief usage/grammar note",
+    "grammarNote": "English explanation of usage in context",
     "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
   }`;
 
-  // This is now purely the fallback/all-in-one path
+  // PRIMARY: Groq 120B for high-fidelity single-pass lookup
+  if (groqKey) {
+    try {
+      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL_DEEP} (Unified Lookup)`);
+      const text = await fetchGroq(prompt, GROQ_MODEL_DEEP, true);
+      return JSON.parse(text) as WordDetails;
+    } catch (e) {
+      console.warn("Groq 120B lookup failed, falling back to Gemini:", e);
+    }
+  }
+
+  // SECONDARY/FALLBACK: Gemini 3 Flash
   if (!geminiKey) return { word, reading: 'Unknown', meaning: 'API Key missing.' };
 
   try {
-    console.log(`🧠 LLM FALLBACK (Gemini) -> gemini-3-flash-preview (fetchWordDefinition)`);
+    console.log(`🧠 LLM FALLBACK: Gemini -> gemini-3-flash-preview`);
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
