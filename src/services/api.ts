@@ -126,6 +126,7 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   // PRIMARY: Try Groq for ultra-low latency lookups
   if (groqKey) {
     try {
+      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL} (fetchWordDefinition)`);
       const text = await fetchGroq(prompt, true);
       return JSON.parse(text) as WordDetails;
     } catch (e) {
@@ -137,6 +138,7 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   if (!geminiKey) return { word, reading: 'Unknown', meaning: 'API Key missing.' };
 
   try {
+    console.log(`🧠 LLM CALL: Gemini -> gemini-3-flash-preview (fetchWordDefinition)`);
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
@@ -163,6 +165,7 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
   // PRIMARY: Groq for instantaneous translation
   if (groqKey) {
     try {
+      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL} (fetchSentenceTranslation)`);
       return await fetchGroq(prompt);
     } catch (e) {
       console.warn("Groq failed, falling back to Gemini:", e);
@@ -173,6 +176,7 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
   if (!geminiKey) return "API Key missing.";
 
   try {
+    console.log(`🧠 LLM CALL: Gemini -> gemini-3-flash-preview (fetchSentenceTranslation)`);
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
     const result = await model.generateContent(prompt);
@@ -260,6 +264,7 @@ News Snippet: ${snippet}
 `;
 
     const result1 = await model.generateContent(prompt1);
+    console.log(`🧠 LLM CALL: Gemini -> gemini-3-flash-preview (rewriteArticle Pass 1)`);
     let rawText1 = result1.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     const rawBlocks = JSON.parse(rawText1);
 
@@ -285,6 +290,7 @@ Output EXACTLY a JSON array matching this interface:
 `;
 
     onProgress?.("Analyzing morphology & attaching Furigana (0 bytes)...");
+    console.log(`🧠 LLM CALL: Gemini -> gemini-3-flash-preview (rewriteArticle Pass 2 Stream)`);
     const result2 = await model.generateContentStream(prompt2);
     let rawText2 = '';
     for await (const chunk of result2.stream) {
