@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Clock, Trash2, BookOpen } from 'lucide-react';
+import { CheckCircle2, Trash2 } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 
 interface Props {
@@ -55,8 +55,9 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
               layout
               exit="exit"
               drag="x"
-              dragConstraints={{ left: 0, right: 120 }}
+              dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.6}
+              dragMomentum={false}
               onDragEnd={(_, info) => {
                 if (info.offset.x > 80 && article.id) {
                   onDismiss(article.id);
@@ -79,7 +80,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                 color: isCached ? '#4a5d23' : '#b40a0a',
                 zIndex: 0
               }}>
-                {isCached ? <BookOpen size={24} style={{ opacity: 0.5 }} /> : <Trash2 size={24} style={{ opacity: 0.5 }} />}
+                {isCached ? <CheckCircle2 size={24} style={{ opacity: 0.5 }} /> : <Trash2 size={24} style={{ opacity: 0.5 }} />}
                 <span style={{ marginLeft: '1rem', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.1em' }}>
                   {isCached ? 'ARCHIVE' : 'DISMISS'}
                 </span>
@@ -131,10 +132,6 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                     }}>
                       {article.category.toUpperCase()}
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 500 }}>
-                      <Clock size={13} strokeWidth={1.5} />
-                      <span>{article.readTime}</span>
-                    </div>
                   </div>
                   
                   {isCached && (
