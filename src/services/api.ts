@@ -126,9 +126,9 @@ export async function fetchWordGrammarInsight(word: string, contextSentence: str
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!geminiKey) return "Set Gemini API key for deep insights.";
 
-  const prompt = `Analze the word "${word}" in this sentence: "${contextSentence}".
-  Provide a concise, high-fidelity grammar insight in English explaining its specific usage or conjugation here.
-  2 sentences maximum, return ONLY text.`;
+  const prompt = `Analyze the word "${word}" in this sentence: "${contextSentence}".
+  MANDATORY: Provide ONLY 2 brief sentences in English explaining its specific usage or grammar in this context.
+  Do not provide general definitions. Be extremely concise.`;
 
   try {
     console.log(`🧠 LLM DEEP (Gemini) -> gemini-3-flash-preview`);
