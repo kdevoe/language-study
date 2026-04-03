@@ -6,7 +6,12 @@ import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinitionQuick, fetc
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
 
-export function Reader() {
+interface ReaderProps {
+  initialArticle?: any;
+  onComplete?: () => void;
+}
+
+export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
   const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string, id: string } | null>(null);
   const [drawerAnchor, setDrawerAnchor] = useState<'top' | 'bottom'>('bottom');
@@ -36,6 +41,11 @@ export function Reader() {
   } = useAppStore();
 
   const loadArticle = async () => {
+    if (initialArticle) {
+      setCurrentArticle(initialArticle);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadingStep("Fetching latest news...");
     setHasFinishedReading(false);
@@ -83,6 +93,7 @@ export function Reader() {
 
   const handleFinishArticle = () => {
     setHasFinishedReading(true);
+    if (onComplete) onComplete();
     const articleWords = new Set<string>();
     currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => { if (w.furigana) articleWords.add(w.text); });
