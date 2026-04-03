@@ -1,17 +1,17 @@
-import { motion } from 'framer-motion';
-import { CheckCircle2, ChevronRight, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2, Clock, Trash2, BookOpen } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 
 interface Props {
   articles: NewsArticle[];
   onSelect: (article: NewsArticle) => void;
+  onDismiss: (id: string) => void;
   isLoading: boolean;
+  processingIds: Set<string>;
+  cachedIds: Set<string>;
 }
 
-export function Feed({ articles, onSelect, isLoading }: Props) {
-  // We can use useAppStore later for bookmarks/completion
-  // const { wordDatabase } = useAppStore();
-
+export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, cachedIds }: Props) {
   const container = {
     hidden: { opacity: 0 },
     show: {
@@ -20,100 +20,158 @@ export function Feed({ articles, onSelect, isLoading }: Props) {
     }
   };
 
-  const item = {
+  const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as any } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as any } },
+    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
   };
 
-  if (isLoading) {
+  if (isLoading && articles.length === 0) {
     return (
-      <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', padding: '2rem 0' }}>
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="skeleton-shimmer" style={{ height: '140px', borderRadius: '20px', backgroundColor: 'var(--border-light)' }} />
+          <div key={i} className="shimmer" style={{ width: '100%', height: '140px', borderRadius: '24px' }} />
         ))}
       </div>
     );
   }
 
   return (
-    <motion.div 
+    <motion.div
       variants={container}
       initial="hidden"
       animate="show"
-      style={{ padding: '0.5rem 1.25rem 4rem 1.25rem' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '8rem' }}
     >
-      <div style={{ marginBottom: '2.5rem' }}>
-        <h2 className="serif" style={{ fontSize: '1.8rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>今日のニュース</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>Your daily Japanese immersion library</p>
-      </div>
+      <AnimatePresence mode="popLayout">
+        {articles.map((article) => {
+          const isProcessing = article.id && processingIds.has(article.id);
+          const isCached = article.id && cachedIds.has(article.id);
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {articles.map((article) => (
-          <motion.div
-            key={article.id}
-            variants={item}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onSelect(article)}
-            style={{
-              backgroundColor: 'var(--bg-pure)',
-              borderRadius: '24px',
-              padding: '1.5rem',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-              cursor: 'pointer',
-              border: '1px solid var(--border-light)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-              <span style={{ 
-                fontSize: '0.65rem', 
-                fontWeight: 800, 
-                letterSpacing: '0.1em', 
-                color: '#4a5d23', 
-                backgroundColor: 'rgba(74, 93, 35, 0.08)', 
-                padding: '0.3rem 0.6rem', 
-                borderRadius: '6px',
-                textTransform: 'uppercase'
+          return (
+            <motion.div
+              key={article.id}
+              variants={itemVariants}
+              layout
+              exit="exit"
+              drag="x"
+              dragConstraints={{ left: 0, right: 120 }}
+              dragElastic={0.6}
+              onDragEnd={(_, info) => {
+                if (info.offset.x > 80 && article.id) {
+                  onDismiss(article.id);
+                }
+              }}
+              style={{ position: 'relative', touchAction: 'pan-y' }}
+            >
+              {/* Swipe Action Background Indicator */}
+              <div style={{ 
+                position: 'absolute', 
+                left: 0, 
+                top: 0, 
+                bottom: 0, 
+                width: '100%', 
+                backgroundColor: isCached ? 'rgba(74, 93, 35, 0.08)' : 'rgba(180, 10, 10, 0.08)', 
+                borderRadius: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                paddingLeft: '1.5rem',
+                color: isCached ? '#4a5d23' : '#b40a0a',
+                zIndex: 0
               }}>
-                {article.category}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                <Clock size={12} />
-                <span>{article.readTime}</span>
+                {isCached ? <BookOpen size={24} style={{ opacity: 0.5 }} /> : <Trash2 size={24} style={{ opacity: 0.5 }} />}
+                <span style={{ marginLeft: '1rem', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.1em' }}>
+                  {isCached ? 'ARCHIVE' : 'DISMISS'}
+                </span>
               </div>
-            </div>
 
-            <h3 className="serif" style={{ 
-              fontSize: '1.2rem', 
-              lineHeight: 1.4, 
-              color: 'var(--text-main)', 
-              marginBottom: '1rem',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
-            }}>
-              {article.title}
-            </h3>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: '0.8rem' }}>
-                {/* Stats or status would go here */}
-                {false && ( // Placeholder for 'Completed' logic if needed
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#4a5d23', fontSize: '0.75rem', fontWeight: 700 }}>
-                     <CheckCircle2 size={14} />
-                     <span>READ</span>
-                   </div>
+              <motion.div
+                onClick={() => onSelect(article)}
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  padding: '1.5rem',
+                  borderRadius: '24px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  zIndex: 1,
+                  border: isCached ? '1px solid rgba(74, 93, 35, 0.15)' : '1px solid var(--border-light)',
+                  boxShadow: '0 4px 25px rgba(0,0,0,0.03)',
+                  overflow: 'hidden'
+                }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {/* Visual Processing Progress Bar (if processing) */}
+                {isProcessing && (
+                  <motion.div 
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '0%' }}
+                    transition={{ duration: 15, ease: 'linear' }}
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      height: '3px',
+                      width: '100%',
+                      backgroundColor: '#4a5d23',
+                      opacity: 0.4
+                    }}
+                  />
                 )}
-              </div>
-              <div style={{ color: 'var(--border-light)' }}>
-                <ChevronRight size={20} />
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <span style={{ 
+                      fontSize: '0.65rem', 
+                      fontWeight: 800, 
+                      color: isCached ? '#4a5d23' : 'var(--text-muted)', 
+                      letterSpacing: '0.15em',
+                      backgroundColor: isCached ? 'rgba(74, 93, 35, 0.08)' : 'var(--bg-pure)',
+                      padding: '0.3rem 0.7rem',
+                      borderRadius: '8px'
+                    }}>
+                      {article.category.toUpperCase()}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 500 }}>
+                      <Clock size={13} strokeWidth={1.5} />
+                      <span>{article.readTime}</span>
+                    </div>
+                  </div>
+                  
+                  {isCached && (
+                    <div style={{ color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800 }}>
+                      <CheckCircle2 size={16} strokeWidth={2.5} />
+                      <span style={{ letterSpacing: '0.05em' }}>READY</span>
+                    </div>
+                  )}
+                </div>
+
+                <h3 className="serif" style={{ 
+                  fontSize: '1.35rem', 
+                  lineHeight: 1.45, 
+                  color: isProcessing ? 'var(--text-muted)' : 'var(--text-main)',
+                  marginBottom: '1rem',
+                  maxWidth: '90%'
+                }}>
+                  {article.title}
+                </h3>
+                
+                {isProcessing ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                     <div className="lucide-spin" style={{ width: '12px', height: '12px', border: '1.5px solid rgba(74, 93, 35, 0.2)', borderTopColor: '#4a5d23', borderRadius: '50%' }} />
+                     <span style={{ fontSize: '0.75rem', color: '#4a5d23', fontWeight: 600, letterSpacing: '0.02em' }}>
+                        AI is preparing this article...
+                     </span>
+                  </div>
+                ) : !isCached && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, fontStyle: 'italic', opacity: 0.8 }}>
+                    Tap to prepare for reading
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </motion.div>
   );
 }

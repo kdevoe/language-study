@@ -29,6 +29,8 @@ interface AppState {
   lastRtkUpdateTs: number | null;
   currentArticle: NewsArticle | null;
   articlesCache: Record<string, NewsArticle>;
+  processingArticles: Set<string>;
+  dismissedArticleIds: Set<string>;
   srsAutoBumpThreshold: number;
   readerFontSize: number;
   readerFontWeight: number;
@@ -41,6 +43,8 @@ interface AppState {
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
+  dismissArticle: (id: string) => void;
+  setProcessing: (id: string, isProcessing: boolean) => void;
   setSrsAutoBumpThreshold: (count: number) => void;
   setReaderFontSize: (size: number) => void;
   setReaderFontWeight: (weight: number) => void;
@@ -66,6 +70,8 @@ export const useAppStore = create<AppState>()(
       lastRtkUpdateTs: null,
       currentArticle: null,
       articlesCache: {},
+      processingArticles: new Set(),
+      dismissedArticleIds: new Set(),
       srsAutoBumpThreshold: 5,
       readerFontSize: 18,
       readerFontWeight: 400,
@@ -82,6 +88,14 @@ export const useAppStore = create<AppState>()(
       saveProcessedArticle: (id, article) => set((state) => ({ 
         articlesCache: { ...state.articlesCache, [id]: article } 
       })),
+      dismissArticle: (id) => set((state) => ({
+        dismissedArticleIds: new Set(state.dismissedArticleIds).add(id)
+      })),
+      setProcessing: (id, isP) => set((state) => {
+        const next = new Set(state.processingArticles);
+        if (isP) next.add(id); else next.delete(id);
+        return { processingArticles: next };
+      }),
       setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),

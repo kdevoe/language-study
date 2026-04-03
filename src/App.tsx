@@ -7,7 +7,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState } from 'react'
-import { fetchNewsFeed, NewsArticle } from './services/api'
+import { fetchNewsFeed, NewsArticle, rewriteArticleWithGemini } from './services/api'
 import { MoreVertical, RefreshCcw, ChevronLeft } from 'lucide-react'
 
 function App() {
@@ -54,12 +54,46 @@ function App() {
     }
   }, [isOnboarded, session, checkDailyKanji, articles.length]);
 
+  const processingArticles = useAppStore(state => state.processingArticles);
+  const articlesCache = useAppStore(state => state.articlesCache);
+  const setProcessing = useAppStore(state => state.setProcessing);
+  const saveProcessedArticle = useAppStore(state => state.saveProcessedArticle);
+  const dismissedArticleIds = useAppStore(state => state.dismissedArticleIds);
+  const dismissArticle = useAppStore(state => state.dismissArticle);
+
+  const handleProcessArticle = async (article: NewsArticle) => {
+    if (!article.id || articlesCache[article.id] || processingArticles.has(article.id)) return;
+    
+    setProcessing(article.id, true);
+    try {
+      const vocabTargets = Object.entries(useAppStore.getState().wordDatabase)
+        .filter(([_, data]) => data.mastery === 'hard' || data.mastery === 'medium')
+        .map(([w]) => w);
+      
+      const snippet = article.blocks[0].content?.[0]?.text || '';
+      const rewrittenBlocks = await rewriteArticleWithGemini(
+        article.title, snippet, 
+        useAppStore.getState().jlptLevel || 5, 
+        useAppStore.getState().rtkLevel || 0,
+        useAppStore.getState().studyMode,
+        useAppStore.getState().vocabMode,
+        vocabTargets,
+        () => {} // No step updates for background processing
+      );
+      saveProcessedArticle(article.id, { ...article, blocks: rewrittenBlocks });
+    } catch (e) { console.error(e); }
+    setProcessing(article.id, false);
+  };
+
   const handleSelectArticle = (article: NewsArticle) => {
-    setActiveArticle(article);
-    // Explicitly clear currentArticle in store to force a fresh Reader mount
-    useAppStore.getState().setCurrentArticle(null);
-    setNewsView('reading');
-    setShowNav(false); // Hide nav when reading for focus
+    if (!article.id) return;
+    if (articlesCache[article.id]) {
+      setActiveArticle(articlesCache[article.id]);
+      setNewsView('reading');
+      setShowNav(false);
+    } else {
+      handleProcessArticle(article);
+    }
   };
 
   const handleBackToHub = () => {
@@ -140,7 +174,14 @@ function App() {
       <main style={{ flex: 1, padding: newsView === 'reading' ? '1rem 1.25rem' : '0rem 1.25rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
         {activeTab === 'news' && (
           newsView === 'hub' ? (
-            <Feed articles={articles} isLoading={isLoadingFeed} onSelect={handleSelectArticle} />
+            <Feed 
+              articles={articles.filter(a => !dismissedArticleIds.has(a.id))} 
+              isLoading={isLoadingFeed} 
+              onSelect={handleSelectArticle} 
+              onDismiss={dismissArticle}
+              processingIds={processingArticles}
+              cachedIds={new Set(Object.keys(articlesCache))}
+            />
           ) : (
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleBackToHub} />
           )
