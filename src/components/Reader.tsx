@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FuriganaText } from './FuriganaText';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
-import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinition, fetchSentenceTranslation } from '../services/api';
+import { fetchNewsFeed, rewriteArticleWithGemini, fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchSentenceTranslation } from '../services/api';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
 
@@ -149,13 +149,39 @@ export function Reader() {
     }
 
     setSelectedWord({ word, reading: '...', meaning: '' });
-    setActiveHighlightId(tokenId);
+    setSelectedSentence(null);
     setTargetRect(e.currentTarget.getBoundingClientRect());
+    setActiveHighlightId(tokenId);
     setIsModalLoading(true);
-    const def = await fetchWordDefinition(word, contextSentence);
-    saveWordDefinition(word, def);
-    setSelectedWord(def);
-    setIsModalLoading(false);
+
+    try {
+      // 1. QUICK PATH (Groq)
+      const quickDef = await fetchWordDefinitionQuick(word, contextSentence);
+      const combinedInitial: WordDetails = {
+        word,
+        reading: quickDef.reading || '...',
+        meaning: quickDef.meaning || 'Looking up...',
+        furiganaMap: quickDef.furiganaMap
+      };
+      setSelectedWord(combinedInitial);
+      
+      // 2. DEEP PATH (Gemini) - Parallel
+      fetchWordGrammarInsight(word, contextSentence).then((insight) => {
+        setSelectedWord(prev => {
+          if (!prev || prev.word !== word) return prev;
+          return { ...prev, grammarNote: insight };
+        });
+        // Save the full result including grammar
+        saveWordDefinition(word, { ...combinedInitial, grammarNote: insight });
+      });
+
+      // Save initial quick data
+      saveWordDefinition(word, combinedInitial);
+      setIsModalLoading(false);
+    } catch (err) {
+      console.warn("Quick lookup failed, no data displayed.");
+      setIsModalLoading(false);
+    }
   };
 
   const handleSentenceTranslate = async (sentence: string, sentenceId: string, e: any) => {

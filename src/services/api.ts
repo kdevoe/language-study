@@ -19,11 +19,12 @@ export interface NewsArticle {
   category: string;
 }
 
-// GROQ CONFIG: llama3-70b-8192 is ideal for high-speed Japanese JSON processing
-const GROQ_MODEL = "openai/gpt-oss-20b";
+// GROQ CONFIG: We use 20b for fast definitions and 120b for deep grammar analysis
+const GROQ_MODEL_QUICK = "openai/gpt-oss-20b";
+const GROQ_MODEL_DEEP = "openai/gpt-oss-120b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-async function fetchGroq(prompt: string, jsonMode: boolean = false): Promise<string> {
+async function fetchGroq(prompt: string, model: string, jsonMode: boolean = false): Promise<string> {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!apiKey) throw new Error("Groq API Key missing.");
 
@@ -34,7 +35,7 @@ async function fetchGroq(prompt: string, jsonMode: boolean = false): Promise<str
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
       response_format: jsonMode ? { type: "json_object" } : undefined
@@ -99,20 +100,53 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
   }
 }
 
-export async function fetchWordDefinition(word: string, contextSentence: string): Promise<WordDetails> {
+export async function fetchWordDefinitionQuick(word: string, contextSentence: string): Promise<Partial<WordDetails>> {
   const groqKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!groqKey) throw new Error("Groq key missing for quick lookup.");
+
+  const prompt = `You are an instant high-fidelity Japanese dictionary. Define "${word}" for: "${contextSentence}".
+  Output JSON:
+  {
+    "word": "${word}",
+    "reading": "full reading",
+    "meaning": "English translation",
+    "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
+  }`;
+
+  try {
+    console.log(`🧠 LLM QUICK (Groq) -> ${GROQ_MODEL_QUICK}`);
+    const text = await fetchGroq(prompt, GROQ_MODEL_QUICK, true);
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Groq Quick Lookup failed:", e);
+    throw e;
+  }
+}
+
+export async function fetchWordGrammarInsight(word: string, contextSentence: string): Promise<string> {
+  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!groqKey) return "Groq API key required for grammar insights.";
+
+  const prompt = `You are a Japanese linguistics expert. Explain the grammar usage of "${word}" in: "${contextSentence}".
+  Focus on why this specific form or particle is used here. 
+  Keep it as a concise insight (2 sentences max). 
+  Just return the text, no other formatting.`;
+
+  try {
+    console.log(`🧠 LLM DEEP (Groq) -> ${GROQ_MODEL_DEEP}`);
+    return await fetchGroq(prompt, GROQ_MODEL_DEEP);
+  } catch (e) {
+    console.error("Groq Deep Grammar Insight failed:", e);
+    return "Grammar analysis unavailable.";
+  }
+}
+
+export async function fetchWordDefinition(word: string, contextSentence: string): Promise<WordDetails> {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
   const prompt = `You are a high-fidelity Japanese dictionary. Define the exact word "${word}" based on this context: "${contextSentence}".
-    
+  
   CRITICAL INSTRUCTION: You MUST provide a 1:1 "furiganaMap" that segments the word into individual characters. 
-  - Kanji: provide the specific kana reading for that kanji.
-  - Kana (Okurigana): provide the kana itself.
-  - Every character in the "word" must be accounted for in the map.
-
   Example for "安全": [{"kanji": "安", "kana": "あん"}, {"kanji": "全", "kana": "ぜん"}]
-  Example for "早い": [{"kanji": "早", "kana": "はや"}, {"kanji": "い", "kana": "い"}]
-  Example for "食べる": [{"kanji": "食", "kana": "た"}, {"kanji": "べ", "kana": "べ"}, {"kanji": "る", "kana": "る"}]
 
   Output EXACTLY JSON:
   {
@@ -123,22 +157,11 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
     "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
   }`;
 
-  // PRIMARY: Try Groq for ultra-low latency lookups
-  if (groqKey) {
-    try {
-      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL} (fetchWordDefinition)`);
-      const text = await fetchGroq(prompt, true);
-      return JSON.parse(text) as WordDetails;
-    } catch (e) {
-      console.warn("Groq failed, falling back to Gemini:", e);
-    }
-  }
-
-  // SECONDARY/FALLBACK: Gemini 3 Flash
+  // This is now purely the fallback/all-in-one path
   if (!geminiKey) return { word, reading: 'Unknown', meaning: 'API Key missing.' };
 
   try {
-    console.log(`🧠 LLM CALL: Gemini -> gemini-3-flash-preview (fetchWordDefinition)`);
+    console.log(`🧠 LLM FALLBACK (Gemini) -> gemini-3-flash-preview (fetchWordDefinition)`);
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
@@ -165,8 +188,8 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
   // PRIMARY: Groq for instantaneous translation
   if (groqKey) {
     try {
-      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL} (fetchSentenceTranslation)`);
-      return await fetchGroq(prompt);
+      console.log(`🧠 LLM CALL: Groq -> ${GROQ_MODEL_QUICK} (fetchSentenceTranslation)`);
+      return await fetchGroq(prompt, GROQ_MODEL_QUICK);
     } catch (e) {
       console.warn("Groq failed, falling back to Gemini:", e);
     }
