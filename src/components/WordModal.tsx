@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Loader2, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkles } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
@@ -57,6 +57,16 @@ export function WordModal({
     }
   }, [isLoading, wordData, isOpen, anchor]);
 
+  const Skeleton = ({ width = '100%', height = '1rem', style = {} }) => (
+    <div className="skeleton-shimmer" style={{ 
+      width, height, 
+      backgroundColor: 'var(--border-light)', 
+      borderRadius: '4px',
+      marginBottom: '0.5rem',
+      ...style 
+    }} />
+  );
+
   const renderContent = () => {
     if (mode === 'sentence') {
       return (
@@ -69,9 +79,9 @@ export function WordModal({
             {sentenceText}
           </p>
           {isLoading ? (
-             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-muted)' }}>
-                <Loader2 className="lucide-spin" size={18} />
-                <span style={{ fontSize: '0.9rem' }}>解釈中...</span>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.6rem' }}>
+                <Skeleton width="90%" height="1.1rem" />
+                <Skeleton width="60%" height="1.1rem" />
              </div>
           ) : (
             <p className="sans" style={{ fontSize: '1.1rem', lineHeight: 1.45, color: 'var(--text-main)', paddingLeft: '0.6rem', borderLeft: '4px solid #4a5d23' }}>
@@ -146,9 +156,17 @@ export function WordModal({
         </div>
       ),
       translation: (
-        <p key="translation" className="serif" style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--text-main)', lineHeight: 1.5, textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span> {wordData.meaning}
-        </p>
+        <div key="translation" style={{ marginBottom: '1.5rem', textAlign: anchor === 'top' ? 'center' : 'left' }}>
+          {isLoading && !wordData.meaning ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: anchor === 'top' ? 'center' : 'flex-start', gap: '0.4rem' }}>
+              <Skeleton width="80%" height="1.25rem" />
+            </div>
+          ) : (
+            <p className="serif" style={{ fontSize: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+              <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span> {wordData.meaning}
+            </p>
+          )}
+        </div>
       ),
       mastery: (
         <div key="mastery" style={{ marginBottom: '1.5rem' }}>
@@ -181,7 +199,13 @@ export function WordModal({
           </div>
         </div>
       ),
-      grammar: wordData.grammarNote && (
+      grammar: (isLoading && !wordData.grammarNote) ? (
+        <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
+           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
+           <Skeleton width="100%" height="1rem" />
+           <Skeleton width="70%" height="1rem" />
+        </div>
+      ) : wordData.grammarNote && (
         <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
           <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
@@ -323,14 +347,7 @@ export function WordModal({
                  e.stopPropagation();
               }}
             >
-              {isLoading && mode === 'word' ? (
-                  <div style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
-                      <Loader2 className="lucide-spin" size={18} />
-                      <span className="serif" style={{ fontSize: '0.9rem' }}>辞書を引いています...</span>
-                    </div>
-                  </div>
-              ) : renderContent()}
+              {renderContent()}
             </div>
 
             {anchor === 'top' && (
