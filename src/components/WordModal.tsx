@@ -104,7 +104,20 @@ export function WordModal({
     const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
 
     const getTrackedSegments = () => {
-      if (wordData.furiganaMap && wordData.furiganaMap.length > 0) return wordData.furiganaMap;
+      let segments = wordData.furiganaMap || [];
+      
+      // Safety: If segments don't cover the full word string, "Heal" it by appending the missing tail
+      const mappedWord = segments.map(s => s.kanji).join('');
+      if (mappedWord !== wordData.word && wordData.word.startsWith(mappedWord)) {
+        const extraChars = wordData.word.slice(mappedWord.length);
+        const chars = Array.from(extraChars);
+        const recovered = chars.map(c => ({ kanji: c, kana: c }));
+        segments = [...segments, ...recovered];
+      }
+
+      if (segments.length > 0) return segments;
+
+      // FALLBACK: Manual Guessing...
       const chars = Array.from(wordData.word);
       const r = wordData.reading;
       if (chars.length > 1 && r.length === chars.length * 2) {

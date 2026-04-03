@@ -104,6 +104,8 @@ export async function fetchWordDefinitionQuick(word: string, contextSentence: st
   if (!groqKey) throw new Error("Groq key missing for quick lookup.");
 
   const prompt = `Define "${word}" for context: "${contextSentence}".
+  CRITICAL: The "furiganaMap" MUST account for EVERY character in "${word}". 
+  Break it down 1:1. Example for "行きます": [{"kanji":"行","kana":"い"},{"kanji":"き","kana":"き"},{"kanji":"ま","kana":"ま"},{"kanji":"す","kana":"す"}]
   Output JSON:
   {
     "word": "${word}",
