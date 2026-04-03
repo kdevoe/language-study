@@ -28,6 +28,7 @@ interface AppState {
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
   currentArticle: NewsArticle | null;
+  articlesCache: Record<string, NewsArticle>;
   srsAutoBumpThreshold: number;
   readerFontSize: number;
   readerFontWeight: number;
@@ -39,6 +40,7 @@ interface AppState {
   setVocabMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
+  saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setSrsAutoBumpThreshold: (count: number) => void;
   setReaderFontSize: (size: number) => void;
   setReaderFontWeight: (weight: number) => void;
@@ -63,6 +65,7 @@ export const useAppStore = create<AppState>()(
       studyKanji: [],
       lastRtkUpdateTs: null,
       currentArticle: null,
+      articlesCache: {},
       srsAutoBumpThreshold: 5,
       readerFontSize: 18,
       readerFontWeight: 400,
@@ -76,6 +79,9 @@ export const useAppStore = create<AppState>()(
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
+      saveProcessedArticle: (id, article) => set((state) => ({ 
+        articlesCache: { ...state.articlesCache, [id]: article } 
+      })),
       setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),

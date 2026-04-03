@@ -37,22 +37,25 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const { 
     jlptLevel, rtkLevel, studyMode, vocabMode,
     wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
-    currentArticle, setCurrentArticle, srsAutoBumpThreshold,
+    currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle, 
+    srsAutoBumpThreshold,
     readerFontSize, readerFontWeight
   } = useAppStore();
 
   const loadArticle = async () => {
-    // 1. Atomic state clearing
+    // 1. Check Cache first for instant return
+    if (initialArticle?.id && articlesCache[initialArticle.id]) {
+      setCurrentArticle(articlesCache[initialArticle.id]);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Atomic state clearing
     setCurrentArticle(null);
     setLoading(true);
     setLoadingStep("Initializing reader...");
     setLoadingArticleTitle(initialArticle?.title || "読書家");
     setClickedWords(new Set());
-    setSelectedWord(null);
-    setSelectedSentence(null);
-    setActiveHighlightId(null);
-
-
     setSelectedWord(null);
     setSelectedSentence(null);
     setActiveHighlightId(null);
@@ -79,7 +82,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         selectedRaw.title, snippet, jlptLevel, rtkLevel, studyMode, vocabMode, vocabTargets,
         (step) => setLoadingStep(step)
       );
-      setCurrentArticle({ ...selectedRaw, blocks: rewrittenBlocks });
+      const processed = { ...selectedRaw, blocks: rewrittenBlocks };
+      setCurrentArticle(processed);
+      // 3. Save to cache for next time
+      if (selectedRaw.id) saveProcessedArticle(selectedRaw.id, processed);
     } else {
       // Emergency Fallback
       setLoading(false);
