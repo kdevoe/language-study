@@ -78,7 +78,8 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
     }
 
     const articles: NewsArticle[] = data.articles.map((item: any) => ({
-      id: item.url,
+      // Robust unique ID combining URL and part of Title
+      id: `${item.title.substring(0, 15)}-${item.url}`, 
       title: item.title,
       originalUrl: item.url,
       date: item.publishedAt || new Date().toISOString(), 

@@ -87,6 +87,11 @@ function App() {
 
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
+    
+    // ATOMIC FLUSH: Clear the store's currentArticle immediately 
+    // to prevent the Reader from showing the "last seen" article.
+    useAppStore.getState().setCurrentArticle(null);
+
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);
       setNewsView('reading');
