@@ -13,36 +13,38 @@ export function LandingPage() {
   const [waitlistMessage, setWaitlistMessage] = useState('');
 
   // --- SCROLL ANIMATIONS ---
+  // We use 2-point vector mapping for translateY ('y') so the containers ALWAYS subtly drift while in view.
+  
   // Section 1: Hero (0 to 0.15)
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.05, 0.15], [1, 1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.9]);
-  const heroY = useTransform(scrollYProgress, [0, 0.15], ['0%', '-10%']);
-  const heroDisplay = useTransform(scrollYProgress, pos => pos > 0.2 ? "none" : "flex");
+  const heroY = useTransform(scrollYProgress, [0, 0.15], ['0%', '-15%']);
+  const heroDisplay = useTransform(scrollYProgress, pos => pos > 0.15 ? "none" : "flex");
 
-  // Section 2: Reader View (0.1 to 0.3)
-  const readerOpacity = useTransform(scrollYProgress, [0.1, 0.15, 0.25, 0.3], [0, 1, 1, 0]);
-  const readerY = useTransform(scrollYProgress, [0.1, 0.15, 0.25, 0.3], ['10%', '0%', '0%', '-10%']);
-  const readerDisplay = useTransform(scrollYProgress, pos => pos > 0.35 ? "none" : "flex");
+  // Section 2: Reader View (0.1 to 0.35)
+  const readerOpacity = useTransform(scrollYProgress, [0.1, 0.15, 0.3, 0.35], [0, 1, 1, 0]);
+  const readerY = useTransform(scrollYProgress, [0.1, 0.35], ['10%', '-15%']);
+  const readerDisplay = useTransform(scrollYProgress, pos => (pos < 0.1 || pos > 0.35) ? "none" : "flex");
 
-  // Section 3: Settings View (0.25 to 0.45)
-  const settingsOpacity = useTransform(scrollYProgress, [0.25, 0.3, 0.4, 0.45], [0, 1, 1, 0]);
-  const settingsY = useTransform(scrollYProgress, [0.25, 0.3, 0.4, 0.45], ['10%', '0%', '0%', '-10%']);
-  const settingsDisplay = useTransform(scrollYProgress, pos => (pos < 0.2 || pos > 0.5) ? "none" : "flex");
+  // Section 3: Settings View (0.3 to 0.55)
+  const settingsOpacity = useTransform(scrollYProgress, [0.3, 0.35, 0.5, 0.55], [0, 1, 1, 0]);
+  const settingsY = useTransform(scrollYProgress, [0.3, 0.55], ['10%', '-15%']);
+  const settingsDisplay = useTransform(scrollYProgress, pos => (pos < 0.3 || pos > 0.55) ? "none" : "flex");
 
-  // Section 4: Word Lookup (0.4 to 0.6)
-  const lookupOpacity = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], [0, 1, 1, 0]);
-  const lookupY = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], ['10%', '0%', '0%', '-10%']);
-  const lookupDisplay = useTransform(scrollYProgress, pos => (pos < 0.35 || pos > 0.65) ? "none" : "flex");
+  // Section 4: Word Lookup (0.5 to 0.75)
+  const lookupOpacity = useTransform(scrollYProgress, [0.5, 0.55, 0.7, 0.75], [0, 1, 1, 0]);
+  const lookupY = useTransform(scrollYProgress, [0.5, 0.75], ['10%', '-15%']);
+  const lookupDisplay = useTransform(scrollYProgress, pos => (pos < 0.5 || pos > 0.75) ? "none" : "flex");
 
-  // Section 5: Article List (0.55 to 0.75)
-  const listOpacity = useTransform(scrollYProgress, [0.55, 0.6, 0.7, 0.75], [0, 1, 1, 0]);
-  const listY = useTransform(scrollYProgress, [0.55, 0.6, 0.7, 0.75], ['10%', '0%', '0%', '-10%']);
-  const listDisplay = useTransform(scrollYProgress, pos => (pos < 0.5 || pos > 0.8) ? "none" : "flex");
+  // Section 5: Article List (0.7 to 0.95)
+  const listOpacity = useTransform(scrollYProgress, [0.7, 0.75, 0.9, 0.95], [0, 1, 1, 0]);
+  const listY = useTransform(scrollYProgress, [0.7, 0.95], ['10%', '-15%']);
+  const listDisplay = useTransform(scrollYProgress, pos => (pos < 0.7 || pos > 0.95) ? "none" : "flex");
 
-  // Section 6: Waitlist (0.7 to 0.9)
-  const waitlistOpacity = useTransform(scrollYProgress, [0.7, 0.8], [0, 1]);
-  const waitlistY = useTransform(scrollYProgress, [0.7, 0.8], ['10%', '0%']);
-  const waitlistDisplay = useTransform(scrollYProgress, pos => pos < 0.65 ? "none" : "flex");
+  // Section 6: Waitlist (0.9 to 1.0)
+  const waitlistOpacity = useTransform(scrollYProgress, [0.9, 0.95, 1], [0, 1, 1]);
+  const waitlistY = useTransform(scrollYProgress, [0.9, 1], ['10%', '0%']);
+  const waitlistDisplay = useTransform(scrollYProgress, pos => pos < 0.9 ? "none" : "flex");
 
   const handleGoogleLogin = async () => {
     try {
@@ -71,11 +73,11 @@ export function LandingPage() {
       transition={{ repeat: Infinity, duration: 6, ease: "easeInOut", delay }}
       style={{ 
         width: '100%', 
-        maxWidth: '280px', 
+        maxWidth: 'min(85vw, 420px)', 
         borderRadius: '32px', 
         overflow: 'hidden', 
         boxShadow: '0 30px 60px rgba(0,0,0,0.1), 0 0 0 8px rgba(0,0,0,0.02)', 
-        margin: '2rem auto 0',
+        margin: '2.5rem auto 0',
         backgroundColor: 'var(--bg-pure)'
       }}
     >
@@ -84,7 +86,7 @@ export function LandingPage() {
   );
 
   return (
-    <div style={{ height: '600vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+    <div style={{ height: '500vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
       
       {/* FIXED VIEWPORT CONTAINER (Bulletproof hardware accelerated wrapper) */}
       <div style={{ position: 'fixed', top: 0, left: 0, height: '100%', width: '100%', overflow: 'hidden', backgroundColor: 'var(--bg-color)' }}>
