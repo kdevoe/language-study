@@ -111,13 +111,26 @@ function App() {
     }
   };
 
+  const checkMidnightReset = useCallback(() => {
+    const lastReset = useAppStore.getState().lastResetTs;
+    const now = new Date();
+    // Compare only YYYY-MM-DD
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    
+    if (!lastReset || lastReset < todayStart) {
+      useAppStore.getState().resetFeedForNewDay(todayStart);
+      loadHub(); // Fully fresh start for the new day
+    }
+  }, [loadHub]);
+
   useEffect(() => {
     if (isOnboarded && session) {
       checkDailyKanji();
+      checkMidnightReset();
       loadGlobalCache(session.user.id);
       if (articles.length === 0) loadHub();
     }
-  }, [isOnboarded, session, checkDailyKanji, articles.length]);
+  }, [isOnboarded, session, checkDailyKanji, articles.length, checkMidnightReset]);
 
   useEffect(() => {
     if (articles.length > 0) syncPrefetchQueue();

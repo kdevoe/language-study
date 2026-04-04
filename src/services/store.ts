@@ -28,6 +28,7 @@ interface AppState {
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
+  lastResetTs: number | null;
   currentArticle: NewsArticle | null;
   articlesCache: Record<string, NewsArticle>;
   processingArticles: string[];
@@ -48,6 +49,7 @@ interface AppState {
   dismissArticle: (id: string) => void;
   setProcessing: (id: string, isProcessing: boolean) => void;
   setSrsAutoBumpThreshold: (count: number) => void;
+  resetFeedForNewDay: (now: number) => void;
   setReaderFontSize: (size: number) => void;
   setReaderFontWeight: (weight: number) => void;
   resetProgress: () => void;
@@ -70,6 +72,7 @@ export const useAppStore = create<AppState>()(
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
+      lastResetTs: null,
       currentArticle: null,
       articlesCache: {},
       processingArticles: [],
@@ -106,6 +109,10 @@ export const useAppStore = create<AppState>()(
         const next = new Set(state.processingArticles || []);
         if (isP) next.add(id); else next.delete(id);
         return { processingArticles: Array.from(next) };
+      }),
+      resetFeedForNewDay: (now) => set({ 
+        dismissedArticleIds: [], 
+        lastResetTs: now 
       }),
       setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
