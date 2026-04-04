@@ -78,21 +78,23 @@ function App() {
     
     setIsReplenishing(true);
     try {
-      let currentPage = newsPage;
-      let currentTopicIndex = topicIndex;
       let found = false;
       let attempts = 0;
       
-      while (!found && attempts < 8) {
+      // Keep searching across rotating topics
+      while (!found && attempts < 10) {
         attempts++;
-        const searchPage = Math.floor(currentPage / 4) + 1;
-        const topic = FEED_TOPICS[currentTopicIndex % FEED_TOPICS.length];
         
-        const moreNews = await fetchNewsFeed(topic, 1, searchPage);
+        // Track unique page progress for every topic to avoid redundancy
+        // Simplified: use a high newsPage offset that keeps incrementing globally
+        const currentSearchPage = newsPage + attempts;
+        const topic = FEED_TOPICS[topicIndex % FEED_TOPICS.length];
         
-        // Rotate topic for the NEXT attempt if this one fails or next time
-        currentTopicIndex++;
-        setTopicIndex(currentTopicIndex);
+        // Final fallback: If we're really stuck, fetch Generic Top Headlines
+        const finalTopic = attempts > 8 ? 'Top Headlines' : topic;
+        const moreNews = await fetchNewsFeed(finalTopic, 1, currentSearchPage);
+
+        setTopicIndex(prev => prev + 1);
 
         if (moreNews.length > 0) {
           const newArticle = moreNews[0];
@@ -105,8 +107,12 @@ function App() {
             return prev;
           });
         }
-        if (found) break;
-        await new Promise(r => setTimeout(r, 150));
+        
+        if (found) {
+            setNewsPage(currentSearchPage);
+            break;
+        }
+        await new Promise(r => setTimeout(r, 200));
       }
     } catch (e) { 
       console.error("Endless search error:", e); 

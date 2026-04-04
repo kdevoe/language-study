@@ -241,8 +241,10 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
         {isReplenishing && (
           <motion.div
             key="ghost-card-replenisher"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 0.8, y: 0 }}
+            initial={{ opacity: 0, y: 30, scale: 0.98 }}
+            animate={{ opacity: 0.8, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             className="shimmer"
             style={{
               padding: '1.5rem',
