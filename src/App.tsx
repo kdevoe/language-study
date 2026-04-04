@@ -166,6 +166,18 @@ function App() {
     }
   }, [isOnboarded, session, checkDailyKanji, articles.length, checkMidnightReset]);
 
+  // THE SENTINEL: Ensure we always have at least 5 visible articles
+  useEffect(() => {
+    if (isLoadingFeed || isReplenishing || articles.length === 0) return;
+    
+    const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
+    if (visibleArticles.length < 5) {
+      // Small delay to let animations settle before pulling another
+      const timer = setTimeout(replenishFeedAtBottom, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [articles, dismissedArticleIds, isReplenishing, isLoadingFeed, replenishFeedAtBottom]);
+
   useEffect(() => {
     if (articles.length > 0) syncPrefetchQueue();
   }, [articles, syncPrefetchQueue]);
