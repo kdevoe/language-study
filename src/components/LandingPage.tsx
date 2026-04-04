@@ -1,114 +1,162 @@
 import { supabase } from '../services/supabase';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { useRef, useState } from 'react';
+import { joinWaitlist } from '../services/api';
+import { ArrowRight, CheckCircle2, ChevronDown } from 'lucide-react';
 
 export function LandingPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: containerRef });
+
+  // --- WAITLIST STATE ---
+  const [email, setEmail] = useState('');
+  const [waitlistStatus, setWaitlistStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [waitlistMessage, setWaitlistMessage] = useState('');
+
+  // --- SCROLL ANIMATIONS ---
+  // Section 1: Hero (0 to 0.25)
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.15, 0.25], [1, 1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.25], [1, 0.8]);
+  const heroY = useTransform(scrollYProgress, [0, 0.25], ['0%', '-20%']);
+
+  // Section 2: Immerse (0.2 to 0.5)
+  const immerseOpacity = useTransform(scrollYProgress, [0.15, 0.25, 0.4, 0.5], [0, 1, 1, 0]);
+  const immerseY = useTransform(scrollYProgress, [0.15, 0.25, 0.4, 0.5], ['20%', '0%', '0%', '-20%']);
+
+  // Section 3: SRS / Context (0.45 to 0.75)
+  const srsOpacity = useTransform(scrollYProgress, [0.4, 0.5, 0.65, 0.75], [0, 1, 1, 0]);
+  const srsY = useTransform(scrollYProgress, [0.4, 0.5, 0.65, 0.75], ['20%', '0%', '0%', '-20%']);
+
+  // Section 4: Waitlist / Footer (0.7 to 1)
+  const waitlistOpacity = useTransform(scrollYProgress, [0.7, 0.85], [0, 1]);
+  const waitlistY = useTransform(scrollYProgress, [0.7, 0.85], ['20%', '0%']);
+
   const handleGoogleLogin = async () => {
     try {
-      if (!import.meta.env.VITE_SUPABASE_URL) {
-        alert("Supabase keys not configured yet! Please add VITE_SUPABASE_URL to your .env file.");
-        return;
-      }
-      
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-    } catch (err) {
-      console.error("Login failed:", err);
+      if (!import.meta.env.VITE_SUPABASE_URL) return;
+      await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+    } catch (err) { console.error(err); }
+  };
+
+  const handleJoinWaitlist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) return;
+    setWaitlistStatus('loading');
+    const res = await joinWaitlist(email);
+    if (res.success) {
+      setWaitlistStatus('success');
+      setWaitlistMessage("You're on the list! We'll be in touch soon.");
+    } else {
+      setWaitlistStatus('error');
+      setWaitlistMessage(res.message || "Something went wrong.");
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      minWidth: '100vw',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'var(--bg-pure)',
-      padding: '2rem',
-      position: 'relative',
-      overflow: 'hidden',
-      textAlign: 'center'
-    }}>
-      {/* Aesthetic Blur Orbs */}
-      <div style={{
-        position: 'absolute',
-        top: '-10%',
-        left: '-10%',
-        width: '50vw',
-        height: '50vw',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0) 70%)',
-        filter: 'blur(40px)',
-        zIndex: 0
-      }} />
-      <div style={{
-        position: 'absolute',
-        bottom: '-20%',
-        right: '-10%',
-        width: '60vw',
-        height: '60vw',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0) 70%)',
-        filter: 'blur(50px)',
-        zIndex: 0
-      }} />
+    <div ref={containerRef} style={{ height: '400vh', backgroundColor: '#0a0a0a', color: '#ffffff' }}>
+      
+      {/* FIXED VIEWPORT CONTAINER (Hardware accelerated wrapper) */}
+      <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100vw', overflow: 'hidden' }}>
 
-      <div className="fade-in" style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '500px' }}>
-        <h1 className="serif" style={{ fontSize: '4.5rem', fontWeight: 400, color: 'var(--text-main)', marginBottom: '0.5rem', letterSpacing: '0.02em', lineHeight: 1.1 }}>
-          幽玄
-        </h1>
-        <h2 className="sans" style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-main)', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: '2.5rem' }}>
-          Yūgen News
-        </h2>
-        
-        <p className="serif" style={{ fontSize: '1.15rem', color: 'var(--text-muted)', lineHeight: 1.8, marginBottom: '3.5rem' }}>
-          A context-aware Japanese immersion engine that dynamically weaves the exact Spaced Repetition vocabulary you're studying right into daily news.
-        </p>
+        {/* Ambient Premium Blur Effects */}
+        <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '50vw', height: '50vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(138,154,91,0.15) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(80px)', zIndex: 0 }} />
+        <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '60vw', height: '60vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(66,133,244,0.1) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(100px)', zIndex: 0 }} />
 
-        <button 
-          onClick={handleGoogleLogin}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '1rem',
-            padding: '1rem 2rem',
-            backgroundColor: 'var(--text-main)',
-            color: 'var(--bg-pure)',
-            border: 'none',
-            borderRadius: '100px',
-            fontSize: '1rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.18)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.12)';
-          }}
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            <path d="M1 1h22v22H1z" fill="none"/>
-          </svg>
-          Continue with Google
-        </button>
-      </div>
+        {/* --- SECTION 1: HERO --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: heroOpacity, scale: heroScale, y: heroY, zIndex: 10 }}>
+          <h1 className="serif" style={{ fontSize: 'clamp(5rem, 15vw, 12rem)', fontWeight: 300, marginBottom: '0rem', letterSpacing: '0.05em', lineHeight: 1, textShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            幽玄
+          </h1>
+          <h2 className="sans" style={{ fontSize: 'clamp(1rem, 3vw, 2rem)', fontWeight: 400, letterSpacing: '0.4em', textTransform: 'uppercase', opacity: 0.8, marginBottom: '6vh' }}>
+            Yūgen News
+          </h2>
+          <div style={{ position: 'absolute', bottom: '8vh', opacity: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.8rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Discover</span>
+            <ChevronDown className="lucide-bounce" size={24} />
+          </div>
+        </motion.div>
 
-      <div style={{ position: 'absolute', bottom: '2rem', fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-        Beta Test Release
+        {/* --- SECTION 2: IMMERSE --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: immerseOpacity, y: immerseY, zIndex: 20 }}>
+          <h2 className="serif" style={{ fontSize: 'clamp(2.5rem, 8vw, 5rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 400, textShadow: '0 10px 30px rgba(0,0,0,0.8)' }}>
+            Read the news. <br/>
+            <span style={{ color: '#8a9a5b' }}>Master the language.</span>
+          </h2>
+          <p className="sans" style={{ marginTop: '2rem', fontSize: 'clamp(1.1rem, 2vw, 1.4rem)', color: '#a0a0a0', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
+            An infinite, beautifully curated timeline of daily articles dynamically matched to your exact reading level. 
+          </p>
+        </motion.div>
+
+        {/* --- SECTION 3: CONTEXT & SRS --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: srsOpacity, y: srsY, zIndex: 30 }}>
+          <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 300 }}>
+            Context is everything.
+          </h2>
+          <div style={{ marginTop: '3rem', padding: '2rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', backdropFilter: 'blur(20px)', maxWidth: '500px', textAlign: 'left', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+            <p className="serif" style={{ fontSize: '1.5rem', lineHeight: 1.8, color: '#666' }}>
+              Our AI extracts your <span style={{ color: '#fff', backgroundColor: 'rgba(138,154,91,0.2)', padding: '2px 8px', borderRadius: '6px' }}>弱点 </span> (weaknesses) and weaves them naturally into tomorrow's headlines.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div>
+                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#888', marginBottom: '0.2rem' }}>Spaced Repetition</div>
+                <div style={{ fontSize: '1rem', fontWeight: 500 }}>Seamless Integration</div>
+              </div>
+              <CheckCircle2 color="#8a9a5b" size={24} />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* --- SECTION 4: WAITLIST & CTA --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: waitlistOpacity, y: waitlistY, zIndex: 40 }}>
+          
+          <div style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+            <h2 className="serif" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Get early access.</h2>
+            <p className="sans" style={{ color: '#888', marginBottom: '3rem' }}>Join the waitlist to be among the first to experience Yūgen News when we launch the private beta.</p>
+
+            {waitlistStatus === 'success' ? (
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ padding: '2rem', background: 'rgba(138,154,91,0.1)', border: '1px solid rgba(138,154,91,0.3)', borderRadius: '16px', color: '#8a9a5b' }}>
+                <CheckCircle2 size={32} style={{ margin: '0 auto 1rem' }} />
+                <div style={{ fontWeight: 600 }}>{waitlistMessage}</div>
+              </motion.div>
+            ) : (
+              <form onSubmit={handleJoinWaitlist} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <input 
+                  type="email" 
+                  placeholder="Enter your email address" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={waitlistStatus === 'loading'}
+                  style={{ width: '100%', padding: '1.25rem 1.5rem', fontSize: '1.1rem', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', outline: 'none' }}
+                />
+                <button 
+                  type="submit" 
+                  disabled={waitlistStatus === 'loading' || !email.includes('@')}
+                  style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem', fontWeight: 600, borderRadius: '100px', border: 'none', background: '#fff', color: '#000', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', transition: 'transform 0.2s, opacity 0.2s', opacity: (waitlistStatus === 'loading' || !email.includes('@')) ? 0.5 : 1 }}
+                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'scale(1.02)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  {waitlistStatus === 'loading' ? <div className="lucide-spin" style={{ width: '20px', height: '20px', border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%' }} /> : <>Join Waitlist <ArrowRight size={20} /></>}
+                </button>
+              </form>
+            )}
+
+            {waitlistStatus === 'error' && (
+              <div style={{ color: '#ff6b6b', marginTop: '1rem', fontSize: '0.9rem' }}>{waitlistMessage}</div>
+            )}
+
+            <div style={{ marginTop: '4rem', paddingTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem' }}>Already have beta access?</div>
+              <button 
+                onClick={handleGoogleLogin}
+                style={{ background: 'none', border: 'none', color: '#8a9a5b', fontWeight: 500, fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px' }}
+              >
+                Sign in with Google
+              </button>
+            </div>
+
+          </div>
+        </motion.div>
+
       </div>
     </div>
   );

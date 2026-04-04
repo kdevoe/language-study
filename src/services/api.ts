@@ -52,6 +52,25 @@ async function fetchGroq(prompt: string, model: string, jsonMode: boolean = fals
 
 import { supabase } from './supabase'
 
+export async function joinWaitlist(email: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const { error } = await supabase.from('waitlist').insert([{ email }]);
+    
+    if (error) {
+      if (error.code === '23505') {
+        // Unique violation
+        return { success: false, message: "You're already on the waitlist!" };
+      }
+      throw error;
+    }
+    
+    return { success: true };
+  } catch (err: any) {
+    console.error("Waitlist error:", err);
+    return { success: false, message: err.message || "An error occurred while joining the waitlist." };
+  }
+}
+
 export async function saveProcessedArticleToSupabase(article: NewsArticle, userId: string) {
   const { error } = await supabase
     .from('processed_news')
