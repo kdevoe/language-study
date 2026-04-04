@@ -25,8 +25,8 @@ function NewsCard({
   setOpenId: (id: string | null) => void;
 }) {
   const x = useMotionValue(0);
-  // Transform x position: keep invisible until -60px, then softly fade perfectly to 1 at -160px
-  const backdropOpacity = useTransform(x, [-160, -60], [1, 0]);
+  // Transform x position: gradual linear fade from 0 to 1 over the full track
+  const backdropOpacity = useTransform(x, [-160, 0], [1, 0]);
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
