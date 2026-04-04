@@ -296,7 +296,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
 
   return (
     <>
-      <div className="reading-content fade-in" style={{ paddingBottom: '6rem', fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 400 }}>
+      <div className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 400 }}>
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>

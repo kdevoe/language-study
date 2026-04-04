@@ -45,7 +45,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
       variants={container}
       initial="hidden"
       animate="show"
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '8rem' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: 0 }}
     >
       <AnimatePresence mode="popLayout">
         {articles.map((article) => {
