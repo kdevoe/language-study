@@ -17,26 +17,32 @@ export function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.9]);
   const heroY = useTransform(scrollYProgress, [0, 0.15], ['0%', '-10%']);
+  const heroDisplay = useTransform(scrollYProgress, pos => pos > 0.2 ? "none" : "flex");
 
   // Section 2: Reader View (0.1 to 0.3)
   const readerOpacity = useTransform(scrollYProgress, [0.1, 0.15, 0.25, 0.3], [0, 1, 1, 0]);
   const readerY = useTransform(scrollYProgress, [0.1, 0.15, 0.25, 0.3], ['10%', '0%', '0%', '-10%']);
+  const readerDisplay = useTransform(scrollYProgress, pos => pos > 0.35 ? "none" : "flex");
 
   // Section 3: Settings View (0.25 to 0.45)
   const settingsOpacity = useTransform(scrollYProgress, [0.25, 0.3, 0.4, 0.45], [0, 1, 1, 0]);
   const settingsY = useTransform(scrollYProgress, [0.25, 0.3, 0.4, 0.45], ['10%', '0%', '0%', '-10%']);
+  const settingsDisplay = useTransform(scrollYProgress, pos => (pos < 0.2 || pos > 0.5) ? "none" : "flex");
 
   // Section 4: Word Lookup (0.4 to 0.6)
   const lookupOpacity = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], [0, 1, 1, 0]);
   const lookupY = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], ['10%', '0%', '0%', '-10%']);
+  const lookupDisplay = useTransform(scrollYProgress, pos => (pos < 0.35 || pos > 0.65) ? "none" : "flex");
 
   // Section 5: Article List (0.55 to 0.75)
   const listOpacity = useTransform(scrollYProgress, [0.55, 0.6, 0.7, 0.75], [0, 1, 1, 0]);
   const listY = useTransform(scrollYProgress, [0.55, 0.6, 0.7, 0.75], ['10%', '0%', '0%', '-10%']);
+  const listDisplay = useTransform(scrollYProgress, pos => (pos < 0.5 || pos > 0.8) ? "none" : "flex");
 
   // Section 6: Waitlist (0.7 to 0.9)
   const waitlistOpacity = useTransform(scrollYProgress, [0.7, 0.8], [0, 1]);
   const waitlistY = useTransform(scrollYProgress, [0.7, 0.8], ['10%', '0%']);
+  const waitlistDisplay = useTransform(scrollYProgress, pos => pos < 0.65 ? "none" : "flex");
 
   const handleGoogleLogin = async () => {
     try {
@@ -81,10 +87,10 @@ export function LandingPage() {
     <div style={{ height: '600vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
       
       {/* FIXED VIEWPORT CONTAINER (Bulletproof hardware accelerated wrapper) */}
-      <div style={{ position: 'fixed', top: 0, left: 0, height: '100%', width: '100%', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, height: '100%', width: '100%', overflow: 'hidden', backgroundColor: 'var(--bg-color)' }}>
 
         {/* --- SECTION 1: HERO --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: heroOpacity, scale: heroScale, y: heroY, zIndex: 10 }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: heroOpacity, scale: heroScale, y: heroY, zIndex: 10, display: heroDisplay }}>
           <h1 className="serif" style={{ fontSize: 'clamp(5rem, 15vw, 12rem)', fontWeight: 300, marginBottom: '0rem', letterSpacing: '0.05em', lineHeight: 1, textShadow: '0 10px 20px rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>
             幽玄
           </h1>
@@ -98,7 +104,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 2: READER VIEW --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: readerOpacity, y: readerY, zIndex: 20 }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: readerOpacity, y: readerY, zIndex: 20, display: readerDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Immersive Reading.
           </h2>
@@ -109,7 +115,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 3: SETTINGS VIEW --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: settingsOpacity, y: settingsY, zIndex: 30 }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: settingsOpacity, y: settingsY, zIndex: 30, display: settingsDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Total Personalization.
           </h2>
@@ -120,7 +126,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 4: WORD LOOKUP --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: lookupOpacity, y: lookupY, zIndex: 40 }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: lookupOpacity, y: lookupY, zIndex: 40, display: lookupDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Contextual Insight.
           </h2>
@@ -131,7 +137,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 5: ARTICLE LIST --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: listOpacity, y: listY, zIndex: 50 }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: listOpacity, y: listY, zIndex: 50, display: listDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             The Infinite Stream.
           </h2>
@@ -142,7 +148,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 6: WAITLIST & CTA --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: waitlistOpacity, y: waitlistY, zIndex: 60 }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: waitlistOpacity, y: waitlistY, zIndex: 60, display: waitlistDisplay }}>
           
           <div style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
             <h2 className="serif" style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-main)' }}>Get early access.</h2>
