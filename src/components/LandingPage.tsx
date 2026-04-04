@@ -75,14 +75,10 @@ export function LandingPage() {
   );
 
   return (
-    <div ref={containerRef} style={{ height: '500vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+    <div ref={containerRef} style={{ height: '500dvh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
       
       {/* FIXED VIEWPORT CONTAINER (Hardware accelerated wrapper) */}
-      <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100vw', overflow: 'hidden' }}>
-
-        {/* Ambient Premium Blur Effects (Adapted for Light Theme) */}
-        <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '50vw', height: '50vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(138,154,91,0.05) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(80px)', zIndex: 0 }} />
-        <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '60vw', height: '60vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(66,133,244,0.03) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(100px)', zIndex: 0 }} />
+      <div style={{ position: 'sticky', top: 0, height: '100dvh', width: '100vw', overflow: 'hidden' }}>
 
         {/* --- SECTION 1: HERO --- */}
         <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: heroOpacity, scale: heroScale, y: heroY, zIndex: 10 }}>
