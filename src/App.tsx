@@ -70,24 +70,39 @@ function App() {
     }
   }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
 
-  const replenishFeedAtBottom = useCallback(async () => {
-    if (isReplenishing || isLoadingFeed) return;
+  const replenishFeedAtBottom = useCallback(async (retryCount = 0) => {
+    // Safety cap to prevent infinite loops (max 5 consecutive retries)
+    if (isReplenishing || isLoadingFeed || retryCount > 5) return;
+    
     setIsReplenishing(true);
+    let success = false;
     try {
       const nextPage = newsPage + 1;
       const moreNews = await fetchNewsFeed('Japan News', 1, nextPage);
       
-      setArticles(prev => {
-        const existingIds = new Set(prev.map(a => a.id));
-        const uniqueMore = moreNews.filter(a => !existingIds.has(a.id));
-        if (uniqueMore.length === 0) return prev; // No new stories on this page
-        return [...prev, ...uniqueMore];
-      });
+      const currentArticles = articles;
+      const existingIds = new Set(currentArticles.map(a => a.id));
+      const uniqueMore = moreNews.filter(a => !existingIds.has(a.id));
       
-      setNewsPage(nextPage);
-    } catch (e) { console.error(e); }
-    setIsReplenishing(false);
-  }, [newsPage, isReplenishing, isLoadingFeed]);
+      if (uniqueMore.length > 0) {
+        setArticles(prev => [...prev, ...uniqueMore]);
+        setNewsPage(nextPage);
+        success = true;
+      } else {
+        // We hit a duplicate/shifted result. Silently try the next page immediately.
+        setNewsPage(nextPage);
+        setIsReplenishing(true); // Keep ghost card visible
+        setTimeout(() => replenishFeedAtBottom(retryCount + 1), 50);
+      }
+    } catch (e) { 
+      console.error("Replenish search error:", e); 
+    }
+    
+    // Only turn off the searching indicator if we found something or hit the cap
+    if (success || retryCount >= 5) {
+      setIsReplenishing(false);
+    }
+  }, [newsPage, isReplenishing, isLoadingFeed, articles]);
 
   const loadHub = async () => {
     setIsLoadingFeed(true);
