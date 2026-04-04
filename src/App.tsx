@@ -84,7 +84,11 @@ function App() {
       
       while (!found && attempts < 10) {
         attempts++;
-        finalSearchPage = newsPage + attempts; 
+        
+        // Wrap finalSearchPage strictly under 20 to prevent NewsAPI 100-item hard limit errors
+        finalSearchPage = ((newsPage + attempts) % 20);
+        if (finalSearchPage === 0) finalSearchPage = 1;
+        
         const topic = FEED_TOPICS[(topicIndex + attempts) % FEED_TOPICS.length];
         
         const finalTopic = attempts > 6 ? 'Top Headlines' : topic;
