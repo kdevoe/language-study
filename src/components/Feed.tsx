@@ -120,22 +120,31 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
                 </button>
               </div>
 
+              {/* CARD FOREGROUND */}
               <motion.div
                 variants={itemVariants}
                 layout
                 exit="exit"
                 drag="x"
                 dragConstraints={{ left: -160, right: 0 }}
-                dragElastic={0.2}
+                dragElastic={0.1}
                 dragMomentum={false}
                 animate={{ 
                   x: isSwipedOpen ? -160 : 0,
                   boxShadow: isSwipedOpen ? '0 10px 40px rgba(0,0,0,0.1)' : '0 4px 25px rgba(0,0,0,0.03)'
                 }}
+                transition={{ 
+                  type: 'spring', 
+                  stiffness: 500, 
+                  damping: 35,
+                  boxShadow: { duration: 0.2 }
+                }}
                 onDragStart={() => setOpenArticleId(null)}
                 whileDrag={{ opacity: 1 }} 
                 onDragEnd={(_, info) => {
-                  if (info.offset.x < -80 && article.id) {
+                  // Capture the total drag distance including the current docking offset
+                  const totalOffset = info.offset.x;
+                  if (totalOffset < -60 && article.id) {
                     setOpenArticleId(article.id);
                   } else {
                     setOpenArticleId(null);
