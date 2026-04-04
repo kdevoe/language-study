@@ -94,6 +94,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   };
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     if (!currentArticle && !loading) loadArticle();
   }, [initialArticle]);
 
