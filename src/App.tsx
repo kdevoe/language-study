@@ -70,39 +70,49 @@ function App() {
     }
   }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
 
-  const replenishFeedAtBottom = useCallback(async (retryCount = 0) => {
-    // Safety cap to prevent infinite loops (max 5 consecutive retries)
-    if (isReplenishing || isLoadingFeed || retryCount > 5) return;
+  const replenishFeedAtBottom = useCallback(async () => {
+    // Only allow one replenishment cycle at a time
+    if (isReplenishing || isLoadingFeed) return;
     
     setIsReplenishing(true);
-    let success = false;
     try {
-      const nextPage = newsPage + 1;
-      const moreNews = await fetchNewsFeed('Japan News', 1, nextPage);
+      let currentPage = newsPage;
+      let found = false;
+      let attempts = 0;
       
-      const currentArticles = articles;
-      const existingIds = new Set(currentArticles.map(a => a.id));
-      const uniqueMore = moreNews.filter(a => !existingIds.has(a.id));
-      
-      if (uniqueMore.length > 0) {
-        setArticles(prev => [...prev, ...uniqueMore]);
-        setNewsPage(nextPage);
-        success = true;
-      } else {
-        // We hit a duplicate/shifted result. Silently try the next page immediately.
-        setNewsPage(nextPage);
-        setIsReplenishing(true); // Keep ghost card visible
-        setTimeout(() => replenishFeedAtBottom(retryCount + 1), 50);
+      // Keep searching until we find a unique article or hit max retries
+      while (!found && attempts < 6) {
+        attempts++;
+        const searchPage = currentPage + 1;
+        const moreNews = await fetchNewsFeed('Japan News', 1, searchPage);
+        
+        // Update current page tracker for the next cycle
+        currentPage = searchPage;
+        setNewsPage(searchPage);
+
+        if (moreNews.length > 0) {
+          const newArticle = moreNews[0];
+          // Functional check to ensure we use the VERY LATEST article list
+          setArticles(prev => {
+            const existingIds = new Set(prev.map(a => a.id));
+            if (!existingIds.has(newArticle.id)) {
+              found = true;
+              return [...prev, newArticle];
+            }
+            return prev;
+          });
+        }
+
+        // If we found it, break; otherwise small delay before next page to keep things smooth
+        if (found) break;
+        if (attempts < 6) await new Promise(r => setTimeout(r, 100));
       }
     } catch (e) { 
-      console.error("Replenish search error:", e); 
-    }
-    
-    // Only turn off the searching indicator if we found something or hit the cap
-    if (success || retryCount >= 5) {
+      console.error("Endless search error:", e); 
+    } finally {
       setIsReplenishing(false);
     }
-  }, [newsPage, isReplenishing, isLoadingFeed, articles]);
+  }, [newsPage, isReplenishing, isLoadingFeed]); // articles removed from deps to prevent unnecessary re-creations
 
   const loadHub = async () => {
     setIsLoadingFeed(true);
