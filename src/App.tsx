@@ -80,40 +80,44 @@ function App() {
     try {
       let found = false;
       let attempts = 0;
+      let finalSearchPage = newsPage;
       
-      // Keep searching across rotating topics
       while (!found && attempts < 10) {
         attempts++;
+        finalSearchPage = newsPage + attempts; 
+        const topic = FEED_TOPICS[(topicIndex + attempts) % FEED_TOPICS.length];
         
-        // Track unique page progress for every topic to avoid redundancy
-        // Simplified: use a high newsPage offset that keeps incrementing globally
-        const currentSearchPage = newsPage + attempts;
-        const topic = FEED_TOPICS[topicIndex % FEED_TOPICS.length];
-        
-        // Final fallback: If we're really stuck, fetch Generic Top Headlines
-        const finalTopic = attempts > 8 ? 'Top Headlines' : topic;
-        const moreNews = await fetchNewsFeed(finalTopic, 1, currentSearchPage);
-
-        setTopicIndex(prev => prev + 1);
+        const finalTopic = attempts > 6 ? 'Top Headlines' : topic;
+        const moreNews = await fetchNewsFeed(finalTopic, 1, finalSearchPage);
 
         if (moreNews.length > 0) {
           const newArticle = moreNews[0];
-          setArticles(prev => {
-            const existingIds = new Set(prev.map(a => a.id));
-            if (!existingIds.has(newArticle.id)) {
-              found = true;
-              return [...prev, newArticle];
-            }
-            return prev;
-          });
+          // VALIDATION: Reject [Removed], empty titles, or titles that look like timestamps
+          const isJunk = !newArticle.title || 
+                         newArticle.title.includes('[Removed]') || 
+                         newArticle.title.length < 10 ||
+                         /^[0-9:\/\s]+$/.test(newArticle.title);
+
+          if (!isJunk) {
+            setArticles(prev => {
+              const existingIds = new Set(prev.map(a => a.id));
+              if (!existingIds.has(newArticle.id)) {
+                found = true;
+                return [...prev, newArticle];
+              }
+              return prev;
+            });
+          }
         }
         
-        if (found) {
-            setNewsPage(currentSearchPage);
-            break;
-        }
-        await new Promise(r => setTimeout(r, 200));
+        if (found) break;
+        await new Promise(r => setTimeout(r, 100));
       }
+      
+      // ALWAYS advance the page tracker so the next sentinel call 
+      // doesn't start from the same spot
+      setNewsPage(finalSearchPage);
+      setTopicIndex(prev => prev + 1);
     } catch (e) { 
       console.error("Endless search error:", e); 
     } finally {

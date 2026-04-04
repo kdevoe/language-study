@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Trash2, Bookmark, Search } from 'lucide-react';
+import { CheckCircle2, Trash2, Bookmark } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 import { useState } from 'react';
 
@@ -243,29 +243,45 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
             key="ghost-card-replenisher"
             initial={{ opacity: 0, y: 30, scale: 0.98 }}
             animate={{ opacity: 0.8, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
+            exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.4 } }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             className="shimmer"
             style={{
               padding: '1.5rem',
               borderRadius: '24px',
               backgroundColor: 'var(--bg-card)',
-              border: '1px dashed var(--border-light)',
+              border: '1px solid var(--border-light)',
               display: 'flex',
               flexDirection: 'column',
               gap: '1rem',
-              minHeight: '140px',
-              justifyContent: 'center',
-              alignItems: 'center',
-              color: 'var(--text-muted)',
-              marginTop: '1rem'
+              minHeight: '160px',
+              marginTop: '1rem',
+              overflow: 'hidden',
+              position: 'relative'
             }}
           >
-            <Search size={22} strokeWidth={1.5} className="lucide-spin" style={{ marginBottom: '0.2rem', opacity: 0.5 }} />
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)' }}>RENEWING FEED...</div>
-            <div style={{ width: '40%', height: '4px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '2px' }} />
+            {/* Minimalist Shimmer Skeleton */}
+            <div style={{ width: '30%', height: '12px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px' }} />
+            <div style={{ width: '85%', height: '24px', background: 'rgba(0,0,0,0.04)', borderRadius: '6px', marginTop: '0.4rem' }} />
+            <div style={{ width: '60%', height: '24px', background: 'rgba(0,0,0,0.04)', borderRadius: '6px' }} />
+            <div style={{ width: '40%', height: '10px', background: 'rgba(0,0,0,0.03)', borderRadius: '4px', marginTop: '0.8rem' }} />
+            
+            {/* Shimmer Light Pulse */}
+            <motion.div 
+               initial={{ x: '-100%' }}
+               animate={{ x: '200%' }}
+               transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+               style={{ 
+                 position: 'absolute', top: 0, left: 0, bottom: 0, width: '50%',
+                 background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                 zIndex: 2
+               }}
+            />
           </motion.div>
         )}
+
+        {/* BOTTOM ANCHOR (Stabilizes scroll and prevents toolbar pops) */}
+        <div style={{ height: '140px', width: '100%' }} />
       </AnimatePresence>
     </motion.div>
   );
