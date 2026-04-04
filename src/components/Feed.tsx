@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { CheckCircle2, Trash2, Bookmark } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 import { useState } from 'react';
@@ -25,8 +25,8 @@ function NewsCard({
   setOpenId: (id: string | null) => void;
 }) {
   const x = useMotionValue(0);
-  // Transform x position (-160 to -20) to opacity (1 to 0)
-  const backdropOpacity = useTransform(x, [-100, -20], [1, 0]);
+  // Transform x position: keep invisible until -60px, then softly fade perfectly to 1 at -160px
+  const backdropOpacity = useTransform(x, [-160, -60], [1, 0]);
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -131,14 +131,17 @@ function NewsCard({
           stiffness: 600, 
           damping: 45
         }}
-        onDragStart={() => setOpenId(null)}
         onDragEnd={(_, info) => {
           // Snap based on position and velocity
           const shouldOpen = info.offset.x < -40 || info.velocity.x < -500;
           if (shouldOpen && article.id) {
             setOpenId(article.id);
+            // If already open, force animation since React won't re-render
+            if (isOpen) animate(x, -160, { type: 'spring', stiffness: 600, damping: 45 });
           } else {
             setOpenId(null);
+            // If already closed, force animation since React won't re-render
+            if (!isOpen) animate(x, 0, { type: 'spring', stiffness: 600, damping: 45 });
           }
         }}
         onClick={() => {
