@@ -122,7 +122,7 @@ export function LandingPage() {
             Total Personalization.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Set your target JLPT level. Your known kanji and vocabulary are strictly managed and reinforced using precise Spaced Repetition algorithms.
+            Set your target JLPT level. The exact vocabulary and kanji you are actively studying are seamlessly threaded through your daily articles to reinforce your Japanese natively. 
           </p>
           <SectionImage src="/screenshot-settings.png" alt="Language Settings View" />
         </motion.div>
