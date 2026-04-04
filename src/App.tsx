@@ -66,9 +66,13 @@ function App() {
     if (articles.length === 0) return;
     const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
     const nextCandidate = visibleArticles.find(a => !articlesCache[a.id] && !processingArticles.includes(a.id));
-    const hasReady = visibleArticles.some(a => articlesCache[a.id]);
+    
+    // Check if we ALREADY have a processed, readable article waiting in the visible feed
+    const hasUnreadReady = visibleArticles.some(a => articlesCache[a.id]);
     const isAlreadyWorking = processingArticles.length > 0;
-    if (nextCandidate && (!hasReady || !isAlreadyWorking)) {
+    
+    // Only trigger heavy LLM processing if the pipeline is completely empty
+    if (nextCandidate && !hasUnreadReady && !isAlreadyWorking) {
       handleProcessArticle(nextCandidate);
     }
   }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
@@ -92,26 +96,22 @@ function App() {
         const topic = FEED_TOPICS[(topicIndex + attempts) % FEED_TOPICS.length];
         
         const finalTopic = attempts > 6 ? 'Top Headlines' : topic;
-        const moreNews = await fetchNewsFeed(finalTopic, 1, finalSearchPage);
+        // Fetch a batch of 10 to guarantee finding at least one valid one efficiently
+        const moreNews = await fetchNewsFeed(finalTopic, 10, finalSearchPage);
 
-        if (moreNews.length > 0) {
-          const newArticle = moreNews[0];
-          // VALIDATION: Reject [Removed], empty titles, or titles that look like timestamps
-          const isJunk = !newArticle.title || 
-                         newArticle.title.includes('[Removed]') || 
-                         newArticle.title.length < 10 ||
-                         /^[0-9:\/\s]+$/.test(newArticle.title);
+        // Synchronously check against our closure's tracking lists
+        const existingIds = new Set(articles.map(a => a.id));
+        const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
 
-          if (!isJunk) {
-            setArticles(prev => {
-              const existingIds = new Set(prev.map(a => a.id));
-              if (!existingIds.has(newArticle.id)) {
-                found = true;
-                return [...prev, newArticle];
-              }
-              return prev;
-            });
-          }
+        const validCandidate = moreNews.find(a => {
+          const isJunk = !a.title || a.title.includes('[Removed]') || a.title.length < 10 || /^[0-9:\/\s]+$/.test(a.title);
+          return !isJunk && !existingIds.has(a.id) && !dismissedSet.has(a.id);
+        });
+
+        if (validCandidate) {
+          found = true;
+          // React state is safe to update since we break immediately
+          setArticles(prev => [...prev, validCandidate]);
         }
         
         if (found) break;
