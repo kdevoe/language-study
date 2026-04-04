@@ -123,7 +123,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
               {/* CARD FOREGROUND */}
               <motion.div
                 variants={itemVariants}
-                layout
+                layout="position"
                 exit="exit"
                 drag="x"
                 dragConstraints={{ left: -160, right: 0 }}
@@ -237,11 +237,12 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
           );
         })}
 
-        {/* GHOST CARD REPLENISHMENT PLACEHOLDER */}
+        {/* GHOST CARD REPLENISHMENT PLACEHOLDER (Explicitly at end of list) */}
         {isReplenishing && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 0.6, y: 0 }}
+            key="ghost-card-replenisher"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 0.8, y: 0 }}
             className="shimmer"
             style={{
               padding: '1.5rem',
@@ -254,12 +255,13 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
               minHeight: '140px',
               justifyContent: 'center',
               alignItems: 'center',
-              color: 'var(--text-muted)'
+              color: 'var(--text-muted)',
+              marginTop: '1rem'
             }}
           >
-            <Search size={24} strokeWidth={1.5} className="lucide-spin" style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.02em' }}>Finding fresh news...</div>
-            <div style={{ width: '60%', height: '8px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '4px' }} />
+            <Search size={22} strokeWidth={1.5} className="lucide-spin" style={{ marginBottom: '0.2rem', opacity: 0.5 }} />
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)' }}>RENEWING FEED...</div>
+            <div style={{ width: '40%', height: '4px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '2px' }} />
           </motion.div>
         )}
       </AnimatePresence>
