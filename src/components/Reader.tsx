@@ -315,7 +315,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         })}
 
         {/* Restored Tsugihe Capsule Button */}
-        <div style={{ textAlign: 'center', marginTop: '6rem', marginBottom: '6rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
            <button 
              onClick={() => {
                handleFinishArticle();
