@@ -55,32 +55,34 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
           return (
             <div key={article.id} style={{ position: 'relative', touchAction: 'pan-y' }}>
               
-              {/* BACK ACTIONS (Revealed on Swipe Left) */}
+              {/* BACK ACTIONS (Revealed on Swipe Left - anchored to the right) */}
               <div style={{ 
                 position: 'absolute', 
                 right: 0, 
                 top: 0, 
                 bottom: 0, 
-                width: '100%', 
+                width: '160px', 
                 display: 'flex',
-                justifyContent: 'flex-end',
+                justifyContent: 'center',
                 alignItems: 'center',
-                paddingRight: '0.8rem',
-                gap: '0.5rem',
-                zIndex: 0
+                padding: '0 0.8rem',
+                gap: '0.6rem',
+                zIndex: 0,
+                opacity: isSwipedOpen ? 1 : 0, // Performance: Only show when swiped or swiping
+                transition: 'opacity 0.2s ease'
               }}>
                 {/* Archive/Save Button */}
                 <button 
-                  onClick={() => {
-                    // Logic to Archive...
-                    if (article.id) onDismiss(article.id); // Temporary: mark as dismissed for now
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (article.id) onDismiss(article.id); 
                   }}
                   style={{ 
                     backgroundColor: 'rgba(74, 93, 35, 0.1)', 
                     color: '#4a5d23', 
-                    height: '80%', 
-                    aspectRatio: '1', 
-                    borderRadius: '16px', 
+                    flex: 1,
+                    height: '70%', 
+                    borderRadius: '18px', 
                     border: 'none', 
                     display: 'flex', 
                     flexDirection: 'column',
@@ -91,20 +93,21 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                   }}
                 >
                   <Bookmark size={18} />
-                  <span style={{ fontSize: '0.55rem', fontWeight: 800 }}>SAVE</span>
+                  <span style={{ fontSize: '0.5rem', fontWeight: 900 }}>SAVE</span>
                 </button>
 
                 {/* Delete/Dismiss Button */}
                 <button 
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (article.id) onDismiss(article.id);
                   }}
                   style={{ 
                     backgroundColor: 'rgba(180, 10, 10, 0.1)', 
                     color: '#b40a0a', 
-                    height: '80%', 
-                    aspectRatio: '1', 
-                    borderRadius: '16px', 
+                    flex: 1,
+                    height: '70%', 
+                    borderRadius: '18px', 
                     border: 'none', 
                     display: 'flex', 
                     flexDirection: 'column',
@@ -115,7 +118,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                   }}
                 >
                   <Trash2 size={18} />
-                  <span style={{ fontSize: '0.55rem', fontWeight: 800 }}>DELETE</span>
+                  <span style={{ fontSize: '0.5rem', fontWeight: 900 }}>DELETE</span>
                 </button>
               </div>
 
@@ -126,10 +129,15 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                 exit="exit"
                 drag="x"
                 dragConstraints={{ left: -160, right: 0 }}
-                dragElastic={0.4}
+                dragElastic={0.2}
                 dragMomentum={false}
-                animate={{ x: isSwipedOpen ? -160 : 0 }}
+                animate={{ 
+                  x: isSwipedOpen ? -160 : 0,
+                  boxShadow: isSwipedOpen ? '0 10px 40px rgba(0,0,0,0.1)' : '0 4px 25px rgba(0,0,0,0.03)'
+                }}
                 onDragStart={() => setOpenArticleId(null)}
+                whileDrag={{ opacity: 1 }} // Show background actions while dragging
+
                 onDragEnd={(_, info) => {
                   if (info.offset.x < -80 && article.id) {
                     setOpenArticleId(article.id);
