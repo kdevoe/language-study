@@ -13,27 +13,30 @@ export function LandingPage() {
   const [waitlistMessage, setWaitlistMessage] = useState('');
 
   // --- SCROLL ANIMATIONS ---
-  // Section 1: Hero (0 to 0.2)
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.1, 0.2], [1, 1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.9]);
-  const heroY = useTransform(scrollYProgress, [0, 0.2], ['0%', '-10%']);
+  // Section 1: Hero (0 to 0.15)
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.9]);
+  const heroY = useTransform(scrollYProgress, [0, 0.15], ['0%', '-10%']);
 
-  // Section 2: Infinite Stream (0.15 to 0.4)
-  const listOpacity = useTransform(scrollYProgress, [0.15, 0.25, 0.35, 0.45], [0, 1, 1, 0]);
-  const listY = useTransform(scrollYProgress, [0.15, 0.25, 0.35, 0.45], ['10%', '0%', '0%', '-10%']);
+  // Section 2: Reader View (0.1 to 0.3)
+  const readerOpacity = useTransform(scrollYProgress, [0.1, 0.15, 0.25, 0.3], [0, 1, 1, 0]);
+  const readerY = useTransform(scrollYProgress, [0.1, 0.15, 0.25, 0.3], ['10%', '0%', '0%', '-10%']);
 
-  // Section 3: Reader View (0.35 to 0.6)
-  const readerOpacity = useTransform(scrollYProgress, [0.35, 0.45, 0.55, 0.65], [0, 1, 1, 0]);
-  const readerY = useTransform(scrollYProgress, [0.35, 0.45, 0.55, 0.65], ['10%', '0%', '0%', '-10%']);
+  // Section 3: Settings View (0.25 to 0.45)
+  const settingsOpacity = useTransform(scrollYProgress, [0.25, 0.3, 0.4, 0.45], [0, 1, 1, 0]);
+  const settingsY = useTransform(scrollYProgress, [0.25, 0.3, 0.4, 0.45], ['10%', '0%', '0%', '-10%']);
 
-  // Section 4: Word Lookup (0.55 to 0.8)
-  const lookupOpacity = useTransform(scrollYProgress, [0.55, 0.65, 0.75, 0.85], [0, 1, 1, 0]);
-  const lookupY = useTransform(scrollYProgress, [0.55, 0.65, 0.75, 0.85], ['10%', '0%', '0%', '-10%']);
+  // Section 4: Word Lookup (0.4 to 0.6)
+  const lookupOpacity = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], [0, 1, 1, 0]);
+  const lookupY = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], ['10%', '0%', '0%', '-10%']);
 
-  // Section 5: Waitlist (0.75 to 0.95)
-  // Stop at 0.95 so we don't hit absolute 1.0 boundary edge cases on Safari overscroll
-  const waitlistOpacity = useTransform(scrollYProgress, [0.75, 0.85], [0, 1]);
-  const waitlistY = useTransform(scrollYProgress, [0.75, 0.85], ['10%', '0%']);
+  // Section 5: Article List (0.55 to 0.75)
+  const listOpacity = useTransform(scrollYProgress, [0.55, 0.6, 0.7, 0.75], [0, 1, 1, 0]);
+  const listY = useTransform(scrollYProgress, [0.55, 0.6, 0.7, 0.75], ['10%', '0%', '0%', '-10%']);
+
+  // Section 6: Waitlist (0.7 to 0.9)
+  const waitlistOpacity = useTransform(scrollYProgress, [0.7, 0.8], [0, 1]);
+  const waitlistY = useTransform(scrollYProgress, [0.7, 0.8], ['10%', '0%']);
 
   const handleGoogleLogin = async () => {
     try {
@@ -75,7 +78,7 @@ export function LandingPage() {
   );
 
   return (
-    <div style={{ height: '500vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+    <div style={{ height: '600vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
       
       {/* FIXED VIEWPORT CONTAINER (Bulletproof hardware accelerated wrapper) */}
       <div style={{ position: 'fixed', top: 0, left: 0, height: '100%', width: '100%', overflow: 'hidden' }}>
@@ -85,8 +88,8 @@ export function LandingPage() {
           <h1 className="serif" style={{ fontSize: 'clamp(5rem, 15vw, 12rem)', fontWeight: 300, marginBottom: '0rem', letterSpacing: '0.05em', lineHeight: 1, textShadow: '0 10px 20px rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>
             幽玄
           </h1>
-          <h2 className="sans" style={{ fontSize: 'clamp(1rem, 3vw, 2rem)', fontWeight: 400, letterSpacing: '0.4em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6vh' }}>
-            Yūgen News
+          <h2 className="sans" style={{ fontSize: 'clamp(1rem, 2vw, 1.5rem)', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6vh' }}>
+            News tailored just for you using AI.
           </h2>
           <div style={{ position: 'absolute', bottom: '8vh', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.8rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Discover</span>
@@ -94,19 +97,8 @@ export function LandingPage() {
           </div>
         </motion.div>
 
-        {/* --- SECTION 2: STREAM --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: listOpacity, y: listY, zIndex: 20 }}>
-          <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
-            The Infinite Stream.
-          </h2>
-          <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Never run out of material. An endless feed of daily news perfectly aligned to your capabilities.
-          </p>
-          <SectionImage src="/Screenshot-article-list.png" alt="Infinite Article Feed" />
-        </motion.div>
-
-        {/* --- SECTION 3: IMMERSE --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: readerOpacity, y: readerY, zIndex: 30 }}>
+        {/* --- SECTION 2: READER VIEW --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: readerOpacity, y: readerY, zIndex: 20 }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Immersive Reading.
           </h2>
@@ -116,19 +108,41 @@ export function LandingPage() {
           <SectionImage src="/screenshot-reader-view.png" alt="Clean Reader View" />
         </motion.div>
 
-        {/* --- SECTION 4: CONTEXT & SRS --- */}
+        {/* --- SECTION 3: SETTINGS VIEW --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: settingsOpacity, y: settingsY, zIndex: 30 }}>
+          <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
+            Total Personalization.
+          </h2>
+          <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
+            Set your target JLPT level. Your known kanji and vocabulary are strictly managed and reinforced using precise Spaced Repetition algorithms.
+          </p>
+          <SectionImage src="/screenshot-settings.png" alt="Language Settings View" />
+        </motion.div>
+
+        {/* --- SECTION 4: WORD LOOKUP --- */}
         <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: lookupOpacity, y: lookupY, zIndex: 40 }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Contextual Insight.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Tap any word for zero-latency, context-aware AI definitions and grammar rules. Rate mastery to control Spaced Repetition injection.
+            Tap any word for zero-latency, context-aware AI definitions and grammar rules natively within the sentence.
           </p>
           <SectionImage src="/screenshot-word-lookup.png" alt="Contextual Word Lookup" />
         </motion.div>
 
-        {/* --- SECTION 5: WAITLIST & CTA --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: waitlistOpacity, y: waitlistY, zIndex: 50 }}>
+        {/* --- SECTION 5: ARTICLE LIST --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: listOpacity, y: listY, zIndex: 50 }}>
+          <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
+            The Infinite Stream.
+          </h2>
+          <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
+            Never run out of material. An endless feed of daily news tailored continuously to your learning pipeline.
+          </p>
+          <SectionImage src="/Screenshot-article-list.png" alt="Infinite Article Feed" />
+        </motion.div>
+
+        {/* --- SECTION 6: WAITLIST & CTA --- */}
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: waitlistOpacity, y: waitlistY, zIndex: 60 }}>
           
           <div style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
             <h2 className="serif" style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-main)' }}>Get early access.</h2>
