@@ -1,12 +1,11 @@
 import { supabase } from '../services/supabase';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { joinWaitlist } from '../services/api';
 import { ArrowRight, CheckCircle2, ChevronDown } from 'lucide-react';
 
 export function LandingPage() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: containerRef });
+  const { scrollYProgress } = useScroll(); // Track overall window scroll strictly
 
   // --- WAITLIST STATE ---
   const [email, setEmail] = useState('');
@@ -31,7 +30,8 @@ export function LandingPage() {
   const lookupOpacity = useTransform(scrollYProgress, [0.55, 0.65, 0.75, 0.85], [0, 1, 1, 0]);
   const lookupY = useTransform(scrollYProgress, [0.55, 0.65, 0.75, 0.85], ['10%', '0%', '0%', '-10%']);
 
-  // Section 5: Waitlist (0.75 to 1)
+  // Section 5: Waitlist (0.75 to 0.95)
+  // Stop at 0.95 so we don't hit absolute 1.0 boundary edge cases on Safari overscroll
   const waitlistOpacity = useTransform(scrollYProgress, [0.75, 0.85], [0, 1]);
   const waitlistY = useTransform(scrollYProgress, [0.75, 0.85], ['10%', '0%']);
 
@@ -75,10 +75,10 @@ export function LandingPage() {
   );
 
   return (
-    <div ref={containerRef} style={{ height: '500dvh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+    <div style={{ height: '500vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
       
-      {/* FIXED VIEWPORT CONTAINER (Hardware accelerated wrapper) */}
-      <div style={{ position: 'sticky', top: 0, height: '100dvh', width: '100vw', overflow: 'hidden' }}>
+      {/* FIXED VIEWPORT CONTAINER (Bulletproof hardware accelerated wrapper) */}
+      <div style={{ position: 'fixed', top: 0, left: 0, height: '100%', width: '100%', overflow: 'hidden' }}>
 
         {/* --- SECTION 1: HERO --- */}
         <motion.div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: heroOpacity, scale: heroScale, y: heroY, zIndex: 10 }}>
