@@ -71,7 +71,6 @@ function App() {
   }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
 
   const replenishFeedAtBottom = useCallback(async () => {
-    // Only allow one replenishment cycle at a time
     if (isReplenishing || isLoadingFeed) return;
     
     setIsReplenishing(true);
@@ -80,19 +79,18 @@ function App() {
       let found = false;
       let attempts = 0;
       
-      // Keep searching until we find a unique article or hit max retries
-      while (!found && attempts < 6) {
+      while (!found && attempts < 8) {
         attempts++;
         const searchPage = currentPage + 1;
-        const moreNews = await fetchNewsFeed('Japan News', 1, searchPage);
+        // If we're deep into searching, broaden the topic to ensure we find SOMETHING
+        const topic = attempts > 4 ? 'World News' : 'Japan News';
+        const moreNews = await fetchNewsFeed(topic, 1, searchPage);
         
-        // Update current page tracker for the next cycle
         currentPage = searchPage;
         setNewsPage(searchPage);
 
         if (moreNews.length > 0) {
           const newArticle = moreNews[0];
-          // Functional check to ensure we use the VERY LATEST article list
           setArticles(prev => {
             const existingIds = new Set(prev.map(a => a.id));
             if (!existingIds.has(newArticle.id)) {
@@ -102,17 +100,27 @@ function App() {
             return prev;
           });
         }
-
-        // If we found it, break; otherwise small delay before next page to keep things smooth
         if (found) break;
-        if (attempts < 6) await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 150));
       }
     } catch (e) { 
       console.error("Endless search error:", e); 
     } finally {
       setIsReplenishing(false);
     }
-  }, [newsPage, isReplenishing, isLoadingFeed]); // articles removed from deps to prevent unnecessary re-creations
+  }, [newsPage, isReplenishing, isLoadingFeed]);
+
+  // THE SENTINEL: Ensure we always have at least 5 visible articles
+  useEffect(() => {
+    if (isLoadingFeed || isReplenishing || articles.length === 0) return;
+    
+    const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
+    if (visibleArticles.length < 5) {
+      // Cooldown timer: Only attempt to replenish every 2 seconds if the count is low
+      const timer = setTimeout(replenishFeedAtBottom, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [articles, dismissedArticleIds, isReplenishing, isLoadingFeed, replenishFeedAtBottom]);
 
   const loadHub = async () => {
     setIsLoadingFeed(true);
