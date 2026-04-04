@@ -6,7 +6,7 @@ import { Settings } from './components/Settings'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { fetchNewsFeed, NewsArticle, rewriteArticleWithGemini } from './services/api'
 import { MoreVertical, RefreshCcw, ChevronLeft } from 'lucide-react'
 
@@ -24,44 +24,14 @@ function App() {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [activeArticle, setActiveArticle] = useState<NewsArticle | null>(null);
 
-  const loadHub = async () => {
-    setIsLoadingFeed(true);
-    try {
-      const feed = await fetchNewsFeed('Japan News');
-      setArticles(feed);
-    } catch (e) { console.error(e); }
-    setIsLoadingFeed(false);
-  };
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsInitializing(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (isOnboarded && session) {
-      checkDailyKanji();
-      if (articles.length === 0) loadHub();
-    }
-  }, [isOnboarded, session, checkDailyKanji, articles.length]);
-
-  const processingArticles = useAppStore(state => state.processingArticles);
-  const articlesCache = useAppStore(state => state.articlesCache);
+  const processingArticles = useAppStore(state => state.processingArticles || []);
+  const articlesCache = useAppStore(state => state.articlesCache || {});
   const setProcessing = useAppStore(state => state.setProcessing);
   const saveProcessedArticle = useAppStore(state => state.saveProcessedArticle);
-  const dismissedArticleIds = useAppStore(state => state.dismissedArticleIds);
+  const dismissedArticleIds = useAppStore(state => state.dismissedArticleIds || []);
   const dismissArticle = useAppStore(state => state.dismissArticle);
 
-  const handleProcessArticle = async (article: NewsArticle) => {
+  const handleProcessArticle = useCallback(async (article: NewsArticle) => {
     if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id)) return;
     
     setProcessing(article.id, true);
@@ -78,31 +48,95 @@ function App() {
         useAppStore.getState().studyMode,
         useAppStore.getState().vocabMode,
         vocabTargets,
-        () => {} // No step updates for background processing
+        () => {} // Background processing
       );
       saveProcessedArticle(article.id, { ...article, blocks: rewrittenBlocks });
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error("Prefetch error:", e); 
+    }
     setProcessing(article.id, false);
+  }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
+
+  // THE INFINITE PIPELINE: Automatically process the next available article
+  const syncPrefetchQueue = useCallback(() => {
+    if (articles.length === 0) return;
+    
+    // Find articles that aren't dismissed and aren't cached/processing
+    const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
+    const nextCandidate = visibleArticles.find(a => !articlesCache[a.id] && !processingArticles.includes(a.id));
+    
+    // Only prefetch if we don't have at least ONE ready article already processed
+    const hasReady = visibleArticles.some(a => articlesCache[a.id]);
+    const isAlreadyWorking = processingArticles.length > 0;
+
+    if (nextCandidate && (!hasReady || !isAlreadyWorking)) {
+      handleProcessArticle(nextCandidate);
+    }
+  }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
+
+  const loadHub = async () => {
+    setIsLoadingFeed(true);
+    try {
+      const feed = await fetchNewsFeed('Japan News');
+      setArticles(feed);
+    } catch (e) { console.error(e); }
+    setIsLoadingFeed(false);
   };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsInitializing(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Proactive Prefetch on Boot/Feed Change
+  useEffect(() => {
+    if (articles.length > 0) syncPrefetchQueue();
+  }, [articles, syncPrefetchQueue]);
+
+  useEffect(() => {
+    if (isOnboarded && session) {
+      checkDailyKanji();
+      if (articles.length === 0) loadHub();
+    }
+  }, [isOnboarded, session, checkDailyKanji, articles.length]);
 
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
     
-    // ATOMIC FLUSH: Clear store's currentArticle immediately
     useAppStore.getState().setCurrentArticle(null);
 
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);
       setNewsView('reading');
       setShowNav(false);
+      // Trigger prefetch for the NEXT one after selecting
+      setTimeout(syncPrefetchQueue, 500); 
     } else {
       handleProcessArticle(article);
     }
   };
 
+  const handleDismissAndSync = (id: string) => {
+    dismissArticle(id);
+    // Explicitly check for next article to pull in after dismissal
+    setTimeout(syncPrefetchQueue, 100);
+  };
+
   const handleBackToHub = () => {
     setNewsView('hub');
     setShowNav(true);
+    // Sync again when coming back
+    syncPrefetchQueue();
   };
 
   useEffect(() => {
@@ -182,7 +216,7 @@ function App() {
               articles={articles.filter(a => !(dismissedArticleIds || []).includes(a.id))} 
               isLoading={isLoadingFeed} 
               onSelect={handleSelectArticle} 
-              onDismiss={dismissArticle}
+              onDismiss={handleDismissAndSync}
               processingIds={processingArticles || []}
               cachedIds={Object.keys(articlesCache)}
             />
