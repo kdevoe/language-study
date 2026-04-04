@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
+import { supabase } from './supabase';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -43,6 +44,7 @@ interface AppState {
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
+  setArticlesCache: (cache: Record<string, NewsArticle>) => void;
   dismissArticle: (id: string) => void;
   setProcessing: (id: string, isProcessing: boolean) => void;
   setSrsAutoBumpThreshold: (count: number) => void;
@@ -85,9 +87,18 @@ export const useAppStore = create<AppState>()(
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
-      saveProcessedArticle: (id, article) => set((state) => ({ 
-        articlesCache: { ...state.articlesCache, [id]: article } 
-      })),
+      saveProcessedArticle: (id, article) => {
+        set((state) => ({ 
+          articlesCache: { ...state.articlesCache, [id]: article } 
+        }));
+        // Mirror to Supabase for persistence across sessions
+        import('./api').then(m => {
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) m.saveProcessedArticleToSupabase(article, user.id);
+          });
+        });
+      },
+      setArticlesCache: (cache) => set({ articlesCache: cache }),
       dismissArticle: (id) => set((state) => ({
         dismissedArticleIds: Array.from(new Set([...state.dismissedArticleIds, id]))
       })),

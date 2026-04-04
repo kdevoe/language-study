@@ -103,9 +103,18 @@ function App() {
     if (articles.length > 0) syncPrefetchQueue();
   }, [articles, syncPrefetchQueue]);
 
+  const loadGlobalCache = async (userId: string) => {
+    const { fetchCachedArticlesFromSupabase } = await import('./services/api');
+    const cache = await fetchCachedArticlesFromSupabase(userId);
+    if (Object.keys(cache).length > 0) {
+      useAppStore.getState().setArticlesCache(cache);
+    }
+  };
+
   useEffect(() => {
     if (isOnboarded && session) {
       checkDailyKanji();
+      loadGlobalCache(session.user.id);
       if (articles.length === 0) loadHub();
     }
   }, [isOnboarded, session, checkDailyKanji, articles.length]);

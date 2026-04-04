@@ -50,6 +50,39 @@ async function fetchGroq(prompt: string, model: string, jsonMode: boolean = fals
   return data.choices[0].message.content;
 }
 
+import { supabase } from './supabase'
+
+export async function saveProcessedArticleToSupabase(article: NewsArticle, userId: string) {
+  const { error } = await supabase
+    .from('processed_news')
+    .upsert({
+      id: article.id,
+      user_id: userId,
+      title: article.title,
+      content: article, // The whole article object
+      metadata: { date: article.date, category: article.category }
+    });
+  if (error) console.error("Error syncing to Supabase:", error);
+}
+
+export async function fetchCachedArticlesFromSupabase(userId: string): Promise<Record<string, NewsArticle>> {
+  const { data, error } = await supabase
+    .from('processed_news')
+    .select('*')
+    .eq('user_id', userId);
+    
+  if (error) {
+    console.error("Error fetching cache from Supabase:", error);
+    return {};
+  }
+  
+  const cache: Record<string, NewsArticle> = {};
+  data?.forEach(row => {
+    cache[row.id] = row.content;
+  });
+  return cache;
+}
+
 export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<NewsArticle[]> {
   const apiKey = import.meta.env.VITE_NEWS_API_KEY;
 
