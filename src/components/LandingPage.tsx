@@ -93,11 +93,11 @@ export function LandingPage() {
 
         {/* --- SECTION 1: HERO --- */}
         <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: heroOpacity, scale: heroScale, y: heroY, zIndex: 10, display: heroDisplay }}>
-          <h1 className="serif" style={{ fontSize: 'clamp(5rem, 15vw, 12rem)', fontWeight: 300, marginBottom: '0rem', letterSpacing: '0.05em', lineHeight: 1, textShadow: '0 10px 20px rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>
+          <h1 className="serif" style={{ fontSize: 'clamp(5rem, 15vw, 12rem)', fontWeight: 300, marginBottom: '2rem', letterSpacing: '0.05em', lineHeight: 1, textShadow: '0 10px 20px rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>
             幽玄
           </h1>
           <h2 className="sans" style={{ fontSize: 'clamp(1rem, 2vw, 1.5rem)', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6vh' }}>
-            News tailored just for you using AI.
+            News tailored to your Japanese level.
           </h2>
           <div style={{ position: 'absolute', bottom: '8vh', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.8rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Discover</span>
@@ -133,7 +133,7 @@ export function LandingPage() {
             Contextual Insight.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Tap any word for zero-latency, context-aware AI definitions and grammar rules natively within the sentence.
+            Tap any word for instant, context-aware AI definitions and grammar rules natively within the sentence.
           </p>
           <SectionImage src="/screenshot-word-lookup.png" alt="Contextual Word Lookup" />
         </motion.div>
