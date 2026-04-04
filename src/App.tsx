@@ -76,7 +76,14 @@ function App() {
     try {
       const nextPage = newsPage + 1;
       const moreNews = await fetchNewsFeed('Japan News', 1, nextPage);
-      setArticles(prev => [...prev, ...moreNews]);
+      
+      setArticles(prev => {
+        const existingIds = new Set(prev.map(a => a.id));
+        const uniqueMore = moreNews.filter(a => !existingIds.has(a.id));
+        if (uniqueMore.length === 0) return prev; // No new stories on this page
+        return [...prev, ...uniqueMore];
+      });
+      
       setNewsPage(nextPage);
     } catch (e) { console.error(e); }
     setIsReplenishing(false);
@@ -86,7 +93,9 @@ function App() {
     setIsLoadingFeed(true);
     try {
       const feed = await fetchNewsFeed('Japan News', 10, 1);
-      setArticles(feed);
+      // Ensure initial set is unique (NewsAPI can be weird)
+      const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
+      setArticles(uniqueFeed);
       setNewsPage(1);
     } catch (e) { console.error(e); }
     setIsLoadingFeed(false);
