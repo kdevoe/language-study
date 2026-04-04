@@ -8,7 +8,7 @@ import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback } from 'react'
 import { fetchNewsFeed, NewsArticle, rewriteArticleWithGemini } from './services/api'
-import { MoreVertical, RefreshCcw, ChevronLeft } from 'lucide-react'
+import { MoreVertical, ChevronLeft } from 'lucide-react'
 
 const FEED_TOPICS = ['Japan News', 'Technology News', 'Science News', 'World News'];
 
@@ -145,9 +145,9 @@ function App() {
     setIsLoadingFeed(true);
     try {
       const feed = await fetchNewsFeed('Japan News', 10, 1);
-      // Ensure initial set is unique (NewsAPI can be weird)
+      // Ensure initial set is unique and limited strictly to 5
       const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
-      setArticles(uniqueFeed);
+      setArticles(uniqueFeed.slice(0, 5));
       setNewsPage(1);
     } catch (e) { console.error(e); }
     setIsLoadingFeed(false);
@@ -244,9 +244,13 @@ function App() {
     let ticking = false;
     const updateNav = () => {
       const currentScrollY = window.scrollY;
+      const isAtBottom = (window.innerHeight + currentScrollY) >= document.body.offsetHeight - 50;
+
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
         setShowNav(false);
-      } else if (lastScrollY - currentScrollY > 15) {
+      } else if (lastScrollY - currentScrollY > 40 && !isAtBottom) {
+        // Require a 40px scroll UP to show the nav, AND prevent it from popping
+        // if we just bounced off the absolute bottom of the page
         setShowNav(true);
       }
       lastScrollY = currentScrollY > 0 ? currentScrollY : 0;
@@ -289,9 +293,7 @@ function App() {
             <ChevronLeft size={24} strokeWidth={1.5} />
           </button>
         ) : (
-          <button onClick={loadHub} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', opacity: isLoadingFeed ? 0.3 : 1 }}>
-            <RefreshCcw size={20} strokeWidth={1.5} className={isLoadingFeed ? 'lucide-spin' : ''} />
-          </button>
+          <div style={{ width: '24px' }} /> // Placeholder to maintain centered title
         )}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <h1 className="serif" translate="no" style={{ fontSize: '1.4rem', letterSpacing: '0.1em', color: 'var(--text-main)' }}>読書家</h1>

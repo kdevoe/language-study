@@ -35,7 +35,14 @@ function NewsCard({
   };
 
   return (
-    <div style={{ position: 'relative', touchAction: 'pan-y' }}>
+    <motion.div 
+      layout="position"
+      variants={itemVariants}
+      initial="hidden"
+      animate="show"
+      exit="exit"
+      style={{ position: 'relative', touchAction: 'pan-y' }}
+    >
       {/* BACK ACTIONS */}
       <motion.div 
         style={{ 
@@ -104,9 +111,6 @@ function NewsCard({
 
       {/* CARD FOREGROUND */}
       <motion.div
-        variants={itemVariants}
-        layout="position"
-        exit="exit"
         drag="x"
         dragConstraints={{ left: -160, right: 0 }}
         dragElastic={0.05}
@@ -216,7 +220,7 @@ function NewsCard({
           </div>
         )}
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
