@@ -10,6 +10,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { fetchNewsFeed, NewsArticle, rewriteArticleWithGemini } from './services/api'
 import { MoreVertical, RefreshCcw, ChevronLeft } from 'lucide-react'
 
+const FEED_TOPICS = ['Japan News', 'Technology News', 'Science News', 'World News'];
+
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
@@ -24,6 +26,7 @@ function App() {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
   const [newsPage, setNewsPage] = useState(1);
+  const [topicIndex, setTopicIndex] = useState(0);
   const [activeArticle, setActiveArticle] = useState<NewsArticle | null>(null);
 
   const processingArticles = useAppStore(state => state.processingArticles || []);
@@ -76,18 +79,20 @@ function App() {
     setIsReplenishing(true);
     try {
       let currentPage = newsPage;
+      let currentTopicIndex = topicIndex;
       let found = false;
       let attempts = 0;
       
       while (!found && attempts < 8) {
         attempts++;
-        const searchPage = currentPage + 1;
-        // If we're deep into searching, broaden the topic to ensure we find SOMETHING
-        const topic = attempts > 4 ? 'World News' : 'Japan News';
+        const searchPage = Math.floor(currentPage / 4) + 1;
+        const topic = FEED_TOPICS[currentTopicIndex % FEED_TOPICS.length];
+        
         const moreNews = await fetchNewsFeed(topic, 1, searchPage);
         
-        currentPage = searchPage;
-        setNewsPage(searchPage);
+        // Rotate topic for the NEXT attempt if this one fails or next time
+        currentTopicIndex++;
+        setTopicIndex(currentTopicIndex);
 
         if (moreNews.length > 0) {
           const newArticle = moreNews[0];
@@ -108,7 +113,7 @@ function App() {
     } finally {
       setIsReplenishing(false);
     }
-  }, [newsPage, isReplenishing, isLoadingFeed]);
+  }, [newsPage, topicIndex, isReplenishing, isLoadingFeed]);
 
   // THE SENTINEL: Ensure we always have at least 5 visible articles
   useEffect(() => {
