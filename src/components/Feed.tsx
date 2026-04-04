@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Trash2, Bookmark } from 'lucide-react';
+import { CheckCircle2, Trash2, Bookmark, Search } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 import { useState } from 'react';
 
@@ -8,11 +8,12 @@ interface Props {
   onSelect: (article: NewsArticle) => void;
   onDismiss: (id: string) => void;
   isLoading: boolean;
+  isReplenishing?: boolean;
   processingIds: string[];
   cachedIds: string[];
 }
 
-export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, cachedIds }: Props) {
+export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing, processingIds, cachedIds }: Props) {
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
 
   const container = {
@@ -54,8 +55,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
 
           return (
             <div key={article.id} style={{ position: 'relative', touchAction: 'pan-y' }}>
-              
-              {/* BACK ACTIONS (Revealed on Swipe Left - anchored to the right) */}
+              {/* BACK ACTIONS */}
               <div style={{ 
                 position: 'absolute', 
                 right: 0, 
@@ -68,10 +68,9 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                 padding: '0 0.8rem',
                 gap: '0.6rem',
                 zIndex: 0,
-                opacity: isSwipedOpen ? 1 : 0, // Performance: Only show when swiped or swiping
+                opacity: isSwipedOpen ? 1 : 0, 
                 transition: 'opacity 0.2s ease'
               }}>
-                {/* Archive/Save Button */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -96,7 +95,6 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                   <span style={{ fontSize: '0.5rem', fontWeight: 900 }}>SAVE</span>
                 </button>
 
-                {/* Delete/Dismiss Button */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -122,7 +120,6 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                 </button>
               </div>
 
-              {/* CARD FOREGROUND */}
               <motion.div
                 variants={itemVariants}
                 layout
@@ -136,8 +133,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                   boxShadow: isSwipedOpen ? '0 10px 40px rgba(0,0,0,0.1)' : '0 4px 25px rgba(0,0,0,0.03)'
                 }}
                 onDragStart={() => setOpenArticleId(null)}
-                whileDrag={{ opacity: 1 }} // Show background actions while dragging
-
+                whileDrag={{ opacity: 1 }} 
                 onDragEnd={(_, info) => {
                   if (info.offset.x < -80 && article.id) {
                     setOpenArticleId(article.id);
@@ -165,7 +161,6 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                 }}
                 whileTap={{ scale: 0.98 }}
               >
-                {/* Visual Processing Progress Bar */}
                 {isProcessing && (
                   <motion.div 
                     initial={{ x: '-100%' }}
@@ -232,6 +227,32 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
             </div>
           );
         })}
+
+        {/* GHOST CARD REPLENISHMENT PLACEHOLDER */}
+        {isReplenishing && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 0.6, y: 0 }}
+            className="shimmer"
+            style={{
+              padding: '1.5rem',
+              borderRadius: '24px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px dashed var(--border-light)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              minHeight: '140px',
+              justifyContent: 'center',
+              alignItems: 'center',
+              color: 'var(--text-muted)'
+            }}
+          >
+            <Search size={24} strokeWidth={1.5} className="lucide-spin" style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.02em' }}>Finding fresh news...</div>
+            <div style={{ width: '60%', height: '8px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '4px' }} />
+          </motion.div>
+        )}
       </AnimatePresence>
     </motion.div>
   );

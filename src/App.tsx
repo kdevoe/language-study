@@ -22,6 +22,8 @@ function App() {
   const [newsView, setNewsView] = useState<'hub' | 'reading'>('hub');
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
+  const [isReplenishing, setIsReplenishing] = useState(false);
+  const [newsPage, setNewsPage] = useState(1);
   const [activeArticle, setActiveArticle] = useState<NewsArticle | null>(null);
 
   const processingArticles = useAppStore(state => state.processingArticles || []);
@@ -48,7 +50,7 @@ function App() {
         useAppStore.getState().studyMode,
         useAppStore.getState().vocabMode,
         vocabTargets,
-        () => {} // Background processing
+        () => {} 
       );
       saveProcessedArticle(article.id, { ...article, blocks: rewrittenBlocks });
     } catch (e) { 
@@ -57,28 +59,35 @@ function App() {
     setProcessing(article.id, false);
   }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
 
-  // THE INFINITE PIPELINE: Automatically process the next available article
   const syncPrefetchQueue = useCallback(() => {
     if (articles.length === 0) return;
-    
-    // Find articles that aren't dismissed and aren't cached/processing
     const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
     const nextCandidate = visibleArticles.find(a => !articlesCache[a.id] && !processingArticles.includes(a.id));
-    
-    // Only prefetch if we don't have at least ONE ready article already processed
     const hasReady = visibleArticles.some(a => articlesCache[a.id]);
     const isAlreadyWorking = processingArticles.length > 0;
-
     if (nextCandidate && (!hasReady || !isAlreadyWorking)) {
       handleProcessArticle(nextCandidate);
     }
   }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
 
+  const replenishFeedAtBottom = useCallback(async () => {
+    if (isReplenishing || isLoadingFeed) return;
+    setIsReplenishing(true);
+    try {
+      const nextPage = newsPage + 1;
+      const moreNews = await fetchNewsFeed('Japan News', 1, nextPage);
+      setArticles(prev => [...prev, ...moreNews]);
+      setNewsPage(nextPage);
+    } catch (e) { console.error(e); }
+    setIsReplenishing(false);
+  }, [newsPage, isReplenishing, isLoadingFeed]);
+
   const loadHub = async () => {
     setIsLoadingFeed(true);
     try {
-      const feed = await fetchNewsFeed('Japan News');
+      const feed = await fetchNewsFeed('Japan News', 10, 1);
       setArticles(feed);
+      setNewsPage(1);
     } catch (e) { console.error(e); }
     setIsLoadingFeed(false);
   };
@@ -88,20 +97,11 @@ function App() {
       setSession(session);
       setIsInitializing(false);
     });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
     return () => subscription.unsubscribe();
   }, []);
-
-  // Proactive Prefetch on Boot/Feed Change
-  useEffect(() => {
-    if (articles.length > 0) syncPrefetchQueue();
-  }, [articles, syncPrefetchQueue]);
 
   const loadGlobalCache = async (userId: string) => {
     const { fetchCachedArticlesFromSupabase } = await import('./services/api');
@@ -119,17 +119,21 @@ function App() {
     }
   }, [isOnboarded, session, checkDailyKanji, articles.length]);
 
+  useEffect(() => {
+    if (articles.length > 0) syncPrefetchQueue();
+  }, [articles, syncPrefetchQueue]);
+
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
-    
     useAppStore.getState().setCurrentArticle(null);
-
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);
       setNewsView('reading');
       setShowNav(false);
-      // Trigger prefetch for the NEXT one after selecting
-      setTimeout(syncPrefetchQueue, 500); 
+      setTimeout(() => {
+        syncPrefetchQueue();
+        replenishFeedAtBottom(); // Pull more when reading starts
+      }, 500); 
     } else {
       handleProcessArticle(article);
     }
@@ -137,21 +141,21 @@ function App() {
 
   const handleDismissAndSync = (id: string) => {
     dismissArticle(id);
-    // Explicitly check for next article to pull in after dismissal
-    setTimeout(syncPrefetchQueue, 100);
+    setTimeout(() => {
+      syncPrefetchQueue();
+      replenishFeedAtBottom(); // Pull more when dismissing
+    }, 100);
   };
 
   const handleBackToHub = () => {
     setNewsView('hub');
     setShowNav(true);
-    // Sync again when coming back
     syncPrefetchQueue();
   };
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
     let ticking = false;
-
     const updateNav = () => {
       const currentScrollY = window.scrollY;
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
@@ -162,14 +166,12 @@ function App() {
       lastScrollY = currentScrollY > 0 ? currentScrollY : 0;
       ticking = false;
     };
-
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(updateNav);
         ticking = true;
       }
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -178,13 +180,8 @@ function App() {
     return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }} />;
   }
 
-  if (!session) {
-    return <LandingPage />;
-  }
-
-  if (!isOnboarded) {
-    return <Onboarding />;
-  }
+  if (!session) return <LandingPage />;
+  if (!isOnboarded) return <Onboarding />;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -224,6 +221,7 @@ function App() {
             <Feed 
               articles={articles.filter(a => !(dismissedArticleIds || []).includes(a.id))} 
               isLoading={isLoadingFeed} 
+              isReplenishing={isReplenishing}
               onSelect={handleSelectArticle} 
               onDismiss={handleDismissAndSync}
               processingIds={processingArticles || []}
@@ -240,7 +238,6 @@ function App() {
         )}
         {activeTab === 'settings' && <Settings />}
       </main>
-
       <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav} />
     </div>
   )

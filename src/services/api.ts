@@ -83,7 +83,7 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
   return cache;
 }
 
-export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<NewsArticle[]> {
+export async function fetchNewsFeed(topic: string = 'Japan News', pageSize: number = 8, page: number = 1): Promise<NewsArticle[]> {
   const apiKey = import.meta.env.VITE_NEWS_API_KEY;
 
   if (!apiKey) {
@@ -97,7 +97,7 @@ export async function fetchNewsFeed(topic: string = 'Technology News'): Promise<
     
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const url = isLocalhost 
-      ? `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${apiKey}`
+      ? `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&language=en&pageSize=${pageSize}&page=${page}&apiKey=${apiKey}`
       : `/api/news?topic=${query}`;
     
     const response = await fetch(url);
