@@ -280,8 +280,8 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
           </motion.div>
         )}
 
-        {/* BOTTOM ANCHOR (Stabilizes scroll and prevents toolbar pops) */}
-        <div style={{ height: '140px', width: '100%' }} />
+        {/* BOTTOM ANCHOR (Safe area spacing only) */}
+        <div style={{ height: 'calc(2rem + env(safe-area-inset-bottom))', width: '100%' }} />
       </AnimatePresence>
     </motion.div>
   );
