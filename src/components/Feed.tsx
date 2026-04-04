@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Trash2 } from 'lucide-react';
+import { CheckCircle2, Trash2, Bookmark } from 'lucide-react';
 import { NewsArticle } from '../services/api';
+import { useState } from 'react';
 
 interface Props {
   articles: NewsArticle[];
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, cachedIds }: Props) {
+  const [openArticleId, setOpenArticleId] = useState<string | null>(null);
+
   const container = {
     hidden: { opacity: 0 },
     show: {
@@ -47,48 +50,100 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
         {articles.map((article) => {
           const isProcessing = article.id && (processingIds || []).includes(article.id);
           const isCached = article.id && (cachedIds || []).includes(article.id);
-
+          const isSwipedOpen = openArticleId === article.id;
 
           return (
-            <motion.div
-              key={article.id}
-              variants={itemVariants}
-              layout
-              exit="exit"
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.6}
-              dragMomentum={false}
-              onDragEnd={(_, info) => {
-                if (info.offset.x > 80 && article.id) {
-                  onDismiss(article.id);
-                }
-              }}
-              style={{ position: 'relative', touchAction: 'pan-y' }}
-            >
-              {/* Swipe Action Background Indicator */}
+            <div key={article.id} style={{ position: 'relative', touchAction: 'pan-y' }}>
+              
+              {/* BACK ACTIONS (Revealed on Swipe Left) */}
               <div style={{ 
                 position: 'absolute', 
-                left: 0, 
+                right: 0, 
                 top: 0, 
                 bottom: 0, 
                 width: '100%', 
-                backgroundColor: isCached ? 'rgba(74, 93, 35, 0.08)' : 'rgba(180, 10, 10, 0.08)', 
-                borderRadius: '24px',
                 display: 'flex',
+                justifyContent: 'flex-end',
                 alignItems: 'center',
-                paddingLeft: '1.5rem',
-                color: isCached ? '#4a5d23' : '#b40a0a',
+                paddingRight: '0.8rem',
+                gap: '0.5rem',
                 zIndex: 0
               }}>
-                {isCached ? <CheckCircle2 size={24} style={{ opacity: 0.5 }} /> : <Trash2 size={24} style={{ opacity: 0.5 }} />}
-                <span style={{ marginLeft: '1rem', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.1em' }}>
-                  {isCached ? 'ARCHIVE' : 'DISMISS'}
-                </span>
+                {/* Archive/Save Button */}
+                <button 
+                  onClick={() => {
+                    // Logic to Archive...
+                    if (article.id) onDismiss(article.id); // Temporary: mark as dismissed for now
+                  }}
+                  style={{ 
+                    backgroundColor: 'rgba(74, 93, 35, 0.1)', 
+                    color: '#4a5d23', 
+                    height: '80%', 
+                    aspectRatio: '1', 
+                    borderRadius: '16px', 
+                    border: 'none', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: '0.3rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Bookmark size={18} />
+                  <span style={{ fontSize: '0.55rem', fontWeight: 800 }}>SAVE</span>
+                </button>
+
+                {/* Delete/Dismiss Button */}
+                <button 
+                  onClick={() => {
+                    if (article.id) onDismiss(article.id);
+                  }}
+                  style={{ 
+                    backgroundColor: 'rgba(180, 10, 10, 0.1)', 
+                    color: '#b40a0a', 
+                    height: '80%', 
+                    aspectRatio: '1', 
+                    borderRadius: '16px', 
+                    border: 'none', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: '0.3rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Trash2 size={18} />
+                  <span style={{ fontSize: '0.55rem', fontWeight: 800 }}>DELETE</span>
+                </button>
               </div>
 
+              {/* CARD FOREGROUND */}
               <motion.div
-                onClick={() => onSelect(article)}
+                variants={itemVariants}
+                layout
+                exit="exit"
+                drag="x"
+                dragConstraints={{ left: -160, right: 0 }}
+                dragElastic={0.4}
+                dragMomentum={false}
+                animate={{ x: isSwipedOpen ? -160 : 0 }}
+                onDragStart={() => setOpenArticleId(null)}
+                onDragEnd={(_, info) => {
+                  if (info.offset.x < -80 && article.id) {
+                    setOpenArticleId(article.id);
+                  } else {
+                    setOpenArticleId(null);
+                  }
+                }}
+                onClick={() => {
+                  if (isSwipedOpen) {
+                    setOpenArticleId(null);
+                  } else {
+                    onSelect(article);
+                  }
+                }}
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   padding: '1.5rem',
@@ -102,7 +157,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                 }}
                 whileTap={{ scale: 0.98 }}
               >
-                {/* Visual Processing Progress Bar (if processing) */}
+                {/* Visual Processing Progress Bar */}
                 {isProcessing && (
                   <motion.div 
                     initial={{ x: '-100%' }}
@@ -166,7 +221,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, processingIds, 
                   </div>
                 )}
               </motion.div>
-            </motion.div>
+            </div>
           );
         })}
       </AnimatePresence>
