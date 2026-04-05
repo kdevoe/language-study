@@ -32,9 +32,9 @@ create policy "Users can manage own news"
   on public.processed_news for all
   using (auth.uid() = user_id);
 
--- 3. Whitelist Check RPC
+-- 3. Whitelist Check RPC (returns 'approved', 'waitlisted', or 'not_joined')
 create or replace function public.check_is_approved(p_email text)
-returns boolean
+returns text
 language plpgsql
 security definer
 set search_path = public
@@ -46,6 +46,12 @@ begin
   from waitlist
   where email = p_email;
   
-  return coalesce(is_appr, false);
+  if is_appr is null then
+    return 'not_joined';
+  elsif is_appr = true then
+    return 'approved';
+  else
+    return 'waitlisted';
+  end if;
 end;
 $$;
