@@ -111,7 +111,7 @@ export function LandingPage() {
             Immersive Reading.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Enjoy a beautifully simple reading experience. The technology fades into the background while AI secretly tailors your learning.
+            Enjoy a beautifully simple reading experience. The technology fades into the background while AI subtly tailors your learning.
           </p>
           <SectionImage src="/screenshot-reader-2.jpg" alt="Clean Reader View" />
         </motion.div>
@@ -146,7 +146,7 @@ export function LandingPage() {
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
             Never run out of material. An endless feed of daily news tailored continuously to your learning pipeline.
           </p>
-          <SectionImage src="/screenshot-articles.jpg" alt="Infinite Article Feed" />
+          <SectionImage src="/screenshot-articles-2.jpg" alt="Infinite Article Feed" />
         </motion.div>
 
         {/* --- SECTION 6: WAITLIST & CTA --- */}
