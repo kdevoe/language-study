@@ -303,7 +303,10 @@ function App() {
             : `Your email (${session.user.email}) is not yet on our authorized beta list.`
           }
           <br /><br />
-          Please join the waitlist on the landing page and keep an eye on your inbox for an invitation.
+          {approvalStatus === 'not_joined' 
+            ? "Please join the waitlist on the landing page and keep an eye on your inbox for an invitation."
+            : "We've got your email! We'll be in touch as soon as we're ready for more testers."
+          }
         </p>
         <button 
           onClick={() => supabase.auth.signOut()}
