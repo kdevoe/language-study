@@ -299,13 +299,8 @@ function App() {
         <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Private Beta</h2>
         <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '2rem', maxWidth: '400px' }}>
           {approvalStatus === 'waitlisted' 
-            ? `Your email (${session.user.email}) is on our waitlist but hasn't been approved yet.`
-            : `Your email (${session.user.email}) is not yet on our authorized beta list.`
-          }
-          <br /><br />
-          {approvalStatus === 'not_joined' 
-            ? "Please join the waitlist on the landing page and keep an eye on your inbox for an invitation."
-            : "We've got your email! We'll be in touch as soon as we're ready for more testers."
+            ? `Your email (${session.user.email}) is on our waitlist. We'll be in touch as soon as we're ready for more testers.`
+            : `Your email (${session.user.email}) is not yet on our authorized beta list. Please join the waitlist on the landing page.`
           }
         </p>
         <button 
