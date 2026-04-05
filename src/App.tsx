@@ -19,7 +19,7 @@ function App() {
   const [showNav, setShowNav] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [isApproved, setIsApproved] = useState<boolean | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'waitlisted' | 'not_joined' | null>(null);
 
   // News Hub State
   const [newsView, setNewsView] = useState<'hub' | 'reading'>('hub');
@@ -160,11 +160,11 @@ function App() {
       setSession(session);
       
       if (session?.user?.email) {
-        const { data: approved, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+        const { data: status, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
         if (error) console.error("Whitelist check error:", error);
-        setIsApproved(!!approved);
+        setApprovalStatus(status || 'not_joined');
       } else {
-        setIsApproved(null);
+        setApprovalStatus(null);
       }
       
       setIsInitializing(false);
@@ -175,10 +175,10 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user?.email) {
-        const { data: approved } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
-        setIsApproved(!!approved);
+        const { data: status } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+        setApprovalStatus(status || 'not_joined');
       } else {
-        setIsApproved(null);
+        setApprovalStatus(null);
       }
     });
     return () => subscription.unsubscribe();
@@ -293,13 +293,17 @@ function App() {
   if (!session) return <LandingPage />;
   
   // Whitelist Gate
-  if (isApproved === false) {
+  if (approvalStatus === 'waitlisted' || approvalStatus === 'not_joined') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
         <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Private Beta</h2>
         <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '2rem', maxWidth: '400px' }}>
-          Thanks for signing in! Your email (<strong>{session.user.email}</strong>) is not yet on our authorized beta list. 
-          Please ensure you've joined the waitlist on the landing page and wait for your invitation.
+          {approvalStatus === 'waitlisted' 
+            ? `Your email (${session.user.email}) is on our waitlist but hasn't been approved yet.`
+            : `Your email (${session.user.email}) is not yet on our authorized beta list.`
+          }
+          <br /><br />
+          Please join the waitlist on the landing page and keep an eye on your inbox for an invitation.
         </p>
         <button 
           onClick={() => supabase.auth.signOut()}

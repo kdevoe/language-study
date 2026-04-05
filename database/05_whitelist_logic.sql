@@ -2,10 +2,9 @@
 alter table public.waitlist 
 add column if not exists is_approved boolean default false;
 
--- Create an RPC to check if an email is approved
--- We use SECURITY DEFINER to allow checking even if RLS would normally block it
+-- Create an RPC to check if an email is approved, waitlisted, or not joined
 create or replace function public.check_is_approved(p_email text)
-returns boolean
+returns text
 language plpgsql
 security definer
 set search_path = public
@@ -17,6 +16,12 @@ begin
   from waitlist
   where email = p_email;
   
-  return coalesce(is_appr, false);
+  if is_appr is null then
+    return 'not_joined';
+  elsif is_appr = true then
+    return 'approved';
+  else
+    return 'waitlisted';
+  end if;
 end;
 $$;
