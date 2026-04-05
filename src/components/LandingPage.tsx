@@ -53,6 +53,24 @@ export function LandingPage() {
     } catch (err) { console.error(err); }
   };
 
+  const handleEmailLogin = async () => {
+    try {
+      if (!email || !email.includes('@')) return;
+      setWaitlistStatus('loading');
+      const { error } = await supabase.auth.signInWithOtp({ 
+        email, 
+        options: { emailRedirectTo: window.location.origin } 
+      });
+      if (error) throw error;
+      setWaitlistStatus('success');
+      setWaitlistMessage("Check your inbox! We've sent a magic login link.");
+    } catch (err: any) { 
+      console.error(err); 
+      setWaitlistStatus('error');
+      setWaitlistMessage(err.message || "Failed to send magic link.");
+    }
+  };
+
   const handleJoinWaitlist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !email.includes('@')) return;
@@ -189,12 +207,22 @@ export function LandingPage() {
 
             <div style={{ marginTop: '4rem', paddingTop: '2rem', borderTop: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Already have beta access?</div>
-              <button 
-                onClick={handleGoogleLogin}
-                style={{ background: 'none', border: 'none', color: '#687742', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px' }}
-              >
-                Sign in with Google
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+                <button 
+                  onClick={handleGoogleLogin}
+                  style={{ background: 'none', border: 'none', color: '#687742', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px' }}
+                >
+                  Sign in with Google
+                </button>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>or</div>
+                <button 
+                  onClick={handleEmailLogin}
+                  disabled={!email.includes('@')}
+                  style={{ background: 'none', border: 'none', color: '#687742', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px', opacity: email.includes('@') ? 1 : 0.5 }}
+                >
+                  Receive a Magic Link via Email
+                </button>
+              </div>
             </div>
 
           </div>

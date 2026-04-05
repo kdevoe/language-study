@@ -19,6 +19,7 @@ function App() {
   const [showNav, setShowNav] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
 
   // News Hub State
   const [newsView, setNewsView] = useState<'hub' | 'reading'>('hub');
@@ -154,12 +155,31 @@ function App() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
+      
+      if (session?.user?.email) {
+        const { data: approved, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+        if (error) console.error("Whitelist check error:", error);
+        setIsApproved(!!approved);
+      } else {
+        setIsApproved(null);
+      }
+      
       setIsInitializing(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    };
+
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
+      if (session?.user?.email) {
+        const { data: approved } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+        setIsApproved(!!approved);
+      } else {
+        setIsApproved(null);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -271,6 +291,25 @@ function App() {
   }
 
   if (!session) return <LandingPage />;
+  
+  // Whitelist Gate
+  if (isApproved === false) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+        <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Private Beta</h2>
+        <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '2rem', maxWidth: '400px' }}>
+          Thanks for signing in! Your email (<strong>{session.user.email}</strong>) is on our waitlist but hasn't been approved for the private beta just yet.
+        </p>
+        <button 
+          onClick={() => supabase.auth.signOut()}
+          style={{ background: 'none', border: 'none', color: 'var(--text-main)', textDecoration: 'underline', cursor: 'pointer' }}
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
   if (!isOnboarded) return <Onboarding />;
 
   return (
