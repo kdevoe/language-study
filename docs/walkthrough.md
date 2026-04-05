@@ -1,6 +1,6 @@
-# Yūgen News - Implementation Walkthrough
+# Yūgen Study - Implementation Walkthrough
 
-The development of the "Yūgen News" application prototype is complete. This walkthrough outlines the architecture, features, and the steps taken to fulfill the requirements of a typography-first, Zen-like Japanese reading application.
+The development of the "Yūgen Study" application prototype is complete. This walkthrough outlines the architecture, features, and the steps taken to fulfill the requirements of a typography-first, Zen-like Japanese reading application.
 
 ## Completed Features
 
