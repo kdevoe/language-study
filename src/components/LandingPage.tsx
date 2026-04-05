@@ -111,7 +111,7 @@ export function LandingPage() {
             Immersive Reading.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Enjoy a beautifully simple reading experience. The technology fades into the background while AI subtly tailors your learning.
+            Enjoy a beautifully simple reading experience. Your study experience is expertly crafted behind the scenes.
           </p>
           <SectionImage src="/screenshot-reader-2.jpg" alt="Clean Reader View" />
         </motion.div>
