@@ -104,8 +104,9 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
 
 export async function fetchNewsFeed(topic: string = 'Japan News', pageSize: number = 8, page: number = 1): Promise<NewsArticle[]> {
   const apiKey = import.meta.env.VITE_NEWS_API_KEY;
-
-  if (!apiKey) {
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  if (!apiKey && isLocalhost) {
     console.warn("⚠️ NewsAPI key not found in .env. Falling back to mock data.");
     await new Promise(resolve => setTimeout(resolve, 800));
     return mockArticles;
