@@ -154,7 +154,7 @@ export function LandingPage() {
           
           <div style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
             <h2 className="serif" style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-main)' }}>Get early access.</h2>
-            <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '3rem' }}>Join the waitlist to be among the first to experience Yūgen News when we launch the private beta.</p>
+            <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '3rem' }}>Join the waitlist to be among the first to experience Yūgen Study when we launch the private beta.</p>
 
             {waitlistStatus === 'success' ? (
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ padding: '2rem', background: 'rgba(138,154,91,0.1)', border: '1px solid rgba(138,154,91,0.2)', borderRadius: '16px', color: '#687742' }}>

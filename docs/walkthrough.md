@@ -26,7 +26,16 @@ Crucial cultural or linguistic keywords are highlighted in the article layout us
 - **API Mocks**: Built robust mock functions in `api.ts` representing future calls to Google Custom Search JSON API and Google Gemini API for custom article rewriting.
 - **Bottom Navigation**: Add a functional, minimalist bottom navigation to toggle between News, Progress, and Settings pages. 
 
+### 5. Premium Landing Page & Zen Aesthetic
+- **Apple-Style Scroll Narrative**: Rebuilt `LandingPage.tsx` using `framer-motion` for a scroll-driven story. Users are guided through Reader, Settings, and Lookup features with floating screenshot tiles.
+- **Zen Light Theme**: Migrated the entire landing page from hardcoded dark styles to the application's global Light Theme CSS variables (`--bg-color`, `--text-main`), ensuring a seamless transition from landing to app.
+- **Micro-Animations**: Integrated subtle floating animations and continuous scroll-driven opacity shifts to create a premium, "living" feel.
+- **Waitlist Integration**: Secure Supabase backend for early access signups.
+
 ## Technical Validation
+- **Mobile Scaling**: Implemented `clamp()` and `min()` CSS constraints for robust viewport-aware typography and image sizing.
+- **Performance**: Optimized rendering by unmounting inactive scroll sections using `display: none` based on scroll progress.
+- **Asset Strategy**: High-fidelity `.jpg` screenshots integrated for optimal load times and visual clarity.
 - Implemented with purely Vite/React + Vanilla CSS (No Tailwind CSS) to respect strict aesthetic and toolset guidelines.
 - Addressed TypeScript compilation requirements and fixed unused imports. 
 - Integrated global custom properties for dynamic theming capability.
