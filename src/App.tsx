@@ -298,7 +298,8 @@ function App() {
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
         <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Private Beta</h2>
         <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '2rem', maxWidth: '400px' }}>
-          Thanks for signing in! Your email (<strong>{session.user.email}</strong>) is on our waitlist but hasn't been approved for the private beta just yet.
+          Thanks for signing in! Your email (<strong>{session.user.email}</strong>) is not yet on our authorized beta list. 
+          Please ensure you've joined the waitlist on the landing page and wait for your invitation.
         </p>
         <button 
           onClick={() => supabase.auth.signOut()}
