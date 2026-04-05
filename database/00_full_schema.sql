@@ -33,6 +33,7 @@ create policy "Users can manage own news"
   using (auth.uid() = user_id);
 
 -- 3. Whitelist Check RPC (returns 'approved', 'waitlisted', or 'not_joined')
+drop function if exists public.check_is_approved(text);
 create or replace function public.check_is_approved(p_email text)
 returns text
 language plpgsql
