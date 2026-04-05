@@ -111,7 +111,7 @@ export function LandingPage() {
             Immersive Reading.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Distraction-free, typography-first layouts explicitly engineered to keep you deeply engaged in Japanese.
+            Enjoy a pristine, distraction-free reading experience. Our AI does the heavy lifting to secretly tailor your learning, allowing the technology to completely fade into the background.
           </p>
           <SectionImage src="/screenshot-reader-2.jpg" alt="Clean Reader View" />
         </motion.div>
