@@ -73,7 +73,7 @@ export function LandingPage() {
       transition={{ repeat: Infinity, duration: 6, ease: "easeInOut", delay }}
       style={{ 
         width: '100%', 
-        maxWidth: 'min(70vw, 420px)', 
+        maxWidth: 'min(78vw, 420px)', 
         borderRadius: '32px', 
         overflow: 'hidden', 
         boxShadow: '0 30px 60px rgba(0,0,0,0.1), 0 0 0 8px rgba(0,0,0,0.02)', 
@@ -96,7 +96,7 @@ export function LandingPage() {
           <h1 className="serif" style={{ fontSize: 'clamp(5rem, 15vw, 12rem)', fontWeight: 300, marginBottom: '2rem', letterSpacing: '0.05em', lineHeight: 1, textShadow: '0 10px 20px rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>
             幽玄
           </h1>
-          <h2 className="sans" style={{ fontSize: 'clamp(1rem, 2vw, 1.5rem)', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6vh' }}>
+          <h2 className="sans" style={{ fontSize: 'clamp(0.85rem, 3.5vw, 1.5rem)', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6vh', whiteSpace: 'nowrap', textAlign: 'center' }}>
             News tailored to your Japanese level.
           </h2>
           <div style={{ position: 'absolute', bottom: '8vh', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
