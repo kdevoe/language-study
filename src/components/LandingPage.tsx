@@ -133,7 +133,7 @@ export function LandingPage() {
             Contextual Insight.
           </h2>
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
-            Tap any word for context-aware AI definitions and grammar rules directly within the sentence.
+            Tap any word for context-aware AI definitions and grammar rules.
           </p>
           <SectionImage src="/screenshot-lookup.jpg" alt="Contextual Word Lookup" />
         </motion.div>
