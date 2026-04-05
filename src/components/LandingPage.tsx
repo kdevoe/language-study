@@ -113,7 +113,7 @@ export function LandingPage() {
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
             Distraction-free, typography-first layouts explicitly engineered to keep you deeply engaged in Japanese.
           </p>
-          <SectionImage src="/screenshot-reader-view.jpg" alt="Clean Reader View" />
+          <SectionImage src="/screenshot-reader.jpg" alt="Clean Reader View" />
         </motion.div>
 
         {/* --- SECTION 3: SETTINGS VIEW --- */}
@@ -135,7 +135,7 @@ export function LandingPage() {
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
             Tap any word for context-aware AI definitions and grammar rules natively within the sentence.
           </p>
-          <SectionImage src="/screenshot-word-lookup.jpg" alt="Contextual Word Lookup" />
+          <SectionImage src="/screenshot-lookup.jpg" alt="Contextual Word Lookup" />
         </motion.div>
 
         {/* --- SECTION 5: ARTICLE LIST --- */}
@@ -146,7 +146,7 @@ export function LandingPage() {
           <p className="sans" style={{ marginTop: '1rem', fontSize: 'clamp(1rem, 2vw, 1.2rem)', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px', lineHeight: 1.6 }}>
             Never run out of material. An endless feed of daily news tailored continuously to your learning pipeline.
           </p>
-          <SectionImage src="/Screenshot-article-list.jpg" alt="Infinite Article Feed" />
+          <SectionImage src="/screenshot-articles.jpg" alt="Infinite Article Feed" />
         </motion.div>
 
         {/* --- SECTION 6: WAITLIST & CTA --- */}
