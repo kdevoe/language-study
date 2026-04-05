@@ -73,7 +73,7 @@ export function LandingPage() {
       transition={{ repeat: Infinity, duration: 6, ease: "easeInOut", delay }}
       style={{ 
         width: '100%', 
-        maxWidth: 'min(85vw, 420px)', 
+        maxWidth: 'min(70vw, 420px)', 
         borderRadius: '32px', 
         overflow: 'hidden', 
         boxShadow: '0 30px 60px rgba(0,0,0,0.1), 0 0 0 8px rgba(0,0,0,0.02)', 
@@ -106,7 +106,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 2: READER VIEW --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: readerOpacity, y: readerY, zIndex: 20, display: readerDisplay }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(1rem, 5vw, 2rem)', opacity: readerOpacity, y: readerY, zIndex: 20, display: readerDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Immersive Reading.
           </h2>
@@ -117,7 +117,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 3: SETTINGS VIEW --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: settingsOpacity, y: settingsY, zIndex: 30, display: settingsDisplay }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(1rem, 5vw, 2rem)', opacity: settingsOpacity, y: settingsY, zIndex: 30, display: settingsDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Total Personalization.
           </h2>
@@ -128,7 +128,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 4: WORD LOOKUP --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: lookupOpacity, y: lookupY, zIndex: 40, display: lookupDisplay }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(1rem, 5vw, 2rem)', opacity: lookupOpacity, y: lookupY, zIndex: 40, display: lookupDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             Contextual Insight.
           </h2>
@@ -139,7 +139,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 5: ARTICLE LIST --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: listOpacity, y: listY, zIndex: 50, display: listDisplay }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(1rem, 5vw, 2rem)', opacity: listOpacity, y: listY, zIndex: 50, display: listDisplay }}>
           <h2 className="serif" style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', textAlign: 'center', lineHeight: 1.2, maxWidth: '800px', fontWeight: 500, color: 'var(--text-main)' }}>
             The Infinite Stream.
           </h2>
@@ -150,7 +150,7 @@ export function LandingPage() {
         </motion.div>
 
         {/* --- SECTION 6: WAITLIST & CTA --- */}
-        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', opacity: waitlistOpacity, y: waitlistY, zIndex: 60, display: waitlistDisplay }}>
+        <motion.div style={{ position: 'absolute', width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(1rem, 5vw, 2rem)', opacity: waitlistOpacity, y: waitlistY, zIndex: 60, display: waitlistDisplay }}>
           
           <div style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
             <h2 className="serif" style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-main)' }}>Get early access.</h2>
