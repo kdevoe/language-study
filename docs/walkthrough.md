@@ -32,6 +32,12 @@ Crucial cultural or linguistic keywords are highlighted in the article layout us
 - **Micro-Animations**: Integrated subtle floating animations and continuous scroll-driven opacity shifts to create a premium, "living" feel.
 - **Waitlist Integration**: Secure Supabase backend for early access signups.
 
+### 6. Private Beta & Whitelist Management
+- **Access Control Gate**: Implemented a whitelist check in `App.tsx`. After signing in, the application calls a custom Supabase RPC (`check_is_approved`) to verify the user's beta status.
+- **Access Denied View**: Users on the waitlist who haven't been approved see a dedicated "Private Beta" screen with their email highlighted, preventing unauthorized access while maintaining the Zen aesthetic.
+- **Magic Link Auth**: Added a "Sign in with Email" option to the Landing Page. This enables passwordless authentication for non-Gmail users (Outlook, Proton, etc.), greatly expanding the beta reach.
+- **Schema Expansion**: Created `database/05_whitelist_logic.sql` which adds the `is_approved` column to the `waitlist` table for easy management via the Supabase dashboard.
+
 ## Technical Validation
 - **Mobile Scaling**: Implemented `clamp()` and `min()` CSS constraints for robust viewport-aware typography and image sizing.
 - **Performance**: Optimized rendering by unmounting inactive scroll sections using `display: none` based on scroll progress.
