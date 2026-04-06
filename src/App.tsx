@@ -130,17 +130,6 @@ function App() {
     }
   }, [newsPage, topicIndex, isReplenishing, isLoadingFeed]);
 
-  // THE SENTINEL: Ensure we always have at least 5 visible articles
-  useEffect(() => {
-    if (isLoadingFeed || isReplenishing || articles.length === 0) return;
-    
-    const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
-    if (visibleArticles.length < 5) {
-      // Cooldown timer: Only attempt to replenish every 2 seconds if the count is low
-      const timer = setTimeout(replenishFeedAtBottom, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [articles, dismissedArticleIds, isReplenishing, isLoadingFeed, replenishFeedAtBottom]);
 
   const loadHub = async () => {
     setIsLoadingFeed(true);
@@ -156,18 +145,31 @@ function App() {
 
   useEffect(() => {
     const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      
-      if (session?.user?.email) {
-        const { data: status, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
-        if (error) console.error("Whitelist check error:", error);
-        setApprovalStatus(status || 'not_joined');
-      } else {
+      try {
+        // Robust initialization with a 5s timeout to prevent blank screens on startup
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Supabase initialization timed out")), 5000)
+        );
+
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        setSession(session);
+        
+        if (session?.user?.email) {
+          const { data: status, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+          if (error) console.error("Whitelist check error:", error);
+          setApprovalStatus(status || 'not_joined');
+        } else {
+          setApprovalStatus(null);
+        }
+      } catch (err) {
+        console.error("Initialization error:", err);
+        // Fallback: Ensure the app at least shows the LandingPage if auth hangs
+        setSession(null);
         setApprovalStatus(null);
+      } finally {
+        setIsInitializing(false);
       }
-      
-      setIsInitializing(false);
     };
 
     initSession();
@@ -175,8 +177,12 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user?.email) {
-        const { data: status } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
-        setApprovalStatus(status || 'not_joined');
+        try {
+          const { data: status } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+          setApprovalStatus(status || 'not_joined');
+        } catch (e) {
+          console.error("Auth change status check error:", e);
+        }
       } else {
         setApprovalStatus(null);
       }
@@ -235,13 +241,15 @@ function App() {
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);
       setNewsView('reading');
-      setShowNav(false);
+      setShowNav(true); 
+      window.scrollTo(0, 0); // Explicitly reset scroll immediately
       setTimeout(() => {
         syncPrefetchQueue();
-        replenishFeedAtBottom(); // Pull more when reading starts
+        replenishFeedAtBottom(); 
       }, 500); 
     } else {
       handleProcessArticle(article);
+      // Note: We don't force showNav true here yet as processing happens in Hub
     }
   };
 
@@ -287,7 +295,27 @@ function App() {
   }, []);
 
   if (isInitializing) {
-    return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }} />;
+    return (
+      <div style={{ 
+        height: '100vh', 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: 'var(--bg-color)',
+        color: 'var(--text-muted)'
+      }}>
+        <div className="lucide-spin" style={{ 
+          width: '32px', 
+          height: '32px', 
+          border: '2px solid var(--border-light)', 
+          borderTopColor: 'var(--text-main)', 
+          borderRadius: '50%',
+          marginBottom: '1.5rem'
+        }} />
+        <span className="serif" style={{ fontSize: '0.9rem', letterSpacing: '0.1em' }}>INITIALIZING</span>
+      </div>
+    );
   }
 
   if (!session) return <LandingPage />;
@@ -299,8 +327,8 @@ function App() {
         <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Private Beta</h2>
         <p className="sans" style={{ color: 'var(--text-muted)', marginBottom: '2rem', maxWidth: '400px' }}>
           {approvalStatus === 'waitlisted' 
-            ? `Your email (${session.user.email}) is on our waitlist. We'll be in touch as soon as we're ready for more testers.`
-            : `Your email (${session.user.email}) is not yet on our authorized beta list. Please join the waitlist on the landing page.`
+            ? `Your email (${session?.user?.email}) is on our waitlist. We'll be in touch as soon as we're ready for more testers.`
+            : `Your email (${session?.user?.email}) is not yet on our authorized beta list. Please join the waitlist on the landing page.`
           }
         </p>
         <button 
@@ -317,19 +345,24 @@ function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        padding: 'max(1.5rem, env(safe-area-inset-top)) 1.25rem 1.5rem',
-        position: 'sticky',
-        top: 0,
-        backgroundColor: 'var(--bg-color)',
-        zIndex: 10,
-        transform: (showNav || newsView === 'reading') ? 'translateY(0)' : 'translateY(-100%)',
-        transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
-        opacity: (showNav || newsView === 'reading') ? 1 : 0
-      }}>
+      <header 
+        data-shownav={showNav}
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          padding: 'max(1.5rem, env(safe-area-inset-top)) 1.25rem 1.5rem',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: 'var(--bg-color)',
+          zIndex: 10,
+          transform: showNav ? 'translateY(0)' : 'translateY(-100%)',
+          transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
+          opacity: showNav ? 1 : 0
+        }}
+      >
         {newsView === 'reading' ? (
           <button onClick={handleBackToHub} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <ChevronLeft size={24} strokeWidth={1.5} />
@@ -345,7 +378,14 @@ function App() {
         </button>
       </header>
 
-      <main style={{ flex: 1, padding: newsView === 'reading' ? '1rem 1.25rem' : '0rem 1.25rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+      <main style={{ 
+        flex: 1, 
+        padding: newsView === 'reading' ? '1rem 1.25rem' : '0rem 1.25rem', 
+        paddingTop: 'calc(4rem + env(safe-area-inset-top))', // Space for fixed header
+        maxWidth: '600px', 
+        margin: '0 auto', 
+        width: '100%' 
+      }}>
         {activeTab === 'news' && (
           newsView === 'hub' ? (
             <Feed 
@@ -368,7 +408,7 @@ function App() {
         )}
         {activeTab === 'settings' && <Settings />}
       </main>
-      <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav} />
+      <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav && newsView !== 'reading'} />
     </div>
   )
 }

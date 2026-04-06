@@ -118,7 +118,7 @@ export function LandingPage() {
             News tailored to your Japanese level.
           </h2>
           <div style={{ position: 'absolute', bottom: '8vh', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.8rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Discover</span>
+            <span style={{ fontSize: '0.8rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Discover V1.1</span>
             <ChevronDown className="lucide-bounce" size={24} />
           </div>
         </motion.div>
