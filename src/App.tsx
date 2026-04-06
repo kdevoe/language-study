@@ -380,8 +380,10 @@ function App() {
 
       <main style={{ 
         flex: 1, 
-        padding: newsView === 'reading' ? '1rem 1.25rem' : '0rem 1.25rem', 
-        paddingTop: 'calc(4rem + env(safe-area-inset-top))', // Space for fixed header
+        paddingTop: 'calc(5rem + env(safe-area-inset-top))', // Space for fixed header
+        paddingRight: '1.25rem',
+        paddingBottom: newsView === 'reading' ? '1rem' : '0rem',
+        paddingLeft: '1.25rem',
         maxWidth: '600px', 
         margin: '0 auto', 
         width: '100%' 
