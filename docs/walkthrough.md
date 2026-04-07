@@ -38,6 +38,11 @@ Crucial cultural or linguistic keywords are highlighted in the article layout us
 - **Magic Link Auth**: Added a "Sign in with Email" option to the Landing Page. This enables passwordless authentication for non-Gmail users (Outlook, Proton, etc.), greatly expanding the beta reach.
 - **Schema Expansion**: Created `database/05_whitelist_logic.sql` which adds the `is_approved` column to the `waitlist` table for easy management via the Supabase dashboard.
 
+### 7. Persistent Project Memory
+- **Interaction Rules**: Established a `.agent/rules.md` file that stores core architectural and aesthetic guidelines. This acts as a persistent "memory" for AI assistants to ensure consistency in future sessions.
+- **Development Guide**: Created `DEVELOPMENT.md` to document preferred workflows, such as using the GitHub CLI (`gh`) for task management and managing the Private Beta whitelist via Supabase.
+- **Issue Tracking**: Successfully integrated with the repository's GitHub Issue tracker via the CLI.
+
 ## Technical Validation
 - **Mobile Scaling**: Implemented `clamp()` and `min()` CSS constraints for robust viewport-aware typography and image sizing.
 - **Performance**: Optimized rendering by unmounting inactive scroll sections using `display: none` based on scroll progress.

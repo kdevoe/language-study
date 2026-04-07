@@ -33,7 +33,7 @@ interface AppState {
   articlesCache: Record<string, NewsArticle>;
   processingArticles: string[];
   dismissedArticleIds: string[];
-  srsAutoBumpThreshold: number;
+  srsAutoBumpThreshold: number | '';
   readerFontSize: number;
   readerFontWeight: number;
   
@@ -48,7 +48,7 @@ interface AppState {
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
   dismissArticle: (id: string) => void;
   setProcessing: (id: string, isProcessing: boolean) => void;
-  setSrsAutoBumpThreshold: (count: number) => void;
+  setSrsAutoBumpThreshold: (count: number | '') => void;
   resetFeedForNewDay: (now: number) => void;
   setReaderFontSize: (size: number) => void;
   setReaderFontWeight: (weight: number) => void;
@@ -77,7 +77,7 @@ export const useAppStore = create<AppState>()(
       articlesCache: {},
       processingArticles: [],
       dismissedArticleIds: [],
-      srsAutoBumpThreshold: 5,
+      srsAutoBumpThreshold: 3,
       readerFontSize: 18,
       readerFontWeight: 400,
 

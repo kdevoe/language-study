@@ -112,7 +112,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         const stats = wordDatabase[word];
         recordWordSeen(word, true);
         const newConsecutive = (stats?.consecutiveUnseen || 0) + 1;
-        if (stats && stats.mastery !== 'easy' && newConsecutive % (srsAutoBumpThreshold || 5) === 0) {
+        if (stats && stats.mastery !== 'easy' && newConsecutive % (srsAutoBumpThreshold || 3) === 0) {
           setWordMastery(word, stats.mastery === 'hard' ? 'medium' : 'easy');
         } else if (!stats) {
           saveWordDefinition(word, { reading: '...', meaning: 'Implicitly parsed context' });

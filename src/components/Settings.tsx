@@ -261,8 +261,12 @@ export function Settings() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
             <input 
               type="number" 
-              value={srsAutoBumpThreshold || 5} 
+              value={srsAutoBumpThreshold} 
               onChange={(e) => {
+                if (e.target.value === '') {
+                  setSrsAutoBumpThreshold('');
+                  return;
+                }
                 const val = parseInt(e.target.value, 10);
                 if (!isNaN(val) && val > 0) {
                   setSrsAutoBumpThreshold(val);
