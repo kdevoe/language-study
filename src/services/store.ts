@@ -79,7 +79,7 @@ export const useAppStore = create<AppState>()(
       dismissedArticleIds: [],
       srsAutoBumpThreshold: 3,
       readerFontSize: 18,
-      readerFontWeight: 400,
+      readerFontWeight: 500,
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
       
