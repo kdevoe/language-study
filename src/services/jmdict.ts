@@ -199,63 +199,64 @@ function buildFuriganaMap(word: string, reading: string): { kanji: string; kana:
     return chars.map(c => ({ kanji: c, kana: c }));
   }
 
-  // If it's a single kanji character, the whole reading applies
-  if (chars.length === 1) {
-    return [{ kanji: chars[0], kana: reading }];
-  }
-
-  // For compound words: identify kana anchor points in the word
-  // to split the reading across kanji groups
   const segments: { kanji: string; kana: string }[] = [];
   let readingIdx = 0;
 
   for (let i = 0; i < chars.length; i++) {
-    if (isKana(chars[i])) {
-      // Kana character maps to itself, advance reading pointer
-      segments.push({ kanji: chars[i], kana: chars[i] });
-      // Find this kana in the reading to stay in sync
-      const kanaPos = reading.indexOf(chars[i], readingIdx);
+    const char = chars[i];
+    if (isKana(char)) {
+      segments.push({ kanji: char, kana: char });
+      const kanaPos = reading.indexOf(char, readingIdx);
       if (kanaPos !== -1) {
         readingIdx = kanaPos + 1;
       } else {
         readingIdx++;
       }
     } else {
-      // Kanji character(s) — find the next kana anchor in the word
+      // Kanji character or consecutive kanjis
       let kanjiEnd = i + 1;
       while (kanjiEnd < chars.length && !isKana(chars[kanjiEnd])) {
         kanjiEnd++;
       }
-      const kanjiGroup = chars.slice(i, kanjiEnd).join('');
       
-      // Find how much of the reading corresponds to this kanji group
+      // Determine the reading for this block of kanji
       let readingEnd = readingIdx;
       if (kanjiEnd < chars.length) {
-        // Next char is kana — find it in the reading
         const nextKana = chars[kanjiEnd];
-        const anchorPos = reading.indexOf(nextKana, readingIdx);
-        if (anchorPos !== -1) {
-          readingEnd = anchorPos;
-        } else {
-          readingEnd = readingIdx + (kanjiEnd - i);
-        }
+        const nextAnchorPos = reading.indexOf(nextKana, readingIdx);
+        readingEnd = nextAnchorPos !== -1 ? nextAnchorPos : readingIdx + (kanjiEnd - i);
       } else {
-        // Kanji group runs to end of word — rest of reading goes here
         readingEnd = reading.length;
       }
 
-      const kanjiReading = reading.slice(readingIdx, readingEnd);
-      segments.push({ kanji: kanjiGroup, kana: kanjiReading });
+      const kanjiBlock = chars.slice(i, kanjiEnd);
+      const blockReading = reading.slice(readingIdx, readingEnd);
+
+      // MANDATORY: Split the block into individual kanji characters
+      // so each gets its own spacing and RTK meaning in the UI.
+      if (kanjiBlock.length === 1) {
+        segments.push({ kanji: kanjiBlock[0], kana: blockReading });
+      } else {
+        // Balanced heuristic for multi-kanji blocks (e.g., 2 kanji + 4 kana -> 2:2)
+        const readingPerKanji = Math.floor(blockReading.length / kanjiBlock.length);
+        const remainder = blockReading.length % kanjiBlock.length;
+
+        let rIdx = 0;
+        for (let k = 0; k < kanjiBlock.length; k++) {
+          const count = readingPerKanji + (k < remainder ? 1 : 0);
+          segments.push({
+            kanji: kanjiBlock[k],
+            kana: blockReading.slice(rIdx, rIdx + count)
+          });
+          rIdx += count;
+        }
+      }
+
       readingIdx = readingEnd;
-      i = kanjiEnd - 1; // skip past the kanji group
+      i = kanjiEnd - 1;
     }
   }
 
-  // Safety: if we generated nothing useful, fall back to simple mapping
-  if (segments.length === 0) {
-    return [{ kanji: word, kana: reading }];
-  }
-
-  return segments;
+  return segments.length > 0 ? segments : [{ kanji: word, kana: reading }];
 }
 

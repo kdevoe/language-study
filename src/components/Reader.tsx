@@ -180,7 +180,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         word,
         reading: quickDef.reading || '...',
         meaning: quickDef.meaning || 'Looking up...',
-        furiganaMap: quickDef.furiganaMap
+        furiganaMap: quickDef.furiganaMap,
+        jlptLevel: quickDef.jlptLevel,
+        pos: quickDef.pos,
+        jmdictEntryId: quickDef.jmdictEntryId
       };
       setSelectedWord(combinedInitial);
       
