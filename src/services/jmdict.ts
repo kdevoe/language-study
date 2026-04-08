@@ -157,16 +157,20 @@ Answer (just the number):`;
 }
 
 /**
- * Convert a JMDictResult into a format compatible with WordDetails
+ * Convert a JMDictResult into a format compatible with WordDetails.
+ * Generates a furiganaMap by splitting the word into kanji/kana segments.
  */
 export function jmdictToWordDetails(
-  _word: string,
+  word: string,
   result: JMDictResult
-): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null } {
+): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null; furiganaMap: { kanji: string; kana: string }[] } {
   const reading = result.readings[0] || '';
   const allGlosses = result.senses.flatMap(s => s.gloss);
   const meaning = allGlosses.slice(0, 3).join('; ') || '';
   const pos = [...new Set(result.senses.flatMap(s => s.pos))];
+
+  // Build furiganaMap from the word and its kana reading
+  const furiganaMap = buildFuriganaMap(word, reading);
 
   return {
     reading,
@@ -174,5 +178,84 @@ export function jmdictToWordDetails(
     jmdictEntryId: result.entryId,
     pos,
     jlptLevel: result.jlptLevel,
+    furiganaMap,
   };
 }
+
+const isKana = (c: string) => /[\u3040-\u309f\u30a0-\u30ff]/.test(c);
+
+/**
+ * Build a furigana map from a word and its reading.
+ * Splits the word into segments: kana chars map to themselves,
+ * kanji groups get the remaining reading portion.
+ * 
+ * Example: "食べる" + "たべる" → [{kanji:"食", kana:"た"}, {kanji:"べ", kana:"べ"}, {kanji:"る", kana:"る"}]
+ */
+function buildFuriganaMap(word: string, reading: string): { kanji: string; kana: string }[] {
+  const chars = Array.from(word);
+  
+  // If the word is entirely kana, each char maps to itself
+  if (chars.every(isKana)) {
+    return chars.map(c => ({ kanji: c, kana: c }));
+  }
+
+  // If it's a single kanji character, the whole reading applies
+  if (chars.length === 1) {
+    return [{ kanji: chars[0], kana: reading }];
+  }
+
+  // For compound words: identify kana anchor points in the word
+  // to split the reading across kanji groups
+  const segments: { kanji: string; kana: string }[] = [];
+  let readingIdx = 0;
+
+  for (let i = 0; i < chars.length; i++) {
+    if (isKana(chars[i])) {
+      // Kana character maps to itself, advance reading pointer
+      segments.push({ kanji: chars[i], kana: chars[i] });
+      // Find this kana in the reading to stay in sync
+      const kanaPos = reading.indexOf(chars[i], readingIdx);
+      if (kanaPos !== -1) {
+        readingIdx = kanaPos + 1;
+      } else {
+        readingIdx++;
+      }
+    } else {
+      // Kanji character(s) — find the next kana anchor in the word
+      let kanjiEnd = i + 1;
+      while (kanjiEnd < chars.length && !isKana(chars[kanjiEnd])) {
+        kanjiEnd++;
+      }
+      const kanjiGroup = chars.slice(i, kanjiEnd).join('');
+      
+      // Find how much of the reading corresponds to this kanji group
+      let readingEnd = readingIdx;
+      if (kanjiEnd < chars.length) {
+        // Next char is kana — find it in the reading
+        const nextKana = chars[kanjiEnd];
+        const anchorPos = reading.indexOf(nextKana, readingIdx);
+        if (anchorPos !== -1) {
+          readingEnd = anchorPos;
+        } else {
+          readingEnd = readingIdx + (kanjiEnd - i);
+        }
+      } else {
+        // Kanji group runs to end of word — rest of reading goes here
+        readingEnd = reading.length;
+      }
+
+      const kanjiReading = reading.slice(readingIdx, readingEnd);
+      segments.push({ kanji: kanjiGroup, kana: kanjiReading });
+      readingIdx = readingEnd;
+      i = kanjiEnd - 1; // skip past the kanji group
+    }
+  }
+
+  // Safety: if we generated nothing useful, fall back to simple mapping
+  if (segments.length === 0) {
+    return [{ kanji: word, kana: reading }];
+  }
+
+  return segments;
+}
+
