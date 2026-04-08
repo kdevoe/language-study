@@ -1,4 +1,5 @@
 import { WordDetails } from '../components/WordModal';
+import { lookupWord, disambiguateWithLLM, jmdictToWordDetails } from './jmdict';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ArticleBlock {
@@ -154,6 +155,29 @@ export async function fetchNewsFeed(topic: string = 'Japan News', pageSize: numb
 }
 
 export async function fetchWordDefinitionQuick(word: string, contextSentence: string): Promise<Partial<WordDetails>> {
+  // 1. Try JMDict first (instant, no LLM needed for single matches)
+  try {
+    const candidates = await lookupWord(word);
+
+    if (candidates.length === 1) {
+      // Unambiguous match — return JMDict data directly
+      console.log(`📖 JMDict HIT (single): ${word}`);
+      const details = jmdictToWordDetails(word, candidates[0]);
+      return { word, ...details };
+    }
+
+    if (candidates.length > 1) {
+      // Ambiguous — use LLM to pick the correct entry
+      console.log(`📖 JMDict HIT (${candidates.length} candidates): ${word} → disambiguating...`);
+      const best = await disambiguateWithLLM(word, contextSentence, candidates);
+      const details = jmdictToWordDetails(word, best);
+      return { word, ...details };
+    }
+  } catch (e) {
+    console.warn('JMDict lookup failed, falling back to LLM:', e);
+  }
+
+  // 2. Fallback: pure LLM definition (for words not in JMDict)
   const groqKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!groqKey) throw new Error("Groq key missing for quick lookup.");
 
@@ -169,7 +193,7 @@ export async function fetchWordDefinitionQuick(word: string, contextSentence: st
   }`;
 
   try {
-    console.log(`🧠 LLM QUICK (Groq) -> ${GROQ_MODEL_QUICK}`);
+    console.log(`🧠 LLM FALLBACK (Groq) -> ${GROQ_MODEL_QUICK} (no JMDict match for "${word}")`);
     const text = await fetchGroq(prompt, GROQ_MODEL_QUICK, true);
     return JSON.parse(text);
   } catch (e) {
