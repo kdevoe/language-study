@@ -201,19 +201,17 @@ export function WordModal({
                 className="serif" 
                 style={{ fontSize: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5 }}
               >
-                <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span> {wordData.meaning}
-              </motion.p>
-              {wordData.jlptLevel && (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.6rem', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
-                  <span style={{ 
-                    fontSize: '0.65rem', fontWeight: 800, color: '#fff', 
-                    backgroundColor: '#4a5d23', padding: '0.15rem 0.5rem', 
-                    borderRadius: '100px', letterSpacing: '0.05em'
+                <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span>
+                {wordData.jlptLevel && (
+                  <span className="sans" style={{ 
+                    fontSize: '0.85rem', fontWeight: 800, color: '#4a5d23', 
+                    marginRight: '0.6rem', opacity: 0.8, verticalAlign: 'middle'
                   }}>
                     N{wordData.jlptLevel}
                   </span>
-                </div>
-              )}
+                )}
+                {wordData.meaning}
+              </motion.p>
             </>
           )}
         </div>
