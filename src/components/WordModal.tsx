@@ -201,7 +201,6 @@ export function WordModal({
                 className="serif" 
                 style={{ fontSize: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5 }}
               >
-                <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span>
                 {wordData.jlptLevel && (
                   <span className="sans" style={{ 
                     fontSize: '0.85rem', fontWeight: 800, color: '#4a5d23', 

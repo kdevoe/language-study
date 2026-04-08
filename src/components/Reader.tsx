@@ -167,7 +167,12 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       return;
     }
 
-    setSelectedWord({ word, reading: '...', meaning: '' });
+    setSelectedWord({ 
+      word, 
+      reading: '...', 
+      meaning: '',
+      furiganaMap: Array.from(word).map(c => ({ kanji: c, kana: '' })) 
+    });
     setSelectedSentence(null);
     setTargetRect(e.currentTarget.getBoundingClientRect());
     setActiveHighlightId(tokenId);
