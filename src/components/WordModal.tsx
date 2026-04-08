@@ -154,7 +154,14 @@ export function WordModal({
           {segments ? (
             segments.map((s, idx) => (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ height: '0.9rem', fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{s.kana}</span>
+                <span style={{ 
+                  height: '0.9rem', fontSize: '0.75rem', 
+                  color: 'var(--text-muted)', letterSpacing: '0.04em', 
+                  fontFamily: 'var(--font-sans)', fontWeight: 800,
+                  opacity: s.kanji === s.kana || (s.kanji.match(/[\u3040-\u309f\u30a0-\u30ff]/) && s.kanji === s.kana) ? 0 : 1
+                }}>
+                  {s.kana}
+                </span>
                 <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{s.kanji}</span>
                 <span style={{ height: '0.8rem', fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
                   {rtkKanjiMap[s.kanji] || ''}
@@ -196,26 +203,15 @@ export function WordModal({
               >
                 <span className="sans" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.4rem', color: '#4a5d23', fontWeight: 900 }}>文</span> {wordData.meaning}
               </motion.p>
-              {(wordData.jlptLevel || (wordData.pos && wordData.pos.length > 0)) && (
+              {wordData.jlptLevel && (
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.6rem', justifyContent: anchor === 'top' ? 'center' : 'flex-start' }}>
-                  {wordData.jlptLevel && (
-                    <span style={{ 
-                      fontSize: '0.65rem', fontWeight: 800, color: '#fff', 
-                      backgroundColor: '#4a5d23', padding: '0.15rem 0.5rem', 
-                      borderRadius: '100px', letterSpacing: '0.05em'
-                    }}>
-                      N{wordData.jlptLevel}
-                    </span>
-                  )}
-                  {wordData.pos && wordData.pos.slice(0, 3).map((p, i) => (
-                    <span key={i} style={{ 
-                      fontSize: '0.6rem', fontWeight: 600, color: 'var(--text-muted)', 
-                      backgroundColor: 'var(--border-light)', padding: '0.15rem 0.45rem', 
-                      borderRadius: '100px'
-                    }}>
-                      {p}
-                    </span>
-                  ))}
+                  <span style={{ 
+                    fontSize: '0.65rem', fontWeight: 800, color: '#fff', 
+                    backgroundColor: '#4a5d23', padding: '0.15rem 0.5rem', 
+                    borderRadius: '100px', letterSpacing: '0.05em'
+                  }}>
+                    N{wordData.jlptLevel}
+                  </span>
                 </div>
               )}
             </>
