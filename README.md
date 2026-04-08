@@ -1,50 +1,40 @@
-# React + TypeScript + Vite
+# Yūgen Study
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Japanese language study platform that uses AI to rewrite real news articles into personalized Japanese reading practice, tailored to your JLPT grammar level, RTK kanji progression, and vocabulary mastery.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Supabase (Auth, Postgres, RLS)
+- **AI**: Google Gemini (article rewriting, grammar insights), Groq (fast dictionary lookups)
+- **Dictionary**: JMDict-Simplified (216k+ entries with JLPT tagging)
 
-## Expanding the ESLint configuration
+## Setup
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+1. Copy `.env.example` to `.env` and fill in your API keys
+2. `npm install`
+3. `npm run dev`
 
-- Configure the top-level `parserOptions` property like this:
+### Database
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+Run the SQL files in `database/` in order (00–08) in the Supabase SQL Editor. Then run the import scripts:
+
+```bash
+node scripts/import_jmdict.cjs        # Import 216k JMDict entries
+node scripts/enrich_jlpt.cjs          # Tag vocabulary with JLPT N1-N5
+node scripts/enrich_kanji_jlpt.cjs    # Tag individual kanji with JLPT N1-N5
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+## Data Sources & Attribution
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+This project uses the following open data sources:
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+- **[JMDict](http://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project)** — Japanese-Multilingual Dictionary by the [Electronic Dictionary Research and Development Group (EDRDG)](http://www.edrdg.org/). Used via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified). Licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **[KANJIDIC](http://www.edrdg.org/wiki/index.php/KANJIDIC_Project)** — Kanji database by the EDRDG. Licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **[JLPT Vocabulary Lists](https://github.com/jamsinclair/open-anki-jlpt-decks)** — Open-source JLPT N1–N5 vocabulary, community-maintained. Licensed under MIT.
+- **[JLPT Kanji Levels](http://www.tanos.co.uk/jlpt/)** — JLPT kanji classification by Jonathan Waller, via [kanji-data](https://github.com/davidluzgouveia/kanji-data) (MIT license).
+- **[Remembering the Kanji](https://en.wikipedia.org/wiki/Remembering_the_Kanji_and_Remembering_the_Hanzi)** — RTK ordering by James Heisig. Kanji ordering data used for study progression.
+
+## License
+
+Private — not open source.
