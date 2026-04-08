@@ -161,7 +161,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     
     const localData = wordDatabase[word];
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context') {
-      setSelectedWord({ word, reading: localData.reading, meaning: localData.meaning, grammarNote: localData.grammarNote });
+      setSelectedWord({ 
+        word, 
+        reading: localData.reading, 
+        meaning: localData.meaning, 
+        grammarNote: localData.grammarNote,
+        furiganaMap: localData.furiganaMap,
+        jlptLevel: localData.jlptLevel,
+        pos: localData.pos,
+        jmdictEntryId: localData.jmdictEntryId
+      });
       setActiveHighlightId(tokenId);
       setTargetRect(e.currentTarget.getBoundingClientRect());
       return;

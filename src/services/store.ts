@@ -10,6 +10,10 @@ export interface WordData {
   reading: string;
   meaning: string;
   grammarNote?: string;
+  furiganaMap?: { kanji: string; kana: string }[];
+  jlptLevel?: number | null;
+  pos?: string[];
+  jmdictEntryId?: string;
   mastery: MasteryLevel;
   timesSeen: number;
   uniqueDaysSeen: string[];
@@ -54,7 +58,7 @@ interface AppState {
   setReaderFontWeight: (weight: number) => void;
   resetProgress: () => void;
   
-  saveWordDefinition: (word: string, def: { reading: string; meaning: string; grammarNote?: string }) => void;
+  saveWordDefinition: (word: string, def: Partial<WordData>) => void;
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
