@@ -103,7 +103,7 @@ export async function disambiguateWithLLM(
   candidates: JMDictResult[]
 ): Promise<JMDictResult> {
   const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROQ_MODEL = 'openai/gpt-oss-20b';
+  const GROQ_MODEL = 'llama3-8b-8192';
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
   if (!apiKey || candidates.length <= 1) {
@@ -125,6 +125,9 @@ ${candidateDescriptions}
 
 Answer (just the number):`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -132,6 +135,7 @@ Answer (just the number):`;
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
@@ -139,6 +143,8 @@ Answer (just the number):`;
         max_tokens: 5
       })
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) return candidates[0];
 

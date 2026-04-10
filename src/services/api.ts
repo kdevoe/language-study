@@ -487,32 +487,41 @@ export async function linkArticleToJMDict(
   let linked = 0;
 
   // 2. Resolve each word (lookup + disambiguate if needed)
-  // We'll do this in small batches to avoid Supabase/LLM overloading
   const resolvedMap = new Map<string, string>(); // word -> entry_id
 
-  for (const word of uniqueWords) {
-    try {
-      const candidates = await lookupWord(word);
-      if (candidates.length === 1) {
-        resolvedMap.set(word, candidates[0].entryId);
-      } else if (candidates.length > 1) {
-        // For linking pass, we'll try a quick disambiguation 
-        // using the first sentence it appears in
-        let contextSentence = "";
-        for (const block of blocks) {
-          if (block.content?.some(t => t.text === word)) {
-            contextSentence = block.content.map(t => t.text).join("");
-            break;
+  // Process words in small chunks to avoid overwhelming the connection or hitting rate limits
+  const CHUNK_SIZE = 5;
+  for (let i = 0; i < uniqueWords.length; i += CHUNK_SIZE) {
+    const chunk = uniqueWords.slice(i, i + CHUNK_SIZE);
+    
+    await Promise.all(chunk.map(async (word) => {
+      try {
+        const candidates = await lookupWord(word);
+        if (candidates.length === 1) {
+          resolvedMap.set(word, candidates[0].entryId);
+        } else if (candidates.length > 1) {
+          // Find context sentence
+          let contextSentence = "";
+          for (const block of blocks) {
+            if (block.content?.some(t => t.text === word)) {
+              contextSentence = block.content.map(t => t.text).join("");
+              break;
+            }
           }
+          // We limit disambiguation calls in background to avoid hitting the RPM limits
+          // and slowing down real-time interaction.
+          const best = await disambiguateWithLLM(word, contextSentence, candidates);
+          resolvedMap.set(word, best.entryId);
         }
-        const best = await disambiguateWithLLM(word, contextSentence, candidates);
-        resolvedMap.set(word, best.entryId);
+      } catch (e) {
+        console.warn(`Background link failed for "${word}":`, e);
       }
-    } catch (e) {
-      console.warn(`Failed to link word "${word}":`, e);
-    }
-    linked++;
-    if (linked % 5 === 0) onProgress?.(linked, total);
+      linked++;
+    }));
+
+    onProgress?.(linked, total);
+    // Brief sleep to avoid hitting Groq RPM limits for background tasks
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   // 3. Update the blocks with entry IDs
