@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { FuriganaText } from './FuriganaText';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
-import { rewriteArticleWithGemini, fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchSentenceTranslation } from '../services/api';
+import { 
+  rewriteArticleWithGemini, 
+  fetchWordDefinitionQuick, 
+  fetchWordGrammarInsight, 
+  fetchSentenceTranslation,
+  linkArticleToJMDict
+} from '../services/api';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
 import { } from 'lucide-react'; // Empty block to show we're using icons elsewhere if needed, or just clear it.
@@ -86,6 +92,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       setCurrentArticle(processed);
       // 3. Save to cache for next time
       if (selectedRaw.id) saveProcessedArticle(selectedRaw.id, processed);
+
+      // START BROWSER LINKING IN BACKGROUND
+      linkArticleToJMDict(rewrittenBlocks, (linked, total) => {
+        // We log linking progress but don't block UI
+        if (linked === total) console.log("🔗 Article Fully Linked to JMDict");
+      }).then((linkedBlocks) => {
+        const fullyLinked = { ...processed, blocks: linkedBlocks };
+        setCurrentArticle(fullyLinked);
+        if (selectedRaw.id) saveProcessedArticle(selectedRaw.id, fullyLinked);
+      });
     } else {
       // Emergency Fallback
       setLoading(false);
@@ -147,7 +163,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     saveWordDefinition(details.word, details);
   };
 
-  const handleDictionaryLookup = async (word: string, contextSentence: string, e: any, tokenId: string) => {
+  const handleDictionaryLookup = async (word: string, contextSentence: string, e: any, tokenId: string, jmdictEntryId?: string) => {
     if (touchLock.isLocked()) return;
     if (activeHighlightId === tokenId) {
       setActiveHighlightId(null);
@@ -188,8 +204,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setIsModalLoading(true);
 
     try {
-      // 1. QUICK PATH (Groq 20B)
-      const quickDef = await fetchWordDefinitionQuick(word, contextSentence);
+      // 1. QUICK PATH (JMDict Instant or Groq Fallback)
+      const quickDef = await fetchWordDefinitionQuick(word, contextSentence, jmdictEntryId);
       const combinedInitial: WordDetails = {
         word,
         reading: quickDef.reading || '...',
@@ -275,7 +291,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                   onClick={(e) => {
                     const tid = `${sentenceId}-${j}`;
                     if (segment.details) handleWordClick(segment.details as WordDetails, e, tid);
-                    else handleDictionaryLookup(segment.text, sentText, e, tid);
+                    else handleDictionaryLookup(segment.text, sentText, e, tid, segment.jmdict_entry_id);
                   }}
                 />
               );

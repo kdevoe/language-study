@@ -1,10 +1,16 @@
 import { WordDetails } from '../components/WordModal';
-import { lookupWord, disambiguateWithLLM, jmdictToWordDetails } from './jmdict';
+import { lookupWord, disambiguateWithLLM, jmdictToWordDetails, fetchEntries } from './jmdict';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ArticleBlock {
   type: 'paragraph' | 'yugen-box';
-  content?: { text: string; furigana?: string; isInteractive?: boolean; details?: WordDetails }[];
+  content?: { 
+    text: string; 
+    furigana?: string; 
+    isInteractive?: boolean; 
+    details?: WordDetails;
+    jmdict_entry_id?: string;
+  }[];
   keyword?: string;
   reading?: string;
   description?: string;
@@ -154,23 +160,34 @@ export async function fetchNewsFeed(topic: string = 'Japan News', pageSize: numb
   }
 }
 
-export async function fetchWordDefinitionQuick(word: string, contextSentence: string): Promise<Partial<WordDetails>> {
+export async function fetchWordDefinitionQuick(word: string, contextSentence: string, jmdictEntryId?: string): Promise<Partial<WordDetails>> {
   // 1. Try JMDict first (instant, no LLM needed for single matches)
   try {
-    const candidates = await lookupWord(word);
+    let result;
 
-    if (candidates.length === 1) {
-      // Unambiguous match — return JMDict data directly
-      console.log(`📖 JMDict HIT (single): ${word}`);
-      const details = jmdictToWordDetails(word, candidates[0]);
-      return { word, ...details };
+    if (jmdictEntryId) {
+      // Direct hit via pre-resolved ID (Phase 2 optimization)
+      console.log(`📖 JMDict HIT (ID): ${word} [${jmdictEntryId}]`);
+      const entries = await fetchEntries([jmdictEntryId]);
+      if (entries.length > 0) result = entries[0];
     }
 
-    if (candidates.length > 1) {
-      // Ambiguous — use LLM to pick the correct entry
-      console.log(`📖 JMDict HIT (${candidates.length} candidates): ${word} → disambiguating...`);
-      const best = await disambiguateWithLLM(word, contextSentence, candidates);
-      const details = jmdictToWordDetails(word, best);
+    if (!result) {
+      const candidates = await lookupWord(word);
+
+      if (candidates.length === 1) {
+        // Unambiguous match — return JMDict data directly
+        console.log(`📖 JMDict HIT (single): ${word}`);
+        result = candidates[0];
+      } else if (candidates.length > 1) {
+        // Ambiguous — use LLM to pick the correct entry
+        console.log(`📖 JMDict HIT (${candidates.length} candidates): ${word} → disambiguating...`);
+        result = await disambiguateWithLLM(word, contextSentence, candidates);
+      }
+    }
+
+    if (result) {
+      const details = jmdictToWordDetails(word, result);
       return { word, ...details };
     }
   } catch (e) {
@@ -441,3 +458,73 @@ const mockArticles: NewsArticle[] = [
     ]
   }
 ];
+
+/**
+ * Post-Rewrite Token Linking (Phase 2)
+ * 
+ * Iterates through article tokens and links them to JMDict entry IDs.
+ * This runs in the background after the article is rendered.
+ */
+export async function linkArticleToJMDict(
+  blocks: ArticleBlock[], 
+  onProgress?: (linkedCount: number, totalCount: number) => void
+): Promise<ArticleBlock[]> {
+  console.log("🔗 Starting JMDict Token Linking...");
+  
+  // 1. Collect all unique tokens that need linking (interactive or kanji-heavy)
+  const tokensToLink = new Set<string>();
+  blocks.forEach(block => {
+    block.content?.forEach(token => {
+      // Link if it has Kanji or is marked interactive
+      if (token.furigana) {
+        tokensToLink.add(token.text);
+      }
+    });
+  });
+
+  const uniqueWords = Array.from(tokensToLink);
+  const total = uniqueWords.length;
+  let linked = 0;
+
+  // 2. Resolve each word (lookup + disambiguate if needed)
+  // We'll do this in small batches to avoid Supabase/LLM overloading
+  const resolvedMap = new Map<string, string>(); // word -> entry_id
+
+  for (const word of uniqueWords) {
+    try {
+      const candidates = await lookupWord(word);
+      if (candidates.length === 1) {
+        resolvedMap.set(word, candidates[0].entryId);
+      } else if (candidates.length > 1) {
+        // For linking pass, we'll try a quick disambiguation 
+        // using the first sentence it appears in
+        let contextSentence = "";
+        for (const block of blocks) {
+          if (block.content?.some(t => t.text === word)) {
+            contextSentence = block.content.map(t => t.text).join("");
+            break;
+          }
+        }
+        const best = await disambiguateWithLLM(word, contextSentence, candidates);
+        resolvedMap.set(word, best.entryId);
+      }
+    } catch (e) {
+      console.warn(`Failed to link word "${word}":`, e);
+    }
+    linked++;
+    if (linked % 5 === 0) onProgress?.(linked, total);
+  }
+
+  // 3. Update the blocks with entry IDs
+  const linkedBlocks = blocks.map(block => ({
+    ...block,
+    content: block.content?.map(token => ({
+      ...token,
+      jmdict_entry_id: resolvedMap.get(token.text) || token.jmdict_entry_id
+    }))
+  }));
+
+  console.log(`✅ Linked ${linked}/${total} tokens to JMDict.`);
+  onProgress?.(linked, total);
+  return linkedBlocks;
+}

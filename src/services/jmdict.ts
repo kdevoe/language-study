@@ -61,7 +61,7 @@ async function lookupByKana(text: string): Promise<JMDictResult[]> {
   return fetchEntries(entryIds);
 }
 
-async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> {
+export async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> {
   // Fetch entries, kanji forms, kana forms, and senses in parallel
   const [entriesRes, kanjiRes, kanaRes, sensesRes] = await Promise.all([
     supabase.from('jmdict_entries').select('id, common, jlpt_level').in('id', entryIds),
