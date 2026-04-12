@@ -86,18 +86,18 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
 
 export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return mockArticles;
+  if (!user) return [];
 
   try {
     const { articles } = await invokeEdgeFn<{ articles: NewsArticle[] }>('fetch-raw-news', { page });
     if (!articles || articles.length === 0) {
-      console.warn('News API returned no articles; returning mock data.');
-      return mockArticles;
+      console.warn(`[api] No articles returned for page ${page}`);
+      return [];
     }
     return articles;
   } catch (error) {
-    console.error('Error fetching raw headlines:', error);
-    return mockArticles;
+    console.error(`[api] Error fetching raw headlines (page ${page}):`, error);
+    return [];
   }
 }
 
