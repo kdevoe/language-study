@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
     let biasInstruction = 'NATURAL KANJI READING: Prioritize fluid, authentic, natural Japanese text.';
     if (studyMode === 'study') {
-      biasInstruction = `STRICT KANJI BIAS: Target Kanji for this student: [${studyKanji.join(', ')}]. Weave as many of these target Kanji into the story as possible, BUT DO NOT sacrifice natural grammar to do so.`;
+      biasInstruction = `STRICT KANJI PREFERENCE: The student is studying these Kanji: [${studyKanji.join(', ')}]. Prefer vocabulary using these Kanji ONLY IF the word accurately describes the actual facts of the news. CRITICAL: DO NOT invent poetic metaphors or unrelated events just to use a Kanji.`;
     } else if (studyMode === 'balanced') {
       biasInstruction = `BALANCED KANJI BIAS: Target Kanji for this student: [${studyKanji.join(', ')}]. Prefer these Kanji when multiple natural word choices exist.`;
     }
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     let vocabInstruction = 'NATURAL VOCABULARY: Use the most fitting authentic Japanese syntax.';
     if (vocabTargets.length > 0) {
       if (vocabMode === 'study') {
-        vocabInstruction = `STRICT VOCABULARY BIAS: Target vocabulary: [${vocabTargets.join(', ')}]. Weave these words into the article naturally. Do NOT compromise the clarity or meaning of the news just to use target vocabulary.`;
+        vocabInstruction = `STRICT VOCABULARY BIAS: Target vocabulary: [${vocabTargets.join(', ')}]. Use these words ONLY if they perfectly fit the factual events in the headline. DO NOT hallucinate facts, use heavy metaphors, or warp the news story just to fit a word.`;
       } else if (vocabMode === 'balanced') {
         vocabInstruction = `BALANCED VOCABULARY: Target vocabulary: [${vocabTargets.join(', ')}]. Prefer these words when adjacent synonyms exist. Ensure the prose remains completely natural.`;
       }
@@ -89,10 +89,14 @@ Deno.serve(async (req) => {
 
     // Pass 1: Rewrite article
     const prompt1 = `
-You are a Japanese teacher writing a 3-paragraph news article for a JLPT ${jlptStr} learner.
-Student Target Vocabulary: [${vocabTargets.join(', ')}].
+You are a factual Japanese news reporter writing a 3-paragraph news article for a JLPT ${jlptStr} learner.
+News Headline: ${title}
+News Snippet: ${snippet}
+
+GOLDEN RULE: The article MUST accurately report on the exact events of the News Headline. DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
+
 Rules:
-1. Tone must be like a Japanese news broadcast.
+1. Tone must be like a factual Japanese news broadcast.
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
 4. KANJI PREFERENCE: ${biasInstruction}
@@ -101,9 +105,6 @@ Rules:
 
 Output EXACTLY a JSON array:
 [{"type":"paragraph"|"yugen-box","text":"...","keyword":"...","reading":"...","description":"..."}]
-
-News Headline: ${title}
-News Snippet: ${snippet}
 `;
 
     console.log(`[process-article] Pass 1 for user ${userId}`);

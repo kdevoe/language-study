@@ -26,6 +26,7 @@ function App() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
+  const [isEndOfFeed, setIsEndOfFeed] = useState(false);
   const [activeArticle, setActiveArticle] = useState<NewsArticle | null>(null);
 
   const processingArticles = useAppStore(state => state.processingArticles || []);
@@ -58,12 +59,18 @@ function App() {
   }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
 
   const replenishFeedAtBottom = useCallback(async () => {
-    if (isReplenishing || isLoadingFeed) return;
+    if (isReplenishing || isLoadingFeed || isEndOfFeed) return;
     
     setIsReplenishing(true);
     try {
-      // Fetch latest pre-processed articles from the server
-      const moreNews = await fetchNewsFeed(10);
+      // The offset is exactly how many articles we have fetched so far 
+      // (whether they are visible in 'articles' or not, we keep all fetched in 'articles' and filter out dismissed dynamically)
+      const offset = articles.length;
+      
+      const moreNews = await fetchNewsFeed(10, offset);
+      if (moreNews.length < 10) {
+        setIsEndOfFeed(true);
+      }
 
       const existingIds = new Set(articles.map(a => a.id));
       const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
@@ -81,16 +88,21 @@ function App() {
     } finally {
       setIsReplenishing(false);
     }
-  }, [articles, isReplenishing, isLoadingFeed]);
+  }, [articles, isReplenishing, isLoadingFeed, isEndOfFeed]);
 
 
   const loadHub = async () => {
     setIsLoadingFeed(true);
+    setIsEndOfFeed(false);
     try {
       // fetchNewsFeed now reads from processed_news (server pre-processed)
-      const feed = await fetchNewsFeed(10);
+      const feed = await fetchNewsFeed(10, 0);
       const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
-      setArticles(uniqueFeed.slice(0, 5));
+      const initialSlice = uniqueFeed.slice(0, 5);
+      setArticles(initialSlice);
+      if (uniqueFeed.length < 10) {
+        setIsEndOfFeed(true);
+      }
     } catch (e) { console.error(e); }
     setIsLoadingFeed(false);
   };

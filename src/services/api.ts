@@ -84,7 +84,7 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
   return cache;
 }
 
-export async function fetchNewsFeed(pageSize: number = 8): Promise<NewsArticle[]> {
+export async function fetchNewsFeed(pageSize: number = 8, offset: number = 0): Promise<NewsArticle[]> {
   // Fetch pre-processed articles from Supabase (server already ran process-article)
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return mockArticles;
@@ -94,9 +94,10 @@ export async function fetchNewsFeed(pageSize: number = 8): Promise<NewsArticle[]
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(pageSize);
+    .range(offset, offset + pageSize - 1);
 
   if (error || !data || data.length === 0) {
+    if (offset > 0) return []; // Stop at the end of the real feed
     console.warn('No pre-processed articles found; returning mock data.');
     return mockArticles;
   }

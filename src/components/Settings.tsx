@@ -322,37 +322,37 @@ export function Settings() {
               style={{ width: '100%', accentColor: 'var(--text-main)' }}
             />
           </div>
+          {/* 5. Danger Zone */}
+          <div style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid #ff444433', backgroundColor: '#ff444408', marginTop: '4rem', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#ff4444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>Danger Zone</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              Wipes your entire study history, word mastery levels, and SRS data from both your phone and the server. This cannot be undone.
+            </p>
+            <button
+              onClick={() => {
+                if (window.confirm("Nuclear Reset: Are you absolutely sure? Your entire study history will be permanently deleted.")) {
+                  import('../services/store').then(m => m.useAppStore.getState().resetProgress());
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                borderRadius: '12px',
+                backgroundColor: 'transparent',
+                color: '#ff4444',
+                border: '2px solid #ff4444',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
+            >
+              Reset All Progress
+            </button>
+          </div>
         </div>
       </details>
-      {/* 5. Danger Zone */}
-      <div style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid #ff444433', backgroundColor: '#ff444408', marginTop: '4rem' }}>
-        <h3 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#ff4444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>Danger Zone</h3>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-          Wipes your entire study history, word mastery levels, and SRS data from both your phone and the server. This cannot be undone.
-        </p>
-        <button
-          onClick={() => {
-            if (window.confirm("Nuclear Reset: Are you absolutely sure? Your entire study history will be permanently deleted.")) {
-              useAppStore.getState().resetProgress();
-            }
-          }}
-          style={{
-            width: '100%',
-            padding: '1rem',
-            borderRadius: '12px',
-            backgroundColor: 'transparent',
-            color: '#ff4444',
-            border: '2px solid #ff4444',
-            fontWeight: 800,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}
-        >
-          Reset All Progress
-        </button>
-      </div>
       
     </div>
   );
