@@ -10,7 +10,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { fetchNewsFeed, NewsArticle, requestArticleProcessing } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
 
-
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
 
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
@@ -121,6 +122,15 @@ function App() {
 
   useEffect(() => {
     const initSession = async () => {
+      if (DEV_MODE) {
+        console.log('[DEV] Skipping auth — loading feed directly');
+        setSession({ user: { email: 'dev@yugen.local', id: 'dev-user' } });
+        setApprovalStatus('approved');
+        setIsInitializing(false);
+        loadHub();
+        return;
+      }
+
       try {
         // Robust initialization with a 5s timeout to prevent blank screens on startup
         const sessionPromise = supabase.auth.getSession();
@@ -140,7 +150,6 @@ function App() {
         }
       } catch (err) {
         console.error("Initialization error:", err);
-        // Fallback: Ensure the app at least shows the LandingPage if auth hangs
         setSession(null);
         setApprovalStatus(null);
       } finally {
@@ -301,7 +310,7 @@ function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  if (isInitializing) {
+  if (isInitializing && !DEV_MODE) {
     return (
       <div style={{ 
         height: '100vh', 
@@ -325,10 +334,10 @@ function App() {
     );
   }
 
-  if (!session) return <LandingPage />;
+  if (!session && !DEV_MODE) return <LandingPage />;
   
   // Whitelist Gate
-  if (approvalStatus === 'waitlisted' || approvalStatus === 'not_joined') {
+  if (!DEV_MODE && (approvalStatus === 'waitlisted' || approvalStatus === 'not_joined')) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
         <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Private Beta</h2>
@@ -348,7 +357,7 @@ function App() {
     );
   }
 
-  if (!isOnboarded) return <Onboarding />;
+  if (!isOnboarded && !DEV_MODE) return <Onboarding />;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

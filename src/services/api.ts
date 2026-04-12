@@ -29,24 +29,9 @@ import { supabase } from './supabase'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 async function invokeEdgeFn<T = any>(name: string, body: object): Promise<T> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-  try {
-    const { data, error } = await supabase.functions.invoke(name, { 
-      body,
-      headers: { 'x-timeout': '10000' }
-    });
-    clearTimeout(timeoutId);
-    if (error) throw error;
-    return data as T;
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error(`Edge Function ${name} timed out after 10s`);
-    }
-    throw err;
-  }
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) throw error;
+  return data as T;
 }
 
 export async function joinWaitlist(email: string): Promise<{ success: boolean; message?: string }> {
@@ -100,8 +85,11 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
 }
 
 export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  const devMode = import.meta.env.VITE_DEV_MODE === 'true';
+  if (!devMode) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+  }
 
   try {
     const { articles } = await invokeEdgeFn<{ articles: NewsArticle[] }>('fetch-raw-news', { page });
