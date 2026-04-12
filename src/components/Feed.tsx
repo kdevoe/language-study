@@ -241,7 +241,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
     return (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', padding: '2rem 0' }}>
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="shimmer" style={{ width: '100%', height: '140px', borderRadius: '24px' }} />
+          <div key={i} className="skeleton-shimmer" style={{ width: '100%', height: '140px', borderRadius: '24px' }} />
         ))}
       </div>
     );
@@ -331,7 +331,7 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
             animate={{ opacity: 0.8, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.4 } }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-            className="shimmer"
+            className="skeleton-shimmer"
             style={{
               padding: '1.5rem',
               borderRadius: '24px',

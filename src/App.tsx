@@ -63,29 +63,40 @@ function App() {
     
     setIsReplenishing(true);
     try {
-      const page = Math.floor(articles.length / 20) + 1;
-      const moreNews = await fetchNewsFeed(page);
+      const currentPage = Math.floor(articles.length / 20) + 1;
+      let newArticles: NewsArticle[] = [];
       
-      if (moreNews.length === 0) {
-        setIsEndOfFeed(true);
+      // Try current and next page if first is full of dupes
+      for (let p = currentPage; p < currentPage + 2; p++) {
+        const moreNews = await fetchNewsFeed(p);
+        if (moreNews.length === 0) {
+          setIsEndOfFeed(true);
+          break;
+        }
+
+        const existingIds = new Set(articles.map(a => a?.id).filter(Boolean));
+        const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
+
+        const filtered = moreNews.filter(a => {
+          if (!a || !a.id) return false;
+          const isJunk = !a.title || a.title.includes('[Removed]') || a.title.length < 10;
+          return !isJunk && !existingIds.has(a.id) && !dismissedSet.has(a.id);
+        });
+
+        if (filtered.length > 0) {
+          newArticles = filtered;
+          break;
+        }
       }
-
-      const existingIds = new Set(articles.map(a => a.id));
-      const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
-
-      const newArticles = moreNews.filter(a => {
-        const isJunk = !a.title || a.title.includes('[Removed]') || a.title.length < 10;
-        return !isJunk && !existingIds.has(a.id) && !dismissedSet.has(a.id);
-      });
 
       if (newArticles.length > 0) {
         setArticles(prev => [...prev, ...newArticles]);
-      } else if (moreNews.length > 0) {
-        // If we got news but they're all dismissed/existing, we might need to fetch the next page immediately!
-        // But the Sentinel will catch this next frame if there are < 5 articles. So we just return.
+      } else {
+        setIsEndOfFeed(true); // No unique news found in search depth
       }
     } catch (e) { 
-      console.error("Endless search error:", e); 
+      console.error("Replenishment failure:", e);
+      setIsEndOfFeed(true);
     } finally {
       setIsReplenishing(false);
     }
@@ -387,7 +398,7 @@ function App() {
         {activeTab === 'news' && (
           newsView === 'hub' ? (
             <Feed 
-              articles={articles.filter(a => !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
+              articles={(articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
               isLoading={isLoadingFeed} 
               isReplenishing={isReplenishing}
               onSelect={handleSelectArticle} 
