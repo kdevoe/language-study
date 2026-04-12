@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai';
+import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { rtkKanjiList } from '../_shared/rtkKanji.ts';
 
 const corsHeaders = {
@@ -81,11 +81,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
-    });
+    const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
 
     // Pass 1: Rewrite article
     const prompt1 = `
@@ -108,8 +104,12 @@ Output EXACTLY a JSON array:
 `;
 
     console.log(`[process-article] Pass 1 for user ${userId}`);
-    const result1 = await model.generateContent(prompt1);
-    let rawText1 = result1.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+    const result1 = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt1,
+      config: { responseMimeType: 'application/json' },
+    });
+    let rawText1 = (result1.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     const rawBlocks = JSON.parse(rawText1);
 
     // Pass 2: Tokenize + furigana
@@ -126,8 +126,12 @@ Output EXACTLY a JSON array:
 `;
 
     console.log(`[process-article] Pass 2 (tokenize) for user ${userId}`);
-    const result2 = await model.generateContent(prompt2);
-    let rawText2 = result2.response.text().replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+    const result2 = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt2,
+      config: { responseMimeType: 'application/json' },
+    });
+    let rawText2 = (result2.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     const processedBlocks = JSON.parse(rawText2);
 
     // ─────────────────────────────────────────────────────────────────────────

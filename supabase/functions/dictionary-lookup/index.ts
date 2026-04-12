@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai';
+import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,10 +50,12 @@ Deno.serve(async (req) => {
 MANDATORY: Provide ONLY 1 SINGLE brief sentence in English explaining its specific usage or grammar in this context.
 Be extremely concise.`;
 
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-      const result = await model.generateContent(prompt);
-      const insight = result.response.text().trim();
+      const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
+      const result = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+      const insight = (result.text ?? '').trim();
 
       return new Response(JSON.stringify({ insight }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
