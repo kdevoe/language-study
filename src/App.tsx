@@ -36,28 +36,36 @@ function App() {
   const saveProcessedArticle = useAppStore(state => state.saveProcessedArticle);
   const dismissedArticleIds = useAppStore(state => state.dismissedArticleIds || []);
   const dismissArticle = useAppStore(state => state.dismissArticle);
+  const [failedArticleIds, setFailedArticleIds] = useState<Set<string>>(new Set());
 
   const handleProcessArticle = useCallback(async (article: NewsArticle) => {
-    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id)) return;
-    
+    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id) || failedArticleIds.has(article.id)) return;
+
     setProcessing(article.id, true);
     try {
       const snippet = article.blocks[0].content?.[0]?.text || '';
-      const { data: { user } } = await (await import('./services/supabase')).supabase.auth.getUser();
-      if (!user) throw new Error('No user');
+      let userId: string;
+      if (DEV_MODE) {
+        userId = 'dev-user';
+      } else {
+        const { data: { user } } = await (await import('./services/supabase')).supabase.auth.getUser();
+        if (!user) throw new Error('No user');
+        userId = user.id;
+      }
       const processedBlocks = await requestArticleProcessing(
-        user.id,
+        userId,
         article.id,
         article.title,
         snippet,
         () => {}
       );
       saveProcessedArticle(article.id, { ...article, blocks: processedBlocks });
-    } catch (e) { 
-      console.error('Processing error:', e); 
+    } catch (e) {
+      console.error('[process] Failed for article:', article.id, article.title, e);
+      setFailedArticleIds(prev => new Set(prev).add(article.id));
     }
     setProcessing(article.id, false);
-  }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
+  }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle, failedArticleIds]);
 
   const replenishFeedAtBottom = useCallback(async () => {
     if (isReplenishing || isLoadingFeed || isEndOfFeed) return;
@@ -230,22 +238,23 @@ function App() {
   // JIT PRE-PROCESSOR: Ensure exactly 1 article ahead is processed or processing
   useEffect(() => {
     if (isLoadingFeed || isReplenishing || isEndOfFeed) return;
-    
+
     const visibleArts = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
     if (visibleArts.length === 0) return;
 
     // Check if there is ANY article in the buffer that's already processed or currently processing
     // We ignore the activeArticle because if they are reading it, we need a fresh one in the buffer!
-    const isBufferReady = visibleArts.some(a => 
-      (articlesCache[a.id] || (processingArticles || []).includes(a.id)) && 
+    const isBufferReady = visibleArts.some(a =>
+      (articlesCache[a.id] || (processingArticles || []).includes(a.id)) &&
       activeArticle?.id !== a.id
     );
 
     if (!isBufferReady) {
-      // Triggers processing for the very first available raw article
-      const nextTarget = visibleArts.find(a => 
-        !articlesCache[a.id] && 
-        !(processingArticles || []).includes(a.id) && 
+      // Triggers processing for the very first available raw article (skip failed ones)
+      const nextTarget = visibleArts.find(a =>
+        !articlesCache[a.id] &&
+        !(processingArticles || []).includes(a.id) &&
+        !failedArticleIds.has(a.id) &&
         activeArticle?.id !== a.id
       );
 
@@ -253,7 +262,7 @@ function App() {
         handleProcessArticle(nextTarget);
       }
     }
-  }, [articles, dismissedArticleIds, articlesCache, processingArticles, activeArticle, handleProcessArticle, isLoadingFeed, isReplenishing, isEndOfFeed]);
+  }, [articles, dismissedArticleIds, articlesCache, processingArticles, activeArticle, handleProcessArticle, failedArticleIds, isLoadingFeed, isReplenishing, isEndOfFeed]);
 
 
   // Removed: syncPrefetchQueue useEffect - the daily-feed Edge Function handles background processing
