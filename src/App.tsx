@@ -7,10 +7,10 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback } from 'react'
-import { fetchNewsFeed, NewsArticle, rewriteArticleWithGemini } from './services/api'
+import { fetchNewsFeed, NewsArticle, requestArticleProcessing } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
 
-const FEED_TOPICS = ['Japan News', 'Technology News', 'Science News', 'World News'];
+
 
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
@@ -26,8 +26,6 @@ function App() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
-  const [newsPage, setNewsPage] = useState(1);
-  const [topicIndex, setTopicIndex] = useState(0);
   const [activeArticle, setActiveArticle] = useState<NewsArticle | null>(null);
 
   const processingArticles = useAppStore(state => state.processingArticles || []);
@@ -42,103 +40,57 @@ function App() {
     
     setProcessing(article.id, true);
     try {
-      const vocabTargets = Object.entries(useAppStore.getState().wordDatabase)
-        .filter(([_, data]) => data.mastery === 'hard' || data.mastery === 'medium')
-        .map(([w]) => w);
-      
       const snippet = article.blocks[0].content?.[0]?.text || '';
-      const rewrittenBlocks = await rewriteArticleWithGemini(
-        article.title, snippet, 
-        useAppStore.getState().jlptLevel || 5, 
-        useAppStore.getState().rtkLevel || 0,
-        useAppStore.getState().studyMode,
-        useAppStore.getState().vocabMode,
-        vocabTargets,
-        () => {} 
+      const { data: { user } } = await (await import('./services/supabase')).supabase.auth.getUser();
+      if (!user) throw new Error('No user');
+      const processedBlocks = await requestArticleProcessing(
+        user.id,
+        article.id,
+        article.title,
+        snippet,
+        () => {}
       );
-      saveProcessedArticle(article.id, { ...article, blocks: rewrittenBlocks });
+      saveProcessedArticle(article.id, { ...article, blocks: processedBlocks });
     } catch (e) { 
-      console.error("Prefetch error:", e); 
+      console.error('Processing error:', e); 
     }
     setProcessing(article.id, false);
   }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
-
-  const syncPrefetchQueue = useCallback(() => {
-    if (articles.length === 0) return;
-    const visibleArticles = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
-    const nextCandidate = visibleArticles.find(a => !articlesCache[a.id] && !processingArticles.includes(a.id));
-    
-    // Check if we ALREADY have a processed, readable article waiting in the visible feed
-    const hasUnreadReady = visibleArticles.some(a => articlesCache[a.id]);
-    const isAlreadyWorking = processingArticles.length > 0;
-    
-    // Only trigger heavy LLM processing if the pipeline is completely empty
-    if (nextCandidate && !hasUnreadReady && !isAlreadyWorking) {
-      handleProcessArticle(nextCandidate);
-    }
-  }, [articles, dismissedArticleIds, articlesCache, processingArticles, handleProcessArticle]);
 
   const replenishFeedAtBottom = useCallback(async () => {
     if (isReplenishing || isLoadingFeed) return;
     
     setIsReplenishing(true);
     try {
-      let found = false;
-      let attempts = 0;
-      let finalSearchPage = newsPage;
-      
-      while (!found && attempts < 10) {
-        attempts++;
-        
-        // Wrap finalSearchPage strictly under 20 to prevent NewsAPI 100-item hard limit errors
-        finalSearchPage = ((newsPage + attempts) % 20);
-        if (finalSearchPage === 0) finalSearchPage = 1;
-        
-        const topic = FEED_TOPICS[(topicIndex + attempts) % FEED_TOPICS.length];
-        
-        const finalTopic = attempts > 6 ? 'Top Headlines' : topic;
-        // Fetch a batch of 10 to guarantee finding at least one valid one efficiently
-        const moreNews = await fetchNewsFeed(finalTopic, 10, finalSearchPage);
+      // Fetch latest pre-processed articles from the server
+      const moreNews = await fetchNewsFeed(10);
 
-        // Synchronously check against our closure's tracking lists
-        const existingIds = new Set(articles.map(a => a.id));
-        const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
+      const existingIds = new Set(articles.map(a => a.id));
+      const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
 
-        const validCandidate = moreNews.find(a => {
-          const isJunk = !a.title || a.title.includes('[Removed]') || a.title.length < 10 || /^[0-9:\/\s]+$/.test(a.title);
-          return !isJunk && !existingIds.has(a.id) && !dismissedSet.has(a.id);
-        });
+      const newArticles = moreNews.filter(a => {
+        const isJunk = !a.title || a.title.includes('[Removed]') || a.title.length < 10;
+        return !isJunk && !existingIds.has(a.id) && !dismissedSet.has(a.id);
+      });
 
-        if (validCandidate) {
-          found = true;
-          // React state is safe to update since we break immediately
-          setArticles(prev => [...prev, validCandidate]);
-        }
-        
-        if (found) break;
-        await new Promise(r => setTimeout(r, 100));
+      if (newArticles.length > 0) {
+        setArticles(prev => [...prev, ...newArticles]);
       }
-      
-      // ALWAYS advance the page tracker so the next sentinel call 
-      // doesn't start from the same spot
-      setNewsPage(finalSearchPage);
-      setTopicIndex(prev => prev + 1);
     } catch (e) { 
       console.error("Endless search error:", e); 
     } finally {
       setIsReplenishing(false);
     }
-  }, [newsPage, topicIndex, isReplenishing, isLoadingFeed]);
+  }, [articles, isReplenishing, isLoadingFeed]);
 
 
   const loadHub = async () => {
     setIsLoadingFeed(true);
     try {
-      const feed = await fetchNewsFeed('Japan News', 10, 1);
-      // Ensure initial set is unique and limited strictly to 5
+      // fetchNewsFeed now reads from processed_news (server pre-processed)
+      const feed = await fetchNewsFeed(10);
       const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
       setArticles(uniqueFeed.slice(0, 5));
-      setNewsPage(1);
     } catch (e) { console.error(e); }
     setIsLoadingFeed(false);
   };
@@ -215,9 +167,20 @@ function App() {
       checkDailyKanji();
       checkMidnightReset();
       loadGlobalCache(session.user.id);
+      useAppStore.getState().syncSrsWithSupabase(session.user.id);
       if (articles.length === 0) loadHub();
     }
   }, [isOnboarded, session, checkDailyKanji, articles.length, checkMidnightReset]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (session?.user?.id) {
+        useAppStore.getState().syncSrsWithSupabase(session.user.id);
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [session]);
 
   // THE SENTINEL: Ensure we always have at least 5 visible articles
   useEffect(() => {
@@ -231,9 +194,7 @@ function App() {
     }
   }, [articles, dismissedArticleIds, isReplenishing, isLoadingFeed, replenishFeedAtBottom]);
 
-  useEffect(() => {
-    if (articles.length > 0) syncPrefetchQueue();
-  }, [articles, syncPrefetchQueue]);
+  // Removed: syncPrefetchQueue useEffect - the daily-feed Edge Function handles background processing
 
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
@@ -241,30 +202,23 @@ function App() {
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);
       setNewsView('reading');
-      setShowNav(true); 
-      window.scrollTo(0, 0); // Explicitly reset scroll immediately
-      setTimeout(() => {
-        syncPrefetchQueue();
-        replenishFeedAtBottom(); 
-      }, 500); 
+      setShowNav(true);
+      window.scrollTo(0, 0);
+      setTimeout(() => replenishFeedAtBottom(), 500);
     } else {
+      // Not yet cached — request on-demand server-side processing
       handleProcessArticle(article);
-      // Note: We don't force showNav true here yet as processing happens in Hub
     }
   };
 
   const handleDismissAndSync = (id: string) => {
     dismissArticle(id);
-    setTimeout(() => {
-      syncPrefetchQueue();
-      replenishFeedAtBottom(); // Pull more when dismissing
-    }, 100);
+    setTimeout(() => replenishFeedAtBottom(), 100);
   };
 
   const handleBackToHub = () => {
     setNewsView('hub');
     setShowNav(true);
-    syncPrefetchQueue();
   };
 
   useEffect(() => {

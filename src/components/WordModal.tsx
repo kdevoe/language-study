@@ -272,8 +272,8 @@ export function WordModal({
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>DAYS</div>
-            <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.uniqueDaysSeen?.length || 1} <span style={{fontSize: '0.8rem', fontWeight: 400}}>d</span></div>
+            <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>STREAK</div>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.1rem' }}>{stats.streak || 0} <span style={{fontSize: '0.8rem', fontWeight: 400}}>🔥</span></div>
           </div>
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>

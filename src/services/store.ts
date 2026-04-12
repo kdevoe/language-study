@@ -18,7 +18,7 @@ export interface WordData {
   timesSeen: number;
   uniqueDaysSeen: string[];
   lastSeenTs: number;
-  consecutiveUnseen?: number;
+  streak: number;
 }
 
 interface AppState {
@@ -62,6 +62,7 @@ interface AppState {
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
+  syncSrsWithSupabase: (userId: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -86,11 +87,31 @@ export const useAppStore = create<AppState>()(
       readerFontWeight: 500,
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
-      
-      setJlptLevel: (level) => set({ jlptLevel: level }),
-      setRtkLevel: (level) => set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() }),
-      setStudyMode: (mode) => set({ studyMode: mode }),
-      setVocabMode: (mode) => set({ vocabMode: mode }),
+
+      setJlptLevel: (level) => {
+        set({ jlptLevel: level });
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { jlpt_level: level }));
+        });
+      },
+      setRtkLevel: (level) => {
+        set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() });
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { rtk_level: level }));
+        });
+      },
+      setStudyMode: (mode) => {
+        set({ studyMode: mode });
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { study_mode: mode }));
+        });
+      },
+      setVocabMode: (mode) => {
+        set({ vocabMode: mode });
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { vocab_mode: mode }));
+        });
+      },
       
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
@@ -122,14 +143,29 @@ export const useAppStore = create<AppState>()(
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
       
-      resetProgress: () => set({ 
-        isOnboarded: false, 
-        jlptLevel: null, 
-        rtkLevel: null, 
-        wordDatabase: {}, 
-        studyKanji: [], 
-        lastRtkUpdateTs: null 
-      }),
+      resetProgress: () => {
+        set({ 
+          isOnboarded: false, 
+          jlptLevel: null, 
+          rtkLevel: null, 
+          wordDatabase: {}, 
+          studyKanji: [], 
+          lastRtkUpdateTs: null 
+        });
+        
+        // Wipe Supabase data
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            Promise.all([
+              supabase.from('user_word_progress').delete().eq('user_id', user.id),
+              supabase.from('study_history').delete().eq('user_id', user.id)
+            ]).then(() => {
+              console.log("♻️ Supabase Progress Wiped.");
+              window.location.reload(); // Refresh to ensure a totally clean state
+            });
+          }
+        });
+      },
       
       saveWordDefinition: (word, def) => 
         set((state) => {
@@ -142,40 +178,113 @@ export const useAppStore = create<AppState>()(
           };
         }),
         
-      recordWordSeen: (word, withoutLookup = false) => 
+        
+      recordWordSeen: (word: string, withoutLookup = false) => 
         set((state) => {
           const today = new Date().toISOString().split('T')[0];
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, consecutiveUnseen: 0 };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0 };
           const newDays = current.uniqueDaysSeen.includes(today) 
             ? current.uniqueDaysSeen 
             : [...current.uniqueDaysSeen, today];
             
-          const newConsecutive = withoutLookup ? (current.consecutiveUnseen || 0) + 1 : 0;
+          const newStreak = withoutLookup ? (current.streak || 0) + 1 : 0;
+          const updatedWord = { 
+            ...current, 
+            timesSeen: current.timesSeen + 1,
+            uniqueDaysSeen: newDays,
+            lastSeenTs: Date.now(),
+            streak: newStreak
+          };
+
+          // Sync to Supabase background
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user && updatedWord.jmdictEntryId) {
+              import('./api').then(m => {
+                const syncData = { 
+                  mastery: updatedWord.mastery, 
+                  timesSeen: updatedWord.timesSeen, 
+                  streak: updatedWord.streak, 
+                  lastSeenTs: updatedWord.lastSeenTs 
+                };
+                m.upsertWordProgressToSupabase(user.id, updatedWord.jmdictEntryId!, syncData);
+                m.logStudyEventToSupabase(user.id, updatedWord.jmdictEntryId!, withoutLookup ? 'seen' : 'lookup');
+              });
+            }
+          });
             
           return {
             wordDatabase: {
               ...state.wordDatabase,
-              [word]: { 
-                ...current, 
-                timesSeen: current.timesSeen + 1,
-                uniqueDaysSeen: newDays,
-                lastSeenTs: Date.now(),
-                consecutiveUnseen: newConsecutive
-              }
+              [word]: updatedWord
             }
           };
         }),
 
-      setWordMastery: (word, level) => 
+      setWordMastery: (word: string, level: MasteryLevel) => 
         set((state) => {
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0 };
+          const updatedWord = { ...current, mastery: level };
+
+          // Sync to Supabase
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user && updatedWord.jmdictEntryId) {
+              import('./api').then(m => {
+                const syncData = { 
+                  mastery: updatedWord.mastery, 
+                  timesSeen: updatedWord.timesSeen, 
+                  streak: updatedWord.streak, 
+                  lastSeenTs: updatedWord.lastSeenTs 
+                };
+                m.upsertWordProgressToSupabase(user.id, updatedWord.jmdictEntryId!, syncData);
+                m.logStudyEventToSupabase(user.id, updatedWord.jmdictEntryId!, 'mastery_change', { level });
+              });
+            }
+          });
+
           return {
             wordDatabase: {
               ...state.wordDatabase,
-              [word]: { ...current, mastery: level }
+              [word]: updatedWord
             }
           };
         }),
+
+      syncSrsWithSupabase: async (userId) => {
+        const { fetchUserWordProgress, fetchUserPreferences } = await import('./api');
+
+        // Pull remote preferences and merge into local state
+        const remotePrefs = await fetchUserPreferences(userId);
+        if (remotePrefs) {
+          set((state) => ({
+            jlptLevel: remotePrefs.jlpt_level ?? state.jlptLevel,
+            rtkLevel: remotePrefs.rtk_level ?? state.rtkLevel,
+            studyMode: remotePrefs.study_mode ?? state.studyMode,
+            vocabMode: remotePrefs.vocab_mode ?? state.vocabMode,
+            furiganaMode: remotePrefs.furigana_mode ?? state.furiganaMode,
+          }));
+        }
+
+        // Pull remote SRS progress (Last Write Wins)
+        const remoteProgress = await fetchUserWordProgress(userId);
+        set((state) => {
+          const newDatabase = { ...state.wordDatabase };
+          let changed = false;
+
+          Object.entries(remoteProgress).forEach(([wordId, remoteData]: [string, any]) => {
+            const localWord = Object.entries(newDatabase).find(([_, data]) => data.jmdictEntryId === wordId);
+            if (localWord) {
+              const [wordKey, localData] = localWord;
+              if (remoteData.lastSeenTs > localData.lastSeenTs) {
+                newDatabase[wordKey] = { ...localData, ...remoteData };
+                changed = true;
+              }
+            }
+          });
+
+          if (changed) return { wordDatabase: newDatabase };
+          return {};
+        });
+      },
 
       checkDailyKanji: () => {
         const now = Date.now();

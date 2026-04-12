@@ -103,7 +103,7 @@ export async function disambiguateWithLLM(
   candidates: JMDictResult[]
 ): Promise<JMDictResult> {
   const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROQ_MODEL = 'llama3-8b-8192';
+  const GROQ_MODEL = 'openai/gpt-oss-20b';
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
   if (!apiKey || candidates.length <= 1) {

@@ -6,8 +6,7 @@ import {
   rewriteArticleWithGemini, 
   fetchWordDefinitionQuick, 
   fetchWordGrammarInsight, 
-  fetchSentenceTranslation,
-  linkArticleToJMDict
+  fetchSentenceTranslation
 } from '../services/api';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
@@ -41,7 +40,6 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   }, []);
   
   const { 
-    jlptLevel, rtkLevel, studyMode, vocabMode,
     wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
     currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle, 
     srsAutoBumpThreshold,
@@ -66,15 +64,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setSelectedSentence(null);
     setActiveHighlightId(null);
     
-    const vocabTargets = Object.entries(wordDatabase)
-      .filter(([_, data]) => data.mastery === 'hard' || data.mastery === 'medium')
-      .sort((a, b) => {
-         if (a[1].mastery === 'hard' && b[1].mastery === 'medium') return -1;
-         if (a[1].mastery === 'medium' && b[1].mastery === 'hard') return 1;
-         return (b[1].consecutiveUnseen || 0) - (a[1].consecutiveUnseen || 0);
-      })
-      .slice(0, 40)
-      .map(([word]) => word);
+
       
       
     // Use the specific article passed from the Hub
@@ -85,23 +75,12 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       // Snippet for rewriting (limit to first block for speed)
       const snippet = selectedRaw.blocks?.[0]?.content?.[0]?.text || '';
       const rewrittenBlocks = await rewriteArticleWithGemini(
-        selectedRaw.title, snippet, jlptLevel, rtkLevel, studyMode, vocabMode, vocabTargets,
-        (step) => setLoadingStep(step)
+        selectedRaw.title, snippet, (step) => setLoadingStep(step)
       );
       const processed = { ...selectedRaw, blocks: rewrittenBlocks };
       setCurrentArticle(processed);
       // 3. Save to cache for next time
       if (selectedRaw.id) saveProcessedArticle(selectedRaw.id, processed);
-
-      // START BROWSER LINKING IN BACKGROUND
-      linkArticleToJMDict(rewrittenBlocks, (linked, total) => {
-        // We log linking progress but don't block UI
-        if (linked === total) console.log("🔗 Article Fully Linked to JMDict");
-      }).then((linkedBlocks) => {
-        const fullyLinked = { ...processed, blocks: linkedBlocks };
-        setCurrentArticle(fullyLinked);
-        if (selectedRaw.id) saveProcessedArticle(selectedRaw.id, fullyLinked);
-      });
     } else {
       // Emergency Fallback
       setLoading(false);
@@ -127,8 +106,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       if (!clickedWords.has(word)) {
         const stats = wordDatabase[word];
         recordWordSeen(word, true);
-        const newConsecutive = (stats?.consecutiveUnseen || 0) + 1;
-        if (stats && stats.mastery !== 'easy' && newConsecutive % (srsAutoBumpThreshold || 3) === 0) {
+        const newStreak = (stats?.streak || 0) + 1;
+        if (stats && stats.mastery !== 'easy' && newStreak % (srsAutoBumpThreshold || 3) === 0) {
           setWordMastery(word, stats.mastery === 'hard' ? 'medium' : 'easy');
         } else if (!stats) {
           saveWordDefinition(word, { reading: '...', meaning: 'Implicitly parsed context' });
@@ -176,7 +155,9 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setSelectedSentence(null);
     
     const localData = wordDatabase[word];
-    if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context') {
+    // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID), 
+    // we allow the lookup to proceed to enrich the entry.
+    if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context' && localData.jlptLevel && localData.jmdictEntryId) {
       setSelectedWord({ 
         word, 
         reading: localData.reading, 
