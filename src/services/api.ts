@@ -91,12 +91,13 @@ export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
   try {
     const { articles } = await invokeEdgeFn<{ articles: NewsArticle[] }>('fetch-raw-news', { page });
     if (!articles || articles.length === 0) {
-      console.warn(`[api] No articles returned for page ${page}`);
+      console.warn(`[api] News API returned zero results for page ${page}. Check Edge Function logs.`);
       return [];
     }
+    console.log(`[api] Received ${articles.length} raw articles for page ${page}`);
     return articles;
   } catch (error) {
-    console.error(`[api] Error fetching raw headlines (page ${page}):`, error);
+    console.error(`[api] Edge Function invocation failed for page ${page}:`, error);
     return [];
   }
 }

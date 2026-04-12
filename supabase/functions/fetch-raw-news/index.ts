@@ -25,23 +25,37 @@ Deno.serve(async (req) => {
 
     let articles: any[] = [];
     for (const q of topics) {
-      console.log(`[fetch-raw-news] Trying query: "${q}" (page ${page})`);
-      const response = await fetch(`${NEWS_API_URL}?q=${encodeURIComponent(q)}&sortBy=publishedAt&language=en&pageSize=20&page=${page}&apiKey=${newsApiKey}`);
-      
-      if (!response.ok) {
-        console.warn(`[fetch-raw-news] News API returned ${response.status} for query "${q}"`);
-        continue;
-      }
-      
-      const data = await response.json();
-      if (data.articles && data.articles.length > 0) {
-        articles = data.articles.filter(
-          (a: any) => a.title && !a.title.includes('[Removed]') && a.title.length > 8
-        );
-        if (articles.length > 0) {
-          console.log(`[fetch-raw-news] Found ${articles.length} articles for query "${q}"`);
-          break;
+      try {
+        const url = `${NEWS_API_URL}?q=${encodeURIComponent(q)}&sortBy=publishedAt&language=en&pageSize=20&page=${page}&apiKey=${newsApiKey}`;
+        console.log(`[fetch-raw-news] Fetching: ${url.replace(newsApiKey, 'REDACTED')}`);
+        
+        const response = await fetch(url, {
+          headers: { 'User-Agent': 'YugenStudy/1.0' } // NewsAPI sometimes likes User-Agents
+        });
+        
+        console.log(`[fetch-raw-news] Response status: ${response.status}`);
+        
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`[fetch-raw-news] API Error: ${errText}`);
+          continue;
         }
+        
+        const data = await response.json();
+        console.log(`[fetch-raw-news] Total results for "${q}": ${data.totalResults}`);
+        
+        if (data.articles && data.articles.length > 0) {
+          const filtered = data.articles.filter(
+            (a: any) => a.title && !a.title.includes('[Removed]') && a.title.length > 8
+          );
+          if (filtered.length > 0) {
+            articles = filtered;
+            console.log(`[fetch-raw-news] Successfully picked ${articles.length} articles from "${q}"`);
+            break;
+          }
+        }
+      } catch (fetchErr) {
+        console.error(`[fetch-raw-news] Fetch failed for "${q}":`, fetchErr);
       }
     }
 

@@ -394,6 +394,8 @@ function App() {
               onDismiss={handleDismissAndSync}
               processingIds={processingArticles || []}
               cachedIds={Object.keys(articlesCache)}
+              onManualFetch={loadHub}
+              isManualFetching={isLoadingFeed}
             />
           ) : (
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleBackToHub} />
