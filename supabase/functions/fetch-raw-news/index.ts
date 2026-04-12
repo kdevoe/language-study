@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const newsApiKey = Deno.env.get('NEWS_API_KEY');
     if (!newsApiKey) throw new Error('NEWS_API_KEY secet missing');
 
-    const topic = 'Japan AND (Technology OR Tech OR Business)';
+    const topic = 'Technology OR AI OR Japan';
     const response = await fetch(`${NEWS_API_URL}?q=${encodeURIComponent(topic)}&sortBy=publishedAt&language=en&pageSize=20&page=${page}&apiKey=${newsApiKey}`);
     if (!response.ok) {
       throw new Error(`News API returned ${response.status}: ${await response.text()}`);
