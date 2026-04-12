@@ -1,0 +1,54 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const NEWS_API_URL = 'https://newsapi.org/v2/top-headlines';
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const { page = 1 } = await req.json().catch(() => ({ page: 1 }));
+    const newsApiKey = Deno.env.get('NEWS_API_KEY');
+    if (!newsApiKey) throw new Error('NEWS_API_KEY secet missing');
+
+    const response = await fetch(`${NEWS_API_URL}?country=jp&category=technology&pageSize=20&page=${page}&apiKey=${newsApiKey}`);
+    if (!response.ok) {
+      throw new Error(`News API returned ${response.status}: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    const articles = (data.articles || []).filter(
+      (a: any) => a.title && !a.title.includes('[Removed]') && a.title.length > 8
+    );
+
+    const rawArticles = articles.map((a: any) => ({
+      id: `${a.title.substring(0, 15)}-${Math.random().toString(36).substring(2, 9)}`,
+      title: a.title,
+      originalUrl: a.url,
+      date: new Date(a.publishedAt).toLocaleDateString(),
+      readTime: '3 min read',
+      category: 'Technology',
+      blocks: [
+        {
+          type: 'paragraph',
+          content: [{ text: a.description || a.content || a.title }]
+        }
+      ]
+    }));
+
+    return new Response(JSON.stringify({ articles: rawArticles }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error('[fetch-raw-news] Error:', err);
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});

@@ -84,26 +84,23 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
   return cache;
 }
 
-export async function fetchNewsFeed(pageSize: number = 8, offset: number = 0): Promise<NewsArticle[]> {
-  // Fetch pre-processed articles from Supabase (server already ran process-article)
+export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return mockArticles;
 
-  const { data, error } = await supabase
-    .from('processed_news')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + pageSize - 1);
-
-  if (error || !data || data.length === 0) {
-    if (offset > 0) return []; // Stop at the end of the real feed
-    console.warn('No pre-processed articles found; returning mock data.');
+  try {
+    const { articles } = await invokeEdgeFn<{ articles: NewsArticle[] }>('fetch-raw-news', { page });
+    if (!articles || articles.length === 0) {
+      console.warn('News API returned no articles; returning mock data.');
+      return mockArticles;
+    }
+    return articles;
+  } catch (error) {
+    console.error('Error fetching raw headlines:', error);
     return mockArticles;
   }
-
-  return data.map((row: any) => row.content as NewsArticle);
 }
+
 
 export async function fetchWordDefinitionQuick(word: string, contextSentence: string, jmdictEntryId?: string): Promise<Partial<WordDetails>> {
   // 1. Try JMDict first (instant, no network needed)

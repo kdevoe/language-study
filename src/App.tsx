@@ -63,12 +63,10 @@ function App() {
     
     setIsReplenishing(true);
     try {
-      // The offset is exactly how many articles we have fetched so far 
-      // (whether they are visible in 'articles' or not, we keep all fetched in 'articles' and filter out dismissed dynamically)
-      const offset = articles.length;
+      const page = Math.floor(articles.length / 20) + 1;
+      const moreNews = await fetchNewsFeed(page);
       
-      const moreNews = await fetchNewsFeed(10, offset);
-      if (moreNews.length < 10) {
+      if (moreNews.length === 0) {
         setIsEndOfFeed(true);
       }
 
@@ -82,6 +80,9 @@ function App() {
 
       if (newArticles.length > 0) {
         setArticles(prev => [...prev, ...newArticles]);
+      } else if (moreNews.length > 0) {
+        // If we got news but they're all dismissed/existing, we might need to fetch the next page immediately!
+        // But the Sentinel will catch this next frame if there are < 5 articles. So we just return.
       }
     } catch (e) { 
       console.error("Endless search error:", e); 
@@ -95,12 +96,12 @@ function App() {
     setIsLoadingFeed(true);
     setIsEndOfFeed(false);
     try {
-      // fetchNewsFeed now reads from processed_news (server pre-processed)
-      const feed = await fetchNewsFeed(10, 0);
+      const feed = await fetchNewsFeed(1);
       const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
-      const initialSlice = uniqueFeed.slice(0, 5);
-      setArticles(initialSlice);
-      if (uniqueFeed.length < 10) {
+      
+      // If we start the app, uniqueFeed could contain up to 20 raw items.
+      setArticles(uniqueFeed);
+      if (uniqueFeed.length === 0) {
         setIsEndOfFeed(true);
       }
     } catch (e) { console.error(e); }
@@ -357,7 +358,7 @@ function App() {
         {activeTab === 'news' && (
           newsView === 'hub' ? (
             <Feed 
-              articles={articles.filter(a => !(dismissedArticleIds || []).includes(a.id))} 
+              articles={articles.filter(a => !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
               isLoading={isLoadingFeed} 
               isReplenishing={isReplenishing}
               onSelect={handleSelectArticle} 

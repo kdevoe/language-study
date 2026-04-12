@@ -11,6 +11,8 @@ interface Props {
   isReplenishing?: boolean;
   processingIds: string[];
   cachedIds: string[];
+  onManualFetch?: () => void;
+  isManualFetching?: boolean;
 }
 
 function NewsCard({ 
@@ -224,7 +226,7 @@ function NewsCard({
   );
 }
 
-export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing, processingIds, cachedIds }: Props) {
+export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing, processingIds, cachedIds, onManualFetch, isManualFetching }: Props) {
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
 
   const container = {
@@ -242,6 +244,62 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
           <div key={i} className="shimmer" style={{ width: '100%', height: '140px', borderRadius: '24px' }} />
         ))}
       </div>
+    );
+  }
+
+  if (articles.length === 0 && !isLoading) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ 
+          textAlign: 'center', 
+          padding: '4rem 1rem', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center',
+          color: 'var(--text-muted)' 
+        }}
+      >
+        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-card)', borderRadius: '24px', marginBottom: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+          <CheckCircle2 size={40} color="#4a5d23" />
+        </div>
+        <h2 className="serif" style={{ fontSize: '1.6rem', marginBottom: '1rem', color: 'var(--text-main)' }}>You're all caught up!</h2>
+        <p style={{ fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '2.5rem', maxWidth: '300px' }}>
+          We prepare fresh, personalized Japanese news every 6 hours. You've read everything we have ready right now.
+        </p>
+        
+        {onManualFetch && (
+          <button 
+            onClick={onManualFetch}
+            disabled={isManualFetching}
+            style={{ 
+              backgroundColor: isManualFetching ? 'transparent' : 'var(--text-main)', 
+              color: isManualFetching ? 'var(--text-main)' : 'var(--bg-pure)', 
+              border: isManualFetching ? '2px solid var(--border-light)' : 'none',
+              padding: '1rem 2rem', 
+              borderRadius: '100px', 
+              fontWeight: 800, 
+              fontSize: '0.8rem', 
+              letterSpacing: '0.1em',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.6rem',
+              cursor: isManualFetching ? 'wait' : 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isManualFetching ? (
+              <>
+                <div className="lucide-spin" style={{ width: '14px', height: '14px', border: '2px solid var(--border-light)', borderTopColor: '#4a5d23', borderRadius: '50%' }} />
+                PREPARING MORE NEWS...
+              </>
+            ) : (
+              'FORCE MANUAL FETCH'
+            )}
+          </button>
+        )}
+      </motion.div>
     );
   }
 
