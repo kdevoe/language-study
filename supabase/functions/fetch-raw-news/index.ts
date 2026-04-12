@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const NEWS_API_URL = 'https://newsapi.org/v2/top-headlines';
+const NEWS_API_URL = 'https://newsapi.org/v2/everything';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
     const newsApiKey = Deno.env.get('NEWS_API_KEY');
     if (!newsApiKey) throw new Error('NEWS_API_KEY secet missing');
 
-    const response = await fetch(`${NEWS_API_URL}?country=jp&category=technology&pageSize=20&page=${page}&apiKey=${newsApiKey}`);
+    const topic = 'Japan AND (Technology OR Tech OR Business)';
+    const response = await fetch(`${NEWS_API_URL}?q=${encodeURIComponent(topic)}&sortBy=publishedAt&language=en&pageSize=20&page=${page}&apiKey=${newsApiKey}`);
     if (!response.ok) {
       throw new Error(`News API returned ${response.status}: ${await response.text()}`);
     }

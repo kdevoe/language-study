@@ -207,6 +207,35 @@ function App() {
     }
   }, [articles, dismissedArticleIds, isReplenishing, isLoadingFeed, replenishFeedAtBottom]);
 
+  // JIT PRE-PROCESSOR: Ensure exactly 1 article ahead is processed or processing
+  useEffect(() => {
+    if (isLoadingFeed || isReplenishing || isEndOfFeed) return;
+    
+    const visibleArts = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
+    if (visibleArts.length === 0) return;
+
+    // Check if there is ANY article in the buffer that's already processed or currently processing
+    // We ignore the activeArticle because if they are reading it, we need a fresh one in the buffer!
+    const isBufferReady = visibleArts.some(a => 
+      (articlesCache[a.id] || (processingArticles || []).includes(a.id)) && 
+      activeArticle?.id !== a.id
+    );
+
+    if (!isBufferReady) {
+      // Triggers processing for the very first available raw article
+      const nextTarget = visibleArts.find(a => 
+        !articlesCache[a.id] && 
+        !(processingArticles || []).includes(a.id) && 
+        activeArticle?.id !== a.id
+      );
+
+      if (nextTarget) {
+        handleProcessArticle(nextTarget);
+      }
+    }
+  }, [articles, dismissedArticleIds, articlesCache, processingArticles, activeArticle, handleProcessArticle, isLoadingFeed, isReplenishing, isEndOfFeed]);
+
+
   // Removed: syncPrefetchQueue useEffect - the daily-feed Edge Function handles background processing
 
   const handleSelectArticle = (article: NewsArticle) => {
