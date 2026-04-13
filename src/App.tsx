@@ -184,6 +184,12 @@ function App() {
   }, []);
 
   const loadGlobalCache = async (userId: string) => {
+    // Skip if we already have cached articles from localStorage (Zustand persist)
+    const existingCache = useAppStore.getState().articlesCache;
+    if (Object.keys(existingCache).length > 0) {
+      console.log(`[App] Skipping Supabase cache fetch — ${Object.keys(existingCache).length} articles already in local state`);
+      return;
+    }
     const { fetchCachedArticlesFromSupabase } = await import('./services/api');
     const cache = await fetchCachedArticlesFromSupabase(userId);
     if (Object.keys(cache).length > 0) {
@@ -203,15 +209,23 @@ function App() {
     }
   }, [loadHub]);
 
+  // One-time init: runs when user is onboarded + authenticated
   useEffect(() => {
     if (isOnboarded && session) {
       checkDailyKanji();
       checkMidnightReset();
       loadGlobalCache(session.user.id);
       useAppStore.getState().syncSrsWithSupabase(session.user.id);
-      if (articles.length === 0) loadHub();
     }
-  }, [isOnboarded, session, checkDailyKanji, articles.length, checkMidnightReset]);
+  }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
+
+  // Separate effect: load feed if empty (no cascade from articles.length changes)
+  useEffect(() => {
+    if (isOnboarded && session && articles.length === 0) {
+      loadHub();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnboarded, session]);
 
   useEffect(() => {
     const handleOnline = () => {
