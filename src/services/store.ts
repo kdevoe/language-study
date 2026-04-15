@@ -28,6 +28,7 @@ interface AppState {
   studyMode: 'natural' | 'balanced' | 'study';
   vocabMode: 'natural' | 'balanced' | 'study';
   furiganaMode: 'always' | 'never' | 'dynamic';
+  readingIntensity: 'leisure' | 'balanced' | 'intensive';
   
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
@@ -47,6 +48,7 @@ interface AppState {
   setStudyMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setVocabMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
+  setReadingIntensity: (intensity: 'leisure' | 'balanced' | 'intensive') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
@@ -74,6 +76,7 @@ export const useAppStore = create<AppState>()(
       studyMode: 'balanced',
       vocabMode: 'balanced',
       furiganaMode: 'dynamic',
+      readingIntensity: 'balanced',
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
@@ -112,7 +115,13 @@ export const useAppStore = create<AppState>()(
           if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { vocab_mode: mode }));
         });
       },
-      
+      setReadingIntensity: (intensity) => {
+        set({ readingIntensity: intensity });
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { reading_intensity: intensity }));
+        });
+      },
+
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
       saveProcessedArticle: (id, article) => {
@@ -261,6 +270,7 @@ export const useAppStore = create<AppState>()(
             studyMode: remotePrefs.study_mode ?? state.studyMode,
             vocabMode: remotePrefs.vocab_mode ?? state.vocabMode,
             furiganaMode: remotePrefs.furigana_mode ?? state.furiganaMode,
+            readingIntensity: remotePrefs.reading_intensity ?? state.readingIntensity,
           }));
         }
 
