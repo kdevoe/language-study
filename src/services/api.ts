@@ -348,6 +348,7 @@ export async function upsertUserPreferences(
     study_mode?: string;
     vocab_mode?: string;
     furigana_mode?: string;
+    reading_intensity?: string;
   }
 ) {
   const { error } = await supabase

@@ -4,14 +4,19 @@ import { useAppStore } from '../services/store';
 import { rtkKanjiList } from '../data/rtkKanji';
 
 export function Settings() {
-  const { 
-    jlptLevel, setJlptLevel, 
-    rtkLevel, setRtkLevel, 
+  const {
+    jlptLevel, setJlptLevel,
+    rtkLevel, setRtkLevel,
     studyMode, setStudyMode,
+    readingIntensity, setReadingIntensity,
     srsAutoBumpThreshold, setSrsAutoBumpThreshold,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight
   } = useAppStore();
+
+  const intensityOptions = ['leisure', 'balanced', 'intensive'] as const;
+  const intensityLabels = ['Leisure', 'Balanced', 'Intensive'] as const;
+  const activeIntensityIndex = intensityOptions.indexOf(readingIntensity);
 
   const handleRtkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
@@ -81,7 +86,64 @@ export function Settings() {
         </p>
       </div>
 
-      {/* 2. Vocab Use */}
+      {/* 2. Article Intensity */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
+          Article Intensity
+        </label>
+
+        <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', marginBottom: '1.2rem', height: '45px', position: 'relative' }}>
+          <div style={{
+            position: 'absolute',
+            top: '4px',
+            bottom: '4px',
+            left: `calc(4px + ${activeIntensityIndex === -1 ? 1 : activeIntensityIndex} * (100% - 8px) / 3)`,
+            width: `calc((100% - 8px) / 3)`,
+            backgroundColor: 'var(--bg-pure)',
+            borderRadius: '100px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 0
+          }} />
+
+          {intensityOptions.map((opt, i) => {
+            const isSelected = readingIntensity === opt;
+            return (
+              <button
+                key={`i-${opt}`}
+                onClick={() => setReadingIntensity(opt)}
+                style={{
+                  flex: 1,
+                  borderRadius: '100px',
+                  backgroundColor: 'transparent',
+                  color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
+                  fontWeight: isSelected ? 700 : 600,
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  position: 'relative',
+                  zIndex: 1
+                }}
+              >
+                {intensityLabels[i]}
+              </button>
+            );
+          })}
+        </div>
+
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          {readingIntensity === 'leisure' && 'Light reading — ~98% known vocabulary. Flow through articles with minimal dictionary lookups.'}
+          {readingIntensity === 'balanced' && 'Comfortable learning — ~95% known, with a handful of review words and 1–2 new words per article.'}
+          {readingIntensity === 'intensive' && 'Study-heavy — ~90% known, with more review and new vocabulary packed in. Slower but faster growth.'}
+        </p>
+      </div>
+
+      {/* 3. Vocab Use */}
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
           Vocab Use
@@ -138,7 +200,7 @@ export function Settings() {
         </p>
       </div>
 
-      {/* 3. Kanji Use */}
+      {/* 4. Kanji Use */}
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
           Kanji Use
@@ -205,7 +267,7 @@ export function Settings() {
         }
       `}</style>
 
-      {/* 4. Advanced Settings */}
+      {/* 5. Advanced Settings */}
       <details 
         style={{ 
           backgroundColor: 'var(--bg-card)', 

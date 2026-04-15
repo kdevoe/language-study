@@ -7,6 +7,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const GROQ_MODEL = 'openai/gpt-oss-20b';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+// Approximate number of unique word tokens in a 3-paragraph article.
+// Used to translate intensity ratios into concrete palette counts.
+const WORDS_PER_ARTICLE = 200;
+
+// reading_intensity preset -> target distribution of known/review/new vocab.
+// See database/10_reading_intensity.sql for the column definition.
+const INTENSITY_RATIOS: Record<string, { known: number; review: number; new: number }> = {
+  leisure:   { known: 0.980, review: 0.015, new: 0.005 },
+  balanced:  { known: 0.950, review: 0.040, new: 0.010 },
+  intensive: { known: 0.900, review: 0.080, new: 0.020 },
+};
+
+async function extractKeywordsWithGroq(title: string, snippet: string, apiKey: string): Promise<string[]> {
+  const prompt = `Extract 10-15 topic keywords from this English news article. Return ONLY a JSON array of lowercase single-word or two-word phrases — concrete nouns and topic terms preferred (skip filler like "the", "said", "people"). No explanation.
+
+Title: ${title}
+Snippet: ${snippet}
+
+Example output: ["economy", "trade", "tariff", "minister", "election"]`;
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(`Groq keyword extraction failed: ${err.error?.message || response.statusText}`);
+  }
+  const data = await response.json();
+  const raw = data.choices?.[0]?.message?.content ?? '[]';
+  // gpt-oss-20b in json_object mode may wrap in {"keywords": [...]} or return a bare array
+  const parsed = JSON.parse(raw);
+  const arr: unknown = Array.isArray(parsed) ? parsed : (parsed.keywords ?? parsed.topics ?? parsed.terms ?? []);
+  if (!Array.isArray(arr)) return [];
+  return arr.map(String).map((s) => s.toLowerCase().trim()).filter((s) => s.length >= 2 && s.length <= 30);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -38,23 +84,89 @@ Deno.serve(async (req) => {
     const rtkLevel = prefs?.rtk_level ?? 0;
     const studyMode = prefs?.study_mode ?? 'balanced';
     const vocabMode = prefs?.vocab_mode ?? 'balanced';
+    const readingIntensity: string = prefs?.reading_intensity ?? 'balanced';
+    const ratios = INTENSITY_RATIOS[readingIntensity] ?? INTENSITY_RATIOS.balanced;
+    const targetReview = Math.max(1, Math.round(ratios.review * WORDS_PER_ARTICLE));
+    const targetNew = Math.max(1, Math.round(ratios.new * WORDS_PER_ARTICLE));
 
-    // 2. Fetch hard/medium vocab targets from user's SRS progress
-    const { data: wordProgress } = await supabase
-      .from('user_word_progress')
-      .select('word_id, mastery_level')
-      .eq('user_id', userId)
-      .in('mastery_level', ['hard', 'medium'])
-      .limit(30);
+    // 2. Vocabulary palette pipeline
+    //    a) Extract topic keywords from the English source (Groq)
+    //    b) Query JMDict for candidate entries whose glosses match
+    //    c) Bucket candidates into known / review / new vs. user_word_progress
+    let knownPalette: string[] = [];
+    let reviewPalette: string[] = [];
+    let newPalette: string[] = [];
+    let vocabTargets: string[] = []; // legacy: kept for vocab_mode prompt back-compat
+    try {
+      const keywords = await extractKeywordsWithGroq(title, snippet, groqKey);
+      if (keywords.length > 0) {
+        const keywordPatterns = keywords.map((k) => `%${k}%`);
+        const { data: candidates, error: candErr } = await supabase.rpc('jmdict_vocab_candidates', {
+          keywords: keywordPatterns,
+          user_jlpt: jlptLevel,
+          max_results: 200,
+        });
+        if (candErr) throw candErr;
 
-    const vocabTargetsData = (wordProgress as any[])?.map(r => r.word_id) ?? [];
-    let vocabTargets: string[] = [];
-    if (vocabTargetsData.length > 0) {
-      // Pick up to 5 random targets to avoid overwhelming the prompt
-      const shuffled = [...vocabTargetsData].sort(() => 0.5 - Math.random()).slice(0, 5);
-      const { data: kanjiRes } = await supabase.from('jmdict_kanji').select('text').in('entry_id', shuffled);
-      if (kanjiRes) {
-        vocabTargets = Array.from(new Set(kanjiRes.map((r: any) => r.text)));
+        const entryIds: string[] = (candidates ?? []).map((c: any) => c.entry_id);
+        let progressMap = new Map<string, string>();
+        if (entryIds.length > 0) {
+          const { data: progress } = await supabase
+            .from('user_word_progress')
+            .select('word_id, mastery_level')
+            .eq('user_id', userId)
+            .in('word_id', entryIds);
+          progressMap = new Map((progress ?? []).map((p: any) => [p.word_id, p.mastery_level]));
+        }
+
+        // Sort candidates: common words first, then by jlpt_level (easier first).
+        const sorted = [...(candidates ?? [])].sort((a: any, b: any) => {
+          if (a.is_common !== b.is_common) return a.is_common ? -1 : 1;
+          return (b.jlpt_level ?? 0) - (a.jlpt_level ?? 0);
+        });
+
+        for (const c of sorted) {
+          const display = c.kanji || c.kana;
+          if (!display) continue;
+          const mastery = progressMap.get(c.entry_id);
+          if (mastery === 'easy') {
+            knownPalette.push(display);
+          } else if (mastery === 'hard' || mastery === 'medium') {
+            reviewPalette.push(display);
+          } else if (c.jlpt_level > jlptLevel) {
+            // Below user's study level (easier) => treat as assumed-known
+            knownPalette.push(display);
+          } else if (c.jlpt_level === jlptLevel && !mastery) {
+            newPalette.push(display);
+          }
+        }
+        // De-dupe while preserving order
+        knownPalette = Array.from(new Set(knownPalette)).slice(0, 30);
+        reviewPalette = Array.from(new Set(reviewPalette)).slice(0, Math.max(5, targetReview + 2));
+        newPalette = Array.from(new Set(newPalette)).slice(0, Math.max(3, targetNew + 2));
+      }
+      console.log(`[process-article] Palette: ${knownPalette.length} known, ${reviewPalette.length} review, ${newPalette.length} new (intensity=${readingIntensity})`);
+    } catch (palErr) {
+      console.error('[process-article] Palette pipeline error (continuing without palette):', palErr);
+    }
+
+    // Legacy vocab_mode targets: any user review words, regardless of this article's topic.
+    // Still used below so the vocab_mode "Study" prompt keeps working even when the
+    // topic-keyed review palette is empty.
+    if (reviewPalette.length > 0) {
+      vocabTargets = reviewPalette.slice(0, 5);
+    } else {
+      const { data: wordProgress } = await supabase
+        .from('user_word_progress')
+        .select('word_id')
+        .eq('user_id', userId)
+        .in('mastery_level', ['hard', 'medium'])
+        .limit(30);
+      const ids = (wordProgress as any[])?.map((r) => r.word_id) ?? [];
+      if (ids.length > 0) {
+        const shuffled = [...ids].sort(() => 0.5 - Math.random()).slice(0, 5);
+        const { data: kanjiRes } = await supabase.from('jmdict_kanji').select('text').in('entry_id', shuffled);
+        if (kanjiRes) vocabTargets = Array.from(new Set(kanjiRes.map((r: any) => r.text)));
       }
     }
 
@@ -83,6 +195,20 @@ Deno.serve(async (req) => {
 
     const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
 
+    // Build targeted vocab palette block (empty string if pipeline produced nothing)
+    let palettePrompt = '';
+    if (knownPalette.length + reviewPalette.length + newPalette.length > 0) {
+      const pctKnown = Math.round(ratios.known * 100);
+      const pctReview = Math.round(ratios.review * 100);
+      const pctNew = Math.round(ratios.new * 100);
+      palettePrompt = `
+VOCABULARY PALETTE (aim for ~${pctKnown}% known / ~${pctReview}% review / ~${pctNew}% new by token count):
+- KNOWN words — draw freely from this list; these form the backbone of the article: ${knownPalette.join('、') || '(rely on natural ' + jlptStr + ' and easier vocabulary)'}
+- REVIEW words — work about ${targetReview} of these in where they fit the facts naturally: ${reviewPalette.join('、') || '(none)'}
+- NEW words — introduce about ${targetNew} of these if the topic allows, and gloss any you use in a yugen-box: ${newPalette.join('、') || '(none)'}
+Treat this palette as a GUIDE, not a quota. Never distort the facts or insert unnatural phrasing just to hit a word.`;
+    }
+
     // Pass 1: Rewrite article
     const prompt1 = `
 You are a factual Japanese news reporter writing a 3-paragraph news article for a JLPT ${jlptStr} learner.
@@ -90,6 +216,7 @@ News Headline: ${title}
 News Snippet: ${snippet}
 
 GOLDEN RULE: The article MUST accurately report on the exact events of the News Headline. DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
+${palettePrompt}
 
 Rules:
 1. Tone must be like a factual Japanese news broadcast.
