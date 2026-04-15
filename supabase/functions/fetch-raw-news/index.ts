@@ -5,7 +5,44 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const NEWS_API_URL = 'https://newsapi.org/v2/everything';
+const TOP_HEADLINES_URL = 'https://newsapi.org/v2/top-headlines';
+const EVERYTHING_URL = 'https://newsapi.org/v2/everything';
+
+// Whitelist of real-journalism publisher IDs on NewsAPI. Used as a filter on
+// /v2/everything so we don't pull in PyPI release feeds, npm package
+// announcements, GitHub readmes, etc. that otherwise dominate the "Technology"
+// firehose when sorted by publishedAt.
+const QUALITY_SOURCES = [
+  'bbc-news', 'the-verge', 'techcrunch', 'ars-technica', 'wired',
+  'associated-press', 'bloomberg', 'business-insider', 'cnn',
+  'nbc-news', 'engadget', 'the-next-web', 'abc-news', 'cbs-news',
+  'the-washington-post', 'time',
+].join(',');
+
+// Belt-and-suspenders against the noise sources even if a quality publisher
+// syndicates them.
+const EXCLUDE_DOMAINS = [
+  'pypi.org', 'github.com', 'npmjs.com',
+  'readthedocs.io', 'readthedocs.org', 'arxiv.org',
+].join(',');
+
+// Detects titles like "axmp-ai-agent-core 1.0.0rc12" or "spanforge 2.0.0" that
+// sometimes slip through — package-release entries masquerading as articles.
+const PACKAGE_RELEASE_TITLE = /^[\w.@/-]+\s+\d+\.\d+(?:\.\d+)?(?:[\w.-]+)?$/i;
+
+function pickValidArticles(raw: any[]): any[] {
+  return (raw ?? []).filter((a: any) => {
+    if (!a?.title || typeof a.title !== 'string') return false;
+    if (a.title.includes('[Removed]')) return false;
+    if (a.title.length < 12) return false;
+    if (PACKAGE_RELEASE_TITLE.test(a.title.trim())) return false;
+    // process-article requires a non-empty snippet; drop articles with
+    // no usable body text so we don't 400 downstream.
+    const snippet = (a.description || a.content || '').toString().trim();
+    if (snippet.length < 40) return false;
+    return true;
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,50 +54,62 @@ Deno.serve(async (req) => {
     const newsApiKey = Deno.env.get('NEWS_API_KEY');
     if (!newsApiKey) throw new Error('NEWS_API_KEY secret missing');
 
-    const topics = [
-      'Technology OR AI OR Robotics',
-      'Japan News OR Tokyo',
-      'Apple OR Google OR Microsoft' // Absolute fallbacks
+    // Strategy order (first non-empty wins):
+    //   1. /top-headlines — curated category-filtered feed from major publishers
+    //   2. /top-headlines — different category for variety
+    //   3. /everything   — whitelisted quality sources, sorted by popularity
+    //                      (NOT publishedAt — that's what surfaced the junk)
+    const strategies: { label: string; url: string; category?: string }[] = [
+      {
+        label: 'top-headlines:technology',
+        category: 'Technology',
+        url: `${TOP_HEADLINES_URL}?country=us&category=technology&pageSize=20&page=${page}&apiKey=${newsApiKey}`,
+      },
+      {
+        label: 'top-headlines:business',
+        category: 'Business',
+        url: `${TOP_HEADLINES_URL}?country=us&category=business&pageSize=20&page=${page}&apiKey=${newsApiKey}`,
+      },
+      {
+        label: 'everything:quality-sources',
+        category: 'Technology',
+        url: `${EVERYTHING_URL}?sources=${QUALITY_SOURCES}&excludeDomains=${EXCLUDE_DOMAINS}&sortBy=popularity&language=en&pageSize=20&page=${page}&apiKey=${newsApiKey}`,
+      },
     ];
 
     let articles: any[] = [];
-    for (const q of topics) {
+    let chosenCategory = 'Recent News';
+    for (const { label, url, category } of strategies) {
       try {
-        const url = `${NEWS_API_URL}?q=${encodeURIComponent(q)}&sortBy=publishedAt&language=en&pageSize=20&page=${page}&apiKey=${newsApiKey}`;
-        console.log(`[fetch-raw-news] Fetching: ${url.replace(newsApiKey, 'REDACTED')}`);
-        
+        console.log(`[fetch-raw-news] Trying ${label}`);
         const response = await fetch(url, {
-          headers: { 'User-Agent': 'YugenStudy/1.0' } // NewsAPI sometimes likes User-Agents
+          headers: { 'User-Agent': 'YugenStudy/1.0' },
         });
-        
-        console.log(`[fetch-raw-news] Response status: ${response.status}`);
-        
+        console.log(`[fetch-raw-news] ${label} → ${response.status}`);
+
         if (!response.ok) {
           const errText = await response.text();
-          console.error(`[fetch-raw-news] API Error: ${errText}`);
+          console.error(`[fetch-raw-news] ${label} API error: ${errText}`);
           continue;
         }
-        
+
         const data = await response.json();
-        console.log(`[fetch-raw-news] Total results for "${q}": ${data.totalResults}`);
-        
-        if (data.articles && data.articles.length > 0) {
-          const filtered = data.articles.filter(
-            (a: any) => a.title && !a.title.includes('[Removed]') && a.title.length > 8
-          );
-          if (filtered.length > 0) {
-            articles = filtered;
-            console.log(`[fetch-raw-news] Successfully picked ${articles.length} articles from "${q}"`);
-            break;
-          }
+        console.log(`[fetch-raw-news] ${label} totalResults=${data.totalResults}`);
+
+        const filtered = pickValidArticles(data.articles);
+        if (filtered.length > 0) {
+          articles = filtered;
+          chosenCategory = category ?? 'Recent News';
+          console.log(`[fetch-raw-news] ${label} picked ${articles.length} articles`);
+          break;
         }
       } catch (fetchErr) {
-        console.error(`[fetch-raw-news] Fetch failed for "${q}":`, fetchErr);
+        console.error(`[fetch-raw-news] ${label} fetch failed:`, fetchErr);
       }
     }
 
     if (articles.length === 0) {
-      console.error('[fetch-raw-news] All queries returned 0 results.');
+      console.error('[fetch-raw-news] All strategies returned 0 articles.');
       return new Response(JSON.stringify({ articles: [], warning: 'No articles found' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -72,13 +121,13 @@ Deno.serve(async (req) => {
       originalUrl: a.url,
       date: new Date(a.publishedAt).toLocaleDateString(),
       readTime: '3 min read',
-      category: 'Technology',
+      category: chosenCategory,
       blocks: [
         {
           type: 'paragraph',
-          content: [{ text: a.description || a.content || a.title }]
-        }
-      ]
+          content: [{ text: a.description || a.content || a.title }],
+        },
+      ],
     }));
 
     return new Response(JSON.stringify({ articles: rawArticles }), {
@@ -87,7 +136,8 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('[fetch-raw-news] Error:', err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
