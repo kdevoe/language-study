@@ -69,7 +69,16 @@ async function clusterArticles(articles: any[], groqKey: string | undefined): Pr
   if (!groqKey || articles.length < 2) return singletons();
 
   const headlineList = articles.map((a, i) => `${i + 1}. ${a.title}`).join('\n');
-  const prompt = `Group these news headlines into topic clusters. Return JSON: {"clusters": [{"topic": "short topic label", "articles": [indices]}]}. Use 1-based indices. Only cluster articles that are clearly about the same story or closely related. Singletons are fine.\n\n${headlineList}`;
+  const prompt = `Group these news headlines into topic clusters. Return JSON: {"clusters": [{"topic": "short topic label", "articles": [indices]}]}. Use 1-based indices.
+
+Rules:
+- ONLY group articles that cover the SAME specific story or event (e.g. the same product launch, the same court ruling, the same company's earnings).
+- DO NOT group by broad category. "Technology", "Gaming", "Business" are NOT valid clusters — a CPU article and a truck-engine article are different stories even though both are "tech". Never create a leftover "misc" bucket.
+- When in doubt, keep an article as its own singleton. Most clusters will be singletons; that is expected and correct.
+- The "topic" label must name the specific shared story, not a broad category.
+
+Headlines:
+${headlineList}`;
 
   try {
     const response = await fetch(GROQ_API_URL, {

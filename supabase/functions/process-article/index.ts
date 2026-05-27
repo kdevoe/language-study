@@ -238,8 +238,10 @@ Treat this palette as a GUIDE, not a quota. Never distort the facts or insert un
 You are a factual Japanese news reporter writing a ${levelConfig.paragraphs} paragraph news article for a JLPT ${jlptStr} learner.
 LEVEL GUIDANCE: ${levelConfig.description}
 Topic: ${title}
-Sources (real English news snippets about this topic — synthesize them into ONE coherent article; combine overlapping facts and do not repeat the same point):
+Sources (real English news snippets; the FIRST source is the primary story):
 ${snippet}
+
+SOURCE HANDLING: Build ONE coherent article around the first source as the main story. Where the other sources genuinely concern the same story, combine their overlapping facts and add their detail without repeating points. If a source is about a clearly different or unrelated story, IGNORE it — never stitch unrelated events together into one article.
 
 GOLDEN RULE: The article MUST accurately report only the events described in the Sources above. DO NOT invent facts not present in the Sources, and DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
 ${palettePrompt}
