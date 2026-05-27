@@ -173,6 +173,30 @@ Deno.serve(async (req) => {
     // 3. Build Gemini prompts (same logic as client-side rewriteArticleWithGemini)
     const jlptStr = `N${jlptLevel}`;
 
+    const JLPT_LEVEL_CONFIG: Record<number, { description: string; paragraphs: string }> = {
+      5: {
+        description: 'N5: The reader understands some basic Japanese. Write simple sentences using hiragana, katakana, and basic kanji. Basic vocabulary and elementary grammar only.',
+        paragraphs: '3',
+      },
+      4: {
+        description: 'N4: The reader understands basic Japanese. Write about familiar daily topics using basic vocabulary and kanji. Simple compound sentences are acceptable.',
+        paragraphs: '3-4',
+      },
+      3: {
+        description: 'N3: The reader understands everyday Japanese. Write like a real newspaper article — use compound sentences, natural news phrasing, and intermediate grammar. The reader can handle newspaper headlines and slightly difficult text with context. Do NOT over-simplify to basic sentence patterns.',
+        paragraphs: '4-5',
+      },
+      2: {
+        description: 'N2: The reader understands Japanese used in everyday situations and a variety of circumstances. Write like a real newspaper article or commentary — clear, natural prose on general topics at near-natural complexity.',
+        paragraphs: '5-6',
+      },
+      1: {
+        description: 'N1: The reader understands Japanese used in a variety of circumstances. Write with full natural complexity — abstract reasoning, editorials, and nuanced prose are appropriate.',
+        paragraphs: '5-6',
+      },
+    };
+    const levelConfig = JLPT_LEVEL_CONFIG[jlptLevel] ?? JLPT_LEVEL_CONFIG[3];
+
     const HEISIG_RTK_RANGE_SIZE = 15;
     const knownKanjiCount = Math.max(0, rtkLevel - HEISIG_RTK_RANGE_SIZE);
     const studyKanji = rtkKanjiList.slice(knownKanjiCount, rtkLevel);
@@ -211,7 +235,8 @@ Treat this palette as a GUIDE, not a quota. Never distort the facts or insert un
 
     // Pass 1: Rewrite article
     const prompt1 = `
-You are a factual Japanese news reporter writing a 3-paragraph news article for a JLPT ${jlptStr} learner.
+You are a factual Japanese news reporter writing a ${levelConfig.paragraphs} paragraph news article for a JLPT ${jlptStr} learner.
+LEVEL GUIDANCE: ${levelConfig.description}
 News Headline: ${title}
 News Snippet: ${snippet}
 
