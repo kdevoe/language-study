@@ -237,10 +237,11 @@ Treat this palette as a GUIDE, not a quota. Never distort the facts or insert un
     const prompt1 = `
 You are a factual Japanese news reporter writing a ${levelConfig.paragraphs} paragraph news article for a JLPT ${jlptStr} learner.
 LEVEL GUIDANCE: ${levelConfig.description}
-News Headline: ${title}
-News Snippet: ${snippet}
+Topic: ${title}
+Sources (real English news snippets about this topic — synthesize them into ONE coherent article; combine overlapping facts and do not repeat the same point):
+${snippet}
 
-GOLDEN RULE: The article MUST accurately report on the exact events of the News Headline. DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
+GOLDEN RULE: The article MUST accurately report only the events described in the Sources above. DO NOT invent facts not present in the Sources, and DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
 ${palettePrompt}
 
 Rules:

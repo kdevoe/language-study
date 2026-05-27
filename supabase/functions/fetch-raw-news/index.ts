@@ -8,6 +8,14 @@ const corsHeaders = {
 const TOP_HEADLINES_URL = 'https://newsapi.org/v2/top-headlines';
 const EVERYTHING_URL = 'https://newsapi.org/v2/everything';
 
+// Topic clustering. Grouping related headlines from a single fetch and merging
+// their snippets gives process-article 3-4x more factual material than a lone
+// ~200-char snippet, which yields substantially richer articles (see #18).
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const CLUSTER_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// Cap merged sources so a single mega-cluster can't blow up the Gemini prompt.
+const MAX_SOURCES_PER_CLUSTER = 5;
+
 // Whitelist of real-journalism publisher IDs on NewsAPI. Used as a filter on
 // /v2/everything so we don't pull in PyPI release feeds, npm package
 // announcements, GitHub readmes, etc. that otherwise dominate the "Technology"
@@ -42,6 +50,74 @@ function pickValidArticles(raw: any[]): any[] {
     if (snippet.length < 40) return false;
     return true;
   });
+}
+
+function snippetText(a: any): string {
+  return (a?.description || a?.content || '').toString().trim();
+}
+
+interface Cluster {
+  topic: string;
+  indices: number[];
+}
+
+// Group related headlines into topic clusters via Groq so process-article can
+// synthesize multiple snippets into one richer article. Always degrades
+// gracefully to one cluster per article (today's behavior) on any failure.
+async function clusterArticles(articles: any[], groqKey: string | undefined): Promise<Cluster[]> {
+  const singletons = (): Cluster[] => articles.map((a, i) => ({ topic: a.title, indices: [i] }));
+  if (!groqKey || articles.length < 2) return singletons();
+
+  const headlineList = articles.map((a, i) => `${i + 1}. ${a.title}`).join('\n');
+  const prompt = `Group these news headlines into topic clusters. Return JSON: {"clusters": [{"topic": "short topic label", "articles": [indices]}]}. Use 1-based indices. Only cluster articles that are clearly about the same story or closely related. Singletons are fine.\n\n${headlineList}`;
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CLUSTER_MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+      }),
+    });
+    if (!response.ok) {
+      console.error(`[fetch-raw-news] clustering failed: ${response.status} ${await response.text()}`);
+      return singletons();
+    }
+
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content ?? '{}';
+    const parsed = JSON.parse(raw);
+    const rawClusters: any[] = Array.isArray(parsed) ? parsed : (parsed.clusters ?? []);
+    if (!Array.isArray(rawClusters) || rawClusters.length === 0) return singletons();
+
+    const used = new Set<number>();
+    const clusters: Cluster[] = [];
+    for (const c of rawClusters) {
+      const idxRaw: any[] = Array.isArray(c?.articles) ? c.articles : [];
+      const indices = idxRaw
+        .map((n) => Number(n) - 1) // model returns 1-based indices
+        .filter((n) => Number.isInteger(n) && n >= 0 && n < articles.length && !used.has(n))
+        .slice(0, MAX_SOURCES_PER_CLUSTER);
+      if (indices.length === 0) continue;
+      indices.forEach((n) => used.add(n));
+      const topic = (typeof c?.topic === 'string' && c.topic.trim()) || articles[indices[0]].title;
+      clusters.push({ topic: topic.trim(), indices });
+    }
+
+    // Any article the model omitted becomes its own singleton so nothing is lost.
+    articles.forEach((a, i) => {
+      if (!used.has(i)) clusters.push({ topic: a.title, indices: [i] });
+    });
+
+    console.log(`[fetch-raw-news] clustered ${articles.length} articles into ${clusters.length} topics`);
+    return clusters.length > 0 ? clusters : singletons();
+  } catch (err) {
+    console.error('[fetch-raw-news] clustering error:', err);
+    return singletons();
+  }
 }
 
 Deno.serve(async (req) => {
@@ -115,20 +191,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    const rawArticles = articles.map((a: any) => ({
-      id: `${a.title.substring(0, 15)}-${Math.random().toString(36).substring(2, 9)}`,
-      title: a.title,
-      originalUrl: a.url,
-      date: new Date(a.publishedAt).toLocaleDateString(),
-      readTime: '3 min read',
-      category: chosenCategory,
-      blocks: [
-        {
-          type: 'paragraph',
-          content: [{ text: a.description || a.content || a.title }],
-        },
-      ],
-    }));
+    const groqKey = Deno.env.get('GROQ_API_KEY');
+    const clusters = await clusterArticles(articles, groqKey);
+
+    const rawArticles = clusters.map((cluster) => {
+      const sources = cluster.indices.map((i) => articles[i]);
+      const lead = sources[0];
+      // Numbered "Sources" block: process-article reads this as the snippet and
+      // synthesizes the merged material into one coherent Japanese article.
+      const mergedSnippet = sources
+        .map((a, n) => `${n + 1}. ${a.title} — ${snippetText(a) || a.title}`)
+        .join('\n');
+
+      return {
+        id: `${cluster.topic.substring(0, 15)}-${Math.random().toString(36).substring(2, 9)}`,
+        title: cluster.topic,
+        originalUrl: lead.url,
+        date: new Date(lead.publishedAt).toLocaleDateString(),
+        readTime: `${Math.min(2 + sources.length, 8)} min read`,
+        category: chosenCategory,
+        sourceCount: sources.length,
+        blocks: [
+          {
+            type: 'paragraph',
+            content: [{ text: mergedSnippet }],
+          },
+        ],
+      };
+    });
 
     return new Response(JSON.stringify({ articles: rawArticles }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
