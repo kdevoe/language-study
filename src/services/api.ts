@@ -15,6 +15,12 @@ export interface ArticleBlock {
   description?: string;
 }
 
+export interface ArticleSource {
+  title: string;
+  url: string;
+  teaser: string;
+}
+
 export interface NewsArticle {
   id: string;
   title: string;
@@ -23,6 +29,9 @@ export interface NewsArticle {
   date: string;
   readTime: string;
   category: string;
+  /** Clustered source articles — passed to process-article for full-text extraction. */
+  sources?: ArticleSource[];
+  sourceCount?: number;
 }
 
 import { supabase } from './supabase'
@@ -215,6 +224,7 @@ export async function requestArticleProcessing(
   articleId: string,
   title: string,
   snippet: string,
+  sources?: ArticleSource[],
   onProgress?: (status: string) => void
 ): Promise<ArticleBlock[]> {
   onProgress?.('Processing article on server...');
@@ -223,6 +233,7 @@ export async function requestArticleProcessing(
     articleId,
     title,
     snippet,
+    sources,
   });
   onProgress?.('Done.');
   return result.blocks;
