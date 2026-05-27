@@ -10,6 +10,59 @@ const corsHeaders = {
 const GROQ_MODEL = 'openai/gpt-oss-20b';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// ── Opportunistic full-text extraction ──────────────────────────────────────
+// A NewsAPI/RSS teaser is ~150-200 chars; the real article body is 10-100x
+// richer. We pull it from the source URL via Jina Reader, but only for sources
+// whose teaser is thin (full-text feeds like Ars already ship the body) and
+// only for articles the user actually opens. Always falls back to the teaser.
+const JINA_READER_URL = 'https://r.jina.ai/';
+const EXTRACT_TEASER_THRESHOLD = 600; // skip extraction when teaser already this long
+const EXTRACT_TIMEOUT_MS = 8000;
+const MAX_EXTRACT_SOURCES = 4;
+const PER_SOURCE_CHAR_CAP = 2500;
+const TOTAL_SOURCE_CHAR_CAP = 7000;
+
+interface SourceRef { title?: string; url?: string; teaser?: string }
+
+async function extractFullText(url: string, jinaKey: string | undefined): Promise<string> {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), EXTRACT_TIMEOUT_MS);
+  try {
+    const headers: Record<string, string> = { 'User-Agent': 'YugenStudy/1.0', 'Accept': 'text/plain' };
+    if (jinaKey) headers['Authorization'] = `Bearer ${jinaKey}`;
+    const res = await fetch(JINA_READER_URL + url, { headers, signal: ctrl.signal });
+    if (!res.ok) return '';
+    const txt = await res.text();
+    // Jina prepends a "Title:/URL Source:/Markdown Content:" header — keep the body.
+    return (txt.split(/Markdown Content:\s*/i).pop() || txt).trim();
+  } catch {
+    return '';
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+// Build the richest source block we can: extracted full text where a teaser is
+// thin and extraction succeeds, teaser otherwise. Returns '' if no sources.
+async function buildSourceBlock(sources: SourceRef[], jinaKey: string | undefined): Promise<string> {
+  const picked = sources.filter((s) => s && (s.teaser || s.url)).slice(0, MAX_EXTRACT_SOURCES);
+  if (picked.length === 0) return '';
+
+  const parts = await Promise.all(picked.map(async (s, n) => {
+    let body = (s.teaser || '').trim();
+    if (s.url && body.length < EXTRACT_TEASER_THRESHOLD) {
+      const full = await extractFullText(s.url, jinaKey);
+      if (full && full.length > body.length) body = full;
+    }
+    body = body.slice(0, PER_SOURCE_CHAR_CAP);
+    return `${n + 1}. ${s.title || ''} — ${body}`.trim();
+  }));
+
+  let block = parts.join('\n\n');
+  if (block.length > TOTAL_SOURCE_CHAR_CAP) block = block.slice(0, TOTAL_SOURCE_CHAR_CAP);
+  return block.trim();
+}
+
 // Approximate number of unique word tokens in a 3-paragraph article.
 // Used to translate intensity ratios into concrete palette counts.
 const WORDS_PER_ARTICLE = 200;
@@ -59,9 +112,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { userId, articleId, title, snippet } = await req.json();
-    if (!userId || !title || !snippet) {
-      return new Response(JSON.stringify({ error: 'userId, title, and snippet are required' }), {
+    const { userId, articleId, title, snippet, sources } = await req.json();
+    if (!userId || !title || !(snippet || (Array.isArray(sources) && sources.length))) {
+      return new Response(JSON.stringify({ error: 'userId, title, and snippet or sources are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -70,8 +123,24 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
     const groqKey = Deno.env.get('GROQ_API_KEY')!;
+    const jinaKey = Deno.env.get('JINA_API_KEY'); // optional — lifts extraction hit rate
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Opportunistically upgrade thin teasers to full article text. Falls back
+    // to the merged teaser block (snippet) when no sources / extraction fails.
+    let sourceText = snippet ?? '';
+    if (Array.isArray(sources) && sources.length > 0) {
+      try {
+        const built = await buildSourceBlock(sources as SourceRef[], jinaKey);
+        if (built) {
+          sourceText = built;
+          console.log(`[process-article] built source block from ${sources.length} source(s), ${built.length} chars`);
+        }
+      } catch (e) {
+        console.warn('[process-article] source extraction failed, using teaser:', e instanceof Error ? e.message : e);
+      }
+    }
 
     // 1. Fetch user preferences
     const { data: prefs } = await supabase
@@ -98,7 +167,7 @@ Deno.serve(async (req) => {
     let newPalette: string[] = [];
     let vocabTargets: string[] = []; // legacy: kept for vocab_mode prompt back-compat
     try {
-      const keywords = await extractKeywordsWithGroq(title, snippet, groqKey);
+      const keywords = await extractKeywordsWithGroq(title, sourceText.slice(0, 2000), groqKey);
       if (keywords.length > 0) {
         const keywordPatterns = keywords.map((k) => `%${k}%`);
         const { data: candidates, error: candErr } = await supabase.rpc('jmdict_vocab_candidates', {
@@ -238,8 +307,8 @@ Treat this palette as a GUIDE, not a quota. Never distort the facts or insert un
 You are a factual Japanese news reporter writing a ${levelConfig.paragraphs} paragraph news article for a JLPT ${jlptStr} learner.
 LEVEL GUIDANCE: ${levelConfig.description}
 Topic: ${title}
-Sources (real English news snippets; the FIRST source is the primary story):
-${snippet}
+Sources (real English news text; the FIRST source is the primary story):
+${sourceText}
 
 SOURCE HANDLING: Build ONE coherent article around the first source as the main story. Where the other sources genuinely concern the same story, combine their overlapping facts and add their detail without repeating points. If a source is about a clearly different or unrelated story, IGNORE it — never stitch unrelated events together into one article.
 

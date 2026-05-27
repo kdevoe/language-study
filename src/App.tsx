@@ -57,6 +57,7 @@ function App() {
         article.id,
         article.title,
         snippet,
+        article.sources,
         () => {}
       );
       saveProcessedArticle(article.id, { ...article, blocks: processedBlocks });
