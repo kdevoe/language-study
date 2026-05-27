@@ -121,6 +121,13 @@ function isValidItem(it: PoolItem): boolean {
   return true;
 }
 
+// Registrable host, used by the multi-outlet heuristic. Feed *names* aren't
+// enough — "BBC" and "BBC Tech" are different feeds from the same outlet
+// (bbc.com), so they must not count as two outlets.
+function domainOf(url: string): string {
+  try { return new URL(url).host.replace(/^www\./, ''); } catch { return url; }
+}
+
 async function fetchFeeds(): Promise<PoolItem[]> {
   const results = await Promise.allSettled(FEED_LIST.map(async (f) => {
     const ctrl = new AbortController();
@@ -247,7 +254,7 @@ ${headlineList}`;
       if (indices.length === 0) continue;
       indices.forEach((n) => used.add(n));
 
-      const distinctOutlets = new Set(indices.map((n) => pool[n].source)).size;
+      const distinctOutlets = new Set(indices.map((n) => domainOf(pool[n].url))).size;
       if (indices.length > 1 && distinctOutlets < 2) {
         // Single-outlet grab-bag — trust nothing, emit as singletons.
         indices.forEach((n) => clusters.push({ topic: pool[n].title, indices: [n] }));
