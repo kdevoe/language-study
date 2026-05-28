@@ -37,8 +37,17 @@ export interface NewsArticle {
 import { supabase } from './supabase'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
-async function invokeEdgeFn<T = any>(name: string, body: object): Promise<T> {
-  const { data, error } = await supabase.functions.invoke(name, { body });
+async function invokeEdgeFn<T = any>(name: string, body: object, timeoutMs?: number): Promise<T> {
+  const invocation = supabase.functions.invoke(name, { body });
+  const result = timeoutMs
+    ? await Promise.race([
+        invocation,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`${name} edge fn timed out after ${timeoutMs}ms`)), timeoutMs),
+        ),
+      ])
+    : await invocation;
+  const { data, error } = result as { data: any; error: any };
   if (error) throw error;
   return data as T;
 }
@@ -149,7 +158,7 @@ export async function fetchWordDefinitionQuick(word: string, contextSentence: st
   // 2. Fallback: server-side Groq via Edge Function
   console.log(`🌐 Edge Fn FALLBACK (dictionary-lookup) for "${word}"`);
   try {
-    const data = await invokeEdgeFn('dictionary-lookup', { word, contextSentence, type: 'definition' });
+    const data = await invokeEdgeFn('dictionary-lookup', { word, contextSentence, type: 'definition' }, 8000);
     return data as Partial<WordDetails>;
   } catch (e) {
     console.error('dictionary-lookup Edge Fn failed:', e);
@@ -162,7 +171,7 @@ export async function fetchWordGrammarInsight(word: string, contextSentence: str
     console.log(`🌐 Edge Fn (dictionary-lookup grammar) for "${word}"`);
     const { insight } = await invokeEdgeFn<{ insight: string }>('dictionary-lookup', {
       word, contextSentence, type: 'grammar',
-    });
+    }, 12000);
     return insight || 'Grammar analysis unavailable.';
   } catch (e) {
     console.error('Grammar insight Edge Fn failed:', e);

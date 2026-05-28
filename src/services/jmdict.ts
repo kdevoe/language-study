@@ -22,6 +22,18 @@ export interface JMDictResult {
   isCommon: boolean;
 }
 
+const LOOKUP_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    Promise.resolve(p).then(
+      v => { clearTimeout(t); resolve(v); },
+      e => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
 /**
  * Look up a word in JMDict by its surface form (kanji or kana).
  * Tries kanji match first, falls back to kana.
@@ -36,11 +48,11 @@ export async function lookupWord(text: string): Promise<JMDictResult[]> {
 }
 
 async function lookupByKanji(text: string): Promise<JMDictResult[]> {
-  const { data: kanjiRows, error } = await supabase
-    .from('jmdict_kanji')
-    .select('entry_id')
-    .eq('text', text)
-    .limit(10);
+  const { data: kanjiRows, error } = await withTimeout(
+    supabase.from('jmdict_kanji').select('entry_id').eq('text', text).limit(10),
+    LOOKUP_TIMEOUT_MS,
+    'jmdict_kanji lookup',
+  );
 
   if (error || !kanjiRows || kanjiRows.length === 0) return [];
 
@@ -49,11 +61,11 @@ async function lookupByKanji(text: string): Promise<JMDictResult[]> {
 }
 
 async function lookupByKana(text: string): Promise<JMDictResult[]> {
-  const { data: kanaRows, error } = await supabase
-    .from('jmdict_kana')
-    .select('entry_id')
-    .eq('text', text)
-    .limit(10);
+  const { data: kanaRows, error } = await withTimeout(
+    supabase.from('jmdict_kana').select('entry_id').eq('text', text).limit(10),
+    LOOKUP_TIMEOUT_MS,
+    'jmdict_kana lookup',
+  );
 
   if (error || !kanaRows || kanaRows.length === 0) return [];
 
@@ -63,12 +75,12 @@ async function lookupByKana(text: string): Promise<JMDictResult[]> {
 
 export async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> {
   // Fetch entries, kanji forms, kana forms, and senses in parallel
-  const [entriesRes, kanjiRes, kanaRes, sensesRes] = await Promise.all([
+  const [entriesRes, kanjiRes, kanaRes, sensesRes] = await withTimeout(Promise.all([
     supabase.from('jmdict_entries').select('id, common, jlpt_level').in('id', entryIds),
     supabase.from('jmdict_kanji').select('entry_id, text').in('entry_id', entryIds),
     supabase.from('jmdict_kana').select('entry_id, text').in('entry_id', entryIds),
     supabase.from('jmdict_senses').select('entry_id, pos, gloss, field, misc').in('entry_id', entryIds),
-  ]);
+  ]), LOOKUP_TIMEOUT_MS, 'jmdict entry fetch');
 
   if (!entriesRes.data) return [];
 

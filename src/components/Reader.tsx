@@ -212,7 +212,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       saveWordDefinition(word, combinedInitial);
       setIsModalLoading(false);
     } catch (err) {
-      console.warn("Hybrid lookup failed, falling back to manual or Gemini-only.");
+      console.error("Word lookup failed:", err);
+      setSelectedWord(prev => (prev && prev.word === word)
+        ? { ...prev, reading: '—', meaning: 'Lookup failed. Tap outside to dismiss.', grammarNote: '—' }
+        : prev);
       setIsModalLoading(false);
     }
   };
