@@ -125,7 +125,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setDrawerAnchor(y > window.innerHeight * 0.38 ? 'top' : 'bottom');
   };
 
-  const handleWordClick = (details: WordDetails, e: any, tokenId: string) => {
+  const handleWordClick = (details: WordDetails, sentText: string, e: any, tokenId: string) => {
     if (touchLock.isLocked()) return;
     if (activeHighlightId === tokenId) {
       setActiveHighlightId(null);
@@ -135,11 +135,24 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     determineAnchor(e);
     recordWordSeen(details.word);
     setClickedWords(prev => new Set(prev).add(details.word));
-    setSelectedWord(details);
+
+    const cached = wordDatabase[details.word];
+    const merged = { ...details, grammarNote: cached?.grammarNote || details.grammarNote };
+    setSelectedWord(merged);
     setSelectedSentence(null);
     setActiveHighlightId(tokenId);
     setTargetRect(e.currentTarget.getBoundingClientRect());
     saveWordDefinition(details.word, details);
+
+    if (!merged.grammarNote) {
+      fetchWordGrammarInsight(details.word, sentText).then(insight => {
+        setSelectedWord(prev => {
+          if (!prev || prev.word !== details.word) return prev;
+          return { ...prev, grammarNote: insight };
+        });
+        saveWordDefinition(details.word, { grammarNote: insight });
+      });
+    }
   };
 
   const handleDictionaryLookup = async (word: string, contextSentence: string, e: any, tokenId: string, jmdictEntryId?: string) => {
@@ -158,10 +171,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID), 
     // we allow the lookup to proceed to enrich the entry.
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context' && localData.jlptLevel && localData.jmdictEntryId) {
-      setSelectedWord({ 
-        word, 
-        reading: localData.reading, 
-        meaning: localData.meaning, 
+      setSelectedWord({
+        word,
+        reading: localData.reading,
+        meaning: localData.meaning,
         grammarNote: localData.grammarNote,
         furiganaMap: localData.furiganaMap,
         jlptLevel: localData.jlptLevel,
@@ -170,6 +183,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       });
       setActiveHighlightId(tokenId);
       setTargetRect(e.currentTarget.getBoundingClientRect());
+
+      if (!localData.grammarNote) {
+        fetchWordGrammarInsight(word, contextSentence).then(insight => {
+          setSelectedWord(prev => {
+            if (!prev || prev.word !== word) return prev;
+            return { ...prev, grammarNote: insight };
+          });
+          saveWordDefinition(word, { grammarNote: insight });
+        });
+      }
       return;
     }
 
@@ -274,7 +297,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                   isSelected={activeHighlightId === `${sentenceId}-${j}`}
                   onClick={(e) => {
                     const tid = `${sentenceId}-${j}`;
-                    if (segment.details) handleWordClick(segment.details as WordDetails, e, tid);
+                    if (segment.details) handleWordClick(segment.details as WordDetails, sentText, e, tid);
                     else handleDictionaryLookup(segment.text, sentText, e, tid, segment.jmdict_entry_id);
                   }}
                 />

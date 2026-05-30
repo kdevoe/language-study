@@ -176,13 +176,15 @@ export const useAppStore = create<AppState>()(
         });
       },
       
-      saveWordDefinition: (word, def) => 
+      saveWordDefinition: (word, def) =>
         set((state) => {
           const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
+          // Strip undefined values so partial saves don't erase cached fields (e.g. grammarNote)
+          const cleanDef = Object.fromEntries(Object.entries(def).filter(([, v]) => v !== undefined));
           return {
             wordDatabase: {
               ...state.wordDatabase,
-              [word]: { ...current, ...def }
+              [word]: { ...current, ...cleanDef }
             }
           };
         }),
