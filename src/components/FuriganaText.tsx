@@ -79,20 +79,34 @@ export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', on
     }
   };
 
+  // The browser fires pointercancel (instead of pointerup) when it reclaims the
+  // touch for a scroll gesture. Without handling it, the peek timer leaks and a
+  // dropped tap leaves no trace — clean up so the next tap isn't swallowed.
+  const handlePointerCancel = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (isPeeking) setIsPeeking(false);
+  };
+
   return (
     <>
       <span 
         ref={spanRef}
         className={isSelected ? 'word-highlight' : ''}
-        onPointerDown={handlePointerDown} 
-        onPointerUp={handlePointerUp} 
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
+        onPointerCancel={handlePointerCancel}
         style={{
           cursor: 'pointer',
           display: isSelected ? 'inline-block' : 'inline',
           userSelect: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
+          // Tell the browser this span won't pan/zoom, so it dispatches taps
+          // immediately instead of holding them in scroll-vs-tap limbo (the
+          // cause of light/quick taps not registering). Vertical scroll of the
+          // article still works because it's driven by the parent container.
+          touchAction: 'manipulation',
           position: 'relative',
           // Skip hit padding while selected so it doesn't fight the word-highlight pill.
           ...(isSelected ? {} : HIT_STYLE[hitWeight]),
