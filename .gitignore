@@ -28,3 +28,10 @@ dist-ssr
 # Downloaded dictionary files
 tmp/
 *.tgz
+.vercel
+
+# Local database backups
+backups/
+
+# Generated personal vocabulary report (contains user stats)
+vocab-summary.html
