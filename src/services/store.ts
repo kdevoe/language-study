@@ -73,6 +73,7 @@ interface AppState {
   
   saveWordDefinition: (word: string, def: Partial<WordData>) => void;
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
+  setLookupDifficulty: (word: string, jlptLevel?: number | null) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
@@ -242,7 +243,48 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
-      setWordMastery: (word: string, level: MasteryLevel) => 
+      // When a word is looked up it stops being "unseen" and gets a difficulty
+      // default derived from its JLPT level relative to the user's:
+      //   - harder than the user (or outside JLPT entirely) -> 'hard'
+      //   - at or below the user's level                    -> 'medium'
+      // Only fills in ungraded ('unseen') words; never overrides an explicit grade.
+      setLookupDifficulty: (word: string, jlptLevel?: number | null) =>
+        set((state) => {
+          const current = state.wordDatabase[word];
+          if (!current || current.mastery !== 'unseen') return {};
+
+          // JLPT scale: higher number = easier (5 = N5 ... 1 = N1).
+          const userLevel = state.jlptLevel;
+          let level: MasteryLevel;
+          if (jlptLevel == null) level = 'hard';
+          else if (userLevel == null) level = 'medium';
+          else level = jlptLevel < userLevel ? 'hard' : 'medium';
+
+          const updatedWord = { ...current, mastery: level };
+
+          currentUserId().then((uid) => {
+            if (uid && updatedWord.jmdictEntryId) {
+              import('./api').then(m => {
+                m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, {
+                  mastery: updatedWord.mastery,
+                  timesSeen: updatedWord.timesSeen,
+                  streak: updatedWord.streak,
+                  lastSeenTs: updatedWord.lastSeenTs
+                });
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level, reason: 'lookup-default' });
+              });
+            }
+          });
+
+          return {
+            wordDatabase: {
+              ...state.wordDatabase,
+              [word]: updatedWord
+            }
+          };
+        }),
+
+      setWordMastery: (word: string, level: MasteryLevel) =>
         set((state) => {
           const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0 };
           const updatedWord = { ...current, mastery: level };

@@ -51,7 +51,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   }, []);
   
   const { 
-    wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
+    wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery, setLookupDifficulty,
     currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle, 
     srsAutoBumpThreshold,
     readerFontSize, readerFontWeight
@@ -154,6 +154,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setActiveHighlightId(tokenId);
     setTargetRect(e.currentTarget.getBoundingClientRect());
     saveWordDefinition(details.word, details);
+    // Looking a word up implies difficulty: seed a default grade from its JLPT level.
+    setLookupDifficulty(details.word, details.jlptLevel);
 
     if (!merged.grammarNote) {
       fetchWordGrammarInsight(details.word, sentText).then(insight => {
@@ -182,6 +184,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID), 
     // we allow the lookup to proceed to enrich the entry.
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context' && localData.jlptLevel && localData.jmdictEntryId) {
+      setLookupDifficulty(word, localData.jlptLevel);
       setSelectedWord({
         word,
         reading: localData.reading,
@@ -244,6 +247,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
 
       // Cache initial quick data
       saveWordDefinition(word, combinedInitial);
+      // Now that the JLPT level is known, seed a difficulty default for this lookup.
+      setLookupDifficulty(word, quickDef.jlptLevel);
       setIsModalLoading(false);
     } catch (err) {
       console.error("Word lookup failed:", err);
