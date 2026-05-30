@@ -43,7 +43,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const [isModalLoading, setIsModalLoading] = useState(false);
   
   const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
-  
+
+  // End-of-article mastery sweep. Runs at most once per article, triggered either
+  // by the 次へ button or by scrolling the end of the text into view (many readers
+  // never tap the button). finishRef mirrors the latest handler so the observer
+  // always calls a fresh closure (current clickedWords / wordDatabase) without
+  // having to re-subscribe.
+  const hasSweptRef = React.useRef(false);
+  const endSentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const finishRef = React.useRef<() => void>(() => {});
+
   const segmenter = React.useMemo(() => {
     try {
       return new (Intl as any).Segmenter('ja-JP', { granularity: 'word' });
@@ -107,7 +116,26 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     if (!currentArticle && !loading) loadArticle();
   }, [initialArticle]);
 
+  // A new article means the sweep is allowed to run again.
+  useEffect(() => {
+    hasSweptRef.current = false;
+  }, [currentArticle]);
+
+  // Fire the sweep when the end-of-text marker scrolls into view, so reading the
+  // whole article counts even when the reader never taps 次へ.
+  useEffect(() => {
+    const el = endSentinelRef.current;
+    if (!el || !currentArticle) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) finishRef.current();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [currentArticle, loading]);
+
   const handleFinishArticle = () => {
+    if (hasSweptRef.current) return; // once per article — button or scroll, whichever comes first
+    hasSweptRef.current = true;
     const articleWords = new Set<string>();
     currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => { if (w.furigana) articleWords.add(w.text); });
@@ -127,6 +155,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       }
     });
   };
+  // Keep the observer pointed at the latest closure every render.
+  finishRef.current = handleFinishArticle;
 
   const determineAnchor = (e: any) => {
     const y = 'clientY' in e ? e.clientY : (e.touches?.[0]?.clientY || 0);
@@ -362,6 +392,12 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     );
   }
 
+  // Anchor the "read" trigger to the end of the actual reading text — i.e. the last
+  // paragraph — so trailing YugenBox keyword/grammar modals don't gate the sweep.
+  const lastParagraphIndex = currentArticle
+    ? currentArticle.blocks.reduce((acc, b, i) => (b.type === 'paragraph' ? i : acc), -1)
+    : -1;
+
   return (
     <>
       <div className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 500 }}>
@@ -377,10 +413,26 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         </div>
 
         {currentArticle.blocks.map((block, i) => {
-          if (block.type === 'paragraph') return <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
-          if (block.type === 'yugen-box') return <YugenBox key={i} keyword={block.keyword!} reading={block.reading} description={block.description!} />;
-          return null;
+          let node: React.ReactNode = null;
+          if (block.type === 'paragraph') node = <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
+          else if (block.type === 'yugen-box') node = <YugenBox key={i} keyword={block.keyword!} reading={block.reading} description={block.description!} />;
+
+          // Drop the end-of-text marker right after the last reading paragraph, so the
+          // sweep fires once you've read the article body — trailing keyword/grammar
+          // boxes sit below it and don't have to be scrolled past.
+          if (i === lastParagraphIndex) {
+            return (
+              <React.Fragment key={i}>
+                {node}
+                <div ref={endSentinelRef} aria-hidden="true" style={{ height: 1 }} />
+              </React.Fragment>
+            );
+          }
+          return node;
         })}
+
+        {/* Fallback for the rare article with no paragraph blocks at all. */}
+        {lastParagraphIndex === -1 && <div ref={endSentinelRef} aria-hidden="true" style={{ height: 1 }} />}
 
         {/* Restored Tsugihe Capsule Button */}
         <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
