@@ -22,8 +22,6 @@
   - [ ] Final visual QA against reference images
 - [/] Level Calibration ("dial-in")
   - [x] Per-JLPT grammar pattern inventory (use/avoid lists) in process-article prompt
-  - [x] Per-user difficulty offset (-1..1) stored in user_preferences (`11_difficulty_calibration.sql`)
-  - [x] Per-article "too easy / just right / too hard" feedback control in Reader
-  - [x] Feedback -> offset -> calibration directive feedback loop
-  - [ ] Auto-calibrate offset from seen/lookup density in study_history (future)
+  - [ ] Difficulty feedback loop (deferred — avoid cluttering the reading UI with input)
+  - [ ] Auto-calibrate level from seen/lookup density in study_history (future, no UI)
   - [ ] Half-step sub-levels (N4 / N4+) (future)

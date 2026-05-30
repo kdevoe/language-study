@@ -40,9 +40,6 @@ interface AppState {
   vocabMode: 'natural' | 'balanced' | 'study';
   furiganaMode: 'always' | 'never' | 'dynamic';
   readingIntensity: 'leisure' | 'balanced' | 'intensive';
-  /** Fine-tuning dial (-1..1) that nudges generation easier/harder within the
-   *  chosen JLPT level. Driven by per-article difficulty feedback. */
-  difficultyOffset: number;
 
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
@@ -63,8 +60,6 @@ interface AppState {
   setVocabMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setReadingIntensity: (intensity: 'leisure' | 'balanced' | 'intensive') => void;
-  setDifficultyOffset: (value: number) => void;
-  recordArticleDifficulty: (rating: 'easy' | 'ok' | 'hard') => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
@@ -93,7 +88,6 @@ export const useAppStore = create<AppState>()(
       vocabMode: 'balanced',
       furiganaMode: 'dynamic',
       readingIntensity: 'balanced',
-      difficultyOffset: 0,
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
@@ -109,10 +103,9 @@ export const useAppStore = create<AppState>()(
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
 
       setJlptLevel: (level) => {
-        // Changing level resets the fine-tuning dial — each level recalibrates fresh.
-        set({ jlptLevel: level, difficultyOffset: 0 });
+        set({ jlptLevel: level });
         currentUserId().then((uid) => {
-          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { jlpt_level: level, difficulty_offset: 0 }));
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { jlpt_level: level }));
         });
       },
       setRtkLevel: (level) => {
@@ -137,29 +130,6 @@ export const useAppStore = create<AppState>()(
         set({ readingIntensity: intensity });
         currentUserId().then((uid) => {
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { reading_intensity: intensity }));
-        });
-      },
-
-      setDifficultyOffset: (value) => {
-        const clamped = Math.max(-1, Math.min(1, value));
-        set({ difficultyOffset: clamped });
-        currentUserId().then((uid) => {
-          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { difficulty_offset: clamped }));
-        });
-      },
-
-      // Per-article feedback -> nudges the difficulty dial. "Too hard" eases off,
-      // "too easy" steps up, "just right" gently re-centers toward on-level. The
-      // next article processed after this reads the new offset from preferences.
-      recordArticleDifficulty: (rating) => {
-        const cur = get().difficultyOffset ?? 0;
-        const raw = rating === 'hard' ? cur - 0.25
-                  : rating === 'easy' ? cur + 0.25
-                  : cur * 0.5;
-        const next = Math.max(-1, Math.min(1, Math.round(raw * 100) / 100));
-        set({ difficultyOffset: next });
-        currentUserId().then((uid) => {
-          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { difficulty_offset: next }));
         });
       },
 
@@ -314,7 +284,6 @@ export const useAppStore = create<AppState>()(
             vocabMode: remotePrefs.vocab_mode ?? state.vocabMode,
             furiganaMode: remotePrefs.furigana_mode ?? state.furiganaMode,
             readingIntensity: remotePrefs.reading_intensity ?? state.readingIntensity,
-            difficultyOffset: remotePrefs.difficulty_offset ?? state.difficultyOffset,
           }));
         }
 

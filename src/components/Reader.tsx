@@ -43,7 +43,6 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const [isModalLoading, setIsModalLoading] = useState(false);
   
   const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
-  const [difficultyRated, setDifficultyRated] = useState<'easy' | 'ok' | 'hard' | null>(null);
   
   const segmenter = React.useMemo(() => {
     try {
@@ -54,7 +53,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const { 
     wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery,
     currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle,
-    srsAutoBumpThreshold, recordArticleDifficulty,
+    srsAutoBumpThreshold,
     readerFontSize, readerFontWeight
   } = useAppStore();
 
@@ -72,7 +71,6 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setLoadingStep("Initializing reader...");
     setLoadingArticleTitle(initialArticle?.title || "読書家");
     setClickedWords(new Set());
-    setDifficultyRated(null);
     setSelectedWord(null);
     setSelectedSentence(null);
     setActiveHighlightId(null);
@@ -379,51 +377,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return null;
         })}
 
-        {/* Per-article difficulty feedback — fine-tunes future generation level */}
-        <div style={{ textAlign: 'center', marginTop: '4rem' }}>
-          {!difficultyRated ? (
-            <>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.9rem', letterSpacing: '0.04em' }}>
-                How was the reading level?
-              </p>
-              <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                {([
-                  { key: 'easy', label: 'Too easy' },
-                  { key: 'ok', label: 'Just right' },
-                  { key: 'hard', label: 'Too hard' },
-                ] as const).map(opt => (
-                  <button
-                    key={opt.key}
-                    onClick={() => { recordArticleDifficulty(opt.key); setDifficultyRated(opt.key); }}
-                    style={{
-                      backgroundColor: 'transparent',
-                      color: 'var(--text-muted)',
-                      padding: '0.5rem 1.1rem',
-                      borderRadius: '100px',
-                      border: '1px solid var(--border-light)',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="fade-in" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {difficultyRated === 'ok'
-                ? 'Thanks — keeping this level.'
-                : difficultyRated === 'hard'
-                  ? 'Got it — easing off the next articles.'
-                  : 'Got it — stepping up the next articles.'}
-            </p>
-          )}
-        </div>
-
         {/* Restored Tsugihe Capsule Button */}
-        <div style={{ textAlign: 'center', marginTop: '2.5rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+        <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
            <button 
              onClick={() => {
                handleFinishArticle();

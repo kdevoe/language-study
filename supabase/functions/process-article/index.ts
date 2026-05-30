@@ -88,32 +88,19 @@ const JLPT_GRAMMAR: Record<number, string[]> = {
   1: ['〜をもって', '〜にあって', '〜ならではの', '〜を余儀なくされる', '〜とあって', '〜きらいがある', '抽象的・論説的な複文'],
 };
 
-// Build the grammar directive, shifted by the user's difficulty offset (-1..1).
-// Lower JLPT number = harder, so "one level up" is jlpt - 1.
-//   offset <= -0.2  => simplest end of the level (recent reads felt too hard)
-//   offset >=  0.2  => hard end + a little of the next level (felt too easy)
-function buildGrammarDirective(jlpt: number, offset: number): string {
+// Build the grammar directive for the target level: lean on this level's
+// patterns, paraphrase anything from the level above back down. Lower JLPT
+// number = harder, so "one level up" is jlpt - 1.
+function buildGrammarDirective(jlpt: number): string {
   const jlptStr = `N${jlpt}`;
   const use = (JLPT_GRAMMAR[jlpt] ?? JLPT_GRAMMAR[3]).join('、');
-  const harderLevel = Math.max(1, jlpt - 1);
-  const harderStr = jlpt > 1 ? (JLPT_GRAMMAR[harderLevel] ?? []).join('、') : '';
-
-  let calib = '';
-  if (offset <= -0.2) {
-    calib = `\nCALIBRATION: recent articles read as TOO HARD — stay at the simplest end of ${jlptStr}. Keep sentences short (one clause where possible), avoid stacking grammar, and lean on the most basic patterns above.`;
-  } else if (offset >= 0.2) {
-    calib = harderStr
-      ? `\nCALIBRATION: recent articles read as TOO EASY — write at the hard end of ${jlptStr}: longer compound sentences, and you MAY work in a few patterns from one level up (N${harderLevel}): ${harderStr}.`
-      : `\nCALIBRATION: recent articles read as TOO EASY — write at the hardest, most natural end of ${jlptStr} with full compound-sentence complexity.`;
-  }
-
-  // Only forbid the next level up when we're NOT deliberately pushing harder.
-  const avoidLine = harderStr && offset < 0.2
+  const harderStr = jlpt > 1 ? (JLPT_GRAMMAR[Math.max(1, jlpt - 1)] ?? []).join('、') : '';
+  const avoidLine = harderStr
     ? `\n- AVOID grammar above ${jlptStr} (e.g. ${harderStr}) — paraphrase those into the patterns above instead.`
     : '';
 
   return `GRAMMAR (primary level lever — match these patterns closely):
-- Build sentences mainly from these ${jlptStr} grammar/phrasing patterns: ${use}.${avoidLine}${calib}`;
+- Build sentences mainly from these ${jlptStr} grammar/phrasing patterns: ${use}.${avoidLine}`;
 }
 
 async function extractKeywordsWithGroq(title: string, snippet: string, apiKey: string): Promise<string[]> {
@@ -195,8 +182,6 @@ Deno.serve(async (req) => {
     const studyMode = prefs?.study_mode ?? 'balanced';
     const vocabMode = prefs?.vocab_mode ?? 'balanced';
     const readingIntensity: string = prefs?.reading_intensity ?? 'balanced';
-    // Fine-tuning dial set by the Reader's per-article difficulty feedback (-1..1).
-    const difficultyOffset = Math.max(-1, Math.min(1, Number(prefs?.difficulty_offset ?? 0)));
     const ratios = INTENSITY_RATIOS[readingIntensity] ?? INTENSITY_RATIOS.balanced;
     const targetReview = Math.max(1, Math.round(ratios.review * WORDS_PER_ARTICLE));
     const targetNew = Math.max(1, Math.round(ratios.new * WORDS_PER_ARTICLE));
@@ -308,8 +293,7 @@ Deno.serve(async (req) => {
       },
     };
     const levelConfig = JLPT_LEVEL_CONFIG[jlptLevel] ?? JLPT_LEVEL_CONFIG[3];
-    const grammarDirective = buildGrammarDirective(jlptLevel, difficultyOffset);
-    console.log(`[process-article] Level ${jlptStr}, difficulty offset ${difficultyOffset.toFixed(2)}`);
+    const grammarDirective = buildGrammarDirective(jlptLevel);
 
     const HEISIG_RTK_RANGE_SIZE = 15;
     const knownKanjiCount = Math.max(0, rtkLevel - HEISIG_RTK_RANGE_SIZE);
