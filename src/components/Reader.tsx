@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FuriganaText } from './FuriganaText';
+import { FuriganaText, HitWeight } from './FuriganaText';
+import type { MasteryLevel } from '../services/store';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
 import { 
@@ -17,6 +18,16 @@ import { } from 'lucide-react'; // Empty block to show we're using icons elsewhe
 interface ReaderProps {
   initialArticle?: any;
   onComplete?: () => void;
+}
+
+// Deterministic tap-target sizing. Kanji content words (furigana present) are
+// the ones users actually look up, so they get the widest hit area; short kana
+// tokens are almost always particles/grammatical glue, so they yield to their
+// neighbors. Already-mastered words don't need a big target either.
+function hitWeightFor(text: string, furigana?: string, mastery?: MasteryLevel): HitWeight {
+  const hasKanji = !!furigana && furigana.trim() !== '';
+  if (hasKanji) return mastery === 'easy' ? 'mid' : 'hi';
+  return [...text].length <= 2 ? 'lo' : 'mid';
 }
 
 export function Reader({ initialArticle, onComplete }: ReaderProps) {
@@ -294,6 +305,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                   key={`${sentenceId}-${j}`}
                   word={segment.text}
                   furigana={segment.furigana}
+                  hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[segment.text]?.mastery)}
                   isSelected={activeHighlightId === `${sentenceId}-${j}`}
                   onClick={(e) => {
                     const tid = `${sentenceId}-${j}`;
@@ -307,12 +319,19 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
               const words = Array.from((segmenter as any).segment(segment.text));
               return words.map((w: any, index: number) => {
                 if (!w.isWordLike) return <span key={`${sentenceId}-${j}-${index}`}>{w.segment}</span>;
+                const isWide = [...w.segment].length > 2;
                 return (
-                  <span 
+                  <span
                     key={`${sentenceId}-${j}-${index}`}
                     className={activeHighlightId === `${sentenceId}-${j}-${index}` ? 'word-highlight' : ''}
                     onClick={(e) => handleDictionaryLookup(w.segment, sentText, e, `${sentenceId}-${j}-${index}`)}
-                    style={{ cursor: 'pointer' }}
+                    style={{
+                      cursor: 'pointer',
+                      position: 'relative',
+                      ...(isWide
+                        ? { paddingLeft: '0.15em', paddingRight: '0.15em', marginLeft: '-0.15em', marginRight: '-0.15em', zIndex: 2 }
+                        : { zIndex: 1 }),
+                    }}
                   >
                     {w.segment}
                   </span>

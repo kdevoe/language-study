@@ -4,15 +4,27 @@ import { touchLock } from '../services/touchLock';
 
 type FuriganaMode = 'always' | 'never' | 'dynamic';
 
+// Deterministic tap-target weight. Words likely to be looked up (kanji content
+// words) get a wider invisible hit area and sit above their neighbors so a
+// near-miss toward an adjacent particle still resolves to the intended word.
+export type HitWeight = 'hi' | 'mid' | 'lo';
+
+const HIT_STYLE: Record<HitWeight, React.CSSProperties> = {
+  hi: { paddingLeft: '0.4em', paddingRight: '0.4em', marginLeft: '-0.4em', marginRight: '-0.4em', zIndex: 3 },
+  mid: { paddingLeft: '0.15em', paddingRight: '0.15em', marginLeft: '-0.15em', marginRight: '-0.15em', zIndex: 2 },
+  lo: { zIndex: 1 },
+};
+
 interface Props {
   word: string;
   furigana?: string;
   mode?: FuriganaMode;
   isSelected?: boolean;
+  hitWeight?: HitWeight;
   onClick?: (e: any) => void;
 }
 
-export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
+export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', onClick }: Props) {
   const [isPeeking, setIsPeeking] = useState(false);
   const [peekPos, setPeekPos] = useState({ top: 0, left: 0 });
   const timerRef = useRef<number | null>(null);
@@ -75,13 +87,15 @@ export function FuriganaText({ word, furigana, isSelected, onClick }: Props) {
         onPointerDown={handlePointerDown} 
         onPointerUp={handlePointerUp} 
         onPointerLeave={handlePointerLeave}
-        style={{ 
+        style={{
           cursor: 'pointer',
-          display: isSelected ? 'inline-block' : 'inline', 
+          display: isSelected ? 'inline-block' : 'inline',
           userSelect: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
-          position: 'relative'
+          position: 'relative',
+          // Skip hit padding while selected so it doesn't fight the word-highlight pill.
+          ...(isSelected ? {} : HIT_STYLE[hitWeight]),
         }}
       >
         {word}
