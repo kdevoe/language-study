@@ -48,9 +48,9 @@ function App() {
       if (DEV_MODE) {
         userId = 'dev-user';
       } else {
-        const { data: { user } } = await (await import('./services/supabase')).supabase.auth.getUser();
-        if (!user) throw new Error('No user');
-        userId = user.id;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) throw new Error('No user');
+        userId = session.user.id;
       }
       const processedBlocks = await requestArticleProcessing(
         userId,
@@ -171,18 +171,25 @@ function App() {
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user?.email) {
-        try {
-          const { data: status } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
-          setApprovalStatus(status || 'not_joined');
-        } catch (e) {
-          console.error("Auth change status check error:", e);
+      // IMPORTANT: this callback runs while GoTrue still holds its navigator
+      // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
+      // inside it would re-enter the lock and deadlock — hanging every later
+      // getSession/getUser until timeout. Defer with setTimeout(0) so the lock
+      // is released first. (Keep the callback itself synchronous.)
+      setTimeout(async () => {
+        if (session?.user?.email) {
+          try {
+            const { data: status } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
+            setApprovalStatus(status || 'not_joined');
+          } catch (e) {
+            console.error("Auth change status check error:", e);
+          }
+        } else {
+          setApprovalStatus(null);
         }
-      } else {
-        setApprovalStatus(null);
-      }
+      }, 0);
     });
     return () => subscription.unsubscribe();
   }, []);

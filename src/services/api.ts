@@ -124,8 +124,10 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
 export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
   const devMode = import.meta.env.VITE_DEV_MODE === 'true';
   if (!devMode) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+    // getSession reads the cached session (no /auth/v1/user round-trip), so a
+    // slow or hanging auth network call can't stall the whole feed load.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return [];
   }
 
   try {
