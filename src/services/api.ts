@@ -390,6 +390,7 @@ export async function upsertUserPreferences(
     vocab_mode?: string;
     furigana_mode?: string;
     reading_intensity?: string;
+    difficulty_offset?: number;
   }
 ) {
   const { error } = await supabase
