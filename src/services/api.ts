@@ -37,17 +37,36 @@ export interface NewsArticle {
 import { supabase } from './supabase'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
+/** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
+function isAuthError(error: any): boolean {
+  const status = error?.status ?? error?.context?.status;
+  if (status === 401) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('jwt') || msg.includes('token') || msg.includes('unauthorized');
+}
+
 async function invokeEdgeFn<T = any>(name: string, body: object, timeoutMs?: number): Promise<T> {
-  const invocation = supabase.functions.invoke(name, { body });
-  const result = timeoutMs
-    ? await Promise.race([
-        invocation,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`${name} edge fn timed out after ${timeoutMs}ms`)), timeoutMs),
-        ),
-      ])
-    : await invocation;
-  const { data, error } = result as { data: any; error: any };
+  const run = () => {
+    const invocation = supabase.functions.invoke(name, { body });
+    return timeoutMs
+      ? Promise.race([
+          invocation,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`${name} edge fn timed out after ${timeoutMs}ms`)), timeoutMs),
+          ),
+        ])
+      : invocation;
+  };
+
+  let { data, error } = (await run()) as { data: any; error: any };
+
+  // Self-heal: a long-idle session may carry an expired token. Refresh once and
+  // retry so the call recovers instead of failing until a full page reload.
+  if (error && isAuthError(error)) {
+    await supabase.auth.refreshSession();
+    ({ data, error } = (await run()) as { data: any; error: any });
+  }
+
   if (error) throw error;
   return data as T;
 }

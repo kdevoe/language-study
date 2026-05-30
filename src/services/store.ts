@@ -6,6 +6,17 @@ import { supabase } from './supabase';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
+/**
+ * Resolve the current user id for fire-and-forget background syncs.
+ * getUser() round-trips to /auth/v1/user on every call; getSession() reads the
+ * cached session (refreshing only if the access token has expired), so it's far
+ * cheaper and avoids a storm of auth network calls on load and on every action.
+ */
+async function currentUserId(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id ?? null;
+}
+
 export interface WordData {
   reading: string;
   meaning: string;
@@ -93,32 +104,32 @@ export const useAppStore = create<AppState>()(
 
       setJlptLevel: (level) => {
         set({ jlptLevel: level });
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { jlpt_level: level }));
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { jlpt_level: level }));
         });
       },
       setRtkLevel: (level) => {
         set({ rtkLevel: level, studyKanji: rtkKanjiList.slice(Math.max(0, level - 15), level), lastRtkUpdateTs: Date.now() });
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { rtk_level: level }));
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { rtk_level: level }));
         });
       },
       setStudyMode: (mode) => {
         set({ studyMode: mode });
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { study_mode: mode }));
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { study_mode: mode }));
         });
       },
       setVocabMode: (mode) => {
         set({ vocabMode: mode });
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { vocab_mode: mode }));
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { vocab_mode: mode }));
         });
       },
       setReadingIntensity: (intensity) => {
         set({ readingIntensity: intensity });
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) import('./api').then(m => m.upsertUserPreferences(user.id, { reading_intensity: intensity }));
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { reading_intensity: intensity }));
         });
       },
 
@@ -130,8 +141,8 @@ export const useAppStore = create<AppState>()(
         }));
         // Mirror to Supabase for persistence across sessions
         import('./api').then(m => {
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user) m.saveProcessedArticleToSupabase(article, user.id);
+          currentUserId().then((uid) => {
+            if (uid) m.saveProcessedArticleToSupabase(article, uid);
           });
         });
       },
@@ -163,11 +174,11 @@ export const useAppStore = create<AppState>()(
         });
         
         // Wipe Supabase data
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) {
+        currentUserId().then((uid) => {
+          if (uid) {
             Promise.all([
-              supabase.from('user_word_progress').delete().eq('user_id', user.id),
-              supabase.from('study_history').delete().eq('user_id', user.id)
+              supabase.from('user_word_progress').delete().eq('user_id', uid),
+              supabase.from('study_history').delete().eq('user_id', uid)
             ]).then(() => {
               console.log("♻️ Supabase Progress Wiped.");
               window.location.reload(); // Refresh to ensure a totally clean state
@@ -208,17 +219,17 @@ export const useAppStore = create<AppState>()(
           };
 
           // Sync to Supabase background
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user && updatedWord.jmdictEntryId) {
+          currentUserId().then((uid) => {
+            if (uid && updatedWord.jmdictEntryId) {
               import('./api').then(m => {
-                const syncData = { 
-                  mastery: updatedWord.mastery, 
-                  timesSeen: updatedWord.timesSeen, 
-                  streak: updatedWord.streak, 
-                  lastSeenTs: updatedWord.lastSeenTs 
+                const syncData = {
+                  mastery: updatedWord.mastery,
+                  timesSeen: updatedWord.timesSeen,
+                  streak: updatedWord.streak,
+                  lastSeenTs: updatedWord.lastSeenTs
                 };
-                m.upsertWordProgressToSupabase(user.id, updatedWord.jmdictEntryId!, syncData);
-                m.logStudyEventToSupabase(user.id, updatedWord.jmdictEntryId!, withoutLookup ? 'seen' : 'lookup');
+                m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, withoutLookup ? 'seen' : 'lookup');
               });
             }
           });
@@ -237,17 +248,17 @@ export const useAppStore = create<AppState>()(
           const updatedWord = { ...current, mastery: level };
 
           // Sync to Supabase
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user && updatedWord.jmdictEntryId) {
+          currentUserId().then((uid) => {
+            if (uid && updatedWord.jmdictEntryId) {
               import('./api').then(m => {
-                const syncData = { 
-                  mastery: updatedWord.mastery, 
-                  timesSeen: updatedWord.timesSeen, 
-                  streak: updatedWord.streak, 
-                  lastSeenTs: updatedWord.lastSeenTs 
+                const syncData = {
+                  mastery: updatedWord.mastery,
+                  timesSeen: updatedWord.timesSeen,
+                  streak: updatedWord.streak,
+                  lastSeenTs: updatedWord.lastSeenTs
                 };
-                m.upsertWordProgressToSupabase(user.id, updatedWord.jmdictEntryId!, syncData);
-                m.logStudyEventToSupabase(user.id, updatedWord.jmdictEntryId!, 'mastery_change', { level });
+                m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level });
               });
             }
           });

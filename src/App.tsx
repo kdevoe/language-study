@@ -141,15 +141,18 @@ function App() {
       }
 
       try {
-        // Robust initialization with a 5s timeout to prevent blank screens on startup
+        // 8s timeout only prevents a blank screen on a slow/hung network. It must
+        // NOT force-logout: on timeout we leave the session untouched and let the
+        // onAuthStateChange INITIAL_SESSION event below deliver the restored
+        // session. Throwing it away here was bouncing valid users to re-login.
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Supabase initialization timed out")), 5000)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase initialization timed out")), 8000)
         );
 
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         setSession(session);
-        
+
         if (session?.user?.email) {
           const { data: status, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
           if (error) console.error("Whitelist check error:", error);
@@ -158,9 +161,9 @@ function App() {
           setApprovalStatus(null);
         }
       } catch (err) {
-        console.error("Initialization error:", err);
-        setSession(null);
-        setApprovalStatus(null);
+        // Slow/transient init — do NOT clear the session. The auth listener will
+        // populate it from persisted storage once getSession resolves.
+        console.warn("Session init slow; deferring to auth listener:", err);
       } finally {
         setIsInitializing(false);
       }
