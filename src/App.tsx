@@ -294,6 +294,9 @@ function App() {
 
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
+    // Opening an article counts as consuming it — mark it dismissed so it isn't
+    // suggested again after the user closes and reopens the app the same day.
+    dismissArticle(article.id);
     useAppStore.getState().setCurrentArticle(null);
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);

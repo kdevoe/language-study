@@ -25,6 +25,20 @@ const ITEMS_PER_FEED = 12;
 const FEED_TIMEOUT_MS = 8000;
 const MAX_CARDS = 40;
 
+// Article IDs MUST be deterministic and stable across fetches. The client tracks
+// dismissed/read articles by id; if the same story comes back with a new id on a
+// later fetch, the dismiss filter no longer matches and it reappears in the feed.
+// We derive the id from the lead story's URL (stable per story) via a small FNV-1a
+// hash, falling back to the title when no URL is present.
+function stableId(seed: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 const TOP_HEADLINES_URL = 'https://newsapi.org/v2/top-headlines';
 const EVERYTHING_URL = 'https://newsapi.org/v2/everything';
 
@@ -328,7 +342,7 @@ Deno.serve(async (req) => {
       const when = lead.date ? new Date(lead.date) : new Date();
 
       return {
-        id: `${lead.title.substring(0, 15)}-${Math.random().toString(36).substring(2, 9)}`,
+        id: `${lead.title.substring(0, 15)}-${stableId(lead.url || lead.title)}`,
         title: lead.title,
         originalUrl: lead.url,
         date: (isNaN(when.getTime()) ? new Date() : when).toLocaleDateString(),
