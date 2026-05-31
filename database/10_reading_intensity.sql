@@ -34,6 +34,10 @@ ALTER TABLE public.user_preferences
 --    and is excluded from the candidate pool (we don't suggest rare
 --    vocab to learners).
 
+-- DROP first: CREATE OR REPLACE cannot change a function's return columns, and
+-- this revision adds freq_rank to the RETURNS TABLE.
+DROP FUNCTION IF EXISTS public.jmdict_vocab_candidates(TEXT[], INT, INT);
+
 CREATE OR REPLACE FUNCTION public.jmdict_vocab_candidates(
   keywords     TEXT[],
   user_jlpt    INT,
