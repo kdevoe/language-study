@@ -9,7 +9,6 @@ export function Settings() {
     rtkLevel, setRtkLevel,
     studyMode, setStudyMode,
     readingIntensity, setReadingIntensity,
-    srsAutoBumpThreshold, setSrsAutoBumpThreshold,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight
   } = useAppStore();
@@ -312,44 +311,6 @@ export function Settings() {
                 / {rtkKanjiList.length} Kanji<br/>Automatically scales up daily
               </span>
             </div>
-          </div>
-
-          <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', marginBottom: '2rem' }} />
-
-          {/* SRS Auto Bump threshold */}
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
-            SRS Auto-Bump Threshold
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <input 
-              type="number" 
-              value={srsAutoBumpThreshold} 
-              onChange={(e) => {
-                if (e.target.value === '') {
-                  setSrsAutoBumpThreshold('');
-                  return;
-                }
-                const val = parseInt(e.target.value, 10);
-                if (!isNaN(val) && val > 0) {
-                  setSrsAutoBumpThreshold(val);
-                }
-              }}
-              min={1}
-              style={{
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid var(--border-light)',
-                backgroundColor: 'var(--bg-pure)',
-                color: 'var(--text-main)',
-                fontSize: '1.1rem',
-                width: '80px',
-                textAlign: 'center',
-                fontWeight: 600
-              }}
-            />
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
-              Consecutive unclicked reads required<br/>to progress a word's mastery level
-            </span>
           </div>
 
           <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', margin: '2rem 0' }} />

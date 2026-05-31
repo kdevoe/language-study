@@ -6,6 +6,41 @@ import { supabase } from './supabase';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
+// Internal difficulty is the source of truth: 1 = easiest for this user, 10 = hardest.
+// The three user-facing buckets (easy/medium/hard) are derived from it so the UI and
+// the article-generation pipeline (which reads mastery_level) stay simple.
+export const DIFFICULTY_MIN = 1;
+export const DIFFICULTY_MAX = 10;
+
+const clampDifficulty = (n: number) =>
+  Math.max(DIFFICULTY_MIN, Math.min(DIFFICULTY_MAX, Math.round(n)));
+
+export function bucketForDifficulty(difficulty: number): Exclude<MasteryLevel, 'unseen'> {
+  if (difficulty <= 3) return 'easy';
+  if (difficulty <= 7) return 'medium';
+  return 'hard';
+}
+
+// Manual selection snaps to the midpoint of the chosen bucket, so a couple of
+// passive nudges stay inside the bucket before crossing into the next one.
+export function difficultyForBucket(level: MasteryLevel): number {
+  switch (level) {
+    case 'easy': return 2;
+    case 'hard': return 9;
+    default: return 5; // medium / unseen
+  }
+}
+
+// Seed an initial difficulty from a word's JLPT level relative to the user's.
+// JLPT numbering: 5 = N5 (easiest) ... 1 = N1 (hardest). A word whose JLPT number
+// is *lower* than the user's level sits above their level => harder for them.
+export function seedDifficulty(jlptLevel: number | null | undefined, userLevel: number | null): number {
+  if (jlptLevel == null) return 9;      // no JLPT data => assume hard
+  if (userLevel == null) return 5;      // unknown user level => neutral
+  const delta = userLevel - jlptLevel;  // >0 => word harder than the user
+  return clampDifficulty(6 + delta * 2);
+}
+
 /**
  * Resolve the current user id for fire-and-forget background syncs.
  * getUser() round-trips to /auth/v1/user on every call; getSession() reads the
@@ -25,7 +60,10 @@ export interface WordData {
   jlptLevel?: number | null;
   pos?: string[];
   jmdictEntryId?: string;
-  mastery: MasteryLevel;
+  mastery: MasteryLevel;          // derived bucket, kept in sync with `difficulty`
+  difficulty?: number | null;     // 1..10 source of truth; null/undefined = unseen
+  lastAdjustedDay?: string;       // YYYY-MM-DD of the last difficulty change (daily dedup)
+  lastAdjustReason?: 'skip' | 'click' | 'manual';
   timesSeen: number;
   uniqueDaysSeen: string[];
   lastSeenTs: number;
@@ -50,7 +88,6 @@ interface AppState {
   processingArticles: string[];
   dismissedArticleIds: string[];
   readArticleIds: string[];
-  srsAutoBumpThreshold: number | '';
   readerFontSize: number;
   readerFontWeight: number;
   
@@ -67,7 +104,6 @@ interface AppState {
   dismissArticle: (id: string) => void;
   markArticleRead: (id: string) => void;
   setProcessing: (id: string, isProcessing: boolean) => void;
-  setSrsAutoBumpThreshold: (count: number | '') => void;
   resetFeedForNewDay: (now: number) => void;
   setReaderFontSize: (size: number) => void;
   setReaderFontWeight: (weight: number) => void;
@@ -75,7 +111,7 @@ interface AppState {
   
   saveWordDefinition: (word: string, def: Partial<WordData>) => void;
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
-  setLookupDifficulty: (word: string, jlptLevel?: number | null) => void;
+  applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
@@ -100,7 +136,6 @@ export const useAppStore = create<AppState>()(
       processingArticles: [],
       dismissedArticleIds: [],
       readArticleIds: [],
-      srsAutoBumpThreshold: 3,
       readerFontSize: 18,
       readerFontWeight: 500,
 
@@ -170,7 +205,6 @@ export const useAppStore = create<AppState>()(
         dismissedArticleIds: [], 
         lastResetTs: now 
       }),
-      setSrsAutoBumpThreshold: (count) => set({ srsAutoBumpThreshold: count }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
       
@@ -253,35 +287,47 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
-      // When a word is looked up it stops being "unseen" and gets a difficulty
-      // default derived from its JLPT level relative to the user's:
-      //   - harder than the user (or outside JLPT entirely) -> 'hard'
-      //   - at or below the user's level                    -> 'medium'
-      // Only fills in ungraded ('unseen') words; never overrides an explicit grade.
-      setLookupDifficulty: (word: string, jlptLevel?: number | null) =>
+      // A learning event nudges the word's internal difficulty (1..10):
+      //   - 'click' (looked up)        -> +2  (a lookup means it wasn't known)
+      //   - 'skip'  (seen, not looked) -> -1  (read past => a little more familiar)
+      // First encounter seeds difficulty from JLPT relative to the user, then nudges.
+      // Daily dedup: at most one passive adjustment per word per day, except a
+      // 'click' may override an earlier same-day 'skip' once (a lookup is a stronger
+      // signal). The user-facing bucket (mastery) is re-derived from difficulty.
+      applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) =>
         set((state) => {
           const current = state.wordDatabase[word];
-          if (!current || current.mastery !== 'unseen') return {};
+          if (!current) return {}; // word must be saved first
 
-          // JLPT scale: higher number = easier (5 = N5 ... 1 = N1).
-          const userLevel = state.jlptLevel;
-          let level: MasteryLevel;
-          if (jlptLevel == null) level = 'hard';
-          else if (userLevel == null) level = 'medium';
-          else level = jlptLevel < userLevel ? 'hard' : 'medium';
+          const today = new Date().toISOString().split('T')[0];
+          if (current.lastAdjustedDay === today) {
+            const overrides = event === 'click' && current.lastAdjustReason === 'skip';
+            if (!overrides) return {};
+          }
 
-          const updatedWord = { ...current, mastery: level };
+          const base = current.difficulty ?? seedDifficulty(jlptLevel ?? current.jlptLevel, state.jlptLevel);
+          const difficulty = clampDifficulty(base + (event === 'click' ? 2 : -1));
+          const mastery = bucketForDifficulty(difficulty);
+
+          const updatedWord: WordData = {
+            ...current,
+            difficulty,
+            mastery,
+            lastAdjustedDay: today,
+            lastAdjustReason: event
+          };
 
           currentUserId().then((uid) => {
             if (uid && updatedWord.jmdictEntryId) {
               import('./api').then(m => {
                 m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, {
                   mastery: updatedWord.mastery,
+                  difficulty,
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
                   lastSeenTs: updatedWord.lastSeenTs
                 });
-                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level, reason: 'lookup-default' });
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { difficulty, mastery, event });
               });
             }
           });
@@ -294,10 +340,15 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
+      // Explicit user selection in the modal. Snaps difficulty to the bucket
+      // midpoint and always applies (bypasses daily dedup); the manual stamp also
+      // prevents passive sees later that day from overriding the user's call.
       setWordMastery: (word: string, level: MasteryLevel) =>
         set((state) => {
           const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0 };
-          const updatedWord = { ...current, mastery: level };
+          const today = new Date().toISOString().split('T')[0];
+          const difficulty = level === 'unseen' ? null : difficultyForBucket(level);
+          const updatedWord: WordData = { ...current, mastery: level, difficulty, lastAdjustedDay: today, lastAdjustReason: 'manual' };
 
           // Sync to Supabase
           currentUserId().then((uid) => {
@@ -305,12 +356,13 @@ export const useAppStore = create<AppState>()(
               import('./api').then(m => {
                 const syncData = {
                   mastery: updatedWord.mastery,
+                  difficulty,
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
                   lastSeenTs: updatedWord.lastSeenTs
                 };
                 m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
-                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level });
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level, difficulty });
               });
             }
           });
@@ -383,17 +435,29 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
-      version: 2,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
+        let state = persistedState;
         if (version < 2) {
-          return {
-            ...persistedState,
+          state = {
+            ...state,
             processingArticles: [],
             dismissedArticleIds: [],
             currentArticle: null
           };
         }
-        return persistedState;
+        // v3: seed the numeric `difficulty` from the legacy mastery bucket.
+        if (version < 3 && state?.wordDatabase) {
+          const wordDatabase = { ...state.wordDatabase };
+          Object.keys(wordDatabase).forEach((key) => {
+            const w = wordDatabase[key];
+            if (w && w.difficulty == null && w.mastery && w.mastery !== 'unseen') {
+              wordDatabase[key] = { ...w, difficulty: difficultyForBucket(w.mastery) };
+            }
+          });
+          state = { ...state, wordDatabase };
+        }
+        return state;
       },
       onRehydrateStorage: () => (state) => {
         // Post-hydration cleanup

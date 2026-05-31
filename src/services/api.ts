@@ -322,6 +322,7 @@ export async function fetchUserWordProgress(userId: string): Promise<Record<stri
   data?.forEach(row => {
     progress[row.word_id] = {
       mastery: row.mastery_level,
+      difficulty: row.difficulty ?? null,
       timesSeen: row.times_seen,
       streak: row.streak,
       lastSeenTs: new Date(row.last_seen_at).getTime()
@@ -331,9 +332,9 @@ export async function fetchUserWordProgress(userId: string): Promise<Record<stri
 }
 
 export async function upsertWordProgressToSupabase(
-  userId: string, 
-  wordId: string, 
-  progress: { mastery: string; timesSeen: number; streak: number; lastSeenTs: number }
+  userId: string,
+  wordId: string,
+  progress: { mastery: string; difficulty?: number | null; timesSeen: number; streak: number; lastSeenTs: number }
 ) {
   const { error } = await supabase
     .from('user_word_progress')
@@ -341,6 +342,7 @@ export async function upsertWordProgressToSupabase(
       user_id: userId,
       word_id: wordId,
       mastery_level: progress.mastery,
+      difficulty: progress.difficulty ?? null,
       times_seen: progress.timesSeen,
       streak: progress.streak,
       last_seen_at: new Date(progress.lastSeenTs).toISOString()
