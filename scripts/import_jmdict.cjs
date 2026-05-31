@@ -49,7 +49,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 // ─── Config ──────────────────────────────────────────────────
-const DOWNLOAD_URL = 'https://github.com/scriptin/jmdict-simplified/releases/latest/download/jmdict-eng-3.6.2+20260406125001.json.tgz';
+// Asset filenames are version-stamped, so the /latest/download/ alias 404s once a
+// new release ships. Update this when bumping versions (see the project's releases).
+const DOWNLOAD_URL = 'https://github.com/scriptin/jmdict-simplified/releases/download/3.6.2%2B20260525143653/jmdict-eng-3.6.2%2B20260525143653.json.tgz';
 const TMP_DIR = path.resolve(__dirname, '..', 'tmp');
 const TGZ_PATH = path.join(TMP_DIR, 'jmdict-eng.json.tgz');
 const BATCH_SIZE = 500;

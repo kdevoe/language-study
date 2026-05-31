@@ -188,9 +188,15 @@ Deno.serve(async (req) => {
           progressMap = new Map((progress ?? []).map((p: any) => [p.word_id, p.mastery_level]));
         }
 
-        // Sort candidates: common words first, then by jlpt_level (easier first).
+        // Sort candidates so the most useful words win the per-bucket slice below:
+        // common first, then by frequency rank (1 = most common, NULL = rare/unranked),
+        // then by jlpt_level (easier first). Feeds the known/review/new buckets alike,
+        // so frequent words are prioritized for study, not just for new introductions.
         const sorted = [...(candidates ?? [])].sort((a: any, b: any) => {
           if (a.is_common !== b.is_common) return a.is_common ? -1 : 1;
+          const fa = a.freq_rank ?? Infinity;
+          const fb = b.freq_rank ?? Infinity;
+          if (fa !== fb) return fa - fb;
           return (b.jlpt_level ?? 0) - (a.jlpt_level ?? 0);
         });
 
@@ -233,8 +239,17 @@ Deno.serve(async (req) => {
         .limit(30);
       const ids = (wordProgress as any[])?.map((r) => r.word_id) ?? [];
       if (ids.length > 0) {
-        const shuffled = [...ids].sort(() => 0.5 - Math.random()).slice(0, 5);
-        const { data: kanjiRes } = await supabase.from('jmdict_kanji').select('text').in('entry_id', shuffled);
+        // Pull the most common review words first (freq_rank 1 = most common,
+        // NULL = rare/unranked) instead of a random sample.
+        const { data: freqRows } = await supabase
+          .from('jmdict_entries')
+          .select('id, freq_rank')
+          .in('id', ids);
+        const rankMap = new Map((freqRows as any[] ?? []).map((r) => [r.id, r.freq_rank]));
+        const ranked = [...ids]
+          .sort((a, b) => (rankMap.get(a) ?? Infinity) - (rankMap.get(b) ?? Infinity))
+          .slice(0, 5);
+        const { data: kanjiRes } = await supabase.from('jmdict_kanji').select('text').in('entry_id', ranked);
         if (kanjiRes) vocabTargets = Array.from(new Set(kanjiRes.map((r: any) => r.text)));
       }
     }

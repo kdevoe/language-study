@@ -44,13 +44,17 @@ RETURNS TABLE (
   jlpt_level  SMALLINT,
   kanji       TEXT,
   kana        TEXT,
-  is_common   BOOLEAN
+  is_common   BOOLEAN,
+  freq_rank   SMALLINT
 )
 LANGUAGE sql
 STABLE
 AS $$
+  -- Keep the most frequent matches when capping at max_results: order by
+  -- freq_rank (1 = most common, NULL = rare/unranked) BEFORE the LIMIT so common
+  -- candidates are never arbitrarily dropped before the app can prioritize them.
   WITH matched_entries AS (
-    SELECT DISTINCT e.id, e.jlpt_level, e.common
+    SELECT DISTINCT e.id, e.jlpt_level, e.common, e.freq_rank
     FROM public.jmdict_senses s
     JOIN public.jmdict_entries e ON e.id = s.entry_id
     WHERE e.jlpt_level IS NOT NULL
@@ -59,6 +63,7 @@ AS $$
         SELECT 1 FROM unnest(s.gloss) g
         WHERE g ILIKE ANY(keywords)
       )
+    ORDER BY e.common DESC, e.freq_rank ASC NULLS LAST
     LIMIT max_results
   )
   SELECT
@@ -70,7 +75,8 @@ AS $$
     (SELECT ka.text FROM public.jmdict_kana ka
        WHERE ka.entry_id = m.id
        ORDER BY ka.common DESC, ka.id ASC LIMIT 1) AS kana,
-    m.common                                 AS is_common
+    m.common                                 AS is_common,
+    m.freq_rank                              AS freq_rank
   FROM matched_entries m;
 $$;
 
