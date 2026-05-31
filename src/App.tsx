@@ -36,6 +36,7 @@ function App() {
   const saveProcessedArticle = useAppStore(state => state.saveProcessedArticle);
   const dismissedArticleIds = useAppStore(state => state.dismissedArticleIds || []);
   const dismissArticle = useAppStore(state => state.dismissArticle);
+  const markArticleRead = useAppStore(state => state.markArticleRead);
   const [failedArticleIds, setFailedArticleIds] = useState<Set<string>>(new Set());
 
   const handleProcessArticle = useCallback(async (article: NewsArticle) => {
@@ -85,12 +86,13 @@ function App() {
         }
 
         const existingIds = new Set(articles.map(a => a?.id).filter(Boolean));
-        const dismissedSet = new Set(useAppStore.getState().dismissedArticleIds || []);
+        const { dismissedArticleIds: dismissed, readArticleIds: read } = useAppStore.getState();
+        const seenSet = new Set([...(dismissed || []), ...(read || [])]);
 
         const filtered = moreNews.filter(a => {
           if (!a || !a.id) return false;
           const isJunk = !a.title || a.title.includes('[Removed]') || a.title.length < 10;
-          return !isJunk && !existingIds.has(a.id) && !dismissedSet.has(a.id);
+          return !isJunk && !existingIds.has(a.id) && !seenSet.has(a.id);
         });
 
         if (filtered.length > 0) {
@@ -119,10 +121,16 @@ function App() {
     try {
       const feed = await fetchNewsFeed(1);
       const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
-      
-      // If we start the app, uniqueFeed could contain up to 20 raw items.
-      setArticles(uniqueFeed);
-      if (uniqueFeed.length === 0) {
+
+      // Drop articles the user has already read or dismissed so they're never
+      // pulled back in as fresh suggestions (e.g. on reopen the same day).
+      const { dismissedArticleIds: dismissed, readArticleIds: read } = useAppStore.getState();
+      const seen = new Set([...(dismissed || []), ...(read || [])]);
+      const freshFeed = uniqueFeed.filter(a => a.id && !seen.has(a.id));
+
+      // If we start the app, freshFeed could contain up to 20 raw items.
+      setArticles(freshFeed);
+      if (freshFeed.length === 0) {
         setIsEndOfFeed(true);
       }
     } catch (e) { console.error(e); }
@@ -294,9 +302,10 @@ function App() {
 
   const handleSelectArticle = (article: NewsArticle) => {
     if (!article.id) return;
-    // Opening an article counts as consuming it — mark it dismissed so it isn't
-    // suggested again after the user closes and reopens the app the same day.
-    dismissArticle(article.id);
+    // Reading marks the article read (so it's never pulled back in as a fresh
+    // suggestion) but does NOT remove it from the visible feed — the user
+    // dismisses it manually when they're done with it.
+    markArticleRead(article.id);
     useAppStore.getState().setCurrentArticle(null);
     if (articlesCache[article.id]) {
       setActiveArticle(articlesCache[article.id]);

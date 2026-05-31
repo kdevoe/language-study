@@ -49,6 +49,7 @@ interface AppState {
   articlesCache: Record<string, NewsArticle>;
   processingArticles: string[];
   dismissedArticleIds: string[];
+  readArticleIds: string[];
   srsAutoBumpThreshold: number | '';
   readerFontSize: number;
   readerFontWeight: number;
@@ -64,6 +65,7 @@ interface AppState {
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
   dismissArticle: (id: string) => void;
+  markArticleRead: (id: string) => void;
   setProcessing: (id: string, isProcessing: boolean) => void;
   setSrsAutoBumpThreshold: (count: number | '') => void;
   resetFeedForNewDay: (now: number) => void;
@@ -97,6 +99,7 @@ export const useAppStore = create<AppState>()(
       articlesCache: {},
       processingArticles: [],
       dismissedArticleIds: [],
+      readArticleIds: [],
       srsAutoBumpThreshold: 3,
       readerFontSize: 18,
       readerFontWeight: 500,
@@ -150,6 +153,13 @@ export const useAppStore = create<AppState>()(
       setArticlesCache: (cache) => set({ articlesCache: cache }),
       dismissArticle: (id) => set((state) => ({
         dismissedArticleIds: Array.from(new Set([...state.dismissedArticleIds, id]))
+      })),
+      // Reading an article does NOT hide it from the visible feed — the user
+      // dismisses it manually. But a read article must never be pulled back in
+      // as a fresh suggestion, so it's tracked separately and (unlike dismissals)
+      // is not cleared by the daily feed reset.
+      markArticleRead: (id) => set((state) => ({
+        readArticleIds: Array.from(new Set([...state.readArticleIds, id]))
       })),
       setProcessing: (id, isP) => set((state) => {
         const next = new Set(state.processingArticles || []);
@@ -389,6 +399,7 @@ export const useAppStore = create<AppState>()(
         // Post-hydration cleanup
         if (state && !Array.isArray(state.processingArticles)) state.processingArticles = [];
         if (state && !Array.isArray(state.dismissedArticleIds)) state.dismissedArticleIds = [];
+        if (state && !Array.isArray(state.readArticleIds)) state.readArticleIds = [];
       }
     }
   )
