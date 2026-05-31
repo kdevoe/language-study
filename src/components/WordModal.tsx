@@ -278,7 +278,12 @@ export function WordModal({
           <div style={{ width: '1px', backgroundColor: 'var(--border-light)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>RANK</div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.3rem', textTransform: 'capitalize' }}>{activeMastery}</div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.3rem', textTransform: 'capitalize' }}>
+              {activeMastery}
+              {stats.difficulty != null && (
+                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', marginLeft: '0.3rem' }}>{stats.difficulty}/10</span>
+              )}
+            </div>
           </div>
         </div>
       )

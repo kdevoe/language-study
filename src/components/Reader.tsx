@@ -59,10 +59,9 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     } catch { return null; }
   }, []);
   
-  const { 
-    wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery, setLookupDifficulty,
-    currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle, 
-    srsAutoBumpThreshold,
+  const {
+    wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery, applyDifficultyEvent,
+    currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle,
     readerFontSize, readerFontWeight
   } = useAppStore();
 
@@ -136,23 +135,32 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const handleFinishArticle = () => {
     if (hasSweptRef.current) return; // once per article — button or scroll, whichever comes first
     hasSweptRef.current = true;
-    const articleWords = new Set<string>();
+    // Keep the richest token per word (one with details/jmdict id) so we can seed
+    // difficulty from JLPT and store a real entry for never-clicked new words.
+    const articleWords = new Map<string, any>();
     currentArticle?.blocks.forEach(b => {
-      if (b.content) b.content.forEach(w => { if (w.furigana) articleWords.add(w.text); });
+      if (b.content) b.content.forEach(w => {
+        if (!w.furigana) return;
+        const existing = articleWords.get(w.text);
+        if (!existing || (!existing.details && (w.details || w.jmdict_entry_id))) {
+          articleWords.set(w.text, w);
+        }
+      });
     });
 
-    articleWords.forEach(word => {
-      if (!clickedWords.has(word)) {
-        const stats = wordDatabase[word];
-        recordWordSeen(word, true);
-        const newStreak = (stats?.streak || 0) + 1;
-        if (stats && stats.mastery !== 'easy' && newStreak % (srsAutoBumpThreshold || 3) === 0) {
-          setWordMastery(word, stats.mastery === 'hard' ? 'medium' : 'easy');
-        } else if (!stats) {
-          saveWordDefinition(word, { reading: '...', meaning: 'Implicitly parsed context' });
-          setWordMastery(word, 'medium');
-        }
+    articleWords.forEach((token, word) => {
+      if (clickedWords.has(word)) return;
+      const details = token.details as WordDetails | undefined;
+      const jlptLevel = details?.jlptLevel;
+      // Make sure a never-seen word exists before grading it.
+      if (!wordDatabase[word]) {
+        saveWordDefinition(word, details
+          ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
+          : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
       }
+      recordWordSeen(word, true);
+      // Reading past a word without a lookup nudges it toward "known".
+      applyDifficultyEvent(word, 'skip', jlptLevel);
     });
   };
   // Keep the observer pointed at the latest closure every render.
@@ -184,8 +192,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     setActiveHighlightId(tokenId);
     setTargetRect(e.currentTarget.getBoundingClientRect());
     saveWordDefinition(details.word, details);
-    // Looking a word up implies difficulty: seed a default grade from its JLPT level.
-    setLookupDifficulty(details.word, details.jlptLevel);
+    // Looking a word up means it wasn't known: nudge its difficulty up.
+    applyDifficultyEvent(details.word, 'click', details.jlptLevel);
 
     if (!merged.grammarNote) {
       fetchWordGrammarInsight(details.word, sentText).then(insight => {
@@ -214,7 +222,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID), 
     // we allow the lookup to proceed to enrich the entry.
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context' && localData.jlptLevel && localData.jmdictEntryId) {
-      setLookupDifficulty(word, localData.jlptLevel);
+      applyDifficultyEvent(word, 'click', localData.jlptLevel);
       setSelectedWord({
         word,
         reading: localData.reading,
@@ -277,8 +285,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
 
       // Cache initial quick data
       saveWordDefinition(word, combinedInitial);
-      // Now that the JLPT level is known, seed a difficulty default for this lookup.
-      setLookupDifficulty(word, quickDef.jlptLevel);
+      // Now that the JLPT level is known, nudge difficulty up for this lookup.
+      applyDifficultyEvent(word, 'click', quickDef.jlptLevel);
       setIsModalLoading(false);
     } catch (err) {
       console.error("Word lookup failed:", err);
