@@ -460,8 +460,13 @@ export const useAppStore = create<AppState>()(
         return state;
       },
       onRehydrateStorage: () => (state) => {
-        // Post-hydration cleanup
-        if (state && !Array.isArray(state.processingArticles)) state.processingArticles = [];
+        // Post-hydration cleanup.
+        // `processingArticles` tracks in-flight, in-memory processing calls that
+        // cannot survive a reload — any entry present at hydration time is stale
+        // (the app closed mid-processing). Always clear it, otherwise the stale
+        // flag makes handleProcessArticle() / the JIT pre-processor treat the
+        // article as "already processing" and silently refuse to retry it.
+        if (state) state.processingArticles = [];
         if (state && !Array.isArray(state.dismissedArticleIds)) state.dismissedArticleIds = [];
         if (state && !Array.isArray(state.readArticleIds)) state.readArticleIds = [];
       }

@@ -39,8 +39,8 @@ function App() {
   const markArticleRead = useAppStore(state => state.markArticleRead);
   const [failedArticleIds, setFailedArticleIds] = useState<Set<string>>(new Set());
 
-  const handleProcessArticle = useCallback(async (article: NewsArticle) => {
-    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id) || failedArticleIds.has(article.id)) return;
+  const handleProcessArticle = useCallback(async (article: NewsArticle): Promise<NewsArticle | null> => {
+    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id) || failedArticleIds.has(article.id)) return null;
 
     setProcessing(article.id, true);
     try {
@@ -61,12 +61,16 @@ function App() {
         article.sources,
         () => {}
       );
-      saveProcessedArticle(article.id, { ...article, blocks: processedBlocks });
+      const processed = { ...article, blocks: processedBlocks };
+      saveProcessedArticle(article.id, processed);
+      setProcessing(article.id, false);
+      return processed;
     } catch (e) {
       console.error('[process] Failed for article:', article.id, article.title, e);
       setFailedArticleIds(prev => new Set(prev).add(article.id));
     }
     setProcessing(article.id, false);
+    return null;
   }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle, failedArticleIds]);
 
   const replenishFeedAtBottom = useCallback(async () => {
@@ -203,17 +207,14 @@ function App() {
   }, []);
 
   const loadGlobalCache = async (userId: string) => {
-    // Skip if we already have cached articles from localStorage (Zustand persist)
-    const existingCache = useAppStore.getState().articlesCache;
-    if (Object.keys(existingCache).length > 0) {
-      console.log(`[App] Skipping Supabase cache fetch — ${Object.keys(existingCache).length} articles already in local state`);
-      return;
-    }
     const { fetchCachedArticlesFromSupabase } = await import('./services/api');
-    const cache = await fetchCachedArticlesFromSupabase(userId);
-    if (Object.keys(cache).length > 0) {
-      useAppStore.getState().setArticlesCache(cache);
-    }
+    const serverCache = await fetchCachedArticlesFromSupabase(userId);
+    if (Object.keys(serverCache).length === 0) return;
+    // Merge server-side completions (e.g. an article that finished processing
+    // after the app was closed) into the local cache. Local copies win on
+    // overlap so we don't clobber anything saved this session.
+    const existingCache = useAppStore.getState().articlesCache;
+    useAppStore.getState().setArticlesCache({ ...serverCache, ...existingCache });
   };
 
   const checkMidnightReset = useCallback(() => {
@@ -300,23 +301,46 @@ function App() {
 
   // Removed: syncPrefetchQueue useEffect - the daily-feed Edge Function handles background processing
 
-  const handleSelectArticle = (article: NewsArticle) => {
+  const openReader = useCallback((article: NewsArticle) => {
+    setActiveArticle(article);
+    setNewsView('reading');
+    setShowNav(true);
+    window.scrollTo(0, 0);
+    setTimeout(() => replenishFeedAtBottom(), 500);
+  }, [replenishFeedAtBottom]);
+
+  const handleSelectArticle = async (article: NewsArticle) => {
     if (!article.id) return;
     // Reading marks the article read (so it's never pulled back in as a fresh
     // suggestion) but does NOT remove it from the visible feed — the user
     // dismisses it manually when they're done with it.
     markArticleRead(article.id);
     useAppStore.getState().setCurrentArticle(null);
+
     if (articlesCache[article.id]) {
-      setActiveArticle(articlesCache[article.id]);
-      setNewsView('reading');
-      setShowNav(true);
-      window.scrollTo(0, 0);
-      setTimeout(() => replenishFeedAtBottom(), 500);
-    } else {
-      // Not yet cached — request on-demand server-side processing
-      handleProcessArticle(article);
+      openReader(articlesCache[article.id]);
+      return;
     }
+
+    // Not in the local cache. It may have finished processing on the server
+    // while the app was closed — pull it down before starting a fresh run.
+    let userId = 'dev-user';
+    if (!DEV_MODE) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      userId = session.user.id;
+    }
+    const { fetchProcessedArticleById } = await import('./services/api');
+    const fromServer = await fetchProcessedArticleById(article.id, userId);
+    if (fromServer) {
+      saveProcessedArticle(article.id, fromServer);
+      openReader(fromServer);
+      return;
+    }
+
+    // Genuinely not processed yet — process on demand, then open the Reader.
+    const processed = await handleProcessArticle(article);
+    if (processed) openReader(processed);
   };
 
   const handleDismissAndSync = (id: string) => {

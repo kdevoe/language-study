@@ -103,6 +103,22 @@ export async function saveProcessedArticleToSupabase(article: NewsArticle, userI
   if (error) console.error("Error syncing to Supabase:", error);
 }
 
+/** Fetch a single processed article by id — used to recover articles that
+ *  finished processing server-side while the app was closed. */
+export async function fetchProcessedArticleById(articleId: string, userId: string): Promise<NewsArticle | null> {
+  const { data, error } = await supabase
+    .from('processed_news')
+    .select('content')
+    .eq('id', articleId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('Error fetching processed article:', error);
+    return null;
+  }
+  return (data?.content as NewsArticle) ?? null;
+}
+
 export async function fetchCachedArticlesFromSupabase(userId: string): Promise<Record<string, NewsArticle>> {
   const { data, error } = await supabase
     .from('processed_news')
