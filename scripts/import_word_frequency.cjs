@@ -35,7 +35,13 @@ if (fs.existsSync(envPath)) {
     if (eqIdx === -1) return;
     const key = trimmed.slice(0, eqIdx).trim();
     let val = trimmed.slice(eqIdx + 1).trim();
-    if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+    // Strip surrounding quotes, repeatedly, to tolerate double-wrapped values
+    // like "'https://...'" (outer " then inner ').
+    while (
+      val.length >= 2 &&
+      ((val[0] === "'" && val[val.length - 1] === "'") ||
+        (val[0] === '"' && val[val.length - 1] === '"'))
+    ) {
       val = val.slice(1, -1);
     }
     process.env[key] = val;
