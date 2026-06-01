@@ -278,3 +278,71 @@ function buildFuriganaMap(word: string, reading: string): { kanji: string; kana:
   return segments.length > 0 ? segments : [{ kanji: word, kana: reading }];
 }
 
+// ── JLPT corpus coverage ────────────────────────────────────────────────────
+// The Progress screen contrasts the handful of words a user has actually
+// encountered against the full vocabulary pool of each JLPT level (5=N5 ... 1=N1).
+// word_frequency carries no JLPT tag, so the denominator is the JMDict entry
+// count per level.
+
+let jlptTotalsCache: Record<number, number> | null = null;
+
+/** Number of JMDict entries at each JLPT level. Cached for the session. */
+export async function fetchJlptTotals(): Promise<Record<number, number>> {
+  if (jlptTotalsCache) return jlptTotalsCache;
+
+  const totals: Record<number, number> = {};
+  await Promise.all(
+    [1, 2, 3, 4, 5].map(async (level) => {
+      const { count, error } = await supabase
+        .from('jmdict_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('jlpt_level', level);
+      if (!error && count != null) totals[level] = count;
+    })
+  );
+
+  // Only cache a successful fetch so a transient/offline failure can be retried.
+  if (Object.keys(totals).length > 0) jlptTotalsCache = totals;
+  return totals;
+}
+
+export interface UnseenWord {
+  word: string;     // surface form (matches the frequency-list key)
+  reading: string;  // kana reading
+  meaning: string;  // first JMDict gloss, if one exists
+  rank: number;     // frequency rank (1 = most common)
+}
+
+/**
+ * Fetch the most common words at a JLPT level that the user has NOT yet seen,
+ * ordered by frequency rank (most common first).
+ *
+ * Backed by the `get_unseen_common_words` Postgres RPC (database/13): it joins
+ * the flat word_frequency ranking to JMDict on surface form to recover JLPT
+ * level, reading and gloss, then excludes the user's already-tracked words.
+ */
+export async function fetchUnseenCommonWords(
+  level: number,
+  seenWords: string[],
+  limit = 40
+): Promise<UnseenWord[]> {
+  const { data, error } = await supabase.rpc('get_unseen_common_words', {
+    p_level: level,
+    p_seen_words: seenWords,
+    p_limit: limit,
+  });
+  if (error || !data) return [];
+
+  return (data as Array<{
+    word: string;
+    reading: string | null;
+    meaning: string | null;
+    rank: number;
+  }>).map((r) => ({
+    word: r.word,
+    reading: r.reading || '',
+    meaning: r.meaning || '',
+    rank: r.rank,
+  }));
+}
+
