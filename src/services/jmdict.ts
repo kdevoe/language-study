@@ -326,11 +326,24 @@ export async function fetchUnseenCommonWords(
   seenWords: string[],
   limit = 40
 ): Promise<UnseenWord[]> {
-  const { data, error } = await supabase.rpc('get_unseen_common_words', {
-    p_level: level,
-    p_seen_words: seenWords,
-    p_limit: limit,
-  });
+  let data: unknown;
+  let error: unknown;
+  try {
+    ({ data, error } = await withTimeout(
+      supabase.rpc('get_unseen_common_words', {
+        p_level: level,
+        p_seen_words: seenWords,
+        p_limit: limit,
+      }),
+      LOOKUP_TIMEOUT_MS,
+      'get_unseen_common_words',
+    ));
+  } catch (e) {
+    // A slow RPC is bounded here so it can't hang the UI or pile up connections
+    // against an already-strained database.
+    console.warn('get_unseen_common_words timed out or failed:', e);
+    return [];
+  }
   if (error || !data) return [];
 
   return (data as Array<{

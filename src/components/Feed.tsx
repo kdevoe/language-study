@@ -154,7 +154,11 @@ function NewsCard({
           if (isOpen) {
             setOpenId(null);
           } else {
-            onSelect(article);
+            // onSelect is async; guard so a rejected processing promise surfaces
+            // (App shows a banner) instead of being silently swallowed.
+            Promise.resolve(onSelect(article)).catch((e) =>
+              console.error('Article selection failed:', e),
+            );
           }
         }}
         whileTap={{ scale: 0.98 }}

@@ -39,6 +39,14 @@ function App() {
   const dismissArticle = useAppStore(state => state.dismissArticle);
   const markArticleRead = useAppStore(state => state.markArticleRead);
   const [failedArticleIds, setFailedArticleIds] = useState<Set<string>>(new Set());
+  // Transient, user-visible message for failures that would otherwise be silent
+  // (e.g. an article that does nothing when tapped because processing failed).
+  const [actionError, setActionError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!actionError) return;
+    const t = setTimeout(() => setActionError(null), 5000);
+    return () => clearTimeout(t);
+  }, [actionError]);
 
   const handleProcessArticle = useCallback(async (article: NewsArticle): Promise<NewsArticle | null> => {
     if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id) || failedArticleIds.has(article.id)) return null;
@@ -323,25 +331,39 @@ function App() {
       return;
     }
 
-    // Not in the local cache. It may have finished processing on the server
-    // while the app was closed — pull it down before starting a fresh run.
-    let userId = 'dev-user';
-    if (!DEV_MODE) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-      userId = session.user.id;
-    }
-    const { fetchProcessedArticleById } = await import('./services/api');
-    const fromServer = await fetchProcessedArticleById(article.id, userId);
-    if (fromServer) {
-      saveProcessedArticle(article.id, fromServer);
-      openReader(fromServer);
-      return;
-    }
+    try {
+      // Not in the local cache. It may have finished processing on the server
+      // while the app was closed — pull it down before starting a fresh run.
+      let userId = 'dev-user';
+      if (!DEV_MODE) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setActionError('You appear to be signed out. Refresh and try again.');
+          return;
+        }
+        userId = session.user.id;
+      }
+      const { fetchProcessedArticleById } = await import('./services/api');
+      const fromServer = await fetchProcessedArticleById(article.id, userId);
+      if (fromServer) {
+        saveProcessedArticle(article.id, fromServer);
+        openReader(fromServer);
+        return;
+      }
 
-    // Genuinely not processed yet — process on demand, then open the Reader.
-    const processed = await handleProcessArticle(article);
-    if (processed) openReader(processed);
+      // Genuinely not processed yet — process on demand, then open the Reader.
+      const processed = await handleProcessArticle(article);
+      if (processed) {
+        openReader(processed);
+      } else {
+        // handleProcessArticle swallows its error into failedArticleIds; surface
+        // it here so the tap doesn't just silently do nothing.
+        setActionError("Couldn't load this article — the server may be busy. Please try another.");
+      }
+    } catch (e) {
+      console.error('[select] Failed to open article:', article.id, e);
+      setActionError("Couldn't load this article — the server may be busy. Please try another.");
+    }
   };
 
   const handleDismissAndSync = (id: string) => {
@@ -432,7 +454,33 @@ function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header 
+      {actionError && (
+        <div
+          role="alert"
+          onClick={() => setActionError(null)}
+          style={{
+            position: 'fixed',
+            top: 'max(1rem, env(safe-area-inset-top))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            maxWidth: 'min(90vw, 420px)',
+            padding: '0.75rem 1.1rem',
+            borderRadius: '14px',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-light)',
+            boxShadow: '0 6px 30px rgba(0,0,0,0.12)',
+            color: 'var(--text-main)',
+            fontSize: '0.85rem',
+            lineHeight: 1.4,
+            cursor: 'pointer',
+            textAlign: 'center',
+          }}
+        >
+          {actionError}
+        </div>
+      )}
+      <header
         data-shownav={showNav}
         style={{ 
           display: 'flex', 

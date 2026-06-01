@@ -290,8 +290,12 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       setIsModalLoading(false);
     } catch (err) {
       console.error("Word lookup failed:", err);
+      const timedOut = /timed out/i.test(err instanceof Error ? err.message : String(err));
+      const message = timedOut
+        ? 'Lookup timed out — the server is busy. Try again in a moment.'
+        : 'Lookup failed. Tap outside to dismiss.';
       setSelectedWord(prev => (prev && prev.word === word)
-        ? { ...prev, reading: '—', meaning: 'Lookup failed. Tap outside to dismiss.', grammarNote: '—' }
+        ? { ...prev, reading: '—', meaning: message, grammarNote: '—' }
         : prev);
       setIsModalLoading(false);
     }
