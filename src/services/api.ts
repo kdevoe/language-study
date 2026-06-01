@@ -119,12 +119,23 @@ export async function fetchProcessedArticleById(articleId: string, userId: strin
   return (data?.content as NewsArticle) ?? null;
 }
 
+// Hydrate the local cache with the user's RECENT processed articles only.
+// Pulling the full history's `content` JSONB on every load (this runs on each
+// auth/session change) cold-reads megabytes off disk, spikes Disk IOPS into the
+// instance ceiling, and starves concurrent word lookups into statement timeouts.
+// Bounding to the most recent N keeps the "show articles that finished server-side
+// while the app was closed" behavior — any older article still opens on demand via
+// fetchProcessedArticleById() in handleSelectArticle.
+const RECENT_CACHE_LIMIT = 30;
+
 export async function fetchCachedArticlesFromSupabase(userId: string): Promise<Record<string, NewsArticle>> {
   const { data, error } = await supabase
     .from('processed_news')
-    .select('*')
-    .eq('user_id', userId);
-    
+    .select('id, content')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(RECENT_CACHE_LIMIT);
+
   if (error) {
     console.error("Error fetching cache from Supabase:", error);
     return {};
