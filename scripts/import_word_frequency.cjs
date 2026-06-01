@@ -195,6 +195,16 @@ async function main() {
   await batchUpsert(updates);
 
   console.log('\n🎉 Done. Entries without an nf band keep freq_rank = NULL.');
+
+  // This backfill is a bulk UPDATE, which leaves ~one dead tuple per updated row
+  // in jmdict_entries. autovacuum only fires at ~20% dead tuples, so a backfill
+  // of ~22k rows on a ~216k-row table stays UNDER the trigger and never gets
+  // cleaned automatically — the bloat then drags every corpus query (it caused an
+  // app-wide IOwait/timeout incident on 2026-05-31). Reclaim it by hand:
+  console.log('\n⚠️  IMPORTANT: this bulk UPDATE leaves dead tuples that autovacuum');
+  console.log('   will NOT clear (under its 20% threshold). Run this in the Supabase');
+  console.log('   SQL editor to reclaim the bloat and refresh stats:');
+  console.log('\n     VACUUM (FULL, ANALYZE) public.jmdict_entries;\n');
 }
 
 main().catch(err => {
