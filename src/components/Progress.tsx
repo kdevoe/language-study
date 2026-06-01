@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
 
@@ -57,6 +57,13 @@ export function Progress() {
     return map;
   }, [wordDatabase]);
 
+  // Latest per-level grouping, read inside the discover effect WITHOUT making it
+  // a dependency. Depending on `wordDatabase`/`byLevel` there would re-run the
+  // expensive get_unseen_common_words RPC on every word the user tracks, which
+  // pegs the shared DB and starves all other queries.
+  const byLevelRef = useRef(byLevel);
+  byLevelRef.current = byLevel;
+
   const totalWords = Object.keys(wordDatabase).length;
 
   // Default to the user's own JLPT level if they have words there, else the
@@ -100,9 +107,12 @@ export function Progress() {
     let cancelled = false;
     setUnseenLoading(true);
     setUnseenWords([]);
-    // Exclude by surface form — word_frequency is keyed by word, and that's how
-    // the local wordDatabase is keyed too, so this is the reliable join.
-    const seenWords = Object.keys(wordDatabase);
+    // Only seen words AT this level can exclude one of this level's candidates: a
+    // shared surface form implies a shared JMDict entry and therefore the same
+    // JLPT level. Sending just this level's seen words (read from a ref, not the
+    // whole database) keeps p_seen_words small and the RPC cheap, and limits the
+    // refetch to when the user actually changes level or enters discover mode.
+    const seenWords = (byLevelRef.current.get(activeLevel) ?? []).map((w) => w.word);
     fetchUnseenCommonWords(activeLevel, seenWords, 40)
       .then((ws) => {
         if (!cancelled) setUnseenWords(ws);
@@ -113,7 +123,7 @@ export function Progress() {
     return () => {
       cancelled = true;
     };
-  }, [activeLevel, listMode, wordDatabase]);
+  }, [activeLevel, listMode]);
 
   const words = byLevel.get(activeLevel) ?? [];
 
