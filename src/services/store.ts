@@ -305,8 +305,17 @@ export const useAppStore = create<AppState>()(
             if (!overrides) return {};
           }
 
-          const base = current.difficulty ?? seedDifficulty(jlptLevel ?? current.jlptLevel, state.jlptLevel);
-          const difficulty = clampDifficulty(base + (event === 'click' ? 2 : -1));
+          // The seed already encodes the word's JLPT level relative to the user, so
+          // on the FIRST event (no prior numeric difficulty) use it directly. Applying
+          // the click(+2)/skip(-1) nudge on the seeding event too double-counts and
+          // shoves an at-level word straight to 'hard' on a single lookup — the bug
+          // where every lookup defaulted to 'hard' regardless of JLPT level. The nudge
+          // only kicks in once a baseline exists (repeat-day lookups harden, clean
+          // reads ease).
+          const prior = current.difficulty;
+          const difficulty = prior == null
+            ? clampDifficulty(seedDifficulty(jlptLevel ?? current.jlptLevel, state.jlptLevel))
+            : clampDifficulty(prior + (event === 'click' ? 2 : -1));
           const mastery = bucketForDifficulty(difficulty);
 
           const updatedWord: WordData = {
