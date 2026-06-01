@@ -34,6 +34,15 @@
   - [x] Confirmed FK indexes from database/06 exist in prod (all present)
   - [x] Reclaimed jmdict_entries bloat: VACUUM (FULL, ANALYZE) → 0 dead tuples
   - [x] import_word_frequency.cjs now prints a VACUUM reminder after backfill
+  - Recurrence (same day): lookups kept timing out after the above. 24h Observability
+    showed an idle DB that spiked Disk IOPS into the instance ceiling + 13MB/s network
+    only on app use. Cause: PR #23 removed the skip-if-cached guard in `loadGlobalCache`,
+    so `fetchCachedArticlesFromSupabase` ran `select('*')` over the user's ENTIRE
+    `processed_news` history (full `content` JSONB) on every session change. The cold
+    read pegged IOPS and starved concurrent word lookups into statement timeouts.
+  - [x] Bound it: fetch only `id, content` for the 30 most recent articles
+    (order by created_at desc). Older articles still open on demand via
+    fetchProcessedArticleById. Keeps PR #23's server-completion behavior.
   - [ ] Only if spikes recur under real concurrent load: revisit `jmdict_vocab_candidates`
         (full jmdict_senses scan w/ ILIKE ANY on gloss, runs per process-article) or
         bump compute. Not needed as of resolution.
