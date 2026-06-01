@@ -7,7 +7,7 @@ import { Progress } from './components/Progress'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, requestArticleProcessing } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
 
@@ -239,11 +239,20 @@ function App() {
   }, [loadHub]);
 
   // One-time init: runs when user is onboarded + authenticated
+  const loadedCacheForUser = useRef<string | null>(null);
   useEffect(() => {
     if (isOnboarded && session) {
       checkDailyKanji();
       checkMidnightReset();
-      loadGlobalCache(session.user.id);
+      // This effect re-runs on every `session` change (token refresh / tab
+      // refocus produce a new session object with the same user id). Only the
+      // first run per user should hydrate the processed-article cache — re-pulling
+      // the recent-articles `content` JSONB on each refocus was the repeated
+      // multi-MB network/Disk-IOPS burst seen in Observability.
+      if (loadedCacheForUser.current !== session.user.id) {
+        loadedCacheForUser.current = session.user.id;
+        loadGlobalCache(session.user.id);
+      }
       useAppStore.getState().syncSrsWithSupabase(session.user.id);
     }
   }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
