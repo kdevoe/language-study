@@ -2,13 +2,17 @@
 -- get_unseen_common_words: per-level "discover" list for the Progress screen
 -- ============================================================
 -- Returns the most common words at an EXACT JLPT level that the user has not yet
--- encountered, ordered by frequency rank (1 = most common), with reading and the
+-- encountered, ordered by frequency (most common first), with reading and the
 -- first JMDict gloss for context.
 --
--- word_frequency (database/12) is a flat list keyed by surface form with no JLPT
--- tag or reading, so this joins it to JMDict on surface form to recover the
--- level (jmdict_entries.jlpt_level), reading (jmdict_kana) and gloss
--- (jmdict_senses). Already-seen surface words are excluded.
+-- Frequency comes from jmdict_entries.freq_rank (database/12): the best (lowest)
+-- nf01..nf48 band across an entry's forms, where 1 = most common and NULL = a
+-- long-tail word with no nf band. We order common entries with a real band first
+-- (freq_rank ASC NULLS LAST), falling back to the coarse `common` flag, so the
+-- list surfaces high-value vocabulary the learner hasn't tracked yet.
+--
+-- An entry is "seen" if any of its kanji or kana surface forms is in p_seen_words
+-- (the store keys progress by surface form).
 --
 --   p_level      : 1 (N1) .. 5 (N5)  — exact match
 --   p_seen_words : surface words the user already tracks (excluded)
@@ -28,40 +32,34 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 AS $$
-  WITH level_forms AS (
-    -- All kanji + kana surface forms belonging to entries at this JLPT level.
-    SELECT k.text AS form, k.entry_id
-    FROM public.jmdict_kanji k
-    JOIN public.jmdict_entries e ON e.id = k.entry_id
+  WITH candidates AS (
+    SELECT e.id, e.freq_rank, e.common
+    FROM public.jmdict_entries e
     WHERE e.jlpt_level = p_level
-    UNION
-    SELECT a.text AS form, a.entry_id
-    FROM public.jmdict_kana a
-    JOIN public.jmdict_entries e ON e.id = a.entry_id
-    WHERE e.jlpt_level = p_level
-  ),
-  matched AS (
-    SELECT lf.entry_id, wf.word AS form, wf.rank
-    FROM public.word_frequency wf
-    JOIN level_forms lf ON lf.form = wf.word
-    WHERE NOT (wf.word = ANY(p_seen_words))
-  ),
-  best AS (
-    -- Lowest (most common) rank per entry, so an entry isn't listed twice via
-    -- two surface forms.
-    SELECT DISTINCT ON (entry_id) entry_id, form, rank
-    FROM matched
-    ORDER BY entry_id, rank ASC
+      AND NOT EXISTS (
+        SELECT 1 FROM public.jmdict_kanji k
+        WHERE k.entry_id = e.id AND k.text = ANY(p_seen_words)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.jmdict_kana a
+        WHERE a.entry_id = e.id AND a.text = ANY(p_seen_words)
+      )
   )
   SELECT
-    b.form AS word,
+    -- Prefer the kanji surface form; fall back to kana for kana-only entries.
+    COALESCE(
+      (SELECT k.text FROM public.jmdict_kanji k
+         WHERE k.entry_id = c.id ORDER BY k.id LIMIT 1),
+      (SELECT a.text FROM public.jmdict_kana a
+         WHERE a.entry_id = c.id ORDER BY a.id LIMIT 1)
+    ) AS word,
     (SELECT a.text FROM public.jmdict_kana a
-       WHERE a.entry_id = b.entry_id ORDER BY a.id LIMIT 1) AS reading,
-    b.rank,
+       WHERE a.entry_id = c.id ORDER BY a.id LIMIT 1) AS reading,
+    c.freq_rank::INTEGER AS rank,
     (SELECT array_to_string(s.gloss, '; ') FROM public.jmdict_senses s
-       WHERE s.entry_id = b.entry_id ORDER BY s.id LIMIT 1) AS meaning
-  FROM best b
-  ORDER BY b.rank ASC
+       WHERE s.entry_id = c.id ORDER BY s.id LIMIT 1) AS meaning
+  FROM candidates c
+  ORDER BY c.freq_rank ASC NULLS LAST, c.common DESC, c.id ASC
   LIMIT p_limit;
 $$;
 
