@@ -3,6 +3,7 @@ import { Feed } from './components/Feed'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
 import { Settings } from './components/Settings'
+import { Progress } from './components/Progress'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
@@ -467,11 +468,7 @@ function App() {
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleBackToHub} />
           )
         )}
-        {activeTab === 'progress' && (
-          <div className="fade-in" style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--text-muted)' }}>
-            <p>Progress dashboard placeholder.</p>
-          </div>
-        )}
+        {activeTab === 'progress' && <Progress />}
         {activeTab === 'settings' && <Settings />}
       </main>
       <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav && newsView !== 'reading'} />
