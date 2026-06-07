@@ -63,3 +63,10 @@
   - [x] Phase 4: POS-ranked disambiguation (replaces first-entry-wins), JLPT fallback
         ladder (kanji_jlpt → freq_rank, shown as `≈Nx`), THIRD_PARTY_LICENSES (NAIST
         IPADIC + Apache-2.0) + Settings acknowledgement.
+  - [x] Furigana: multi-kanji compounds shown as one reading over the group (大統領 →
+        だいとうりょう), not dumped on the first kanji; per-kanji RTK kept. Accuracy
+        harness in scripts/furigana-accuracy.mjs (gold set + corpus scan).
+  - [x] Heteronyms: curated watchlist (src/data/heteronyms.ts) of ambiguous-reading
+        words; enricher batches them into one context-aware LLM call via the
+        dictionary-lookup edge fn (type:'readings'), overrides only with an
+        in-candidate hiragana reading, caches result. Needs edge fn redeploy.
