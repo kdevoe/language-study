@@ -7,7 +7,7 @@
  */
 
 import { supabase } from './supabase';
-import { alignOkurigana, hasKanji } from './furigana';
+import { alignReading, hasKanji } from './furigana';
 import type { CoarsePos } from './tokenizer';
 
 export interface JMDictResult {
@@ -327,8 +327,8 @@ export function jmdictToWordDetails(
   const jlptLevel = result.jlptLevel ?? result.derivedJlpt ?? null;
   const jlptDerived = result.jlptLevel == null && jlptLevel != null;
 
-  // Kana-anchored okurigana alignment (shared with the tokenizer).
-  const furiganaMap = alignOkurigana(word, reading);
+  // Per-kanji reading alignment (shared with the tokenizer).
+  const furiganaMap = alignReading(word, reading);
 
   return {
     reading,

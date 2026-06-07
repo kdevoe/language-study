@@ -15,11 +15,11 @@
  */
 
 import type { IpadicFeatures, Tokenizer } from '@sglkc/kuromoji';
-import { isKana, hasKanji, kataToHira, alignOkurigana } from './furigana';
+import { isKana, hasKanji, kataToHira, alignReading } from './furigana';
 
 /** Bump when the tokenizer/dict or the enrichment shape changes, so cached
  *  articles stamped with an older version get re-enriched on next open. */
-export const TOKENIZER_VERSION = 3;
+export const TOKENIZER_VERSION = 4;
 
 /** Coarse part of speech, mapped from kuromoji's Japanese POS labels. */
 export type CoarsePos = 'verb' | 'noun' | 'adjective' | 'adverb' | 'other';
@@ -176,7 +176,7 @@ export function displayFromRaw(raw: IpadicFeatures[]): DisplayToken[] {
 
     if (surfaceHasKanji) {
       token.furigana = readingHira;
-      token.furiganaMap = alignOkurigana(m.surface, readingHira);
+      token.furiganaMap = alignReading(m.surface, readingHira);
     }
 
     if (m.isContent) {
