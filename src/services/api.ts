@@ -220,6 +220,27 @@ export async function fetchWordDefinitionQuick(word: string, contextSentence: st
   }
 }
 
+/**
+ * Batched heteronym reading disambiguation. Sends ambiguous-reading words with
+ * their sentence context + candidate readings to the dictionary-lookup edge fn
+ * (Groq, server-side key); returns one hiragana reading per item, in order.
+ * Returns [] on any failure so the caller keeps the tokenizer's reading.
+ */
+export async function fetchHeteronymReadings(
+  items: { surface: string; sentence: string; candidates: string[] }[],
+): Promise<string[]> {
+  if (items.length === 0) return [];
+  try {
+    const { readings } = await invokeEdgeFn<{ readings: string[] }>(
+      'dictionary-lookup', { type: 'readings', items }, 12000,
+    );
+    return Array.isArray(readings) ? readings : [];
+  } catch (e) {
+    console.warn('Heteronym disambiguation failed (keeping tokenizer readings):', e);
+    return [];
+  }
+}
+
 export async function fetchWordGrammarInsight(word: string, contextSentence: string): Promise<string> {
   try {
     console.log(`🌐 Edge Fn (dictionary-lookup grammar) for "${word}"`);

@@ -158,7 +158,43 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { word, contextSentence, jmdictEntryId, type } = await req.json();
+    const { word, contextSentence, jmdictEntryId, type, items } = await req.json();
+
+    // Batched heteronym reading disambiguation. The client sends words whose
+    // surface has more than one common reading (今日, 市場, 上手, 日本…) with the
+    // sentence they appear in and the candidate readings; Groq picks the right
+    // one per item in a single call. This is the narrow, constrained task an LLM
+    // is actually good at — the deterministic tokenizer (kuromoji) does the rest.
+    if (type === 'readings') {
+      const list: { surface: string; sentence: string; candidates: string[] }[] =
+        Array.isArray(items) ? items.slice(0, 40) : [];
+      if (list.length === 0) {
+        return new Response(JSON.stringify({ readings: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const lines = list.map((it, i) =>
+        `${i + 1}. word: "${it.surface}" | candidates: ${(it.candidates || []).join(', ')} | sentence: "${it.sentence}"`,
+      ).join('\n');
+      const prompt = `You are a Japanese reading disambiguator. For each item, give the correct reading of "word" as it is used in its "sentence", in HIRAGANA only. Pick from "candidates" when the right reading is among them.
+Return ONLY JSON: {"readings": ["…", "…"]} — one hiragana reading per item, in the same order, exactly ${list.length} entries.
+
+${lines}`;
+
+      let readings: string[] = [];
+      try {
+        const text = await groqComplete(prompt, true);
+        const parsed = JSON.parse(text);
+        const arr = Array.isArray(parsed) ? parsed : (parsed.readings ?? parsed.results ?? []);
+        if (Array.isArray(arr)) readings = arr.map((r: unknown) => String(r ?? '').trim());
+      } catch (e) {
+        console.warn('[dictionary-lookup] readings disambiguation failed:', e);
+      }
+      return new Response(JSON.stringify({ readings }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!word) {
       return new Response(JSON.stringify({ error: 'word is required' }), {
