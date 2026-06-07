@@ -154,22 +154,35 @@ export function WordModal({
           justifyContent: anchor === 'top' ? 'center' : 'flex-start' 
         }}>
           {segments ? (
-            segments.map((s, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ 
-                  height: '0.9rem', fontSize: '0.75rem', 
-                  color: 'var(--text-muted)', letterSpacing: '0.04em', 
-                  fontFamily: 'var(--font-sans)', fontWeight: 800,
-                  opacity: s.kanji === s.kana || (s.kanji.match(/[\u3040-\u309f\u30a0-\u30ff]/) && s.kanji === s.kana) ? 0 : 1
-                }}>
-                  {s.kana}
-                </span>
-                <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{s.kanji}</span>
-                <span style={{ height: '0.8rem', fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
-                  {rtkKanjiMap[s.kanji] || ''}
-                </span>
-              </div>
-            ))
+            segments.map((s, idx) => {
+              // A multi-kanji segment (e.g. \u5927\u7d71\u9818 \u2192 \u3060\u3044\u3068\u3046\u308a\u3087\u3046) carries one
+              // reading over the whole run \u2014 we don't have per-character readings,
+              // so center the reading above the group and show each kanji's RTK
+              // keyword below, rather than guess a wrong per-kanji split.
+              const kanjiChars = Array.from(s.kanji);
+              return (
+                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span style={{
+                    height: '0.9rem', fontSize: '0.75rem',
+                    color: 'var(--text-muted)', letterSpacing: '0.04em',
+                    fontFamily: 'var(--font-sans)', fontWeight: 800,
+                    opacity: s.kanji === s.kana ? 0 : 1
+                  }}>
+                    {s.kana}
+                  </span>
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'baseline' }}>
+                    {kanjiChars.map((char, ci) => (
+                      <div key={ci} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span className="serif" style={{ fontSize: '2.8rem', lineHeight: 1, color: 'var(--text-main)', fontWeight: 500 }}>{char}</span>
+                        <span style={{ height: '0.8rem', fontSize: '0.55rem', color: '#4a5d23', textTransform: 'uppercase', marginTop: '0.1rem', fontFamily: 'var(--font-sans)', fontWeight: 800, letterSpacing: '0.04em' }}>
+                          {rtkKanjiMap[char] || ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           ) : (
              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '0.25em', marginBottom: '0.2rem', fontFamily: 'var(--font-sans)', fontWeight: 800 }}>{wordData.reading}</span>

@@ -65,11 +65,12 @@ export function alignOkurigana(
         readingEnd = reading.length;
       }
 
-      const blockReading = reading.slice(rIdx, readingEnd);
-      segments.push({ kanji: kanjiRun[0], kana: blockReading });
-      for (let k = 1; k < kanjiRun.length; k++) {
-        segments.push({ kanji: kanjiRun[k], kana: '' });
-      }
+      // Keep a contiguous kanji run as ONE segment: the reading spans the whole
+      // run (大統領 → だいとうりょう). Splitting per kanji would need per-character
+      // reading data we don't have — even-distribution is wrong for unequal
+      // compounds (首相 → しゅ/しょう, not しゅしょ/う). The modal renders this
+      // reading over the group and still shows each kanji's RTK keyword below.
+      segments.push({ kanji: kanjiRun.join(''), kana: reading.slice(rIdx, readingEnd) });
       rIdx = readingEnd;
       i = j;
     }
