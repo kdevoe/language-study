@@ -46,3 +46,20 @@
   - [ ] Only if spikes recur under real concurrent load: revisit `jmdict_vocab_candidates`
         (full jmdict_senses scan w/ ILIKE ANY on gloss, runs per process-article) or
         bump compute. Not needed as of resolution.
+- [x] Client-side morphological tokenization (kuromoji) — 2026-06-07
+  - Replaces buggy LLM tokenization (Gemini Pass 2 + exact-surface Pass 3) that
+    split words at arbitrary boundaries (鎮める → 鎮 read ちん, wrong meaning, no JLPT).
+  - [x] Phase 1: `src/services/tokenizer.ts` (kuromoji singleton, inflection merge,
+        okurigana alignment, content-word classification) + dict self-hosted under
+        `public/kuromoji-dict/` (~17 MB, SW/HTTP cached). Shared kana helpers in
+        `src/services/furigana.ts`. kuromoji lazy-imported → its own 29 KB-gz chunk.
+        Verified: 鎮めて→lemma 鎮める/furi しず; した→する; 〜ている stays split.
+  - [x] Phase 2: `src/services/enrich.ts` (`enrichArticle`) — tokenize → batch
+        `lookupLemmasBatch` by lemma → attach reading/meaning/JLPT/furigana. Reader
+        renders raw text first, swaps in enriched blocks, caches them. Lemma-keyed
+        SRS so conjugations collapse and the end-of-article sweep agrees.
+  - [x] Phase 3: process-article stores raw `{type, text}` paragraphs; Pass 2/3 deleted
+        (one fewer Gemini call, no linking queries). Old content[] articles auto-heal.
+  - [x] Phase 4: POS-ranked disambiguation (replaces first-entry-wins), JLPT fallback
+        ladder (kanji_jlpt → freq_rank, shown as `≈Nx`), THIRD_PARTY_LICENSES (NAIST
+        IPADIC + Apache-2.0) + Settings acknowledgement.

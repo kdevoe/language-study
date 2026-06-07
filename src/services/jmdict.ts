@@ -7,6 +7,8 @@
  */
 
 import { supabase } from './supabase';
+import { alignOkurigana, hasKanji } from './furigana';
+import type { CoarsePos } from './tokenizer';
 
 export interface JMDictResult {
   entryId: string;
@@ -19,7 +21,11 @@ export interface JMDictResult {
     misc: string[];
   }[];
   jlptLevel: number | null;
+  /** Best (lowest) frequency band across the entry's forms; null = rare/unranked. */
+  freqRank: number | null;
   isCommon: boolean;
+  /** JLPT level inferred from kanji/frequency when jlptLevel is null (Phase 4). */
+  derivedJlpt?: number | null;
 }
 
 const LOOKUP_TIMEOUT_MS = 6000;
@@ -76,7 +82,7 @@ async function lookupByKana(text: string): Promise<JMDictResult[]> {
 export async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> {
   // Fetch entries, kanji forms, kana forms, and senses in parallel
   const [entriesRes, kanjiRes, kanaRes, sensesRes] = await withTimeout(Promise.all([
-    supabase.from('jmdict_entries').select('id, common, jlpt_level').in('id', entryIds),
+    supabase.from('jmdict_entries').select('id, common, jlpt_level, freq_rank').in('id', entryIds),
     supabase.from('jmdict_kanji').select('entry_id, text').in('entry_id', entryIds),
     supabase.from('jmdict_kana').select('entry_id, text').in('entry_id', entryIds),
     supabase.from('jmdict_senses').select('entry_id, pos, gloss, field, misc').in('entry_id', entryIds),
@@ -100,9 +106,139 @@ export async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> 
       readings,
       senses,
       jlptLevel: entry.jlpt_level,
+      freqRank: entry.freq_rank ?? null,
       isCommon: entry.common || false,
     };
   });
+}
+
+// ── Lemma batch lookup + disambiguation ──────────────────────────────────────
+// kuromoji gives us a lemma (鎮める) and coarse POS per content word; one query
+// per article collapses N per-word lookups into a single round-trip.
+
+/** Does any sense of this entry match the analyzer's coarse POS? */
+function posMatches(result: JMDictResult, pos: CoarsePos | undefined): boolean {
+  if (!pos) return false;
+  const codes = result.senses.flatMap(s => s.pos);
+  if (pos === 'verb') return codes.some(c => /^v/.test(c));
+  if (pos === 'noun') return codes.some(c => /^n/.test(c));
+  if (pos === 'adjective') return codes.some(c => /^adj/.test(c));
+  if (pos === 'adverb') return codes.some(c => /^adv/.test(c) || c === 'n-adv');
+  return false;
+}
+
+/**
+ * Pick the best entry for a lemma: prefer a POS match, then common words, then
+ * the most frequent (lowest freq_rank). Replaces the old "first entry wins".
+ */
+export function pickBestEntry(candidates: JMDictResult[], pos?: CoarsePos): JMDictResult {
+  return [...candidates].sort((a, b) => {
+    const pa = posMatches(a, pos) ? 0 : 1;
+    const pb = posMatches(b, pos) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    if (a.isCommon !== b.isCommon) return a.isCommon ? -1 : 1;
+    return (a.freqRank ?? Infinity) - (b.freqRank ?? Infinity);
+  })[0];
+}
+
+/**
+ * Look up many lemmas at once. Returns lemma → best JMDict entry.
+ * Kanji surface matches win over kana matches for the same lemma.
+ * Entries with no JLPT tag get a derived level (kanji_jlpt, else freq_rank).
+ */
+export async function lookupLemmasBatch(
+  lemmas: string[],
+  posByLemma?: Map<string, CoarsePos>,
+): Promise<Map<string, JMDictResult>> {
+  const unique = [...new Set(lemmas.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+
+  const [kanjiRes, kanaRes] = await withTimeout(Promise.all([
+    supabase.from('jmdict_kanji').select('entry_id, text').in('text', unique),
+    supabase.from('jmdict_kana').select('entry_id, text').in('text', unique),
+  ]), LOOKUP_TIMEOUT_MS, 'lemma batch surface lookup');
+
+  // lemma → candidate entry ids, kanji matches kept separate so they take priority.
+  const kanjiIds = new Map<string, Set<string>>();
+  const kanaIds = new Map<string, Set<string>>();
+  const collect = (rows: { entry_id: string; text: string }[] | null, into: Map<string, Set<string>>) => {
+    (rows || []).forEach(r => {
+      if (!into.has(r.text)) into.set(r.text, new Set());
+      into.get(r.text)!.add(r.entry_id);
+    });
+  };
+  collect(kanjiRes.data, kanjiIds);
+  collect(kanaRes.data, kanaIds);
+
+  const allIds = new Set<string>();
+  [kanjiIds, kanaIds].forEach(m => m.forEach(set => set.forEach(id => allIds.add(id))));
+  if (allIds.size === 0) return new Map();
+
+  const entries = await fetchEntries([...allIds]);
+  const byId = new Map(entries.map(e => [e.entryId, e]));
+
+  const result = new Map<string, JMDictResult>();
+  for (const lemma of unique) {
+    const ids = (kanjiIds.get(lemma)?.size ? kanjiIds.get(lemma) : kanaIds.get(lemma)) ?? new Set();
+    const cands = [...ids].map(id => byId.get(id)).filter((e): e is JMDictResult => !!e);
+    if (cands.length > 0) result.set(lemma, pickBestEntry(cands, posByLemma?.get(lemma)));
+  }
+
+  await applyJlptFallback(result);
+  return result;
+}
+
+/**
+ * Fill in a derived JLPT level for matched entries that carry no official tag:
+ *   (a) the hardest (lowest-numbered) JLPT level among the lemma's kanji, else
+ *   (b) a coarse bucket from frequency rank.
+ * Stored on `derivedJlpt` so the UI can mark it as approximate.
+ */
+async function applyJlptFallback(byLemma: Map<string, JMDictResult>): Promise<void> {
+  const needKanji = new Set<string>();
+  byLemma.forEach((entry, lemma) => {
+    if (entry.jlptLevel == null) {
+      for (const ch of lemma) if (hasKanji(ch)) needKanji.add(ch);
+    }
+  });
+
+  let kanjiLevels = new Map<string, number>();
+  if (needKanji.size > 0) {
+    try {
+      const { data } = await withTimeout(
+        supabase.from('kanji_jlpt').select('kanji, jlpt_level').in('kanji', [...needKanji]),
+        LOOKUP_TIMEOUT_MS,
+        'kanji_jlpt fallback',
+      );
+      kanjiLevels = new Map(
+        ((data || []) as { kanji: string; jlpt_level: number }[]).map(r => [r.kanji, r.jlpt_level]),
+      );
+    } catch (e) {
+      console.warn('kanji_jlpt fallback failed:', e);
+    }
+  }
+
+  byLemma.forEach((entry, lemma) => {
+    if (entry.jlptLevel != null) return;
+    // Hardest kanji = lowest JLPT number (N1 hardest = 1).
+    let derived: number | null = null;
+    for (const ch of lemma) {
+      const lv = kanjiLevels.get(ch);
+      if (lv != null) derived = derived == null ? lv : Math.min(derived, lv);
+    }
+    if (derived == null) derived = freqRankToJlpt(entry.freqRank);
+    entry.derivedJlpt = derived;
+  });
+}
+
+/** Coarse JLPT bucket from a frequency band (1 = most common … 48 = rare). */
+function freqRankToJlpt(rank: number | null): number | null {
+  if (rank == null) return null;
+  if (rank <= 4) return 5;
+  if (rank <= 8) return 4;
+  if (rank <= 16) return 3;
+  if (rank <= 24) return 2;
+  return 1;
 }
 
 /**
@@ -181,101 +317,28 @@ Answer (just the number):`;
 export function jmdictToWordDetails(
   word: string,
   result: JMDictResult
-): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null; furiganaMap: { kanji: string; kana: string }[] } {
+): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null; jlptDerived: boolean; furiganaMap: { kanji: string; kana: string }[] } {
   const reading = result.readings[0] || '';
   const allGlosses = result.senses.flatMap(s => s.gloss);
   const meaning = allGlosses.slice(0, 3).join('; ') || '';
   const pos = [...new Set(result.senses.flatMap(s => s.pos))];
 
-  // Build furiganaMap from the word and its kana reading
-  const furiganaMap = buildFuriganaMap(word, reading);
+  // Prefer the official JLPT tag; fall back to the derived level when untagged.
+  const jlptLevel = result.jlptLevel ?? result.derivedJlpt ?? null;
+  const jlptDerived = result.jlptLevel == null && jlptLevel != null;
+
+  // Kana-anchored okurigana alignment (shared with the tokenizer).
+  const furiganaMap = alignOkurigana(word, reading);
 
   return {
     reading,
     meaning,
     jmdictEntryId: result.entryId,
     pos,
-    jlptLevel: result.jlptLevel,
+    jlptLevel,
+    jlptDerived,
     furiganaMap,
   };
-}
-
-const isKana = (c: string) => /[\u3040-\u309f\u30a0-\u30ff]/.test(c);
-
-/**
- * Build a furigana map from a word and its reading.
- * Splits the word into segments: kana chars map to themselves,
- * kanji groups get the remaining reading portion.
- * 
- * Example: "食べる" + "たべる" → [{kanji:"食", kana:"た"}, {kanji:"べ", kana:"べ"}, {kanji:"る", kana:"る"}]
- */
-function buildFuriganaMap(word: string, reading: string): { kanji: string; kana: string }[] {
-  const chars = Array.from(word);
-  
-  // If the word is entirely kana, each char maps to itself
-  if (chars.every(isKana)) {
-    return chars.map(c => ({ kanji: c, kana: c }));
-  }
-
-  const segments: { kanji: string; kana: string }[] = [];
-  let readingIdx = 0;
-
-  for (let i = 0; i < chars.length; i++) {
-    const char = chars[i];
-    if (isKana(char)) {
-      segments.push({ kanji: char, kana: char });
-      const kanaPos = reading.indexOf(char, readingIdx);
-      if (kanaPos !== -1) {
-        readingIdx = kanaPos + 1;
-      } else {
-        readingIdx++;
-      }
-    } else {
-      // Kanji character or consecutive kanjis
-      let kanjiEnd = i + 1;
-      while (kanjiEnd < chars.length && !isKana(chars[kanjiEnd])) {
-        kanjiEnd++;
-      }
-      
-      // Determine the reading for this block of kanji
-      let readingEnd = readingIdx;
-      if (kanjiEnd < chars.length) {
-        const nextKana = chars[kanjiEnd];
-        const nextAnchorPos = reading.indexOf(nextKana, readingIdx);
-        readingEnd = nextAnchorPos !== -1 ? nextAnchorPos : readingIdx + (kanjiEnd - i);
-      } else {
-        readingEnd = reading.length;
-      }
-
-      const kanjiBlock = chars.slice(i, kanjiEnd);
-      const blockReading = reading.slice(readingIdx, readingEnd);
-
-      // MANDATORY: Split the block into individual kanji characters
-      // so each gets its own spacing and RTK meaning in the UI.
-      if (kanjiBlock.length === 1) {
-        segments.push({ kanji: kanjiBlock[0], kana: blockReading });
-      } else {
-        // Balanced heuristic for multi-kanji blocks (e.g., 2 kanji + 4 kana -> 2:2)
-        const readingPerKanji = Math.floor(blockReading.length / kanjiBlock.length);
-        const remainder = blockReading.length % kanjiBlock.length;
-
-        let rIdx = 0;
-        for (let k = 0; k < kanjiBlock.length; k++) {
-          const count = readingPerKanji + (k < remainder ? 1 : 0);
-          segments.push({
-            kanji: kanjiBlock[k],
-            kana: blockReading.slice(rIdx, rIdx + count)
-          });
-          rIdx += count;
-        }
-      }
-
-      readingIdx = readingEnd;
-      i = kanjiEnd - 1;
-    }
-  }
-
-  return segments.length > 0 ? segments : [{ kanji: word, kana: reading }];
 }
 
 // ── JLPT corpus coverage ────────────────────────────────────────────────────
