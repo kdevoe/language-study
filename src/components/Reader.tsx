@@ -3,12 +3,13 @@ import { FuriganaText, HitWeight } from './FuriganaText';
 import type { MasteryLevel } from '../services/store';
 import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
-import { 
-  rewriteArticleWithGemini, 
-  fetchWordDefinitionQuick, 
-  fetchWordGrammarInsight, 
+import {
+  rewriteArticleWithGemini,
+  fetchWordDefinitionQuick,
+  fetchWordGrammarInsight,
   fetchSentenceTranslation
 } from '../services/api';
+import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { touchLock } from '../services/touchLock';
 import { } from 'lucide-react'; // Empty block to show we're using icons elsewhere if needed, or just clear it.
@@ -65,11 +66,35 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     readerFontSize, readerFontWeight
   } = useAppStore();
 
+  // Tracks the article currently being loaded so a slow background enrichment
+  // from a previous article can't clobber a newer one the reader switched to.
+  const loadIdRef = React.useRef<string | null>(null);
+
+  // Tokenize + dictionary-link the article on the client, then swap in the
+  // enriched blocks and cache them. Runs in the background so the raw text shows
+  // immediately (sub-second flash on the very first session, then dict-cached).
+  const enrichInBackground = (article: any) => {
+    if (!article || isEnriched(article.blocks)) return;
+    const loadId = article.id ?? null;
+    enrichArticle(article.blocks)
+      .then((blocks) => {
+        if (loadIdRef.current !== loadId) return; // reader moved on
+        const enriched = { ...article, blocks };
+        setCurrentArticle(enriched);
+        if (article.id) saveProcessedArticle(article.id, enriched);
+      })
+      .catch((e) => console.warn('[Reader] enrichment failed:', e));
+  };
+
   const loadArticle = async () => {
+    loadIdRef.current = initialArticle?.id ?? null;
+
     // 1. Check Cache first for instant return
     if (initialArticle?.id && articlesCache[initialArticle.id]) {
-      setCurrentArticle(articlesCache[initialArticle.id]);
+      const cached = articlesCache[initialArticle.id];
+      setCurrentArticle(cached);
       setLoading(false);
+      enrichInBackground(cached);
       return;
     }
 
@@ -100,6 +125,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       setCurrentArticle(processed);
       // 3. Save to cache for next time
       if (selectedRaw.id) saveProcessedArticle(selectedRaw.id, processed);
+      // 4. Tokenize + dictionary-link on the client, then swap in enriched blocks.
+      enrichInBackground(processed);
     } else {
       // Emergency Fallback
       setLoading(false);
@@ -140,10 +167,12 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     const articleWords = new Map<string, any>();
     currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => {
-        if (!w.furigana) return;
-        const existing = articleWords.get(w.text);
+        if (!w.isInteractive && !w.furigana) return;
+        // Key by lemma so conjugations collapse and the key matches clickedWords.
+        const key = w.lemma ?? w.details?.word ?? w.text;
+        const existing = articleWords.get(key);
         if (!existing || (!existing.details && (w.details || w.jmdict_entry_id))) {
-          articleWords.set(w.text, w);
+          articleWords.set(key, w);
         }
       });
     });
@@ -155,7 +184,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       // Make sure a never-seen word exists before grading it.
       if (!wordDatabase[word]) {
         saveWordDefinition(word, details
-          ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
+          ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
           : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
       }
       recordWordSeen(word, true);
@@ -323,10 +352,14 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   };
 
   const renderParagraph = (block: any, blockIdx: number) => {
+    // Before client enrichment finishes, a block may carry only raw text — render
+    // it as one segment so the text (and sentence-tap) work during the brief flash.
+    const content: any[] = block.content ?? (block.text ? [{ text: block.text }] : []);
+
     // 1. Group tokens into sentences
     const sentences: any[][] = [];
     let currentSent: any[] = [];
-    block.content.forEach((seg: any) => {
+    content.forEach((seg: any) => {
       currentSent.push(seg);
       if (seg.text.match(/[。！？\n]/)) {
         sentences.push(currentSent);
@@ -357,7 +390,8 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                   onClick={(e) => {
                     const tid = `${sentenceId}-${j}`;
                     if (segment.details) handleWordClick(segment.details as WordDetails, sentText, e, tid);
-                    else handleDictionaryLookup(segment.text, sentText, e, tid, segment.jmdict_entry_id);
+                    // Look up by lemma (鎮める) when we have it, not the surface form (鎮めて).
+                    else handleDictionaryLookup(segment.lemma ?? segment.text, sentText, e, tid, segment.jmdict_entry_id);
                   }}
                 />
               );

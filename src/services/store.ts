@@ -58,6 +58,7 @@ export interface WordData {
   grammarNote?: string;
   furiganaMap?: { kanji: string; kana: string }[];
   jlptLevel?: number | null;
+  jlptDerived?: boolean;
   pos?: string[];
   jmdictEntryId?: string;
   mastery: MasteryLevel;          // derived bucket, kept in sync with `difficulty`

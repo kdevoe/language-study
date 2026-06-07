@@ -3,13 +3,19 @@ import { lookupWord, disambiguateWithLLM, jmdictToWordDetails, fetchEntries } fr
 
 export interface ArticleBlock {
   type: 'paragraph' | 'yugen-box';
-  content?: { 
-    text: string; 
-    furigana?: string; 
-    isInteractive?: boolean; 
+  /** Raw paragraph text (server-stored shape). Tokenized into `content` client-side. */
+  text?: string;
+  content?: {
+    text: string;
+    furigana?: string;
+    isInteractive?: boolean;
+    /** Dictionary/base form, used for lookup and SRS keying (conjugations collapse here). */
+    lemma?: string;
     details?: WordDetails;
     jmdict_entry_id?: string;
   }[];
+  /** Tokenizer version that produced `content`; gates client re-enrichment. */
+  tokenizerVersion?: number;
   keyword?: string;
   reading?: string;
   description?: string;

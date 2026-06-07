@@ -13,6 +13,8 @@ export interface WordDetails {
   jmdictEntryId?: string;
   pos?: string[];
   jlptLevel?: number | null;
+  /** True when jlptLevel was inferred (kanji/frequency) rather than an official tag. */
+  jlptDerived?: boolean;
 }
 
 interface Props {
@@ -202,11 +204,12 @@ export function WordModal({
                 style={{ fontSize: '1.25rem', color: 'var(--text-main)', lineHeight: 1.5 }}
               >
                 {wordData.jlptLevel && (
-                  <span className="sans" style={{ 
-                    fontSize: '0.85rem', fontWeight: 800, color: '#4a5d23', 
+                  <span className="sans" style={{
+                    fontSize: '0.85rem', fontWeight: 800, color: '#4a5d23',
                     marginRight: '0.6rem', opacity: 0.8, verticalAlign: 'middle'
-                  }}>
-                    N{wordData.jlptLevel}
+                  }}
+                  title={wordData.jlptDerived ? 'Approximate level (inferred from kanji / frequency)' : undefined}>
+                    {wordData.jlptDerived ? '≈' : ''}N{wordData.jlptLevel}
                   </span>
                 )}
                 {wordData.meaning}

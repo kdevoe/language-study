@@ -374,9 +374,16 @@ export function Settings() {
               Reset All Progress
             </button>
           </div>
+
+          {/* Acknowledgements — required attribution for the bundled dictionary. */}
+          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.6, marginTop: '2rem', opacity: 0.7 }}>
+            Japanese analysis by kuromoji.js (Apache-2.0). Dictionary data from
+            mecab-ipadic, © Nara Institute of Science and Technology (NAIST). See
+            THIRD_PARTY_LICENSES for full notices.
+          </p>
         </div>
       </details>
-      
+
     </div>
   );
 }

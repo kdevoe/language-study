@@ -348,73 +348,16 @@ Output EXACTLY a JSON array:
       contents: prompt1,
       config: { responseMimeType: 'application/json' },
     });
-    let rawText1 = (result1.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+    const rawText1 = (result1.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
     const rawBlocks = JSON.parse(rawText1);
 
-    // Pass 2: Tokenize + furigana
-    const prompt2 = `
-You are a morphological analyzer. For every "text" field in this JSON, replace it with a "content" array of individual Japanese tokens.
-CRITICAL: For EVERY word token containing Kanji, provide a "furigana" field showing its reading.
-CRITICAL: Strip all brackets [], special markup from text.
-
-Input:
-${JSON.stringify(rawBlocks, null, 2)}
-
-Output EXACTLY a JSON array:
-[{"type":"paragraph"|"yugen-box","content":[{"text":"...","furigana":"..."}],"keyword":"...","reading":"...","description":"..."}]
-`;
-
-    console.log(`[process-article] Pass 2 (tokenize) for user ${userId}`);
-    const result2 = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt2,
-      config: { responseMimeType: 'application/json' },
-    });
-    let rawText2 = (result2.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
-    const processedBlocks = JSON.parse(rawText2);
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pass 3: Server-Side JMDict Linking
-    // ─────────────────────────────────────────────────────────────────────────
-    try {
-      console.log(`[process-article] Pass 3 (JMDict linking) for user ${userId}`);
-      
-      const tokensToLink = new Set<string>();
-      processedBlocks.forEach((block: any) => {
-        block.content?.forEach((token: any) => {
-          if (token.furigana) tokensToLink.add(token.text);
-        });
-      });
-
-      const uniqueWords = Array.from(tokensToLink);
-      if (uniqueWords.length > 0) {
-        // Batch query Kanji and Kana matches
-        const [kanjiRes, kanaRes] = await Promise.all([
-          supabase.from('jmdict_kanji').select('entry_id, text').in('text', uniqueWords),
-          supabase.from('jmdict_kana').select('entry_id, text').in('text', uniqueWords),
-        ]);
-
-        const resolvedMap = new Map<string, string>(); // word -> entry_id
-
-        // Simple mapping: Store the first entry_id found for each word
-        // (In a more advanced version, we could check for 'common' flags or disambiguate)
-        kanjiRes.data?.forEach((r: any) => { if (!resolvedMap.has(r.text)) resolvedMap.set(r.text, r.entry_id); });
-        kanaRes.data?.forEach((r: any) => { if (!resolvedMap.has(r.text)) resolvedMap.set(r.text, r.entry_id); });
-
-        // Update blocks with entry IDs
-        processedBlocks.forEach((block: any) => {
-          block.content?.forEach((token: any) => {
-            if (resolvedMap.has(token.text)) {
-              token.jmdict_entry_id = resolvedMap.get(token.text);
-            }
-          });
-        });
-        console.log(`[process-article] Successfully linked ${resolvedMap.size} unique tokens.`);
-      }
-    } catch (linkErr) {
-      console.error('[process-article] JMDict linking error (skipping):', linkErr);
-      // We don't fail the whole request if linking fails; just return unlinked article
-    }
+    // Store paragraphs as raw text ({type, text}); the client tokenizes, adds
+    // furigana, and links JMDict entries with a real morphological analyzer
+    // (kuromoji). Tokenization/furigana/linking used to be Gemini Pass 2 + a
+    // server-side exact-surface Pass 3 — both removed: an LLM with no lexicon
+    // split words at arbitrary boundaries (鎮める → 鎮 read ちん). yugen-box
+    // blocks keep Gemini's keyword/reading/description (that path is reliable).
+    const processedBlocks = rawBlocks;
 
     // 4. Save to processed_news
     const finalArticleId = articleId || `${Date.now()}-${userId.slice(0, 8)}`;
