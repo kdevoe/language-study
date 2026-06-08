@@ -21,6 +21,10 @@ interface ReaderProps {
   onComplete?: () => void;
 }
 
+// Minimal shape needed to grade a word: definition details (for a never-seen word)
+// and a jmdict id fallback. Article tokens carry more, but this is all grading reads.
+type GradeToken = { details?: WordDetails; jmdict_entry_id?: string };
+
 // Deterministic tap-target sizing. Kanji content words (furigana present) are
 // the ones users actually look up, so they get the widest hit area; short kana
 // tokens are almost always particles/grammatical glue, so they yield to their
@@ -45,14 +49,24 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   
   const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
 
-  // End-of-article mastery sweep. Runs at most once per article, triggered either
-  // by the 次へ button or by scrolling the end of the text into view (many readers
-  // never tap the button). finishRef mirrors the latest handler so the observer
-  // always calls a fresh closure (current clickedWords / wordDatabase) without
-  // having to re-subscribe.
-  const hasSweptRef = React.useRef(false);
-  const endSentinelRef = React.useRef<HTMLDivElement | null>(null);
-  const finishRef = React.useRef<() => void>(() => {});
+  // ── Grade-on-visible ──────────────────────────────────────────────────────
+  // A word is graded ('skip') once it has been FULLY on screen (no partial clip)
+  // for a short dwell, so reading is tracked wherever the reader leaves off — not
+  // only on reaching the end. Replaces the old end-of-article sweep, which graded
+  // every word whether or not it was ever scrolled into view.
+  const DWELL_MS = 500; // must stay fully visible this long to count as "read"
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const visObserverRef = React.useRef<IntersectionObserver | null>(null);
+  const dwellTimersRef = React.useRef<Map<string, number>>(new Map());
+  const gradedRef = React.useRef<Set<string>>(new Set());
+  const gradedArticleIdRef = React.useRef<string | null>(null);
+  // Richest token per gradeable lemma in the current article (carries details /
+  // jmdict id so a never-seen word can be stored and JLPT-seeded).
+  const wordPayloadsRef = React.useRef<Map<string, GradeToken>>(new Map());
+  // Latest clickedWords / grader for the observer callbacks, mirrored into refs so
+  // the observer never has to re-subscribe.
+  const clickedWordsRef = React.useRef(clickedWords);
+  const gradeRef = React.useRef<(key: string) => void>(() => {});
 
   const segmenter = React.useMemo(() => {
     try {
@@ -65,6 +79,36 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle,
     readerFontSize, readerFontWeight
   } = useAppStore();
+
+  // Keep the observer's view of mutable state fresh without re-creating it.
+  clickedWordsRef.current = clickedWords;
+
+  // Grade one word as a 'skip' (read past without a lookup). Idempotent per article
+  // session, and a no-op for words the reader tapped (those go through the click path).
+  const gradeWordByKey = (key: string) => {
+    if (gradedRef.current.has(key)) return;
+    if (clickedWordsRef.current.has(key)) return;
+    const token = wordPayloadsRef.current.get(key);
+    if (!token) return;
+    gradedRef.current.add(key);
+    const details = token.details;
+    const jlptLevel = details?.jlptLevel;
+    // Make sure a never-seen word exists before grading it (read latest store state).
+    if (!useAppStore.getState().wordDatabase[key]) {
+      saveWordDefinition(key, details
+        ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
+        : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
+    }
+    recordWordSeen(key, true);
+    applyDifficultyEvent(key, 'skip', jlptLevel);
+  };
+  gradeRef.current = gradeWordByKey;
+
+  // Stable ref callback so re-renders don't churn observation. Reads each word's key
+  // from data-grade-key, so one shared function serves every word element.
+  const observeWord = React.useCallback((el: HTMLElement | null) => {
+    if (el) visObserverRef.current?.observe(el);
+  }, []);
 
   // Tracks the article currently being loaded so a slow background enrichment
   // from a previous article can't clobber a newer one the reader switched to.
@@ -142,58 +186,75 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     if (!currentArticle && !loading) loadArticle();
   }, [initialArticle]);
 
-  // A new article means the sweep is allowed to run again.
+  // Build the gradeable-word payload map for the article: the richest token per
+  // lemma (details/jmdict id win), so a word can be stored and JLPT-seeded on grade.
+  // Rebuilds when enrichment swaps in linked blocks.
   useEffect(() => {
-    hasSweptRef.current = false;
-  }, [currentArticle]);
-
-  // Fire the sweep when the end-of-text marker scrolls into view, so reading the
-  // whole article counts even when the reader never taps 次へ.
-  useEffect(() => {
-    const el = endSentinelRef.current;
-    if (!el || !currentArticle) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some(e => e.isIntersecting)) finishRef.current();
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [currentArticle, loading]);
-
-  const handleFinishArticle = () => {
-    if (hasSweptRef.current) return; // once per article — button or scroll, whichever comes first
-    hasSweptRef.current = true;
-    // Keep the richest token per word (one with details/jmdict id) so we can seed
-    // difficulty from JLPT and store a real entry for never-clicked new words.
-    const articleWords = new Map<string, any>();
+    const map = new Map<string, GradeToken>();
     currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => {
         if (!w.isInteractive && !w.furigana) return;
         // Key by lemma so conjugations collapse and the key matches clickedWords.
         const key = w.lemma ?? w.details?.word ?? w.text;
-        const existing = articleWords.get(key);
-        if (!existing || (!existing.details && (w.details || w.jmdict_entry_id))) {
-          articleWords.set(key, w);
-        }
+        const existing = map.get(key);
+        if (!existing || (!existing.details && (w.details || w.jmdict_entry_id))) map.set(key, w);
       });
     });
+    wordPayloadsRef.current = map;
+  }, [currentArticle]);
 
-    articleWords.forEach((token, word) => {
-      if (clickedWords.has(word)) return;
-      const details = token.details as WordDetails | undefined;
-      const jlptLevel = details?.jlptLevel;
-      // Make sure a never-seen word exists before grading it.
-      if (!wordDatabase[word]) {
-        saveWordDefinition(word, details
-          ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
-          : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
+  // Watch every fully-visible word; grade it once it has dwelled on screen. This is
+  // the sole grading path — words never scrolled into view stay ungraded by design.
+  useEffect(() => {
+    if (!currentArticle) return;
+
+    // Reset session state only when the article itself changes, so a mid-read
+    // enrichment swap (same id, new object) doesn't re-grade what's already done.
+    const id = currentArticle.id ?? null;
+    if (gradedArticleIdRef.current !== id) {
+      gradedArticleIdRef.current = id;
+      gradedRef.current = new Set();
+    }
+    const timers = dwellTimersRef.current; // stable across this effect's lifetime
+    timers.forEach((t) => clearTimeout(t));
+    timers.clear();
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const el = entry.target as HTMLElement;
+        const key = el.dataset.gradeKey;
+        if (!key) continue;
+        // threshold 1.0 => the whole word box is inside the viewport (no partial clip).
+        const fullyVisible = entry.isIntersecting && entry.intersectionRatio >= 0.999;
+        if (fullyVisible) {
+          if (gradedRef.current.has(key)) { observer.unobserve(el); continue; }
+          if (!timers.has(key)) {
+            const timer = window.setTimeout(() => {
+              timers.delete(key);
+              gradeRef.current(key);
+              observer.unobserve(el); // graded — stop watching this word
+            }, DWELL_MS);
+            timers.set(key, timer);
+          }
+        } else {
+          // Scrolled away before the dwell completed — didn't actually read it.
+          const timer = timers.get(key);
+          if (timer) { clearTimeout(timer); timers.delete(key); }
+        }
       }
-      recordWordSeen(word, true);
-      // Reading past a word without a lookup nudges it toward "known".
-      applyDifficultyEvent(word, 'skip', jlptLevel);
-    });
-  };
-  // Keep the observer pointed at the latest closure every render.
-  finishRef.current = handleFinishArticle;
+    }, { threshold: [1.0] });
+
+    visObserverRef.current = observer;
+    // Observe words already in the DOM; observeWord handles ones mounted later.
+    contentRef.current?.querySelectorAll<HTMLElement>('[data-grade-key]').forEach((el) => observer.observe(el));
+
+    return () => {
+      observer.disconnect();
+      visObserverRef.current = null;
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, [currentArticle]);
 
   const determineAnchor = (e: any) => {
     const y = 'clientY' in e ? e.clientY : (e.touches?.[0]?.clientY || 0);
@@ -380,20 +441,25 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         >
           {sentTokens.map((segment, j) => {
             if (segment.furigana || segment.isInteractive) {
+              // Key by lemma so the grade key matches clickedWords and the payload map.
+              const gradeKey = segment.lemma ?? segment.details?.word ?? segment.text;
               return (
-                <FuriganaText
-                  key={`${sentenceId}-${j}`}
-                  word={segment.text}
-                  furigana={segment.furigana}
-                  hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[segment.text]?.mastery)}
-                  isSelected={activeHighlightId === `${sentenceId}-${j}`}
-                  onClick={(e) => {
-                    const tid = `${sentenceId}-${j}`;
-                    if (segment.details) handleWordClick(segment.details as WordDetails, sentText, e, tid);
-                    // Look up by lemma (鎮める) when we have it, not the surface form (鎮めて).
-                    else handleDictionaryLookup(segment.lemma ?? segment.text, sentText, e, tid, segment.jmdict_entry_id);
-                  }}
-                />
+                // Inline wrapper carries the grade key and is the intersection target,
+                // so "fully visible for a dwell" grades this word (see grade-on-visible).
+                <span key={`${sentenceId}-${j}`} ref={observeWord} data-grade-key={gradeKey} style={{ display: 'inline' }}>
+                  <FuriganaText
+                    word={segment.text}
+                    furigana={segment.furigana}
+                    hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[segment.text]?.mastery)}
+                    isSelected={activeHighlightId === `${sentenceId}-${j}`}
+                    onClick={(e) => {
+                      const tid = `${sentenceId}-${j}`;
+                      if (segment.details) handleWordClick(segment.details as WordDetails, sentText, e, tid);
+                      // Look up by lemma (鎮める) when we have it, not the surface form (鎮めて).
+                      else handleDictionaryLookup(segment.lemma ?? segment.text, sentText, e, tid, segment.jmdict_entry_id);
+                    }}
+                  />
+                </span>
               );
             }
             if (segmenter) {
@@ -438,15 +504,9 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     );
   }
 
-  // Anchor the "read" trigger to the end of the actual reading text — i.e. the last
-  // paragraph — so trailing YugenBox keyword/grammar modals don't gate the sweep.
-  const lastParagraphIndex = currentArticle
-    ? currentArticle.blocks.reduce((acc, b, i) => (b.type === 'paragraph' ? i : acc), -1)
-    : -1;
-
   return (
     <>
-      <div className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 500 }}>
+      <div ref={contentRef} className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 500 }}>
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>
@@ -459,34 +519,15 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         </div>
 
         {currentArticle.blocks.map((block, i) => {
-          let node: React.ReactNode = null;
-          if (block.type === 'paragraph') node = <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
-          else if (block.type === 'yugen-box') node = <YugenBox key={i} keyword={block.keyword!} reading={block.reading} description={block.description!} />;
-
-          // Drop the end-of-text marker right after the last reading paragraph, so the
-          // sweep fires once you've read the article body — trailing keyword/grammar
-          // boxes sit below it and don't have to be scrolled past.
-          if (i === lastParagraphIndex) {
-            return (
-              <React.Fragment key={i}>
-                {node}
-                <div ref={endSentinelRef} aria-hidden="true" style={{ height: 1 }} />
-              </React.Fragment>
-            );
-          }
-          return node;
+          if (block.type === 'paragraph') return <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
+          if (block.type === 'yugen-box') return <YugenBox key={i} keyword={block.keyword!} reading={block.reading} description={block.description!} />;
+          return null;
         })}
-
-        {/* Fallback for the rare article with no paragraph blocks at all. */}
-        {lastParagraphIndex === -1 && <div ref={endSentinelRef} aria-hidden="true" style={{ height: 1 }} />}
 
         {/* Restored Tsugihe Capsule Button */}
         <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
-           <button 
-             onClick={() => {
-               handleFinishArticle();
-               onComplete?.();
-             }} 
+           <button
+             onClick={() => onComplete?.()}
              style={{ 
                backgroundColor: 'transparent', 
                color: 'var(--text-muted)', 

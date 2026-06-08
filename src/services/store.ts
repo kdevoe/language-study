@@ -291,7 +291,8 @@ export const useAppStore = create<AppState>()(
       // A learning event nudges the word's internal difficulty (1..10):
       //   - 'click' (looked up)        -> +2  (a lookup means it wasn't known)
       //   - 'skip'  (seen, not looked) -> -1  (read past => a little more familiar)
-      // First encounter seeds difficulty from JLPT relative to the user, then nudges.
+      // First encounter seeds from JLPT relative to the user: a 'skip' applies the -1
+      // nudge to the seed, a 'click' uses the raw seed (see below). Thereafter both nudge.
       // Daily dedup: at most one passive adjustment per word per day, except a
       // 'click' may override an earlier same-day 'skip' once (a lookup is a stronger
       // signal). The user-facing bucket (mastery) is re-derived from difficulty.
@@ -306,17 +307,22 @@ export const useAppStore = create<AppState>()(
             if (!overrides) return {};
           }
 
-          // The seed already encodes the word's JLPT level relative to the user, so
-          // on the FIRST event (no prior numeric difficulty) use it directly. Applying
-          // the click(+2)/skip(-1) nudge on the seeding event too double-counts and
-          // shoves an at-level word straight to 'hard' on a single lookup — the bug
-          // where every lookup defaulted to 'hard' regardless of JLPT level. The nudge
-          // only kicks in once a baseline exists (repeat-day lookups harden, clean
-          // reads ease).
+          // First contact (no prior numeric difficulty) seeds from the word's JLPT
+          // level relative to the user. The skip/click signal is applied asymmetrically:
+          //   - 'skip' (read past, no lookup) nudges the seed DOWN by 1 — mild evidence
+          //     of familiarity. For an N4 user this lands an N3 word in high medium, an
+          //     N4 word in low medium, and an N5 word in easy (exactly the intended map).
+          //   - 'click' uses the RAW seed (no +2): a single lookup isn't enough to call a
+          //     word 'hard' — applying +2 here is the old bug where every lookup => 'hard'.
+          // Once a baseline exists, every event nudges (repeat lookups harden, clean reads ease).
           const prior = current.difficulty;
-          const difficulty = prior == null
-            ? clampDifficulty(seedDifficulty(jlptLevel ?? current.jlptLevel, state.jlptLevel))
-            : clampDifficulty(prior + (event === 'click' ? 2 : -1));
+          let difficulty: number;
+          if (prior == null) {
+            const seed = seedDifficulty(jlptLevel ?? current.jlptLevel, state.jlptLevel);
+            difficulty = clampDifficulty(event === 'skip' ? seed - 1 : seed);
+          } else {
+            difficulty = clampDifficulty(prior + (event === 'click' ? 2 : -1));
+          }
           const mastery = bucketForDifficulty(difficulty);
 
           const updatedWord: WordData = {
