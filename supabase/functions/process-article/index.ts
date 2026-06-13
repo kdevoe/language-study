@@ -367,6 +367,11 @@ Output EXACTLY a JSON array:
         id: finalArticleId,
         user_id: userId,
         title,
+        // Producing content always lands the row in the consumable `ready` state.
+        // When ensureBuffer pre-claimed a `pending` row, this upsert flips it to
+        // `ready` (conflict target is the composite PK). On a fresh on-tap insert
+        // it's `ready` from the start.
+        status: 'ready',
         content: {
           id: finalArticleId,
           title,
@@ -377,7 +382,7 @@ Output EXACTLY a JSON array:
           category: 'Recent News',
         },
         metadata: { date: new Date().toISOString(), category: 'Recent News' },
-      });
+      }, { onConflict: 'user_id,id' });
 
     if (saveError) {
       console.error('[process-article] Save error:', saveError);

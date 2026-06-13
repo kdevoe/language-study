@@ -81,3 +81,48 @@
         Measured 0.004% wrong / 91.6% correct split over 206k words
         (scripts/furigana-align-accuracy.mjs). TOKENIZER_VERSION 3→4 to re-enrich
         cached articles.
+- [/] Server-side JIT article production — always 1+ ready on open (issue #31)
+  - Plan: docs/plan_overnight_ready_article.md. Server owns production via
+    idempotent `ensureBuffer(userId)`; client becomes a pure consumer. N=2 buffer,
+    daily cap M=15, 5-min stale-pending reclaim, kill switch off by default.
+  - [x] Step 1: schema migration `database/16_server_jit_buffer.sql` (manual-apply) —
+        adds status (pending|ready|read|dismissed|failed) + read_at/dismissed_at/
+        retry_count to processed_news, backfills existing → ready, partial index on
+        active (user_id,status) + (user_id,created_at) for the daily-cap count.
+  - [/] Step 2: server JIT core (no triggers wired yet). All 7 guardrails.
+        - [x] PK fix: processed_news → composite (user_id, id) so per-user articles
+              don't collide on the story-derived id (database/17, manual-apply).
+              process-article upsert now sets status='ready' + onConflict 'user_id,id'.
+        - [x] `ensure_buffer_claim(user_id, candidates, N, M, reclaim_min)` RPC
+              (database/17): advisory-lock txn → reclaim stale pending → count
+              ready+pending + produced24h → bounded deficit → claim pending via
+              ON CONFLICT, returns {buffer,produced24h,deficit,reclaimed,claimed}.
+              (supabase-js can't hold a txn, so the locked core lives in PG.)
+        - [x] `ensure-buffer` Edge Function: kill switch (JIT_ENABLED off by default,
+              N=2/M=15/reclaim=5 env-overridable) → cheap pre-check (skip RSS when
+              full) → fetch-raw-news candidates → RPC claim → process-article per
+              slot (outside lock) → mark failed on error → one structured log line.
+              JWT-derives userId (cron sends service key + body userId). deno check clean.
+        - [x] Data-reality audit (docs/audit_buffer_readiness.sql): single-user
+              beta (756 rows, 1 user), confirms clean-slate + M=15/N=2 + PK assumption.
+        - [x] Corrective migration database/18_buffer_clean_slate.sql — resets the
+              backfilled `ready` history → `read` so the buffer starts empty (16's
+              `ready` backfill made deficit perpetually 0). One-shot, pre-go-live.
+        - [x] APPLIED database/17 + 18, deployed ensure-buffer (v2) + process-article (v27).
+        - [x] ISOLATED GATE PASSED (2026-06-13, JIT_ENABLED=true, cap bumped to 30):
+              empty buffer → produced exactly 2; repeat calls → reason:full, produced:0
+              (idempotent, no runaway). Guardrails #1/#2/#3/#7 + idempotency proven live.
+        - [ ] In-app open test (READY card, open → read → 1 replacement). Then reset
+              JIT_DAILY_CAP to 15 (bumped to 30 for the same-day test).
+  - [x] Step 3: server-owned read/dismiss — api.markArticleConsumed (direct RLS
+        update, .in('status',['ready','pending']) so only a live buffer row moves,
+        exactly once; raw cards & already-consumed no-op = guardrail #6) + api.ensureBuffer.
+        store.syncConsumed wires markArticleRead/dismissArticle to both (fire-and-forget).
+  - [x] Step 4: client consumer — api.fetchReadyBufferArticles surfaces ready rows at
+        TOP of feed in loadHub (fixes invisible-cached-article bug); ensureBuffer fired
+        on open; fetchCachedArticlesFromSupabase now filters status='ready' (no stale
+        leftovers); client JIT effect REMOVED; redundant saveProcessedArticle Supabase
+        mirror REMOVED; on-tap fallback kept. build + lint clean (no new errors).
+        ⚠️ MUTUALLY EXCLUSIVE with server JIT — do not merge until JIT_ENABLED=true in prod.
+  - [ ] Step 5: overnight cron — pg_cron + pg_net → ensure-buffer for active users
+        (study_history in last 14 days), service-role key via Vault. Retire daily-feed.
