@@ -112,8 +112,10 @@
         - [x] ISOLATED GATE PASSED (2026-06-13, JIT_ENABLED=true, cap bumped to 30):
               empty buffer → produced exactly 2; repeat calls → reason:full, produced:0
               (idempotent, no runaway). Guardrails #1/#2/#3/#7 + idempotency proven live.
-        - [ ] In-app open test (READY card, open → read → 1 replacement). Then reset
-              JIT_DAILY_CAP to 15 (bumped to 30 for the same-day test).
+        - [x] Verified on Vercel preview, then SHIPPED to prod (PR #44 → main 0213b73,
+              deploy success). JIT_ENABLED=true confirmed live before merge.
+        - [ ] Post-ship: clear stale client localStorage for the true fresh experience;
+              consider JIT_DAILY_CAP 30 → 15.
   - [x] Step 3: server-owned read/dismiss — api.markArticleConsumed (direct RLS
         update, .in('status',['ready','pending']) so only a live buffer row moves,
         exactly once; raw cards & already-consumed no-op = guardrail #6) + api.ensureBuffer.
@@ -124,5 +126,29 @@
         leftovers); client JIT effect REMOVED; redundant saveProcessedArticle Supabase
         mirror REMOVED; on-tap fallback kept. build + lint clean (no new errors).
         ⚠️ MUTUALLY EXCLUSIVE with server JIT — do not merge until JIT_ENABLED=true in prod.
-  - [ ] Step 5: overnight cron — pg_cron + pg_net → ensure-buffer for active users
+  - [x] HOTFIX (2026-06-13): buffer-wedge deadlock. Server had 2 `ready` articles
+        (healthy, under cap) but the feed showed nothing new. Cause: loadHub
+        re-filtered server `ready` rows through the LOCAL seen set; swiping a raw
+        headline before it's processed only wrote localStorage (no DB row), so the
+        buffer re-produced that story → it landed `ready` but was hidden as "seen"
+        → buffer stuck full at N → server stopped producing. Fix: (1) App.tsx
+        loadHub trusts server `ready` status, no longer seen-filters the buffer;
+        (2) api.markArticleConsumed writes a dismissed/read TOMBSTONE when no live
+        buffer row matched, so ensure_buffer_claim's ON CONFLICT never re-produces
+        a swiped raw headline. Self-heals existing stuck buffers on next open.
+  - [/] Step 5: overnight cron — pg_cron + pg_net → ensure-buffer for active users
         (study_history in last 14 days), service-role key via Vault. Retire daily-feed.
+        Cron adds overnight/daily-fresh seeding + bootstrap for non-opening users
+        (event-driven app-open/read/dismiss refill already shipped in Steps 3/4).
+        - [x] database/19_overnight_cron.sql (manual-apply): enables pg_cron+pg_net;
+              jit_refill_active_users(active_days,max_users,timeout) reads the PUBLIC
+              anon key from Vault (jit_anon_key) + hardcoded public URL, fans out ONE
+              pg_net POST/active user to ensure-buffer (idempotent, fire-and-forget);
+              nightly cron 'jit-overnight-refill' @ 09:00 UTC; defensively unschedules
+              any daily-feed pg_cron job. ensure-buffer keeps verify_jwt=true; anon key
+              is just the gateway pass (body userId is authoritative).
+        - [x] daily-feed/index.ts marked DEPRECATED (banner); pg_cron schedule removed
+              by 19. Dashboard-scheduled daily-feed (if any) must be disabled by hand.
+        - [ ] APPLY (your steps): (1) select vault.create_secret('<ANON_KEY>','jit_anon_key');
+              (2) run database/19 in SQL editor; (3) smoke-test select jit_refill_active_users().
+        - [ ] After cron verified live: delete the daily-feed Edge Function deployment.
