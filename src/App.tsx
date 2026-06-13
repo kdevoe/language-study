@@ -192,6 +192,56 @@ function App() {
     setIsLoadingFeed(false);
   };
 
+  // ── Mid-session buffer surfacing ─────────────────────────────────────────────
+  // loadHub only pulls the server's `ready` buffer on open, but the server keeps
+  // producing (on every read/dismiss, plus the overnight cron). Without this, a
+  // user who reads through the buffer sees nothing new until they reopen the app
+  // — exactly the "I swiped everything and it's stuck on raw cards" report. This
+  // prepends any freshly-produced ready article into the live feed. Returns true
+  // if it added at least one (so the watcher can stop early).
+  const articlesRef = useRef<NewsArticle[]>([]);
+  articlesRef.current = articles;
+  const surfaceReadyBuffer = useCallback(async (): Promise<boolean> => {
+    if (DEV_MODE) return false;
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return false;
+    const ready = await fetchReadyBufferArticles(userId);
+    if (ready.length === 0) return false;
+    const have = new Set(articlesRef.current.map(a => a?.id).filter(Boolean));
+    const fresh = ready.filter(a => a && a.id && !have.has(a.id));
+    if (fresh.length === 0) return false;
+    // Cache so they open instantly and show the READY badge.
+    const cache = useAppStore.getState().articlesCache;
+    const add: Record<string, NewsArticle> = {};
+    fresh.forEach(a => { add[a.id] = a; });
+    useAppStore.getState().setArticlesCache({ ...add, ...cache });
+    setArticles(prev => {
+      const ids = new Set(prev.map(a => a?.id).filter(Boolean));
+      const toAdd = fresh.filter(a => !ids.has(a.id));
+      return toAdd.length ? [...toAdd, ...prev] : prev;
+    });
+    return true;
+  }, []);
+
+  // A read/dismiss that moves a buffer row triggers server production (~10-20s of
+  // Gemini work). Poll a few times afterward to surface the result, then stop.
+  // One watcher at a time (ref guard) so rapid swiping doesn't stack timers; it
+  // ends early the moment a fresh article lands.
+  const readyWatchRef = useRef(false);
+  const watchForFreshReady = useCallback(() => {
+    if (readyWatchRef.current) return;
+    readyWatchRef.current = true;
+    let tries = 0;
+    const tick = async () => {
+      tries++;
+      const added = await surfaceReadyBuffer().catch(() => false);
+      if (added || tries >= 4) { readyWatchRef.current = false; return; }
+      setTimeout(tick, 8000);
+    };
+    setTimeout(tick, 8000);
+  }, [surfaceReadyBuffer]);
+
   useEffect(() => {
     const initSession = async () => {
       if (DEV_MODE) {
@@ -355,6 +405,7 @@ function App() {
     // suggestion) but does NOT remove it from the visible feed — the user
     // dismisses it manually when they're done with it.
     markArticleRead(article.id);
+    watchForFreshReady(); // reading a buffer article frees a slot → server refills
     useAppStore.getState().setCurrentArticle(null);
 
     if (articlesCache[article.id]) {
@@ -399,12 +450,14 @@ function App() {
 
   const handleDismissAndSync = (id: string) => {
     dismissArticle(id);
+    watchForFreshReady(); // dismissing a buffer article frees a slot → server refills
     setTimeout(() => replenishFeedAtBottom(), 100);
   };
 
   const handleBackToHub = () => {
     setNewsView('hub');
     setShowNav(true);
+    surfaceReadyBuffer(); // returning to the feed: pull in anything produced while reading
   };
 
   useEffect(() => {
