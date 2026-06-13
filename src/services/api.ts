@@ -107,9 +107,10 @@ export async function markArticleConsumed(
   userId: string,
   kind: 'read' | 'dismissed',
 ): Promise<boolean> {
+  const now = new Date().toISOString();
   const patch = kind === 'read'
-    ? { status: 'read', read_at: new Date().toISOString() }
-    : { status: 'dismissed', dismissed_at: new Date().toISOString() };
+    ? { status: 'read', read_at: now }
+    : { status: 'dismissed', dismissed_at: now };
   const { data, error } = await supabase
     .from('processed_news')
     .update(patch)
@@ -121,7 +122,23 @@ export async function markArticleConsumed(
     console.error(`[api] markArticleConsumed(${kind}) failed:`, error);
     return false;
   }
-  return (data?.length ?? 0) > 0;
+  if ((data?.length ?? 0) > 0) return true; // a live buffer row moved → caller refills
+
+  // No live buffer row matched: this was a RAW feed card swiped/read before it was
+  // ever processed, so the only record of it was in localStorage. Write a tombstone
+  // so ensure_buffer_claim's ON CONFLICT never (re)produces this story into the
+  // buffer — where it would land `ready` but, being in the client's local seen set,
+  // get hidden and wedge the buffer (the issue #31 deadlock). A no-content row is
+  // valid (title/content are nullable). This is NOT a buffer move, so it returns
+  // false and never triggers production (guardrail #6: only real buffer rows refill).
+  const tombstone = kind === 'read'
+    ? { id: articleId, user_id: userId, status: 'read', read_at: now }
+    : { id: articleId, user_id: userId, status: 'dismissed', dismissed_at: now };
+  const { error: tombErr } = await supabase
+    .from('processed_news')
+    .upsert(tombstone, { onConflict: 'user_id,id', ignoreDuplicates: true });
+  if (tombErr) console.warn(`[api] markArticleConsumed(${kind}) tombstone failed:`, tombErr.message);
+  return false;
 }
 
 /** Ask the server to top up this user's ready-article buffer. Idempotent and

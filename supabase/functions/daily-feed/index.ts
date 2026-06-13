@@ -1,3 +1,10 @@
+// ⚠️ DEPRECATED (issue #31, Step 5) — superseded by the server-side JIT buffer.
+// This job broadcast the SAME 2 headlines to every user, ignoring per-user read/
+// dismiss state and the buffer invariant. The overnight refill is now pg_cron →
+// jit_refill_active_users() → ensure-buffer (per user, idempotent, capped). Its
+// pg_cron schedule is removed by database/19_overnight_cron.sql. Left deployed
+// only as a fallback; delete this function once the new cron is verified live.
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {

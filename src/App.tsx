@@ -159,7 +159,17 @@ function App() {
       // Server-produced ready articles go FIRST — they're fresh and instantly
       // openable. They surface even when not in today's raw NewsAPI fetch, fixing
       // the original "processed-but-unread article never appears on open" bug.
-      const readyFresh = readyBuffer.filter(a => a && a.id && !seen.has(a.id));
+      //
+      // Do NOT re-filter these through the local `seen` set: the server's `ready`
+      // status is authoritative. ensure_buffer_claim only produces a story the
+      // user has no row for, and markArticleConsumed flips a row OUT of `ready`
+      // the instant it's read/dismissed — so a row that is STILL `ready` is
+      // genuinely unread. A ready id CAN sit in the local seen set when a raw
+      // headline was swiped before it was ever processed (that dismiss only
+      // touched localStorage, leaving no DB row, so the buffer later re-produced
+      // it). Filtering it here hid the article AND wedged the buffer full of
+      // invisible rows so nothing new ever loaded (issue #31 deadlock).
+      const readyFresh = readyBuffer.filter(a => a && a.id);
       const readyIds = new Set(readyFresh.map(a => a.id));
 
       const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
