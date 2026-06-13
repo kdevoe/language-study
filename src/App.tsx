@@ -8,7 +8,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { fetchNewsFeed, NewsArticle, requestArticleProcessing } from './services/api'
+import { fetchNewsFeed, NewsArticle, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -132,19 +132,51 @@ function App() {
     setIsLoadingFeed(true);
     setIsEndOfFeed(false);
     try {
-      const feed = await fetchNewsFeed(1);
-      const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
+      // Who are we? The ready buffer + ensureBuffer are per-user (skipped in dev,
+      // which has no real session / server rows).
+      let userId: string | null = null;
+      if (DEV_MODE) {
+        userId = 'dev-user';
+      } else {
+        const { data: { session } } = await supabase.auth.getSession();
+        userId = session?.user?.id ?? null;
+      }
+
+      // App-open trigger: idempotent safety net so a new/drained user gets a
+      // buffer even if no cron/read fired. Fire-and-forget — never blocks the feed.
+      if (userId && !DEV_MODE) ensureBuffer(userId);
+
+      const [feed, readyBuffer] = await Promise.all([
+        fetchNewsFeed(1),
+        userId && !DEV_MODE ? fetchReadyBufferArticles(userId) : Promise.resolve([] as NewsArticle[]),
+      ]);
 
       // Drop articles the user has already read or dismissed so they're never
       // pulled back in as fresh suggestions (e.g. on reopen the same day).
       const { dismissedArticleIds: dismissed, readArticleIds: read } = useAppStore.getState();
       const seen = new Set([...(dismissed || []), ...(read || [])]);
-      const freshFeed = uniqueFeed.filter(a => a.id && !seen.has(a.id));
 
-      // If we start the app, freshFeed could contain up to 20 raw items.
-      setArticles(freshFeed);
-      if (freshFeed.length === 0) {
+      // Server-produced ready articles go FIRST — they're fresh and instantly
+      // openable. They surface even when not in today's raw NewsAPI fetch, fixing
+      // the original "processed-but-unread article never appears on open" bug.
+      const readyFresh = readyBuffer.filter(a => a && a.id && !seen.has(a.id));
+      const readyIds = new Set(readyFresh.map(a => a.id));
+
+      const uniqueFeed = Array.from(new Map(feed.map(a => [a.id, a])).values());
+      const freshFeed = uniqueFeed.filter(a => a.id && !seen.has(a.id) && !readyIds.has(a.id));
+
+      const combined = [...readyFresh, ...freshFeed];
+      setArticles(combined);
+      if (combined.length === 0) {
         setIsEndOfFeed(true);
+      }
+
+      // Cache the ready articles so they show the READY badge and open instantly.
+      if (readyFresh.length > 0) {
+        const cache = useAppStore.getState().articlesCache;
+        const add: Record<string, NewsArticle> = {};
+        readyFresh.forEach(a => { add[a.id] = a; });
+        useAppStore.getState().setArticlesCache({ ...add, ...cache });
       }
     } catch (e) { console.error(e); }
     setIsLoadingFeed(false);
@@ -287,37 +319,17 @@ function App() {
     }
   }, [articles, dismissedArticleIds, isReplenishing, isLoadingFeed, replenishFeedAtBottom]);
 
-  // JIT PRE-PROCESSOR: Ensure exactly 1 article ahead is processed or processing
-  useEffect(() => {
-    if (isLoadingFeed || isReplenishing || isEndOfFeed) return;
-
-    const visibleArts = articles.filter(a => !(dismissedArticleIds || []).includes(a.id));
-    if (visibleArts.length === 0) return;
-
-    // Check if there is ANY article in the buffer that's already processed or currently processing
-    // We ignore the activeArticle because if they are reading it, we need a fresh one in the buffer!
-    const isBufferReady = visibleArts.some(a =>
-      (articlesCache[a.id] || (processingArticles || []).includes(a.id)) &&
-      activeArticle?.id !== a.id
-    );
-
-    if (!isBufferReady) {
-      // Triggers processing for the very first available raw article (skip failed ones)
-      const nextTarget = visibleArts.find(a =>
-        !articlesCache[a.id] &&
-        !(processingArticles || []).includes(a.id) &&
-        !failedArticleIds.has(a.id) &&
-        activeArticle?.id !== a.id
-      );
-
-      if (nextTarget) {
-        handleProcessArticle(nextTarget);
-      }
-    }
-  }, [articles, dismissedArticleIds, articlesCache, processingArticles, activeArticle, handleProcessArticle, failedArticleIds, isLoadingFeed, isReplenishing, isEndOfFeed]);
-
-
-  // Removed: syncPrefetchQueue useEffect - the daily-feed Edge Function handles background processing
+  // RETIRED (issue #31): the client-side JIT pre-processor. The SERVER now owns
+  // production via ensureBuffer — it keeps N ready articles in processed_news,
+  // under a per-user advisory lock + daily cap. The client is a pure consumer:
+  // loadHub surfaces the ready buffer, ensureBuffer is triggered on open/read/
+  // dismiss, and handleSelectArticle keeps on-tap processing as a last resort.
+  //
+  // ⚠️  This client JIT and the server JIT are MUTUALLY EXCLUSIVE: the old effect
+  // called process-article directly, bypassing the buffer accounting and daily
+  // cap. Re-enabling it alongside the server JIT would mean uncapped production.
+  // Do not restore it. (And this branch must not ship until JIT_ENABLED=true is
+  // set in prod, else there is no pre-processing at all → spinner on every open.)
 
   const openReader = useCallback((article: NewsArticle) => {
     setActiveArticle(article);

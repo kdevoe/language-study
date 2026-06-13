@@ -52,6 +52,21 @@ async function currentUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
+/** Fire-and-forget: persist read/dismissed state server-side and, only when a
+ *  real buffer row actually transitioned, ask the server to refill the buffer.
+ *  No-ops without a session (dev mode) or for raw feed cards (no processed row),
+ *  so swiping raw cards never triggers production (guardrail #6). */
+function syncConsumed(id: string, kind: 'read' | 'dismissed'): void {
+  import('./api').then((m) => {
+    currentUserId().then((uid) => {
+      if (!uid) return;
+      m.markArticleConsumed(id, uid, kind).then((moved) => {
+        if (moved) m.ensureBuffer(uid);
+      });
+    });
+  }).catch(() => { /* never block the UI on a sync failure */ });
+}
+
 export interface WordData {
   reading: string;
   meaning: string;
@@ -176,27 +191,33 @@ export const useAppStore = create<AppState>()(
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
       saveProcessedArticle: (id, article) => {
-        set((state) => ({ 
-          articlesCache: { ...state.articlesCache, [id]: article } 
+        // Local cache only. The server write is owned by process-article (it
+        // upserts the row as `status='ready'`), so the old Supabase mirror here
+        // was a redundant second write — removed per issue #31.
+        set((state) => ({
+          articlesCache: { ...state.articlesCache, [id]: article }
         }));
-        // Mirror to Supabase for persistence across sessions
-        import('./api').then(m => {
-          currentUserId().then((uid) => {
-            if (uid) m.saveProcessedArticleToSupabase(article, uid);
-          });
-        });
       },
       setArticlesCache: (cache) => set({ articlesCache: cache }),
-      dismissArticle: (id) => set((state) => ({
-        dismissedArticleIds: Array.from(new Set([...state.dismissedArticleIds, id]))
-      })),
+      dismissArticle: (id) => {
+        set((state) => ({
+          dismissedArticleIds: Array.from(new Set([...state.dismissedArticleIds, id]))
+        }));
+        // Server-owned dismissed state + JIT refill. Local array stays as a fast
+        // cache; the server is the source of truth (cross-device + buffer trigger).
+        syncConsumed(id, 'dismissed');
+      },
       // Reading an article does NOT hide it from the visible feed — the user
       // dismisses it manually. But a read article must never be pulled back in
       // as a fresh suggestion, so it's tracked separately and (unlike dismissals)
       // is not cleared by the daily feed reset.
-      markArticleRead: (id) => set((state) => ({
-        readArticleIds: Array.from(new Set([...state.readArticleIds, id]))
-      })),
+      markArticleRead: (id) => {
+        set((state) => ({
+          readArticleIds: Array.from(new Set([...state.readArticleIds, id]))
+        }));
+        // Mark read server-side (on open) and top up the buffer.
+        syncConsumed(id, 'read');
+      },
       setProcessing: (id, isP) => set((state) => {
         const next = new Set(state.processingArticles || []);
         if (isP) next.add(id); else next.delete(id);

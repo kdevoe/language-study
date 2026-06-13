@@ -96,6 +96,45 @@ export async function joinWaitlist(email: string): Promise<{ success: boolean; m
   }
 }
 
+/** Mark a processed article consumed server-side — `read` on open, `dismissed`
+ *  on swipe — and return whether an actual buffer row transitioned. Only `ready`/
+ *  `pending` rows move: a raw feed card has no row, and an already-consumed row
+ *  won't re-match, so both update 0 rows and return false. The caller uses that to
+ *  fire ensureBuffer EXACTLY once per real consumption (guardrail #6: dismissing a
+ *  raw card must never trigger production). */
+export async function markArticleConsumed(
+  articleId: string,
+  userId: string,
+  kind: 'read' | 'dismissed',
+): Promise<boolean> {
+  const patch = kind === 'read'
+    ? { status: 'read', read_at: new Date().toISOString() }
+    : { status: 'dismissed', dismissed_at: new Date().toISOString() };
+  const { data, error } = await supabase
+    .from('processed_news')
+    .update(patch)
+    .eq('user_id', userId)
+    .eq('id', articleId)
+    .in('status', ['ready', 'pending'])
+    .select('id');
+  if (error) {
+    console.error(`[api] markArticleConsumed(${kind}) failed:`, error);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+/** Ask the server to top up this user's ready-article buffer. Idempotent and
+ *  fire-and-forget: no-ops when the buffer is full or the kill switch is off, and
+ *  never throws into the UI (the cron and other triggers catch up regardless). */
+export async function ensureBuffer(userId: string): Promise<void> {
+  try {
+    await invokeEdgeFn('ensure-buffer', { userId }, 20000);
+  } catch (e) {
+    console.warn('[api] ensureBuffer failed (non-fatal):', e instanceof Error ? e.message : e);
+  }
+}
+
 export async function saveProcessedArticleToSupabase(article: NewsArticle, userId: string) {
   const { error } = await supabase
     .from('processed_news')
@@ -135,10 +174,15 @@ export async function fetchProcessedArticleById(articleId: string, userId: strin
 const RECENT_CACHE_LIMIT = 30;
 
 export async function fetchCachedArticlesFromSupabase(userId: string): Promise<Record<string, NewsArticle>> {
+  // Only `ready` (fresh, unread) articles hydrate the cache. Pulling read/
+  // dismissed history would resurface 2-month-old articles as "fresh" cards —
+  // exactly the stale-leftover behavior issue #31 eliminates. The ready set is
+  // tiny (≤ buffer depth), so this is also far cheaper than the old 30-row pull.
   const { data, error } = await supabase
     .from('processed_news')
     .select('id, content')
     .eq('user_id', userId)
+    .eq('status', 'ready')
     .order('created_at', { ascending: false })
     .limit(RECENT_CACHE_LIMIT);
 
@@ -146,12 +190,31 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
     console.error("Error fetching cache from Supabase:", error);
     return {};
   }
-  
+
   const cache: Record<string, NewsArticle> = {};
   data?.forEach(row => {
     cache[row.id] = row.content;
   });
   return cache;
+}
+
+/** The user's fresh, unread server-produced buffer — surfaced at the TOP of the
+ *  feed on open so a ready article is always there with no spinner, even when it
+ *  isn't in today's raw NewsAPI fetch (the original "invisible cached article"
+ *  bug). Bounded and tiny (≤ buffer depth), newest first. */
+export async function fetchReadyBufferArticles(userId: string, limit = 10): Promise<NewsArticle[]> {
+  const { data, error } = await supabase
+    .from('processed_news')
+    .select('content')
+    .eq('user_id', userId)
+    .eq('status', 'ready')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('[api] fetchReadyBufferArticles failed:', error);
+    return [];
+  }
+  return (data ?? []).map((r) => r.content as NewsArticle).filter(Boolean);
 }
 
 export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
