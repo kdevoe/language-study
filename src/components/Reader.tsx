@@ -196,9 +196,15 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     window.scrollTo(0, 0);
   }, []);
 
+  // Each Reader instance is keyed to one article (App keys <Reader> by id), so load
+  // THIS article on mount. Keying the load off `initialArticle.id` — rather than the
+  // global `currentArticle` being null — means the feed no longer has to blank the
+  // shared currentArticle to trigger a load, which used to flash the article you were
+  // reading down to a spinner the instant you tapped a different one.
   useEffect(() => {
-    if (!currentArticle && !loading) loadArticle();
-  }, [initialArticle]);
+    if (currentArticle?.id !== initialArticle?.id) loadArticle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialArticle?.id]);
 
   // Build the gradeable-word payload map for the article: the richest token per
   // lemma (details/jmdict id win), so a word can be stored and JLPT-seeded on grade.
@@ -506,7 +512,11 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     });
   };
 
-  if (loading || !currentArticle) {
+  // Render content only when the loaded article IS this Reader's article. On mount the
+  // shared `currentArticle` may still hold the PREVIOUS article for a frame (until the
+  // load effect runs) — gating on identity shows this article's loading state instead
+  // of briefly flashing the old article's text under the new one.
+  if (loading || !currentArticle || currentArticle.id !== initialArticle?.id) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', textAlign: 'center', padding: '0 2rem' }}>
         <div className="lucide-spin" style={{ color: 'var(--text-main)', marginBottom: '1.5rem', width: '32px', height: '32px', border: '3px solid var(--border-light)', borderTopColor: 'var(--text-main)', borderRadius: '50%' }} />

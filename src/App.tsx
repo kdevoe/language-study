@@ -406,7 +406,10 @@ function App() {
     // dismisses it manually when they're done with it.
     markArticleRead(article.id);
     watchForFreshReady(); // reading a buffer article frees a slot → server refills
-    useAppStore.getState().setCurrentArticle(null);
+    // NOTE: do NOT null currentArticle here. The Reader loads its own article by id on
+    // mount (keyed by activeArticle.id), so blanking the shared currentArticle only
+    // served to flash the article you're currently reading down to a spinner the moment
+    // you tapped a different one — before the new article had even finished loading.
 
     if (articlesCache[article.id]) {
       openReader(articlesCache[article.id]);
