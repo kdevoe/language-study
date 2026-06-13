@@ -74,11 +74,23 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     } catch { return null; }
   }, []);
   
-  const {
-    wordDatabase, saveWordDefinition, recordWordSeen, setWordMastery, applyDifficultyEvent,
-    currentArticle, setCurrentArticle, articlesCache, saveProcessedArticle,
-    readerFontSize, readerFontWeight
-  } = useAppStore();
+  // Narrow, per-field subscriptions so the Reader re-renders ONLY when something it
+  // actually renders changes. The old selector-less `useAppStore()` subscribed to the
+  // whole store, so any background `articlesCache` write (the server buffer surfacing a
+  // freshly-produced article mid-session) re-rendered the open Reader for nothing.
+  // `articlesCache` is read imperatively in `loadArticle` (once, at open) — it needs no
+  // reactive subscription. Actions are stable references in Zustand, so subscribing to
+  // them never triggers a re-render.
+  const currentArticle = useAppStore(s => s.currentArticle);
+  const wordDatabase = useAppStore(s => s.wordDatabase);
+  const readerFontSize = useAppStore(s => s.readerFontSize);
+  const readerFontWeight = useAppStore(s => s.readerFontWeight);
+  const saveWordDefinition = useAppStore(s => s.saveWordDefinition);
+  const recordWordSeen = useAppStore(s => s.recordWordSeen);
+  const setWordMastery = useAppStore(s => s.setWordMastery);
+  const applyDifficultyEvent = useAppStore(s => s.applyDifficultyEvent);
+  const setCurrentArticle = useAppStore(s => s.setCurrentArticle);
+  const saveProcessedArticle = useAppStore(s => s.saveProcessedArticle);
 
   // Keep the observer's view of mutable state fresh without re-creating it.
   clickedWordsRef.current = clickedWords;
@@ -133,7 +145,9 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const loadArticle = async () => {
     loadIdRef.current = initialArticle?.id ?? null;
 
-    // 1. Check Cache first for instant return
+    // 1. Check Cache first for instant return. Read imperatively — the Reader has no
+    // reactive subscription to articlesCache (see the store hooks above).
+    const articlesCache = useAppStore.getState().articlesCache;
     if (initialArticle?.id && articlesCache[initialArticle.id]) {
       const cached = articlesCache[initialArticle.id];
       setCurrentArticle(cached);
@@ -506,7 +520,12 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
 
   return (
     <>
-      <div ref={contentRef} className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 500 }}>
+      {/* key pins the fade-in to the article identity: `enrichInBackground` swaps in a
+          NEW currentArticle object (same id) once readings are linked, mid-read. Keying
+          by id lets React reconcile in place across that swap — the furigana appears
+          without remounting, so the `fade-in` animation never replays as a flash. The
+          animation plays only on a genuine open (the loading → loaded branch flip). */}
+      <div key={currentArticle.id} ref={contentRef} className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 500 }}>
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>
