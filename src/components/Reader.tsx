@@ -553,21 +553,21 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return null;
         })}
 
-        {/* Restored Tsugihe Capsule Button */}
+        {/* Finish capsule: marks the article done and removes it from the feed. */}
         <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
            <button
              onClick={() => onComplete?.()}
-             style={{ 
-               backgroundColor: 'transparent', 
-               color: 'var(--text-muted)', 
-               padding: '0.75rem 2.5rem', 
-               borderRadius: '100px', 
-               fontWeight: 600, 
-               border: '1px solid var(--border-light)', 
+             style={{
+               backgroundColor: 'transparent',
+               color: 'var(--text-muted)',
+               padding: '0.75rem 2.5rem',
+               borderRadius: '100px',
+               fontWeight: 600,
+               border: '1px solid var(--border-light)',
                cursor: 'pointer'
              }}
            >
-             <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle', marginRight: '0.2rem' }}>次へ</span> &rarr;
+             <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle' }}>完了</span>
            </button>
         </div>
       </div>
