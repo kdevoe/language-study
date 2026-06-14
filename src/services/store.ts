@@ -291,6 +291,11 @@ export const useAppStore = create<AppState>()(
               import('./api').then(m => {
                 const syncData = {
                   mastery: updatedWord.mastery,
+                  // Preserve the word's graded difficulty. This is a full-row upsert,
+                  // so omitting `difficulty` writes null and wipes the SRS signal that
+                  // applyDifficultyEvent/setMastery wrote — and the seen path fires far
+                  // more often than grading, so it clobbered most words.
+                  difficulty: updatedWord.difficulty ?? null,
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
                   lastSeenTs: updatedWord.lastSeenTs
