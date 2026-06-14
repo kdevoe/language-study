@@ -1,7 +1,7 @@
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { CheckCircle2, Trash2, Bookmark } from 'lucide-react';
 import { NewsArticle } from '../services/api';
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 
 interface Props {
   articles: NewsArticle[];
@@ -15,17 +15,21 @@ interface Props {
   isManualFetching?: boolean;
 }
 
-function NewsCard({ 
-  article, onSelect, onDismiss, isProcessing, isCached, isOpen, setOpenId 
-}: { 
-  article: NewsArticle; 
-  onSelect: (a: NewsArticle) => void; 
+// forwardRef is required by <AnimatePresence mode="popLayout">: Framer attaches a
+// ref to each child to measure it and absolutely-position it while it exits. A
+// plain function component drops that ref (React warns), leaving popLayout unable
+// to manage exiting cards correctly.
+const NewsCard = forwardRef<HTMLDivElement, {
+  article: NewsArticle;
+  onSelect: (a: NewsArticle) => void;
   onDismiss: (id: string) => void;
   isProcessing: boolean;
   isCached: boolean;
   isOpen: boolean;
   setOpenId: (id: string | null) => void;
-}) {
+}>(function NewsCard({
+  article, onSelect, onDismiss, isProcessing, isCached, isOpen, setOpenId
+}, ref) {
   const x = useMotionValue(0);
   // Transform x position: gradual linear fade from 0 to 1 over the full track
   const backdropOpacity = useTransform(x, [-160, 0], [1, 0]);
@@ -37,7 +41,8 @@ function NewsCard({
   };
 
   return (
-    <motion.div 
+    <motion.div
+      ref={ref}
       layout="position"
       variants={itemVariants}
       initial="hidden"
@@ -228,7 +233,7 @@ function NewsCard({
       </motion.div>
     </motion.div>
   );
-}
+});
 
 export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing, processingIds, cachedIds, onManualFetch, isManualFetching }: Props) {
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
