@@ -453,6 +453,25 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       const sentText = sentTokens.map(t => t.text).join('');
       const sentenceId = `${blockIdx}-${sIdx}`;
 
+      // Render a run of non-interactive text, turning sentence-ending marks
+      // (。！？) into tap targets that translate the whole sentence. Single-tap on
+      // a word stays word-lookup; tapping the period is the non-conflicting way to
+      // pull up the sentence (the double-tap gesture loses to the word's onClick).
+      const renderText = (text: string, keyBase: string) =>
+        text.split(/([。！？])/).filter(s => s !== '').map((part, idx) =>
+          /[。！？]/.test(part) ? (
+            <span
+              key={`${keyBase}-p${idx}`}
+              onClick={(e) => handleSentenceTranslate(sentText, sentenceId, e)}
+              style={{ cursor: 'pointer', padding: '0 0.25em', margin: '0 -0.1em' }}
+            >
+              {part}
+            </span>
+          ) : (
+            <span key={`${keyBase}-t${idx}`}>{part}</span>
+          ),
+        );
+
       return (
         <span 
           key={sentenceId} 
@@ -485,7 +504,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
             if (segmenter) {
               const words = Array.from((segmenter as any).segment(segment.text));
               return words.map((w: any, index: number) => {
-                if (!w.isWordLike) return <span key={`${sentenceId}-${j}-${index}`}>{w.segment}</span>;
+                if (!w.isWordLike) return <span key={`${sentenceId}-${j}-${index}`}>{renderText(w.segment, `${sentenceId}-${j}-${index}`)}</span>;
                 const isWide = [...w.segment].length > 2;
                 return (
                   <span
@@ -505,7 +524,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                 );
               });
             }
-            return <span key={`${sentenceId}-${j}`}>{segment.text}</span>;
+            return <span key={`${sentenceId}-${j}`}>{renderText(segment.text, `${sentenceId}-${j}`)}</span>;
           })}
         </span>
       );
