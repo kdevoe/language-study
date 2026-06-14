@@ -391,6 +391,13 @@ function App() {
   // Do not restore it. (And this branch must not ship until JIT_ENABLED=true is
   // set in prod, else there is no pre-processing at all → spinner on every open.)
 
+  // Tracks the article the user most recently asked to open. On-demand processing
+  // takes ~10-20s; by the time it resolves the user may have tapped a different
+  // article, opened another, or gone back to browsing the list. A stale resolution
+  // must NOT yank them into an article they're no longer waiting for — it just
+  // lands in the cache (READY badge) for them to open on their own terms.
+  const pendingOpenIdRef = useRef<string | null>(null);
+
   const openReader = useCallback((article: NewsArticle) => {
     setActiveArticle(article);
     setNewsView('reading');
@@ -401,6 +408,9 @@ function App() {
 
   const handleSelectArticle = async (article: NewsArticle) => {
     if (!article.id) return;
+    // Mark this as the live open request. Any in-flight processing for a PREVIOUS
+    // tap will see a changed token when it resolves and decline to navigate.
+    pendingOpenIdRef.current = article.id;
     // Reading marks the article read (so it's never pulled back in as a fresh
     // suggestion) but does NOT remove it from the visible feed — the user
     // dismisses it manually when they're done with it.
@@ -432,14 +442,16 @@ function App() {
       const fromServer = await fetchProcessedArticleById(article.id, userId);
       if (fromServer) {
         saveProcessedArticle(article.id, fromServer);
-        openReader(fromServer);
+        // Cached now; only navigate if the user is still waiting on THIS article.
+        if (pendingOpenIdRef.current === article.id) openReader(fromServer);
         return;
       }
 
       // Genuinely not processed yet — process on demand, then open the Reader.
       const processed = await handleProcessArticle(article);
       if (processed) {
-        openReader(processed);
+        // Don't yank the user in if they moved on during the long processing wait.
+        if (pendingOpenIdRef.current === article.id) openReader(processed);
       } else {
         // handleProcessArticle swallows its error into failedArticleIds; surface
         // it here so the tap doesn't just silently do nothing.
@@ -461,6 +473,13 @@ function App() {
     setNewsView('hub');
     setShowNav(true);
     surfaceReadyBuffer(); // returning to the feed: pull in anything produced while reading
+  };
+
+  // Finish button at the end of the Reader: mark the article done AND remove it
+  // from the feed (handleDismissAndSync), then return to the hub.
+  const handleFinishArticle = () => {
+    if (activeArticle?.id) handleDismissAndSync(activeArticle.id);
+    handleBackToHub();
   };
 
   useEffect(() => {
@@ -624,7 +643,7 @@ function App() {
               isManualFetching={isLoadingFeed}
             />
           ) : (
-            <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleBackToHub} />
+            <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} />
           )
         )}
         {activeTab === 'progress' && <Progress />}
