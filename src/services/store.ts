@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
@@ -478,6 +478,46 @@ export const useAppStore = create<AppState>()(
     {
       name: 'yugen-storage',
       version: 3,
+      // A persist write throws QuotaExceededError once localStorage fills up. That
+      // exception used to propagate out of store actions (markArticleRead,
+      // recordWordSeen, ...) and abort the tap handler — silently breaking article
+      // opens and word lookups while read-only UI (Progress) kept working, worse the
+      // longer the session ran. Swallow write failures so a full quota degrades
+      // gracefully (stale persisted state) instead of wedging the UI.
+      storage: createJSONStorage(() => ({
+        getItem: (name) => localStorage.getItem(name),
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, value);
+          } catch (e) {
+            console.error('[store] localStorage persist failed (quota?) — continuing without persisting:', e);
+          }
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      })),
+      // Persist only durable, lightweight state. Full processed articles
+      // (articlesCache, currentArticle) are large, accumulate with every article
+      // read, and were the bulk of the blob that overflowed the ~5MB quota. They
+      // live in Supabase / the JIT buffer and are refetched on demand, so they never
+      // need to survive a reload. processingArticles is in-flight-only (and already
+      // cleared on rehydrate).
+      partialize: (state) => ({
+        isOnboarded: state.isOnboarded,
+        jlptLevel: state.jlptLevel,
+        rtkLevel: state.rtkLevel,
+        studyMode: state.studyMode,
+        vocabMode: state.vocabMode,
+        furiganaMode: state.furiganaMode,
+        readingIntensity: state.readingIntensity,
+        wordDatabase: state.wordDatabase,
+        studyKanji: state.studyKanji,
+        lastRtkUpdateTs: state.lastRtkUpdateTs,
+        lastResetTs: state.lastResetTs,
+        dismissedArticleIds: state.dismissedArticleIds,
+        readArticleIds: state.readArticleIds,
+        readerFontSize: state.readerFontSize,
+        readerFontWeight: state.readerFontWeight,
+      }),
       migrate: (persistedState: any, version: number) => {
         let state = persistedState;
         if (version < 2) {
