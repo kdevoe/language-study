@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, processLock } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/['"]/g, '') || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.replace(/['"]/g, '') || 'placeholder';
@@ -12,6 +12,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
+    // Use the in-memory process lock instead of the default navigator.locks lock.
+    // In a long-lived iOS standalone PWA, a token auto-refresh that starts just as
+    // iOS suspends the WebView can leave the navigator.locks lock held and never
+    // released; every later getSession()/refresh then blocks on it, so all
+    // session-dependent actions (article open, word-lookup sync) stall while
+    // local-only UI keeps working. processLock serializes in-memory within this
+    // single window — correct for a one-window PWA — and cannot deadlock that way.
+    lock: processLock,
   },
 });
 
