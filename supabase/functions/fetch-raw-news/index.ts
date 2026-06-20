@@ -25,6 +25,20 @@ const ITEMS_PER_FEED = 12;
 const FEED_TIMEOUT_MS = 8000;
 const MAX_CARDS = 40;
 
+// Source-material caps. A full-text feed (e.g. Ars) ships the whole article body
+// in content:encoded; keep enough of it that process-article classifies the
+// article as `full` (its FULL_SOURCE_CHARS = 1500 bar) instead of truncating to a
+// teaser — the old flat 800-char cap landed full-text feeds as `partial` and also
+// tripped process-article's Jina skip. A bare `description` is just a teaser, so
+// keep it short (Jina backfills the body from the URL). process-article re-caps
+// each source at PER_SOURCE_CHAR_CAP = 2500, so matching that here is the ceiling.
+const FULLTEXT_BODY_CAP = 2500;  // content:encoded / Atom content — a real body
+const TEASER_CAP = 800;          // description-only — Jina fills the rest
+// The card preview (shown in the Feed and used only as a fallback snippet) never
+// needs the whole body; the full text rides in each card's `sources[].teaser`.
+// Keeping the preview small bounds the persisted articlesCache blob (see #54).
+const PREVIEW_CHARS = 400;
+
 // Article IDs MUST be deterministic and stable across fetches. The client tracks
 // dismissed/read articles by id; if the same story comes back with a new id on a
 // later fetch, the dismiss filter no longer matches and it reappears in the feed.
@@ -115,10 +129,14 @@ function parseFeed(xml: string, source: string, category: string): PoolItem[] {
   for (const b of blocks) {
     const title = stripHtml(extractTag(b, 'title'));
     const desc = stripHtml(extractTag(b, 'description') || extractTag(b, 'summary'));
-    // content:encoded (RSS) / content (Atom) is often the full body — keep the
-    // longer of the two so feeds that ship full text (e.g. Ars) skip extraction.
+    // content:encoded (RSS) / content (Atom) is often the full body. When the
+    // feed ships one, keep it under the generous full-text cap so it survives to
+    // process-article as a real body; otherwise the bare description is a teaser
+    // and gets the short cap (Jina backfills it downstream).
     const content = stripHtml(extractTag(b, 'content:encoded') || extractTag(b, 'content'));
-    const teaser = (content.length > desc.length ? content : desc).slice(0, 800);
+    const teaser = content.length > desc.length
+      ? content.slice(0, FULLTEXT_BODY_CAP)
+      : desc.slice(0, TEASER_CAP);
     const url = extractLink(b);
     const date = stripHtml(extractTag(b, 'pubDate') || extractTag(b, 'published') || extractTag(b, 'updated'));
     out.push({ title, teaser, url, date, source, category });
@@ -336,8 +354,11 @@ Deno.serve(async (req) => {
       // The card title is the lead article's real headline — concrete and
       // trustworthy even when clustering is imperfect — not a model-generated
       // topic label (which can mislabel a loose merge).
+      // Preview only — trim each member so a full-text body doesn't bloat the
+      // persisted card. The untrimmed body rides in `sources[].teaser` below and
+      // is what process-article actually builds the article from.
       const mergedSnippet = members
-        .map((m, n) => `${n + 1}. ${m.title} — ${m.teaser || m.title}`)
+        .map((m, n) => `${n + 1}. ${m.title} — ${(m.teaser || m.title).slice(0, PREVIEW_CHARS)}`)
         .join('\n');
       const when = lead.date ? new Date(lead.date) : new Date();
 
