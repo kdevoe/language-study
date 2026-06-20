@@ -39,6 +39,14 @@ const TEASER_CAP = 800;          // description-only — Jina fills the rest
 // Keeping the preview small bounds the persisted articlesCache blob (see #54).
 const PREVIEW_CHARS = 400;
 
+// Buffer prioritization. source_kind is only known after process-article runs, so
+// at card-build time we approximate richness from teaser size — the cheap proxy
+// the #49 follow-up calls for. Tiers mirror process-article's classifier (a full
+// body ≥1500 chars; a merged-teaser total ≥600) so the buffer prefers cards that
+// will land as `full`/`partial` over bare snippets.
+const FULL_BODY_CHARS = 1500;
+const PARTIAL_TOTAL_CHARS = 600;
+
 // Article IDs MUST be deterministic and stable across fetches. The client tracks
 // dismissed/read articles by id; if the same story comes back with a new id on a
 // later fetch, the dismiss filter no longer matches and it reappears in the feed.
@@ -310,6 +318,53 @@ ${headlineList}`;
   }
 }
 
+// ── Buffer re-rank by source richness ────────────────────────────────────────
+// Richness tier from a card's sources' teaser sizes: 2 = a full body is present,
+// 1 = enough merged teaser to build a partial, 0 = snippet. Mirrors
+// process-article's classifySourceFullness on the data we have before extraction.
+function richnessTier(card: { sources: { teaser?: string }[] }): number {
+  const lens = card.sources.map((s) => (s.teaser || '').length);
+  const maxLen = lens.length ? Math.max(...lens) : 0;
+  const total = Math.min(7000, lens.reduce((a, b) => a + Math.min(b, 2500), 0));
+  if (maxLen >= FULL_BODY_CHARS) return 2;
+  if (total >= PARTIAL_TOTAL_CHARS) return 1;
+  return 0;
+}
+
+// Round-robin cards across outlets (preserving each outlet's internal order) so a
+// single full-text outlet (e.g. Ars) can't monopolize the top of the buffer.
+function roundRobinByOutlet<T extends { originalUrl: string }>(cards: T[]): T[] {
+  const byOutlet = new Map<string, T[]>();
+  for (const c of cards) {
+    const k = domainOf(c.originalUrl);
+    const q = byOutlet.get(k);
+    if (q) q.push(c); else byOutlet.set(k, [c]);
+  }
+  const queues = [...byOutlet.values()];
+  const out: T[] = [];
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const q of queues) {
+      const c = q.shift();
+      if (c) { out.push(c); progressed = true; }
+    }
+  }
+  return out;
+}
+
+// Prefer richer source material into the buffer (full text > partial > snippet),
+// keeping topic variety by interleaving outlets within each richness tier.
+function rerankByRichness<T extends { sources: { teaser?: string }[]; originalUrl: string }>(cards: T[]): T[] {
+  const tiers: Record<number, T[]> = { 2: [], 1: [], 0: [] };
+  for (const c of cards) tiers[richnessTier(c)].push(c);
+  return [
+    ...roundRobinByOutlet(tiers[2]),
+    ...roundRobinByOutlet(tiers[1]),
+    ...roundRobinByOutlet(tiers[0]),
+  ];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -348,7 +403,7 @@ Deno.serve(async (req) => {
 
     const clusters = await clusterArticles(pool, groqKey);
 
-    const cards = clusters.slice(0, MAX_CARDS).map((cluster) => {
+    const allCards = clusters.map((cluster) => {
       const members = cluster.indices.map((i) => pool[i]);
       const lead = members[0];
       // The card title is the lead article's real headline — concrete and
@@ -379,6 +434,12 @@ Deno.serve(async (req) => {
         ],
       };
     });
+
+    // Prefer richer sources into the buffer, then cap. ensure-buffer claims these
+    // in order, so full-text cards get produced before snippet-only ones.
+    const cards = rerankByRichness(allCards).slice(0, MAX_CARDS);
+    const tierCounts = allCards.reduce((acc, c) => { acc[richnessTier(c)]++; return acc; }, { 0: 0, 1: 0, 2: 0 } as Record<number, number>);
+    console.log(`[fetch-raw-news] ${allCards.length} cards (full=${tierCounts[2]} partial=${tierCounts[1]} snippet=${tierCounts[0]}) -> top ${cards.length} re-ranked by richness`);
 
     return new Response(JSON.stringify({ articles: cards }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
