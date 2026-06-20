@@ -96,9 +96,24 @@ async function buildSourceBlock(sources: SourceRef[], jinaKey: string | undefine
   return { text: block, chars: block.length, fullBody, sourceCount: picked.length };
 }
 
-// Approximate number of unique word tokens in a 3-paragraph article.
-// Used to translate intensity ratios into concrete palette counts.
-const WORDS_PER_ARTICLE = 200;
+// Article LENGTH is driven by source fullness (full text supports a longer
+// article; a thin snippet should stay short to avoid padding), and is
+// user-configurable. JLPT level drives COMPLEXITY (grammar/vocab difficulty), not
+// length. These are the fallbacks when the user hasn't overridden them in Settings.
+const DEFAULT_TARGET_PARAGRAPHS: Record<SourceKind, number> = {
+  full: 5,
+  partial: 4,
+  snippet: 3,
+};
+
+// Unique-token budget per paragraph (~200 tokens over a 3-paragraph article was
+// the original fixed basis). The vocab palette scales with paragraph count so a
+// longer full-text article gets proportionally more review/new words — keeping
+// the known/review/new density constant instead of diluting it across more text.
+const WORDS_PER_PARAGRAPH = 67;
+// Backbone (KNOWN) pool size per paragraph — a draw-from pool, not a quota — so a
+// longer article has a richer known palette to build its spine from.
+const KNOWN_WORDS_PER_PARAGRAPH = 10;
 
 // reading_intensity preset -> target distribution of known/review/new vocab.
 // See database/10_reading_intensity.sql for the column definition.
@@ -194,8 +209,20 @@ Deno.serve(async (req) => {
     const vocabMode = prefs?.vocab_mode ?? 'balanced';
     const readingIntensity: string = prefs?.reading_intensity ?? 'balanced';
     const ratios = INTENSITY_RATIOS[readingIntensity] ?? INTENSITY_RATIOS.balanced;
-    const targetReview = Math.max(1, Math.round(ratios.review * WORDS_PER_ARTICLE));
-    const targetNew = Math.max(1, Math.round(ratios.new * WORDS_PER_ARTICLE));
+
+    // Length follows source fullness (user-configurable), not JLPT level.
+    const paragraphPref: Record<SourceKind, number> = {
+      full: prefs?.target_paragraphs_full ?? DEFAULT_TARGET_PARAGRAPHS.full,
+      partial: prefs?.target_paragraphs_partial ?? DEFAULT_TARGET_PARAGRAPHS.partial,
+      snippet: prefs?.target_paragraphs_snippet ?? DEFAULT_TARGET_PARAGRAPHS.snippet,
+    };
+    const targetParagraphs = Math.max(1, Math.round(paragraphPref[sourceKind]));
+
+    // Scale the vocab budget with length so review/new density stays constant.
+    const wordsBudget = WORDS_PER_PARAGRAPH * targetParagraphs;
+    const targetReview = Math.max(1, Math.round(ratios.review * wordsBudget));
+    const targetNew = Math.max(1, Math.round(ratios.new * wordsBudget));
+    console.log(`[process-article] length: ${targetParagraphs} paragraphs (sourceKind=${sourceKind}), vocab budget ${wordsBudget} -> ${targetReview} review / ${targetNew} new`);
 
     // 2. Vocabulary palette pipeline
     //    a) Extract topic keywords from the English source (Groq)
@@ -255,7 +282,7 @@ Deno.serve(async (req) => {
           }
         }
         // De-dupe while preserving order
-        knownPalette = Array.from(new Set(knownPalette)).slice(0, 30);
+        knownPalette = Array.from(new Set(knownPalette)).slice(0, KNOWN_WORDS_PER_PARAGRAPH * targetParagraphs);
         reviewPalette = Array.from(new Set(reviewPalette)).slice(0, Math.max(5, targetReview + 2));
         newPalette = Array.from(new Set(newPalette)).slice(0, Math.max(3, targetNew + 2));
       }
@@ -296,26 +323,23 @@ Deno.serve(async (req) => {
     // 3. Build Gemini prompts (same logic as client-side rewriteArticleWithGemini)
     const jlptStr = `N${jlptLevel}`;
 
-    const JLPT_LEVEL_CONFIG: Record<number, { description: string; paragraphs: string }> = {
+    // JLPT level controls COMPLEXITY only (grammar/vocab difficulty). Article
+    // LENGTH comes from targetParagraphs (source fullness, user-configurable) above.
+    const JLPT_LEVEL_CONFIG: Record<number, { description: string }> = {
       5: {
         description: 'N5: The reader understands some basic Japanese. Write simple sentences using hiragana, katakana, and basic kanji. Basic vocabulary and elementary grammar only.',
-        paragraphs: '3',
       },
       4: {
         description: 'N4: The reader understands basic Japanese. Write about familiar daily topics using basic vocabulary and kanji. Simple compound sentences are acceptable.',
-        paragraphs: '3-4',
       },
       3: {
         description: 'N3: The reader understands everyday Japanese. Write like a real newspaper article — use compound sentences, natural news phrasing, and intermediate grammar. The reader can handle newspaper headlines and slightly difficult text with context. Do NOT over-simplify to basic sentence patterns.',
-        paragraphs: '4-5',
       },
       2: {
         description: 'N2: The reader understands Japanese used in everyday situations and a variety of circumstances. Write like a real newspaper article or commentary — clear, natural prose on general topics at near-natural complexity.',
-        paragraphs: '5-6',
       },
       1: {
         description: 'N1: The reader understands Japanese used in a variety of circumstances. Write with full natural complexity — abstract reasoning, editorials, and nuanced prose are appropriate.',
-        paragraphs: '5-6',
       },
     };
     const levelConfig = JLPT_LEVEL_CONFIG[jlptLevel] ?? JLPT_LEVEL_CONFIG[3];
@@ -358,7 +382,7 @@ Treat this palette as a GUIDE, not a quota. Never distort the facts or insert un
 
     // Pass 1: Rewrite article
     const prompt1 = `
-You are a factual Japanese news reporter writing a ${levelConfig.paragraphs} paragraph news article for a JLPT ${jlptStr} learner.
+You are a factual Japanese news reporter writing a ${targetParagraphs}-paragraph news article for a JLPT ${jlptStr} learner.
 LEVEL GUIDANCE: ${levelConfig.description}
 Topic: ${title}
 Sources (real English news text; the FIRST source is the primary story):

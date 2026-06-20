@@ -3,12 +3,36 @@ import { ChevronDown } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiList } from '../data/rtkKanji';
 
+const stepperBtnStyle = (disabled: boolean): React.CSSProperties => ({
+  width: '34px',
+  height: '34px',
+  borderRadius: '100px',
+  border: 'none',
+  backgroundColor: 'var(--border-light)',
+  color: disabled ? 'var(--text-muted)' : 'var(--text-main)',
+  fontSize: '1.2rem',
+  fontWeight: 700,
+  lineHeight: 1,
+  cursor: disabled ? 'default' : 'pointer',
+  opacity: disabled ? 0.4 : 1,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+});
+
+const lengthRows = [
+  { kind: 'full', label: 'Full text', hint: 'Whole article body (badged FULL TEXT)' },
+  { kind: 'partial', label: 'Partial', hint: 'A richer-than-teaser excerpt' },
+  { kind: 'snippet', label: 'Snippet', hint: 'Only a short headline teaser' },
+] as const;
+
 export function Settings() {
   const {
     jlptLevel, setJlptLevel,
     rtkLevel, setRtkLevel,
     studyMode, setStudyMode,
     readingIntensity, setReadingIntensity,
+    targetParagraphs, setTargetParagraphs,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight
   } = useAppStore();
@@ -140,6 +164,42 @@ export function Settings() {
           {readingIntensity === 'balanced' && 'Comfortable learning — ~95% known, with a handful of review words and 1–2 new words per article.'}
           {readingIntensity === 'intensive' && 'Study-heavy — ~90% known, with more review and new vocabulary packed in. Slower but faster growth.'}
         </p>
+      </div>
+
+      {/* 3. Article Length */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          Article Length
+        </label>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+          Target paragraphs by how much real source text each article was built from. Full-text sources support longer reads; thin snippets stay short to avoid padding. Your JLPT level still sets the difficulty.
+        </p>
+
+        {lengthRows.map(({ kind, label, hint }) => (
+          <div key={kind} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: kind === 'snippet' ? 0 : '1.1rem' }}>
+            <div style={{ marginRight: '1rem' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>{label}</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{hint}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+              <button
+                onClick={() => setTargetParagraphs(kind, targetParagraphs[kind] - 1)}
+                disabled={targetParagraphs[kind] <= 1}
+                aria-label={`Decrease ${label} length`}
+                style={stepperBtnStyle(targetParagraphs[kind] <= 1)}
+              >−</button>
+              <span style={{ minWidth: '1.5rem', textAlign: 'center', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
+                {targetParagraphs[kind]}
+              </span>
+              <button
+                onClick={() => setTargetParagraphs(kind, targetParagraphs[kind] + 1)}
+                disabled={targetParagraphs[kind] >= 10}
+                aria-label={`Increase ${label} length`}
+                style={stepperBtnStyle(targetParagraphs[kind] >= 10)}
+              >+</button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* 3. Vocab Use */}

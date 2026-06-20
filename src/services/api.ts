@@ -531,6 +531,9 @@ export async function upsertUserPreferences(
     vocab_mode?: string;
     furigana_mode?: string;
     reading_intensity?: string;
+    target_paragraphs_full?: number;
+    target_paragraphs_partial?: number;
+    target_paragraphs_snippet?: number;
   }
 ) {
   const { error } = await supabase
