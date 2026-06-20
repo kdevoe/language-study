@@ -102,8 +102,18 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     if (clickedWordsRef.current.has(key)) return;
     const token = wordPayloadsRef.current.get(key);
     if (!token) return;
-    gradedRef.current.add(key);
     const details = token.details;
+    const entryId = details?.jmdictEntryId || token.jmdict_entry_id;
+    // Don't grade off a raw, un-enriched token: with no dictionary link the JLPT
+    // is unknown, so seeding difficulty here would assume the word is hard (and it
+    // can't sync without an entry id). If the article hasn't been dictionary-linked
+    // yet, defer — leave the word un-marked so it grades correctly once enrichment
+    // swaps in linked tokens and it scrolls into view again.
+    if (!details && !entryId) {
+      const blocks = useAppStore.getState().currentArticle?.blocks;
+      if (blocks && !isEnriched(blocks)) return;
+    }
+    gradedRef.current.add(key);
     const jlptLevel = details?.jlptLevel;
     // Make sure a never-seen word exists before grading it (read latest store state).
     if (!useAppStore.getState().wordDatabase[key]) {
@@ -112,7 +122,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
     }
     recordWordSeen(key, true);
-    applyDifficultyEvent(key, 'skip', jlptLevel);
+    // Count the read either way, but only seed a difficulty when the word is
+    // dictionary-linked (official or freq-derived JLPT). A wholly unlinkable word
+    // stays ungraded rather than being guessed as hard.
+    if (details || entryId) applyDifficultyEvent(key, 'skip', jlptLevel);
   };
   gradeRef.current = gradeWordByKey;
 

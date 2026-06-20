@@ -35,7 +35,13 @@ export function difficultyForBucket(level: MasteryLevel): number {
 // JLPT numbering: 5 = N5 (easiest) ... 1 = N1 (hardest). A word whose JLPT number
 // is *lower* than the user's level sits above their level => harder for them.
 export function seedDifficulty(jlptLevel: number | null | undefined, userLevel: number | null): number {
-  if (jlptLevel == null) return 9;      // no JLPT data => assume hard
+  // No JLPT signal. Frequency already feeds seeding upstream — the JMDict lookup
+  // derives a level from freq_rank/kanji when the official tag is missing (see
+  // applyJlptFallback in jmdict.ts) — so a null reaching here means we have *no*
+  // signal, not that the word is hard. Seed neutral, not 9: the old "assume hard"
+  // default mis-seeded words graded before enrichment (null JLPT) straight to
+  // Hard, and a read-past only eases -1/day so they stayed stuck there.
+  if (jlptLevel == null) return 6;      // no signal => neutral, let reads ease it
   if (userLevel == null) return 5;      // unknown user level => neutral
   const delta = userLevel - jlptLevel;  // >0 => word harder than the user
   return clampDifficulty(6 + delta * 2);
@@ -499,7 +505,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
-      version: 3,
+      version: 4,
       // A persist write throws QuotaExceededError once localStorage fills up. That
       // exception used to propagate out of store actions (markArticleRead,
       // recordWordSeen, ...) and abort the tap handler — silently breaking article
@@ -558,6 +564,33 @@ export const useAppStore = create<AppState>()(
             const w = wordDatabase[key];
             if (w && w.difficulty == null && w.mastery && w.mastery !== 'unseen') {
               wordDatabase[key] = { ...w, difficulty: difficultyForBucket(w.mastery) };
+            }
+          });
+          state = { ...state, wordDatabase };
+        }
+        // v4: repair difficulties mis-seeded by the grading race. Words read past
+        // before client enrichment populated their JLPT were seeded from a null
+        // level => difficulty 8/9 => stuck "hard". Re-seed any *passively* graded
+        // (read-past — not a manual set or a lookup) hard row from its stored JLPT;
+        // legit-hard rows (e.g. an N3 word for an N5 user) re-derive to the same
+        // value, so only the mis-seeded ones actually move. Rows with no stored
+        // JLPT drop to ungraded and re-grade correctly on the next read.
+        if (version < 4 && state?.wordDatabase) {
+          const wordDatabase = { ...state.wordDatabase };
+          Object.keys(wordDatabase).forEach((key) => {
+            const w = wordDatabase[key];
+            if (!w) return;
+            const passivelyHard =
+              (w.mastery === 'hard' || (w.difficulty != null && w.difficulty >= 8)) &&
+              w.lastAdjustReason !== 'manual' &&
+              w.lastAdjustReason !== 'click';
+            if (!passivelyHard) return;
+            if (w.jlptLevel != null) {
+              // Mirror a single read-past on a fresh seed (see applyDifficultyEvent).
+              const difficulty = clampDifficulty(seedDifficulty(w.jlptLevel, state.jlptLevel ?? null) - 1);
+              wordDatabase[key] = { ...w, difficulty, mastery: bucketForDifficulty(difficulty), lastAdjustReason: 'skip' };
+            } else {
+              wordDatabase[key] = { ...w, difficulty: null, mastery: 'unseen', lastAdjustedDay: undefined, lastAdjustReason: undefined };
             }
           });
           state = { ...state, wordDatabase };
