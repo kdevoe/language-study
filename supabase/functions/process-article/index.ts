@@ -24,6 +24,27 @@ const TOTAL_SOURCE_CHAR_CAP = 7000;
 
 interface SourceRef { title?: string; url?: string; teaser?: string }
 
+// ── Source fullness classification ──────────────────────────────────────────
+// We track how much real source material Gemini actually received, because
+// article quality tracks it directly: a bare ~200-char teaser forces Gemini to
+// pad ("50% means half"), while an extracted body produces real news prose.
+// Stored on processed_news (source_kind / source_chars) for aggregate analytics
+// and echoed into content JSON so the Feed can badge full-text articles.
+//   full    — extraction succeeded and yielded a substantial body
+//   partial — more than a bare teaser (e.g. a full-text RSS body), but thin
+//   snippet — only the ~150-200 char NewsAPI/teaser fallback reached Gemini
+type SourceKind = 'full' | 'partial' | 'snippet';
+const FULL_SOURCE_CHARS = 1500;    // an extracted body Gemini can build a real article from
+const PARTIAL_SOURCE_CHARS = 600;  // richer than a bare teaser, but not a full body
+
+function classifySourceFullness(chars: number, extracted: boolean): SourceKind {
+  if (extracted && chars >= FULL_SOURCE_CHARS) return 'full';
+  if (chars >= PARTIAL_SOURCE_CHARS) return 'partial';
+  return 'snippet';
+}
+
+interface SourceBlock { text: string; chars: number; extracted: boolean; sourceCount: number }
+
 async function extractFullText(url: string, jinaKey: string | undefined): Promise<string> {
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), EXTRACT_TIMEOUT_MS);
@@ -43,16 +64,21 @@ async function extractFullText(url: string, jinaKey: string | undefined): Promis
 }
 
 // Build the richest source block we can: extracted full text where a teaser is
-// thin and extraction succeeds, teaser otherwise. Returns '' if no sources.
-async function buildSourceBlock(sources: SourceRef[], jinaKey: string | undefined): Promise<string> {
+// thin and extraction succeeds, teaser otherwise. Reports whether any extraction
+// contributed and the final char count so the caller can classify fullness.
+async function buildSourceBlock(sources: SourceRef[], jinaKey: string | undefined): Promise<SourceBlock> {
   const picked = sources.filter((s) => s && (s.teaser || s.url)).slice(0, MAX_EXTRACT_SOURCES);
-  if (picked.length === 0) return '';
+  if (picked.length === 0) return { text: '', chars: 0, extracted: false, sourceCount: 0 };
 
+  let extracted = false;
   const parts = await Promise.all(picked.map(async (s, n) => {
     let body = (s.teaser || '').trim();
     if (s.url && body.length < EXTRACT_TEASER_THRESHOLD) {
       const full = await extractFullText(s.url, jinaKey);
-      if (full && full.length > body.length) body = full;
+      if (full && full.length > body.length) {
+        body = full;
+        extracted = true;
+      }
     }
     body = body.slice(0, PER_SOURCE_CHAR_CAP);
     return `${n + 1}. ${s.title || ''} — ${body}`.trim();
@@ -60,7 +86,8 @@ async function buildSourceBlock(sources: SourceRef[], jinaKey: string | undefine
 
   let block = parts.join('\n\n');
   if (block.length > TOTAL_SOURCE_CHAR_CAP) block = block.slice(0, TOTAL_SOURCE_CHAR_CAP);
-  return block.trim();
+  block = block.trim();
+  return { text: block, chars: block.length, extracted, sourceCount: picked.length };
 }
 
 // Approximate number of unique word tokens in a 3-paragraph article.
@@ -130,17 +157,23 @@ Deno.serve(async (req) => {
     // Opportunistically upgrade thin teasers to full article text. Falls back
     // to the merged teaser block (snippet) when no sources / extraction fails.
     let sourceText = snippet ?? '';
+    let sourceChars = sourceText.length;
+    let extracted = false;
     if (Array.isArray(sources) && sources.length > 0) {
       try {
         const built = await buildSourceBlock(sources as SourceRef[], jinaKey);
-        if (built) {
-          sourceText = built;
-          console.log(`[process-article] built source block from ${sources.length} source(s), ${built.length} chars`);
+        if (built.text) {
+          sourceText = built.text;
+          sourceChars = built.chars;
+          extracted = built.extracted;
+          console.log(`[process-article] built source block from ${sources.length} source(s), ${built.chars} chars`);
         }
       } catch (e) {
         console.warn('[process-article] source extraction failed, using teaser:', e instanceof Error ? e.message : e);
       }
     }
+    const sourceKind = classifySourceFullness(sourceChars, extracted);
+    console.log(`[process-article] source fullness: ${sourceKind} (${sourceChars} chars, extracted=${extracted})`);
 
     // 1. Fetch user preferences
     const { data: prefs } = await supabase
@@ -372,6 +405,10 @@ Output EXACTLY a JSON array:
         // `ready` (conflict target is the composite PK). On a fresh on-tap insert
         // it's `ready` from the start.
         status: 'ready',
+        // Queryable fullness columns — let us aggregate "what % of articles got
+        // full text vs a bare snippet" over time (see database/20_source_fullness.sql).
+        source_kind: sourceKind,
+        source_chars: sourceChars,
         content: {
           id: finalArticleId,
           title,
@@ -380,6 +417,10 @@ Output EXACTLY a JSON array:
           date: new Date().toISOString(),
           readTime: '5分で読める',
           category: 'Recent News',
+          // Echoed into content so the Feed can badge full-text articles without
+          // a second query (cache hydration only selects id + content).
+          sourceKind,
+          sourceChars,
         },
         metadata: { date: new Date().toISOString(), category: 'Recent News' },
       }, { onConflict: 'user_id,id' });

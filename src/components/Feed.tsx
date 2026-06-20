@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { CheckCircle2, Trash2, Bookmark } from 'lucide-react';
+import { CheckCircle2, Trash2, Bookmark, FileText } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 import { useState, forwardRef } from 'react';
 
@@ -198,6 +198,29 @@ const NewsCard = forwardRef<HTMLDivElement, {
             }}>
               {article.category.toUpperCase()}
             </span>
+
+            {/* Built from extracted full article text, not just a teaser snippet
+                — the strongest signal of article richness. */}
+            {article.sourceKind === 'full' && (
+              <span
+                title="Written from the full source article"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  fontSize: '0.6rem',
+                  fontWeight: 800,
+                  color: '#4a5d23',
+                  letterSpacing: '0.1em',
+                  backgroundColor: 'rgba(74, 93, 35, 0.08)',
+                  padding: '0.3rem 0.6rem',
+                  borderRadius: '8px',
+                }}
+              >
+                <FileText size={12} strokeWidth={2.5} />
+                FULL TEXT
+              </span>
+            )}
           </div>
           
           {isCached && (

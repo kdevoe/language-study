@@ -38,6 +38,11 @@ export interface NewsArticle {
   /** Clustered source articles — passed to process-article for full-text extraction. */
   sources?: ArticleSource[];
   sourceCount?: number;
+  /** How much real source material reached Gemini (set by process-article).
+   *  Drives the "Full text" badge; absent on legacy articles. */
+  sourceKind?: 'full' | 'partial' | 'snippet';
+  /** Char count of the source block sent to Gemini. */
+  sourceChars?: number;
 }
 
 import { supabase } from './supabase'
