@@ -94,7 +94,10 @@ interface AppState {
   vocabMode: 'natural' | 'balanced' | 'study';
   furiganaMode: 'always' | 'never' | 'dynamic';
   readingIntensity: 'leisure' | 'balanced' | 'intensive';
-  
+  // Target article length (paragraphs) by source fullness. Length follows how
+  // much real source material the article was built from; JLPT drives complexity.
+  targetParagraphs: { full: number; partial: number; snippet: number };
+
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
@@ -114,6 +117,7 @@ interface AppState {
   setVocabMode: (mode: 'natural' | 'balanced' | 'study') => void;
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setReadingIntensity: (intensity: 'leisure' | 'balanced' | 'intensive') => void;
+  setTargetParagraphs: (kind: 'full' | 'partial' | 'snippet', value: number) => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
@@ -143,6 +147,7 @@ export const useAppStore = create<AppState>()(
       vocabMode: 'balanced',
       furiganaMode: 'dynamic',
       readingIntensity: 'balanced',
+      targetParagraphs: { full: 5, partial: 4, snippet: 3 },
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
@@ -185,6 +190,18 @@ export const useAppStore = create<AppState>()(
         set({ readingIntensity: intensity });
         currentUserId().then((uid) => {
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { reading_intensity: intensity }));
+        });
+      },
+      setTargetParagraphs: (kind, value) => {
+        const v = Math.max(1, Math.min(10, Math.round(value)));
+        set((state) => ({ targetParagraphs: { ...state.targetParagraphs, [kind]: v } }));
+        const column = ({
+          full: 'target_paragraphs_full',
+          partial: 'target_paragraphs_partial',
+          snippet: 'target_paragraphs_snippet',
+        } as const)[kind];
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { [column]: v }));
         });
       },
 
@@ -430,6 +447,11 @@ export const useAppStore = create<AppState>()(
             vocabMode: remotePrefs.vocab_mode ?? state.vocabMode,
             furiganaMode: remotePrefs.furigana_mode ?? state.furiganaMode,
             readingIntensity: remotePrefs.reading_intensity ?? state.readingIntensity,
+            targetParagraphs: {
+              full: remotePrefs.target_paragraphs_full ?? state.targetParagraphs.full,
+              partial: remotePrefs.target_paragraphs_partial ?? state.targetParagraphs.partial,
+              snippet: remotePrefs.target_paragraphs_snippet ?? state.targetParagraphs.snippet,
+            },
           }));
         }
 
@@ -509,6 +531,7 @@ export const useAppStore = create<AppState>()(
         vocabMode: state.vocabMode,
         furiganaMode: state.furiganaMode,
         readingIntensity: state.readingIntensity,
+        targetParagraphs: state.targetParagraphs,
         wordDatabase: state.wordDatabase,
         studyKanji: state.studyKanji,
         lastRtkUpdateTs: state.lastRtkUpdateTs,
