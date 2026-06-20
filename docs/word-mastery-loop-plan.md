@@ -38,7 +38,7 @@ A fresh read of the code (2026-06-20) established the baseline:
 - **Model reality:** article rewriting and grammar lookups run on **`gemini-3-flash-preview`** (unpinned), keyword extraction + readings/translation on Groq **`openai/gpt-oss-20b`**, news clustering on Groq **`llama-3.3-70b-versatile`**. *(Note: `CLAUDE.md` still says "Gemini 2.0-flash" — stale; worth correcting.)* No prompt-eval harness exists; no model versions are pinned.
 - **Flashcards:** none. Zero existing UI/quiz/deck code. Word-progress data *is* fully queryable (store `wordDatabase` + `fetchUserWordProgress`), so the deck has a backend to read from once a scheduler exists.
 - **Intake:** none. The app grades **every** word on sight (immediate `seedDifficulty` + `applyDifficultyEvent` on read) — there is no queue, no daily-new cap, nothing holding words back. This is the "overwhelm" gap below.
-- **Tracking has no canonical key.** The same word is counted under different identifiers by path — kuromoji `lemma` on passive reads, JMDict `details.word` on clicks, `entry_id` on sync (`Reader.tsx:231/308/340`, `store.ts:313`) — so one word fragments into several records, and entry_id-less tokens never sync (#74). Since `times_seen` feeds intake ordering, difficulty, and staleness, this corrupts the SRS foundation — fix early (Phase A), together with #39 (same entry-resolution root).
+- **Tracking has no canonical key.** The same word is counted under different identifiers by path — kuromoji `lemma` on passive reads, JMDict `details.word` on clicks, `entry_id` on sync (`Reader.tsx:231/308/340`, `store.ts:313`) — so one word fragments into several records, and entry_id-less tokens never sync. Since `times_seen` feeds intake ordering, difficulty, and staleness, this corrupts the SRS foundation. Same root cause as the entry-resolution problem, so it's folded into #39 as a `times_seen` acceptance criterion (fix early, Phase A).
 
 ---
 
@@ -73,8 +73,7 @@ For words already promoted, a single comparable **priority score** decides which
 
 Garbage-in guard: if JLPT/entry resolution is wrong **or reads aren't counted**, the SRS schedule, the LLM palette, and the flashcard deck all inherit the error. Do this alongside/ahead of Phase D.
 
-- [ ] **#74 — Word tracking has no canonical key (`times_seen` globally off)** 🟡 *(do early — foundational; pair with #39)* — the same word fragments across key spaces: passive reads key by kuromoji `lemma`, clicks by JMDict `details.word`, sync by `entry_id` (`Reader.tsx:231/308/340`, `tokenizer.ts:123`, `store.ts:313`), and entry_id-less tokens never sync at all. One word becomes several under-counted records. Fix by keying all tracking on **one canonical `entry_id`** resolved at enrichment. **Same root cause as #39** — ship together. (The enrichment-race/dwell heuristic is at most secondary.) Distinct from #41 (sync/display layer).
-- [ ] **#39 — Unify entry resolution (displayed vs stored JLPT)** 🔴 — homographs must resolve to one canonical `entry_id` so the badge, SRS seed, and palette read the same entry; stop the server's first-match Pass-3 linking from overriding the client's disambiguation; align NULL-JLPT handling (client "hard" vs server "ignored").
+- [ ] **#39 — Unify entry resolution (displayed vs stored JLPT) + canonical `times_seen` keying** 🔴 *(do early — foundational)* — homographs must resolve to one canonical `entry_id` so the badge, SRS seed, and palette read the same entry; stop the server's first-match Pass-3 linking from overriding the client's disambiguation; align NULL-JLPT handling (client "hard" vs server "ignored"). **Now also absorbs the `times_seen` under-count fix (folded in from #74):** the same word fragments across key spaces — passive reads key by kuromoji `lemma`, clicks by JMDict `details.word`, sync by `entry_id` (`Reader.tsx:231/308/340`, `tokenizer.ts:123`, `store.ts:313`), and entry_id-less tokens never sync — so all tracking must key on one canonical `entry_id`. Distinct from #41 (sync/display layer).
 - [ ] **#37 — JMDict sense miss (手当て → "salary")** 🟢 — prefer the entry whose kanji form exactly matches the surface; consider context-disambiguating the sense.
 - [ ] **#41 — Sync gap: remote progress doesn't hydrate locally** 🟡 — Option B (server-side aggregate query for the Progress page) first, Option A (full per-field reconcile across devices) as follow-up. Required so the flashcard deck and Progress page reflect *all* tracked words, not just locally-seen ones.
 - ✅ **Shipped 2026-06-19:** `seedDifficulty` null-JLPT default 9→6; no grading off un-enriched tokens; persist-v4 re-seed migration.
@@ -184,7 +183,7 @@ Phase C (prompt/model) ───────────[parallel]────�
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-**#74 (count reads right) + #64 (pin) → finish B (#69 metric → #25 → #22 → #51) + A (#39/#37/#41) → #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).**
+**#64 (pin) → finish B (#69 metric → #25 → #22 → #51) + A (#39 canonical key / counts reads right → #37 → #41) → #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).**
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
@@ -194,7 +193,6 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 
 | Ref | Title | Size | Phase |
 |-----|-------|------|-------|
-| [#74](https://github.com/kdevoe/language-study/issues/74) | Word tracking has no canonical key — same word fragments across lemma / headword / entry_id (`times_seen` globally off); pair with #39 | 🟡 | A |
 | [#64](https://github.com/kdevoe/language-study/issues/64) | Audit & pin all LLM model versions across edge functions (+ fix stale CLAUDE.md "Gemini 2.0-flash") | 🟢 | C |
 | [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C |
 | [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C |
@@ -206,7 +204,7 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 | [#72](https://github.com/kdevoe/language-study/issues/72) | Feed due words into article generation (upgrade #51 staleness → real due_at) | 🟡 | E |
 | [#73](https://github.com/kdevoe/language-study/issues/73) | Study dashboard: due/new/learning health + daily goal on Progress page | 🟢 | E |
 
-**Existing issues this plan organizes:** #74, #39, #37, #41 (Phase A) · #25, #22, #51 (Phase B) · #8 (epic that Phases D+E fulfill; decompose into #67, #68, #70–#73).
+**Existing issues this plan organizes:** #39 (now also absorbs the #74 `times_seen` fix), #37, #41 (Phase A) · #25, #22, #51 (Phase B) · #8 (epic that Phases D+E fulfill; decompose into #67, #68, #70–#73).
 
 ---
 
