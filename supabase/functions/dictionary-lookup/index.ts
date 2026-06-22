@@ -1,12 +1,12 @@
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GROQ_MODEL = 'openai/gpt-oss-20b';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // --- JMDict lookup helpers (server-side, mirrors client jmdict.ts) ---
@@ -212,7 +212,7 @@ Be extremely concise.`;
 
       const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
       const result = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: GEMINI_FLASH,
         contents: prompt,
       });
       const insight = (result.text ?? '').trim();

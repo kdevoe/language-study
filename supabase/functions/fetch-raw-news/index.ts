@@ -1,3 +1,5 @@
+import { GROQ_CLUSTER as CLUSTER_MODEL } from '../_shared/models.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -72,7 +74,6 @@ const EVERYTHING_URL = 'https://newsapi.org/v2/everything';
 // llama-3.3-70b is used over the smaller scout model, which produced a
 // catastrophic 91-item "misc" mega-bucket at real scale.
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const CLUSTER_MODEL = 'llama-3.3-70b-versatile';
 // Keep merges tight — over-merging suppresses unrelated articles and wastes
 // extraction calls. The lead article is always primary; extras are corroboration.
 const MAX_SOURCES_PER_CLUSTER = 3;

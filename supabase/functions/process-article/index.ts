@@ -1,13 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { rtkKanjiList } from '../_shared/rtkKanji.ts';
+import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GROQ_MODEL = 'openai/gpt-oss-20b';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // ── Opportunistic full-text extraction ──────────────────────────────────────
@@ -407,7 +407,7 @@ Output EXACTLY a JSON array:
 
     console.log(`[process-article] Pass 1 for user ${userId}`);
     const result1 = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_FLASH,
       contents: prompt1,
       config: { responseMimeType: 'application/json' },
     });

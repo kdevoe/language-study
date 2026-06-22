@@ -25,7 +25,7 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 
 ## Architecture
 
-**Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 2.0-flash (article rewriting), Groq (dictionary fallback)
+**Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 3.5-flash (article rewriting), Groq (dictionary fallback). Model identifiers are centralized in `supabase/functions/_shared/models.ts` (single bump point per model).
 
 ### Frontend (`src/`)
 
