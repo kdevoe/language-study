@@ -245,14 +245,21 @@ Deno.serve(async (req) => {
         if (candErr) throw candErr;
 
         const entryIds: string[] = (candidates ?? []).map((c: any) => c.entry_id);
-        let progressMap = new Map<string, string>();
+        // Fetch the richer per-user signals (numeric difficulty + times_seen), not just
+        // the coarse mastery_level bucket, so the metric can rank by real familiarity (#25).
+        type Progress = { mastery: WordSignal['mastery']; difficulty: number | null; timesSeen: number | null };
+        let progressMap = new Map<string, Progress>();
         if (entryIds.length > 0) {
           const { data: progress } = await supabase
             .from('user_word_progress')
-            .select('word_id, mastery_level')
+            .select('word_id, mastery_level, difficulty, times_seen')
             .eq('user_id', userId)
             .in('word_id', entryIds);
-          progressMap = new Map((progress ?? []).map((p: any) => [p.word_id, p.mastery_level]));
+          progressMap = new Map((progress ?? []).map((p: any) => [p.word_id, {
+            mastery: p.mastery_level,
+            difficulty: p.difficulty ?? null,
+            timesSeen: p.times_seen ?? null,
+          }]));
         }
 
         // Map DB rows onto the shared Word Priority Metric (../_shared/wordPriority.ts),
@@ -265,12 +272,15 @@ Deno.serve(async (req) => {
           const text = c.kanji || c.kana;
           if (!text) continue;
           display.set(c.entry_id, text);
+          const prog = progressMap.get(c.entry_id);
           signals.push({
             entryId: c.entry_id,
             jlptLevel: c.jlpt_level ?? null,
             freqRank: c.freq_rank ?? null,
             isCommon: !!c.is_common,
-            mastery: progressMap.get(c.entry_id) as WordSignal['mastery'],
+            mastery: prog?.mastery,
+            difficulty: prog?.difficulty ?? null,
+            timesSeen: prog?.timesSeen ?? null,
           });
         }
         signals.sort(compareSurfacing);

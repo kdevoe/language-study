@@ -42,16 +42,54 @@ export interface WordSignal {
   isCommon: boolean;
   /** Per-user SRS mastery; undefined/null = never tracked. */
   mastery?: Mastery;
+  /**
+   * Per-user numeric difficulty (1 = easiest for this user … 10 = hardest); the SRS
+   * source of truth that `mastery` is derived from. null/undefined = never tracked.
+   */
+  difficulty?: number | null;
+  /** How many times this user has encountered the word. null/undefined = never tracked. */
+  timesSeen?: number | null;
+}
+
+/**
+ * Confirmed-familiar = the user has actually interacted with the word and it graded out
+ * easy (real evidence), as opposed to "assumed-from-level" words inferred easy purely
+ * from JLPT level with no interaction history. Only these ever feed the KNOWN backbone
+ * as verified vocabulary (#25).
+ */
+export function isConfirmedFamiliar(w: WordSignal): boolean {
+  return w.mastery === 'easy';
 }
 
 const FREQ_RANK_RARE = Number.POSITIVE_INFINITY; // null freq_rank sorts last (rarest)
 
 /**
  * In-SRS surfacing order — "most useful word wins" for slicing the article palette.
- * Common words first, then most-frequent (lowest freq_rank, nulls last), then easier
+ *
+ * Confirmed-familiar words sort first (#25): they're verified-easy backbone material,
+ * strictly better than below-level words the user has never seen, so the KNOWN cap drops
+ * the guesses before the verified words. Within the confirmed group, strongest evidence
+ * leads — easiest-for-the-user (lowest numeric difficulty) then most-often-seen.
+ *
+ * Everything else (and the tiebreak among confirmed words) falls back to frequency:
+ * common first, then most-frequent (lowest freq_rank, nulls last), then easier
  * (higher jlpt_level) first. Returns a standard Array.sort comparator result.
+ *
+ * Note: only confirmed-easy words ever land in the KNOWN bucket, so promoting them here
+ * reorders the backbone only — the review/new buckets keep their frequency ordering.
  */
 export function compareSurfacing(a: WordSignal, b: WordSignal): number {
+  const ca = isConfirmedFamiliar(a);
+  const cb = isConfirmedFamiliar(b);
+  if (ca !== cb) return ca ? -1 : 1;
+  if (ca && cb) {
+    const da = a.difficulty ?? FREQ_RANK_RARE; // missing difficulty = least-confirmed, last
+    const db = b.difficulty ?? FREQ_RANK_RARE;
+    if (da !== db) return da - db; // easier for the user first
+    const ta = a.timesSeen ?? 0;
+    const tb = b.timesSeen ?? 0;
+    if (ta !== tb) return tb - ta; // more interaction evidence first
+  }
   if (a.isCommon !== b.isCommon) return a.isCommon ? -1 : 1;
   const fa = a.freqRank ?? FREQ_RANK_RARE;
   const fb = b.freqRank ?? FREQ_RANK_RARE;
