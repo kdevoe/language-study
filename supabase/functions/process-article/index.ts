@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { rtkKanjiList } from '../_shared/rtkKanji.ts';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
-import { classifyBucket, compareSurfacing, type WordSignal } from '../_shared/wordPriority.ts';
+import { classifyBucket, compareByProximity, compareKnown, type WordSignal } from '../_shared/wordPriority.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -264,16 +264,17 @@ Deno.serve(async (req) => {
 
         // Map DB rows onto the shared Word Priority Metric (../_shared/wordPriority.ts),
         // the single source of "which word matters" across the palette, intake (#68),
-        // and the deck (#70). It owns the surfacing order (most useful first) and the
-        // known/review/new bucketing.
+        // and the deck (#70). It owns the known/review/new bucketing and the per-bucket
+        // ordering: the KNOWN backbone by confirmed-familiarity then frequency (#25), and
+        // REVIEW/NEW by JLPT proximity to the reader then frequency (#22).
         const display = new Map<string, string>();
-        const signals: WordSignal[] = [];
+        const buckets: Record<'known' | 'review' | 'new', WordSignal[]> = { known: [], review: [], new: [] };
         for (const c of (candidates ?? []) as any[]) {
           const text = c.kanji || c.kana;
           if (!text) continue;
           display.set(c.entry_id, text);
           const prog = progressMap.get(c.entry_id);
-          signals.push({
+          const signal: WordSignal = {
             entryId: c.entry_id,
             jlptLevel: c.jlpt_level ?? null,
             freqRank: c.freq_rank ?? null,
@@ -281,18 +282,17 @@ Deno.serve(async (req) => {
             mastery: prog?.mastery,
             difficulty: prog?.difficulty ?? null,
             timesSeen: prog?.timesSeen ?? null,
-          });
+          };
+          const bucket = classifyBucket(signal, jlptLevel);
+          if (bucket) buckets[bucket].push(signal);
         }
-        signals.sort(compareSurfacing);
-
-        for (const s of signals) {
-          const text = display.get(s.entryId)!;
-          switch (classifyBucket(s, jlptLevel)) {
-            case 'known': knownPalette.push(text); break;
-            case 'review': reviewPalette.push(text); break;
-            case 'new': newPalette.push(text); break;
-          }
-        }
+        const byProximity = compareByProximity(jlptLevel);
+        buckets.known.sort(compareKnown);
+        buckets.review.sort(byProximity);
+        buckets.new.sort(byProximity);
+        knownPalette = buckets.known.map((s) => display.get(s.entryId)!);
+        reviewPalette = buckets.review.map((s) => display.get(s.entryId)!);
+        newPalette = buckets.new.map((s) => display.get(s.entryId)!);
         // De-dupe while preserving order
         knownPalette = Array.from(new Set(knownPalette)).slice(0, KNOWN_WORDS_PER_PARAGRAPH * targetParagraphs);
         reviewPalette = Array.from(new Set(reviewPalette)).slice(0, Math.max(5, targetReview + 2));
