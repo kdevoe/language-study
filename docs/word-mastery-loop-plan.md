@@ -18,9 +18,10 @@
 
 **Legend:** 🟢 cheap / high-leverage · 🟡 medium · 🔴 large · ✅ done · [/] in progress · [ ] not started
 
-**📍 You are here (2026-06-20):**
-- Goals 1–3 are **in flight** via the content/word-selection plan (Tier 0–1 shipped; Tier 2 keystone #25 is next-up).
-- Goals 4–5 (prompt/model optimization, flashcards) are **greenfield** — no implementation exists, and the only issue (#8) is a high-level epic assuming an SRS engine we haven't built. This doc opens those workstreams and lists the **new issues to create**.
+**📍 You are here (2026-06-22):**
+- **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer.
+- **Phase C is partially done** — models are pinned and upgraded to `gemini-3.5-flash` (#64 ✅). The eval harness (#65) and prompt restructure (#66) are next-up; the first concrete regression case is logged in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md).
+- Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
 
 **Two decisions locked (2026-06-20):**
 1. **SRS foundation → real FSRS/SM-2 due-dates.** We add a genuine scheduling layer (intervals + `due_at`) on top of the existing `difficulty` signal — not a pseudo-due hack. This is the prerequisite for the flashcard deck (Phase D → E).
@@ -82,17 +83,17 @@ Garbage-in guard: if JLPT/entry resolution is wrong **or reads aren't counted**,
 
 ---
 
-## Phase B — SRS-driven word selection for the LLM (Goal 3)
-*Status: detailed in [`content-and-word-selection-plan.md`](./content-and-word-selection-plan.md) Tier 2. The keystone (#25) is the project's current next-up.*
+## Phase B — SRS-driven word selection for the LLM (Goal 3) — ✅ COMPLETE (2026-06-22)
+*Status: shipped and deployed. All four items below merged; `process-article` now reads one shared scorer (`supabase/functions/_shared/wordPriority.ts`). Detail in [`content-and-word-selection-plan.md`](./content-and-word-selection-plan.md) Tier 2.*
 
 Build these as **one series around a shared `priorityScore(word, user)`**, not three disconnected PRs (#25 widens the data select that #51 needs).
 
 The LLM palette is the first consumer of the **in-SRS Word Priority Metric** defined in [Cross-cutting subsystem — Word prioritization & intake](#cross-cutting-subsystem--word-prioritization--intake). #25/#22 stand that scorer up server-side — **build it as a reusable module** (#69) so the intake queue (Phase D) and flashcard deck (Phase E) share one implementation.
 
-- [ ] **#69 Extract the Word Priority Metric into a shared scoring module** 🟡 — one function combining SRS signal + level fit + frequency, callable from `process-article`, the intake-promotion job, and the deck. Prevents three drifting copies of "which word matters."
-- [ ] **#25 — Prefer confirmed-familiar over assumed-from-level words** 🟡 *(keystone)* — widen the server `user_word_progress` select to include numeric `difficulty` + `times_seen`; rank verified-easy words ahead of never-seen below-level guesses in the KNOWN backbone.
-- [ ] **#22 — Prioritize unknown vocab by JLPT proximity + difficulty + frequency** 🟡 — replace hard `>`/`===`/`<` bucketing with the metric: **difficult at-or-below-level words first, frequency weighted in, above-level stretch words ranked below in-reach ones** (revises #22's upward tilt). Widen `jmdict_vocab_candidates` to expose words 1–2 levels harder *and* to carry `freq_rank` + per-user `difficulty` into the ranker; handle NULL JLPT explicitly (lowest).
-- [ ] **#51 — Topic-independent review slot** 🟡 *(best reinforcement ROI)* — always reserve 1–2 review slots for the most-stuck words regardless of article topic. **This is the no-engine interim** that delivers most of the flashcard "feed due words" benefit *before* Phase D exists; once FSRS lands, the staleness heuristic here upgrades to true `due_at` ordering (see Phase E).
+- ✅ **#69 Extract the Word Priority Metric into a shared scoring module** 🟡 — `_shared/wordPriority.ts`: one place combining SRS signal + level fit + frequency, callable from `process-article` (and ready for the intake job + deck). Prevents three drifting copies of "which word matters."
+- ✅ **#25 — Prefer confirmed-familiar over assumed-from-level words** 🟡 *(keystone)* — widened the server `user_word_progress` select to include numeric `difficulty` + `times_seen`; verified-easy words now rank ahead of never-seen below-level guesses in the KNOWN backbone.
+- ✅ **#22 — Prioritize unknown vocab by JLPT proximity + difficulty + frequency** 🟡 — replaced hard `>`/`===`/`<` bucketing with `proximityRank`: at-level highest, easier in-reach next, above-level stretch ranked below in-reach (decreasing with hardness). Widened `jmdict_vocab_candidates` to expose words 1–2 levels harder (migration `database/22_vocab_candidates_stretch.sql`); NULL JLPT handled explicitly (lowest).
+- ✅ **#51 — Topic-independent review slot** 🟡 *(best reinforcement ROI)* — reserves up to 2 review slots for the most-stuck words (by `compareStuck` staleness heuristic) regardless of article topic. **The no-engine interim** delivering most of the flashcard "feed due words" benefit *before* Phase D; once FSRS lands, the staleness ordering upgrades to true `due_at` (#72).
 
 **Phase-B exit:** the article backbone is anchored by words the user has actually confirmed; stretch words near the user's level surface as "new"; stuck words resurface even off-topic.
 
@@ -102,12 +103,12 @@ The LLM palette is the first consumer of the **in-SRS Word Priority Metric** def
 
 No prompt-eval harness exists and models are unpinned. Make model choice data-driven, then optimize prompts against a fixed yardstick.
 
-- [ ] **#64 Audit & pin LLM model versions across edge functions** 🟢
-  - Pin every model string used in `supabase/functions/*` (`gemini-3-flash-preview` in process-article + dictionary-lookup grammar; `openai/gpt-oss-20b`; `llama-3.3-70b-versatile`) to explicit, reproducible versions; centralize them in one constants module per function.
-  - Correct the stale "Gemini 2.0-flash" reference in `CLAUDE.md`.
-  - **Acceptance:** no unpinned `-preview`/floating model strings; a single place to bump each model.
-- [ ] **#65 Build a process-article eval harness + investigate latest Gemini flash** 🟡
-  - Investigate model availability — **specifically whether a newer flash (e.g. `gemini-3.5-flash`) exists** and is appropriate; record current options for flash vs pro.
+- ✅ **#64 Audit & pin LLM model versions across edge functions** 🟢 *(done 2026-06-21)*
+  - Centralized every model string in `supabase/functions/_shared/models.ts` (single bump point per model); imported across process-article, dictionary-lookup, fetch-raw-news.
+  - **Upgraded** Gemini from the floating `gemini-3-flash-preview` alias to stable `gemini-3.5-flash` (verified live on both call paths). Groq IDs are themselves the version. Corrected the stale "Gemini 2.0-flash" reference in `CLAUDE.md`.
+  - **Acceptance met:** no floating `-preview` strings; one place to bump each model.
+- [ ] **#65 Build a process-article eval harness + investigate latest Gemini flash** 🟡 *(next-up; first regression case logged in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md) — EVAL-001)*
+  - Investigate model availability — **specifically whether a newer flash (e.g. `gemini-3.5-flash`) exists** and is appropriate; record current options for flash vs pro. *(Note: #64 already moved the live model to `gemini-3.5-flash`; #65 still owns the flash-vs-pro per-task call against data.)*
   - Capture a fixed set of ~15–20 real source articles + user profiles (varied JLPT/RTK/intensity) as a golden eval set.
   - Score rewrites on: factual fidelity to source, JLPT-appropriateness, palette adherence (known/review/new ratios actually hit), furigana/markup cleanliness, plus cost + latency.
   - Compare flash (current) vs newer-flash vs pro on the same set.
@@ -178,12 +179,12 @@ Phase C (prompt/model) ───────────[parallel]────�
 
 - **A is prerequisite** for D and E (and improves B): correct entry-resolution/JLPT before you schedule, queue, or feed words.
 - **The Word Priority Metric (#69) is the shared spine.** Born in Phase B (#25/#22) but built as a module so the intake queue (#68) and deck (#70/#72) reuse it. Note the two distinct orderings it serves: **intake = level↑ then freq↑ (foundation-first)**; **in-SRS surfacing = SRS + level-fit + freq**.
-- **B is already underway** — finish the #25→#22→#51 series; #51 is the bridge that delivers due-word-feeding value *before* D ships.
-- **C is independent** and can run in parallel anytime; do **#64 pinning** first (cheap), then the **#65 eval harness** before any prompt or model change.
+- **B is ✅ complete** (2026-06-22) — the #69→#25→#22→#51 series shipped and deployed; #51's staleness heuristic is the bridge delivering due-word-feeding value until D's real `due_at` lands (#72).
+- **C is independent** and can run in parallel anytime; **#64 pinning is ✅ done**, so the **#65 eval harness** is next-up before any further prompt/model change (#66).
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-**#64 (pin) → finish B (#69 metric → #25 → #22 → #51) + A (#39 canonical key / counts reads right → #37 → #41) → #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).**
+~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → **next:** A (#39 canonical key / counts reads right → #37 → #41) + #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
@@ -191,25 +192,25 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 
 ## New issues to create
 
-| Ref | Title | Size | Phase |
-|-----|-------|------|-------|
-| [#64](https://github.com/kdevoe/language-study/issues/64) | Audit & pin all LLM model versions across edge functions (+ fix stale CLAUDE.md "Gemini 2.0-flash") | 🟢 | C |
-| [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C |
-| [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C |
-| [#69](https://github.com/kdevoe/language-study/issues/69) | Extract the Word Priority Metric into a shared scoring module (SRS + level + frequency) | 🟡 | B (shared) |
-| [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS/SM-2 due-dates + intervals + review log atop existing difficulty | 🔴 | D |
-| [#68](https://github.com/kdevoe/language-study/issues/68) | Word intake queue + daily new-word limit, foundation-first promotion (level↑ then freq↑) | 🔴 | D |
-| [#70](https://github.com/kdevoe/language-study/issues/70) | Flashcard study UI (Zen front/back/reveal, Again/Hard/Good/Easy) wired to #67 | 🔴 | E |
-| [#71](https://github.com/kdevoe/language-study/issues/71) | Reader ↔ flashcard synergy: converge read-past and graded reviews on one SRS state | 🟡 | E |
-| [#72](https://github.com/kdevoe/language-study/issues/72) | Feed due words into article generation (upgrade #51 staleness → real due_at) | 🟡 | E |
-| [#73](https://github.com/kdevoe/language-study/issues/73) | Study dashboard: due/new/learning health + daily goal on Progress page | 🟢 | E |
+| Ref | Title | Size | Phase | Status |
+|-----|-------|------|-------|--------|
+| [#64](https://github.com/kdevoe/language-study/issues/64) | Audit & pin all LLM model versions across edge functions (+ fix stale CLAUDE.md "Gemini 2.0-flash") | 🟢 | C | ✅ done |
+| [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C | next-up |
+| [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C | not started |
+| [#69](https://github.com/kdevoe/language-study/issues/69) | Extract the Word Priority Metric into a shared scoring module (SRS + level + frequency) | 🟡 | B (shared) | ✅ done |
+| [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS/SM-2 due-dates + intervals + review log atop existing difficulty | 🔴 | D | not started |
+| [#68](https://github.com/kdevoe/language-study/issues/68) | Word intake queue + daily new-word limit, foundation-first promotion (level↑ then freq↑) | 🔴 | D | not started |
+| [#70](https://github.com/kdevoe/language-study/issues/70) | Flashcard study UI (Zen front/back/reveal, Again/Hard/Good/Easy) wired to #67 | 🔴 | E | not started |
+| [#71](https://github.com/kdevoe/language-study/issues/71) | Reader ↔ flashcard synergy: converge read-past and graded reviews on one SRS state | 🟡 | E | not started |
+| [#72](https://github.com/kdevoe/language-study/issues/72) | Feed due words into article generation (upgrade #51 staleness → real due_at) | 🟡 | E | not started |
+| [#73](https://github.com/kdevoe/language-study/issues/73) | Study dashboard: due/new/learning health + daily goal on Progress page | 🟢 | E | not started |
 
 **Existing issues this plan organizes:** #39 (now also absorbs the #74 `times_seen` fix), #37, #41 (Phase A) · #25, #22, #51 (Phase B) · #8 (epic that Phases D+E fulfill; decompose into #67, #68, #70–#73).
 
 ---
 
 ## TL;DR
-Five goals are one loop, held together by a **shared Word Priority Metric** (SRS + level + frequency) and a **foundation-first intake queue** (level↑ then freq↑, paced by a daily new-word cap) that stops every-word-on-sight overwhelm. Goals 1–3 are already being built (Phase A/B via the content plan — finish #25→#22→#51 on correct #39/#37/#41 data). Goals 4–5 are new: pin models, build an eval harness and check for a newer flash, restructure the prompt (Phase C); then build a **real FSRS due-date engine + intake queue** (Phase D) and the **flashcard deck** on top of it (Phase E), at which point reading, scheduling, the deck, and article word-selection all share one SRS state.
+Five goals are one loop, held together by a **shared Word Priority Metric** (SRS + level + frequency) and a **foundation-first intake queue** (level↑ then freq↑, paced by a daily new-word cap) that stops every-word-on-sight overwhelm. **Phase B is ✅ done** — the shared metric (#69) and all three consumers (#25/#22/#51) ship, so article word-selection reads one scorer. **Phase C is started** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); eval harness (#65) + prompt restructure (#66) remain. Still open: **Phase A** correctness (#39/#37/#41) and the **real FSRS due-date engine + intake queue** (Phase D), then the **flashcard deck** on top (Phase E) — at which point reading, scheduling, the deck, and article word-selection all share one SRS state.
 
 ---
 comments:
