@@ -64,7 +64,7 @@ export function isConfirmedFamiliar(w: WordSignal): boolean {
 const FREQ_RANK_RARE = Number.POSITIVE_INFINITY; // null freq_rank sorts last (rarest)
 
 /**
- * In-SRS surfacing order — "most useful word wins" for slicing the article palette.
+ * KNOWN-backbone order — "safest, most useful word wins" for slicing the backbone.
  *
  * Confirmed-familiar words sort first (#25): they're verified-easy backbone material,
  * strictly better than below-level words the user has never seen, so the KNOWN cap drops
@@ -73,12 +73,11 @@ const FREQ_RANK_RARE = Number.POSITIVE_INFINITY; // null freq_rank sorts last (r
  *
  * Everything else (and the tiebreak among confirmed words) falls back to frequency:
  * common first, then most-frequent (lowest freq_rank, nulls last), then easier
- * (higher jlpt_level) first. Returns a standard Array.sort comparator result.
- *
- * Note: only confirmed-easy words ever land in the KNOWN bucket, so promoting them here
- * reorders the backbone only — the review/new buckets keep their frequency ordering.
+ * (higher jlpt_level) first. Returns a standard Array.sort comparator result. Also used
+ * as the frequency tiebreaker inside compareByProximity (its confirmed-familiar branch is
+ * inert for the review/new buckets, which hold no verified-easy words).
  */
-export function compareSurfacing(a: WordSignal, b: WordSignal): number {
+export function compareKnown(a: WordSignal, b: WordSignal): number {
   const ca = isConfirmedFamiliar(a);
   const cb = isConfirmedFamiliar(b);
   if (ca !== cb) return ca ? -1 : 1;
@@ -97,25 +96,59 @@ export function compareSurfacing(a: WordSignal, b: WordSignal): number {
   return (b.jlptLevel ?? 0) - (a.jlptLevel ?? 0); // easier (higher number) first
 }
 
+const STRETCH_PENALTY = 100; // above-level "stretch" words rank after every in-reach word
+
+/**
+ * JLPT-proximity rank for an UNKNOWN / not-yet-mastered word, relative to a reader at
+ * `userJlpt` (#22). Lower = higher priority. A word at the reader's level ranks highest;
+ * easier in-reach words follow; words harder than the reader ("stretch") rank after all
+ * in-reach words, closest-harder first with priority decreasing as they get harder.
+ * Untagged level (null) sorts last. Numbering: 5 = N5 easiest … 1 = N1 hardest.
+ *
+ * Examples (reader N4 → userJlpt 4): at-level N4 → 0; easier N5 → 1; stretch N3 → 101;
+ * harder stretch N2 → 102 — so an unknown N3 outranks an unknown N2.
+ */
+export function proximityRank(w: WordSignal, userJlpt: number): number {
+  if (w.jlptLevel === null) return Number.POSITIVE_INFINITY;
+  const easierBy = w.jlptLevel - userJlpt; // >= 0 at the reader's level or easier
+  if (easierBy >= 0) return easierBy; // in-reach: at-level (0) first, then easier
+  return STRETCH_PENALTY + (userJlpt - w.jlptLevel); // harder: after in-reach, closest first
+}
+
+/**
+ * In-SRS surfacing order for the REVIEW and NEW buckets: rank unknown words by JLPT
+ * proximity to the reader (#22), then fall back to frequency. Returns a comparator bound
+ * to `userJlpt` for Array.sort.
+ */
+export function compareByProximity(userJlpt: number): (a: WordSignal, b: WordSignal) => number {
+  return (a, b) => {
+    const pa = proximityRank(a, userJlpt);
+    const pb = proximityRank(b, userJlpt);
+    if (pa !== pb) return pa - pb;
+    return compareKnown(a, b); // frequency tiebreaker
+  };
+}
+
 /**
  * Assign a word to the article palette bucket for a reader at `userJlpt`:
- * - confirmed-easy            → known (the backbone the article is built on)
- * - confirmed hard/medium     → review (resurface for reinforcement)
- * - easier than the reader    → known (assumed-known, never explicitly tracked)
- * - at the reader's level, untracked → new (a fresh introduction)
- * - otherwise                 → null (not placed)
+ * - confirmed-easy             → known (the backbone the article is built on)
+ * - confirmed hard/medium      → review (resurface for reinforcement)
+ * - easier than the reader     → known (assumed-known, never explicitly tracked)
+ * - at the reader's level OR a stretch harder, untracked → new (#22: stretch words used
+ *                                 to be dropped; they're now surfaced, ranked by
+ *                                 proximityRank so the closest-harder lead)
+ * - untagged level (null)      → null (rare/untagged — not suggested to learners)
  *
- * NOTE (#22/#25): this is the *current* coarse, mastery-bucket logic, lifted verbatim
- * from process-article so behavior is preserved by the extraction. Those follow-ups
- * replace it with the richer metric (numeric difficulty + JLPT proximity + frequency
- * weighting) — they change THIS function, and every consumer inherits the change.
+ * The *ordering* within each bucket comes from compareKnown (KNOWN) and compareByProximity
+ * (REVIEW/NEW); this function only decides placement. How far above-level a stretch word
+ * may reach is bounded upstream by the jmdict_vocab_candidates query (user_jlpt - 2).
  */
 export function classifyBucket(w: WordSignal, userJlpt: number): PaletteBucket {
   if (w.mastery === 'easy') return 'known';
   if (w.mastery === 'hard' || w.mastery === 'medium') return 'review';
-  if (w.jlptLevel !== null && w.jlptLevel > userJlpt) return 'known';
-  if (w.jlptLevel === userJlpt && !w.mastery) return 'new';
-  return null;
+  if (w.jlptLevel === null) return null; // untagged/rare — don't suggest
+  if (w.jlptLevel > userJlpt) return 'known'; // easier than the reader → assumed-known
+  return 'new'; // at the reader's level or a stretch harder, never tracked
 }
 
 /**
