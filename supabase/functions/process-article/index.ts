@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { rtkKanjiList } from '../_shared/rtkKanji.ts';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
-import { classifyBucket, compareByProximity, compareKnown, type WordSignal } from '../_shared/wordPriority.ts';
+import { classifyBucket, compareByProximity, compareKnown, compareStuck, type WordSignal } from '../_shared/wordPriority.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -115,6 +115,11 @@ const WORDS_PER_PARAGRAPH = 67;
 // Backbone (KNOWN) pool size per paragraph — a draw-from pool, not a quota — so a
 // longer article has a richer known palette to build its spine from.
 const KNOWN_WORDS_PER_PARAGRAPH = 10;
+
+// #51: how many review slots to reserve for a topic-INDEPENDENT floor of the user's
+// most-stuck words, blended in regardless of whether they match the article's topic.
+// Clamped to the article's review budget so short articles don't get swamped.
+const STUCK_REVIEW_FLOOR = 2;
 
 // reading_intensity preset -> target distribution of known/review/new vocab.
 // See database/10_reading_intensity.sql for the column definition.
@@ -303,34 +308,58 @@ Deno.serve(async (req) => {
       console.error('[process-article] Palette pipeline error (continuing without palette):', palErr);
     }
 
-    // Legacy vocab_mode targets: any user review words, regardless of this article's topic.
-    // Still used below so the vocab_mode "Study" prompt keeps working even when the
-    // topic-keyed review palette is empty.
-    if (reviewPalette.length > 0) {
-      vocabTargets = reviewPalette.slice(0, 5);
-    } else {
-      const { data: wordProgress } = await supabase
+    // #51: topic-INDEPENDENT review floor. The palette above only re-injects a review
+    // word when the article's topic happens to match it, so words tied to a one-off
+    // story orphan (seen once, topic never recurs) and never drift easier. Reserve a
+    // couple of review slots for the user's most-stuck hard/medium words and blend them
+    // in regardless of topic. Needs no SRS engine — it routes the existing review pool
+    // by a staleness heuristic (compareStuck); #72 upgrades that ordering to real due_at.
+    const stuckFloor = Math.min(STUCK_REVIEW_FLOOR, Math.max(1, targetReview));
+    try {
+      const { data: stuckRows } = await supabase
         .from('user_word_progress')
-        .select('word_id')
+        .select('word_id, mastery_level, difficulty, times_seen, last_seen_at')
         .eq('user_id', userId)
         .in('mastery_level', ['hard', 'medium'])
-        .limit(30);
-      const ids = (wordProgress as any[])?.map((r) => r.word_id) ?? [];
-      if (ids.length > 0) {
-        // Pull the most common review words first (freq_rank 1 = most common,
-        // NULL = rare/unranked) instead of a random sample.
-        const { data: freqRows } = await supabase
-          .from('jmdict_entries')
-          .select('id, freq_rank')
-          .in('id', ids);
-        const rankMap = new Map((freqRows as any[] ?? []).map((r) => [r.id, r.freq_rank]));
-        const ranked = [...ids]
-          .sort((a, b) => (rankMap.get(a) ?? Infinity) - (rankMap.get(b) ?? Infinity))
-          .slice(0, 5);
-        const { data: kanjiRes } = await supabase.from('jmdict_kanji').select('text').in('entry_id', ranked);
-        if (kanjiRes) vocabTargets = Array.from(new Set(kanjiRes.map((r: any) => r.text)));
+        .limit(200);
+      const stuckSignals: WordSignal[] = (stuckRows as any[] ?? []).map((r) => ({
+        entryId: r.word_id,
+        jlptLevel: null,
+        freqRank: null,
+        isCommon: false,
+        mastery: r.mastery_level,
+        difficulty: r.difficulty ?? null,
+        timesSeen: r.times_seen ?? null,
+        lastSeenAt: r.last_seen_at ?? null,
+      }));
+      stuckSignals.sort(compareStuck);
+      const stuckIds = stuckSignals.slice(0, stuckFloor).map((s) => s.entryId);
+      if (stuckIds.length > 0) {
+        // Resolve surface forms (kanji preferred, kana fallback), preserving stuck order.
+        const [{ data: kanjiRows }, { data: kanaRows }] = await Promise.all([
+          supabase.from('jmdict_kanji').select('entry_id, text, common').in('entry_id', stuckIds).order('common', { ascending: false }),
+          supabase.from('jmdict_kana').select('entry_id, text, common').in('entry_id', stuckIds).order('common', { ascending: false }),
+        ]);
+        const firstByEntry = (rows: any[] | null) => {
+          const m = new Map<string, string>();
+          for (const r of rows ?? []) if (!m.has(r.entry_id)) m.set(r.entry_id, r.text);
+          return m;
+        };
+        const kanjiMap = firstByEntry(kanjiRows);
+        const kanaMap = firstByEntry(kanaRows);
+        const stuckReview = stuckIds
+          .map((id) => kanjiMap.get(id) ?? kanaMap.get(id))
+          .filter((t): t is string => !!t);
+        // Floor first (guaranteed to survive the slice), then topic-relevant review; dedupe.
+        reviewPalette = Array.from(new Set([...stuckReview, ...reviewPalette])).slice(0, Math.max(5, targetReview + 2));
+        console.log(`[process-article] Review floor: blended ${stuckReview.length} stuck word(s) [${stuckReview.join(', ')}]`);
       }
+    } catch (stuckErr) {
+      console.error('[process-article] Review-floor blend failed (continuing):', stuckErr);
     }
+
+    // vocab_mode "Study" prompt targets: drawn from the (now floor-blended) review palette.
+    vocabTargets = reviewPalette.slice(0, 5);
 
     // 3. Build Gemini prompts (same logic as client-side rewriteArticleWithGemini)
     const jlptStr = `N${jlptLevel}`;
