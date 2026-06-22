@@ -23,6 +23,8 @@
 - **Phase C is partially done** — models are pinned and upgraded to `gemini-3.5-flash` (#64 ✅). The eval harness (#65) and prompt restructure (#66) are next-up; the first concrete regression case is logged in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md).
 - Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
 
+> **➡️ NEXT UP (pick this up first): Phase A — #39.** Phase B's selection logic shipped, but it ranks on per-word signals (`times_seen`, `difficulty`, `last_seen_at`) that **Phase A says are currently fragmented/under-counted** — one word splits across multiple tracking keys (kuromoji lemma on reads, JMDict word on clicks, entry_id on sync). So the smart scoring is running on noisy data. **#39 (canonical entry-id keying) is the foundational fix** that retroactively sharpens the shipped B work *and* is a hard prerequisite for Phase D (FSRS schedules per-word — fragmented keys → fragmented schedules). Phase A was deferred this session only because B chained cleanly within the edge function while #39 is larger and lives in the client read/tracking path — **not** because it was deprioritized. Recommended order from here: **A (#39 → #37 → #41) → C #65 → D #67**. Start #39 by mapping the exact keying divergence before writing code.
+
 **Two decisions locked (2026-06-20):**
 1. **SRS foundation → real FSRS/SM-2 due-dates.** We add a genuine scheduling layer (intervals + `due_at`) on top of the existing `difficulty` signal — not a pseudo-due hack. This is the prerequisite for the flashcard deck (Phase D → E).
 2. **Model → investigate before committing.** Audit/pin current versions, **check whether a newer Gemini flash (e.g. 3.5-flash) is available**, and decide flash-vs-pro per task against an eval harness rather than upgrading blind.
@@ -69,10 +71,10 @@ For words already promoted, a single comparable **priority score** decides which
 
 ---
 
-## Phase A — Foundation correctness (Goal 1: assign JLPT right · Goal 2: track right)
-*Status: detailed in [`content-and-word-selection-plan.md`](./content-and-word-selection-plan.md) Tier 3. Listed here because everything downstream inherits its data.*
+## Phase A — Foundation correctness (Goal 1: assign JLPT right · Goal 2: track right) — ⬅️ IMMEDIATE NEXT
+*Status: **open and now the top priority** (#39 → #37 → #41). Detailed in [`content-and-word-selection-plan.md`](./content-and-word-selection-plan.md) Tier 3. Deferred while Phase B shipped — see the NEXT UP callout above for why this should be picked up before Phase C/D.*
 
-Garbage-in guard: if JLPT/entry resolution is wrong **or reads aren't counted**, the SRS schedule, the LLM palette, and the flashcard deck all inherit the error. Do this alongside/ahead of Phase D.
+Garbage-in guard: if JLPT/entry resolution is wrong **or reads aren't counted**, the SRS schedule, the LLM palette, and the flashcard deck all inherit the error. **This is no longer hypothetical: Phase B (#25/#51) is already live and ranking on `times_seen`/`difficulty`/`last_seen_at`, so the keying bug in #39 is silently degrading shipped features right now.** Do this ahead of Phase D.
 
 - [ ] **#39 — Unify entry resolution (displayed vs stored JLPT) + canonical `times_seen` keying** 🔴 *(do early — foundational)* — homographs must resolve to one canonical `entry_id` so the badge, SRS seed, and palette read the same entry; stop the server's first-match Pass-3 linking from overriding the client's disambiguation; align NULL-JLPT handling (client "hard" vs server "ignored"). **Now also absorbs the `times_seen` under-count fix (folded in from #74):** the same word fragments across key spaces — passive reads key by kuromoji `lemma`, clicks by JMDict `details.word`, sync by `entry_id` (`Reader.tsx:231/308/340`, `tokenizer.ts:123`, `store.ts:313`), and entry_id-less tokens never sync — so all tracking must key on one canonical `entry_id`. Distinct from #41 (sync/display layer).
 - [ ] **#37 — JMDict sense miss (手当て → "salary")** 🟢 — prefer the entry whose kanji form exactly matches the surface; consider context-disambiguating the sense.
@@ -184,7 +186,7 @@ Phase C (prompt/model) ───────────[parallel]────�
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → **next:** A (#39 canonical key / counts reads right → #37 → #41) + #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).
+~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → **NEXT: A (#39 canonical key / counts reads right → #37 → #41)** → #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
