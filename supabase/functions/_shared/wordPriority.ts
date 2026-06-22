@@ -49,6 +49,11 @@ export interface WordSignal {
   difficulty?: number | null;
   /** How many times this user has encountered the word. null/undefined = never tracked. */
   timesSeen?: number | null;
+  /**
+   * ISO-8601 timestamp of the user's last encounter (`user_word_progress.last_seen_at`).
+   * null/undefined = never tracked. Used for staleness ordering (#51).
+   */
+  lastSeenAt?: string | null;
 }
 
 /**
@@ -149,6 +154,26 @@ export function classifyBucket(w: WordSignal, userJlpt: number): PaletteBucket {
   if (w.jlptLevel === null) return null; // untagged/rare — don't suggest
   if (w.jlptLevel > userJlpt) return 'known'; // easier than the reader → assumed-known
   return 'new'; // at the reader's level or a stretch harder, never tracked
+}
+
+/**
+ * "Most-stuck" order for the topic-independent review floor (#51): surface the review
+ * words the user is most neglecting, regardless of the article's topic. Stalest first
+ * (oldest `last_seen_at`; never-seen sorts first), then hardest (highest difficulty),
+ * then least-seen. ISO-8601 timestamps compare chronologically as plain strings, so no
+ * date parsing is needed (keeps the module Date-free and portable).
+ *
+ * This is the interim staleness heuristic; #72 swaps the primary key for true `due_at`
+ * once the FSRS engine (#67) lands — callers keep using this comparator either way.
+ */
+export function compareStuck(a: WordSignal, b: WordSignal): number {
+  const la = a.lastSeenAt ?? ''; // never-seen / unknown = stalest, sorts first
+  const lb = b.lastSeenAt ?? '';
+  if (la !== lb) return la < lb ? -1 : 1; // older timestamp first
+  const da = a.difficulty ?? 0;
+  const db = b.difficulty ?? 0;
+  if (da !== db) return db - da; // hardest first
+  return (a.timesSeen ?? 0) - (b.timesSeen ?? 0); // least-seen first
 }
 
 /**
