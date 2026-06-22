@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { rtkKanjiList } from '../_shared/rtkKanji.ts';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
+import { classifyBucket, compareSurfacing, type WordSignal } from '../_shared/wordPriority.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -254,31 +255,32 @@ Deno.serve(async (req) => {
           progressMap = new Map((progress ?? []).map((p: any) => [p.word_id, p.mastery_level]));
         }
 
-        // Sort candidates so the most useful words win the per-bucket slice below:
-        // common first, then by frequency rank (1 = most common, NULL = rare/unranked),
-        // then by jlpt_level (easier first). Feeds the known/review/new buckets alike,
-        // so frequent words are prioritized for study, not just for new introductions.
-        const sorted = [...(candidates ?? [])].sort((a: any, b: any) => {
-          if (a.is_common !== b.is_common) return a.is_common ? -1 : 1;
-          const fa = a.freq_rank ?? Infinity;
-          const fb = b.freq_rank ?? Infinity;
-          if (fa !== fb) return fa - fb;
-          return (b.jlpt_level ?? 0) - (a.jlpt_level ?? 0);
-        });
+        // Map DB rows onto the shared Word Priority Metric (../_shared/wordPriority.ts),
+        // the single source of "which word matters" across the palette, intake (#68),
+        // and the deck (#70). It owns the surfacing order (most useful first) and the
+        // known/review/new bucketing.
+        const display = new Map<string, string>();
+        const signals: WordSignal[] = [];
+        for (const c of (candidates ?? []) as any[]) {
+          const text = c.kanji || c.kana;
+          if (!text) continue;
+          display.set(c.entry_id, text);
+          signals.push({
+            entryId: c.entry_id,
+            jlptLevel: c.jlpt_level ?? null,
+            freqRank: c.freq_rank ?? null,
+            isCommon: !!c.is_common,
+            mastery: progressMap.get(c.entry_id) as WordSignal['mastery'],
+          });
+        }
+        signals.sort(compareSurfacing);
 
-        for (const c of sorted) {
-          const display = c.kanji || c.kana;
-          if (!display) continue;
-          const mastery = progressMap.get(c.entry_id);
-          if (mastery === 'easy') {
-            knownPalette.push(display);
-          } else if (mastery === 'hard' || mastery === 'medium') {
-            reviewPalette.push(display);
-          } else if (c.jlpt_level > jlptLevel) {
-            // Below user's study level (easier) => treat as assumed-known
-            knownPalette.push(display);
-          } else if (c.jlpt_level === jlptLevel && !mastery) {
-            newPalette.push(display);
+        for (const s of signals) {
+          const text = display.get(s.entryId)!;
+          switch (classifyBucket(s, jlptLevel)) {
+            case 'known': knownPalette.push(text); break;
+            case 'review': reviewPalette.push(text); break;
+            case 'new': newPalette.push(text); break;
           }
         }
         // De-dupe while preserving order
