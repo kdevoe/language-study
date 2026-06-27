@@ -152,3 +152,27 @@
         - [ ] APPLY (your steps): (1) select vault.create_secret('<ANON_KEY>','jit_anon_key');
               (2) run database/19 in SQL editor; (3) smoke-test select jit_refill_active_users().
         - [ ] After cron verified live: delete the daily-feed Edge Function deployment.
+- [x] Progress bucketing + sync fixes (2026-06-27): words wrongly in "Other"/Ungraded
+      and lost on reinstall. Investigation traced one symptom to four distinct issues:
+  - Root symptom: common N5–N4 words sat in Progress "Other" because their cached
+    record had `jlptLevel == null`. JLPT data existed in JMDict the whole time
+    (verified: 会社=N5, 道=N5, …); records stored read-past as "Implicitly parsed
+    context" were never backfilled (write-once + jlptLevel never persisted).
+  - [x] PR #85 — JLPT backfill (drains "Other") + seed difficulty for seen-but-
+        ungraded words. `fetchJlptByEntryIds` (official→kanji→freq, shared
+        fetchKanjiJlpt/deriveJlpt); Reader self-heals null jlptLevel on grade.
+  - [x] PR #86 — reconcile locally-graded words up to the server (fill server nulls,
+        never overwrite) + harden upsertWordProgressBatch (bad lastSeenTs no longer
+        aborts the whole batch).
+  - [x] PR #87 — rehydrate the word cache from the server after a wipe
+        (`fetchDetailsByEntryIds`): Progress survives reinstall/cleared cache. Sync
+        previously only UPDATED existing local words, never ADDED server-only ones.
+  - [x] PR #88 — ROOT CAUSE of the partial restore: `fetchUserWordProgress` had no
+        pagination, so PostgREST silently capped it at ~1000 rows. A 2210-word
+        account only synced ~1000 — which throttled SRS sync, backfill, reconcile,
+        AND rehydration. Now pages via `.range()`. (Affected any 1000+ word account.)
+  - Verified end-to-end: Progress "Other" 1297→342; server ungraded 331→0
+    (2210/2210 graded); reinstall rebuilds ~2200 words.
+  - [ ] Known gap: words with no jmdictEntryId (proper nouns / tokenizer fragments,
+        ~577) are never synced, so a reinstall still loses them. Future work: back
+        them up via a string word_id (the table already allows it).
