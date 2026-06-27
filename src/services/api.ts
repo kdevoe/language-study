@@ -447,26 +447,36 @@ const mockArticles: NewsArticle[] = [
 
 
 export async function fetchUserWordProgress(userId: string): Promise<Record<string, any>> {
-  const { data, error } = await supabase
-    .from('user_word_progress')
-    .select('*')
-    .eq('user_id', userId);
-    
-  if (error) {
-    console.error("Error fetching word progress:", error);
-    return {};
-  }
-  
   const progress: Record<string, any> = {};
-  data?.forEach(row => {
-    progress[row.word_id] = {
-      mastery: row.mastery_level,
-      difficulty: row.difficulty ?? null,
-      timesSeen: row.times_seen,
-      streak: row.streak,
-      lastSeenTs: new Date(row.last_seen_at).getTime()
-    };
-  });
+  // PostgREST caps a select at ~1000 rows. A heavy user has more word-progress
+  // rows than that, so an unpaginated fetch silently returned only the first
+  // 1000 — which capped SRS sync, the JLPT/difficulty backfill, AND the
+  // post-wipe rehydration at 1000 words. Page through the full set.
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('user_word_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      console.error("Error fetching word progress:", error);
+      break;
+    }
+
+    (data || []).forEach(row => {
+      progress[row.word_id] = {
+        mastery: row.mastery_level,
+        difficulty: row.difficulty ?? null,
+        timesSeen: row.times_seen,
+        streak: row.streak,
+        lastSeenTs: new Date(row.last_seen_at).getTime()
+      };
+    });
+
+    if (!data || data.length < PAGE) break; // last page
+  }
   return progress;
 }
 

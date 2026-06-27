@@ -298,7 +298,10 @@ export async function fetchDetailsByEntryIds(
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return out;
 
-  const CHUNK = 300;
+  // Keep chunks small enough that a chunk's child-row queries (senses especially,
+  // several rows per entry) stay under the PostgREST ~1000-row cap, so no entry
+  // comes back missing its surface/meaning.
+  const CHUNK = 200;
   for (let i = 0; i < unique.length; i += CHUNK) {
     const entries = await fetchEntries(unique.slice(i, i + CHUNK));
 
