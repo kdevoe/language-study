@@ -483,6 +483,52 @@ export const useAppStore = create<AppState>()(
           return {};
         });
 
+        // Rehydrate remote-only words. The merge above only UPDATES words already
+        // cached locally — it never ADDS ones that exist on the server but not in
+        // the local store. So a wiped localStorage (reinstall / cleared cache) left
+        // Progress empty despite intact server data. Pull full JMDict details for
+        // any server word missing locally and reconstruct its WordData. Guarded by
+        // `missingIds`, so once the cache is whole this fetch is skipped.
+        const haveIds = new Set(
+          Object.values(get().wordDatabase).map((w) => w.jmdictEntryId).filter(Boolean),
+        );
+        const missingIds = Object.keys(remoteProgress).filter((id) => !haveIds.has(id));
+        if (missingIds.length > 0) {
+          try {
+            const { fetchDetailsByEntryIds } = await import('./jmdict');
+            const details = await fetchDetailsByEntryIds(missingIds);
+            if (details.size > 0) {
+              set((state) => {
+                const newDatabase = { ...state.wordDatabase };
+                details.forEach((d, id) => {
+                  const r = remoteProgress[id];
+                  if (!r) return;
+                  // Don't overwrite a local entry already keyed by this surface.
+                  if (newDatabase[d.word]?.jmdictEntryId === id) return;
+                  newDatabase[d.word] = {
+                    reading: d.reading,
+                    meaning: d.meaning,
+                    jlptLevel: d.jlptLevel,
+                    jlptDerived: d.jlptDerived,
+                    pos: d.pos,
+                    furiganaMap: d.furiganaMap,
+                    jmdictEntryId: id,
+                    mastery: r.mastery ?? 'unseen',
+                    difficulty: r.difficulty ?? null,
+                    timesSeen: r.timesSeen ?? 0,
+                    streak: r.streak ?? 0,
+                    lastSeenTs: r.lastSeenTs ?? Date.now(),
+                    uniqueDaysSeen: [],
+                  };
+                });
+                return { wordDatabase: newDatabase };
+              });
+            }
+          } catch (e) {
+            console.warn('[store] word-cache rehydrate failed:', e);
+          }
+        }
+
         // Repair words stored without a JLPT level (→ Progress "Other") and/or
         // without a difficulty (→ "Ungraded") — read-past / pre-enrichment / legacy
         // records. They carry a JMDict entry id, so the level is recoverable and a
