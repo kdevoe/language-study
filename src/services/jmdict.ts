@@ -202,33 +202,87 @@ async function applyJlptFallback(byLemma: Map<string, JMDictResult>): Promise<vo
     }
   });
 
-  let kanjiLevels = new Map<string, number>();
-  if (needKanji.size > 0) {
-    try {
-      const { data } = await withTimeout(
-        supabase.from('kanji_jlpt').select('kanji, jlpt_level').in('kanji', [...needKanji]),
-        LOOKUP_TIMEOUT_MS,
-        'kanji_jlpt fallback',
-      );
-      kanjiLevels = new Map(
-        ((data || []) as { kanji: string; jlpt_level: number }[]).map(r => [r.kanji, r.jlpt_level]),
-      );
-    } catch (e) {
-      console.warn('kanji_jlpt fallback failed:', e);
-    }
-  }
+  const kanjiLevels = await fetchKanjiJlpt(needKanji);
 
   byLemma.forEach((entry, lemma) => {
     if (entry.jlptLevel != null) return;
-    // Hardest kanji = lowest JLPT number (N1 hardest = 1).
-    let derived: number | null = null;
-    for (const ch of lemma) {
-      const lv = kanjiLevels.get(ch);
-      if (lv != null) derived = derived == null ? lv : Math.min(derived, lv);
-    }
-    if (derived == null) derived = freqRankToJlpt(entry.freqRank);
-    entry.derivedJlpt = derived;
+    entry.derivedJlpt = deriveJlpt(lemma, entry.freqRank, kanjiLevels);
   });
+}
+
+/** Look up the JLPT level for each kanji character. Empty/failed → empty map. */
+async function fetchKanjiJlpt(chars: Set<string>): Promise<Map<string, number>> {
+  if (chars.size === 0) return new Map();
+  try {
+    const { data } = await withTimeout(
+      supabase.from('kanji_jlpt').select('kanji, jlpt_level').in('kanji', [...chars]),
+      LOOKUP_TIMEOUT_MS,
+      'kanji_jlpt fallback',
+    );
+    return new Map(
+      ((data || []) as { kanji: string; jlpt_level: number }[]).map(r => [r.kanji, r.jlpt_level]),
+    );
+  } catch (e) {
+    console.warn('kanji_jlpt fallback failed:', e);
+    return new Map();
+  }
+}
+
+/**
+ * Derive an approximate JLPT level for an untagged entry: the hardest (lowest-
+ * numbered) JLPT level among `scanText`'s kanji, else a coarse frequency bucket.
+ */
+function deriveJlpt(
+  scanText: string,
+  freqRank: number | null,
+  kanjiLevels: Map<string, number>,
+): number | null {
+  // Hardest kanji = lowest JLPT number (N1 hardest = 1).
+  let derived: number | null = null;
+  for (const ch of scanText) {
+    const lv = kanjiLevels.get(ch);
+    if (lv != null) derived = derived == null ? lv : Math.min(derived, lv);
+  }
+  if (derived == null) derived = freqRankToJlpt(freqRank);
+  return derived;
+}
+
+/**
+ * Resolve a JLPT level for each JMDict entry id, applying the same official-tag →
+ * kanji → frequency fallback used during enrichment. Used to backfill word
+ * records that were stored (e.g. read-past, pre-enrichment) without a level.
+ * Chunks the id list so a large backlog doesn't blow the PostgREST `in(...)` limit.
+ */
+export async function fetchJlptByEntryIds(
+  ids: string[],
+): Promise<Map<string, { jlptLevel: number | null; jlptDerived: boolean }>> {
+  const out = new Map<string, { jlptLevel: number | null; jlptDerived: boolean }>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return out;
+
+  const CHUNK = 300;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const entries = await fetchEntries(unique.slice(i, i + CHUNK));
+
+    // Gather kanji from untagged entries' surfaces for one batched fallback query.
+    const needKanji = new Set<string>();
+    for (const e of entries) {
+      if (e.jlptLevel == null) {
+        for (const form of e.kanji) for (const ch of form) if (hasKanji(ch)) needKanji.add(ch);
+      }
+    }
+    const kanjiLevels = await fetchKanjiJlpt(needKanji);
+
+    for (const e of entries) {
+      if (e.jlptLevel != null) {
+        out.set(e.entryId, { jlptLevel: e.jlptLevel, jlptDerived: false });
+      } else {
+        const derived = deriveJlpt(e.kanji.join(''), e.freqRank, kanjiLevels);
+        out.set(e.entryId, { jlptLevel: derived, jlptDerived: derived != null });
+      }
+    }
+  }
+  return out;
 }
 
 /** Coarse JLPT bucket from a frequency band (1 = most common … 48 = rare). */
