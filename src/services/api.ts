@@ -490,6 +490,30 @@ export async function upsertWordProgressToSupabase(
   if (error) console.error(`Error syncing progress for ${wordId}:`, error);
 }
 
+/**
+ * Upsert many word-progress rows in a single request. Used by the one-time
+ * backfill so repairing hundreds of words is one round-trip, not a write burst.
+ */
+export async function upsertWordProgressBatch(
+  userId: string,
+  rows: { wordId: string; mastery: string; difficulty: number | null; timesSeen: number; streak: number; lastSeenTs: number }[]
+) {
+  if (rows.length === 0) return;
+  const { error } = await supabase
+    .from('user_word_progress')
+    .upsert(rows.map(r => ({
+      user_id: userId,
+      word_id: r.wordId,
+      mastery_level: r.mastery,
+      difficulty: r.difficulty ?? null,
+      times_seen: r.timesSeen,
+      streak: r.streak,
+      last_seen_at: new Date(r.lastSeenTs).toISOString()
+    })));
+
+  if (error) console.error('Error batch-syncing word progress:', error);
+}
+
 export async function logStudyEventToSupabase(
   userId: string, 
   wordId: string, 

@@ -141,7 +141,7 @@ interface AppState {
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
-  backfillMissingJlptLevels: () => Promise<void>;
+  backfillWordProgress: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -483,18 +483,24 @@ export const useAppStore = create<AppState>()(
           return {};
         });
 
-        // Repair words stored without a JLPT level (read-past / pre-enrichment
-        // grades, which land in the Progress "Other" bucket). They carry a JMDict
-        // entry id, so we can resolve the level from the dictionary and patch the
-        // local cache. Early-returns once everything is backfilled.
-        await get().backfillMissingJlptLevels();
+        // Repair words stored without a JLPT level (→ Progress "Other") and/or
+        // without a difficulty (→ "Ungraded") — read-past / pre-enrichment / legacy
+        // records. They carry a JMDict entry id, so the level is recoverable and a
+        // first-contact difficulty can be seeded. Early-returns once backfilled.
+        await get().backfillWordProgress();
       },
 
-      // Fill in jlptLevel for any cached word that has a JMDict entry id but no
-      // level. Resolves official → kanji → frequency, matching enrichment.
-      backfillMissingJlptLevels: async () => {
+      // Backfill cached words that have a JMDict entry id but are missing a JLPT
+      // level and/or a difficulty:
+      //   - jlptLevel: resolved official → kanji → frequency (matches enrichment).
+      //   - difficulty: seeded from the (now-known) JLPT as a read-past 'skip',
+      //     exactly like applyDifficultyEvent's first contact, so a word seen before
+      //     grading existed stops sitting in the unseen/ungraded bucket.
+      // Only seeds difficulty for words actually encountered (timesSeen >= 1) and
+      // syncs the seeded grades to Supabase in one batched round-trip.
+      backfillWordProgress: async () => {
         const targets = Object.entries(get().wordDatabase)
-          .filter(([, w]) => w.jlptLevel == null && !!w.jmdictEntryId);
+          .filter(([, w]) => !!w.jmdictEntryId && (w.jlptLevel == null || w.difficulty == null));
         if (targets.length === 0) return;
 
         const { fetchJlptByEntryIds } = await import('./jmdict');
@@ -502,25 +508,67 @@ export const useAppStore = create<AppState>()(
         try {
           resolved = await fetchJlptByEntryIds(targets.map(([, w]) => w.jmdictEntryId!));
         } catch (e) {
-          console.warn('[store] JLPT backfill failed:', e);
+          console.warn('[store] word-progress backfill failed:', e);
           return;
         }
+
+        const synced: { wordId: string; mastery: MasteryLevel; difficulty: number | null; timesSeen: number; streak: number; lastSeenTs: number }[] = [];
 
         set((state) => {
           const newDatabase = { ...state.wordDatabase };
           let changed = false;
           for (const [key] of targets) {
-            // Re-read latest; a concurrent enrichment may have already set it.
+            // Re-read latest; a concurrent enrichment/grade may have already set it.
             const current = newDatabase[key];
-            if (!current || current.jlptLevel != null || !current.jmdictEntryId) continue;
+            if (!current || !current.jmdictEntryId) continue;
             const hit = resolved.get(current.jmdictEntryId);
-            if (hit && hit.jlptLevel != null) {
-              newDatabase[key] = { ...current, jlptLevel: hit.jlptLevel, jlptDerived: hit.jlptDerived };
+            const next: WordData = { ...current };
+            let touched = false;
+
+            // 1. Backfill JLPT level → moves the word out of "Other".
+            if (next.jlptLevel == null && hit && hit.jlptLevel != null) {
+              next.jlptLevel = hit.jlptLevel;
+              next.jlptDerived = hit.jlptDerived;
+              touched = true;
+            }
+
+            // 2. Seed a difficulty for seen-but-ungraded words → out of "Ungraded".
+            //    Treat the past encounter as a read-past 'skip' (seed - 1), matching
+            //    first contact in applyDifficultyEvent.
+            if (next.difficulty == null && current.timesSeen >= 1) {
+              next.difficulty = clampDifficulty(seedDifficulty(next.jlptLevel ?? null, state.jlptLevel) - 1);
+              next.mastery = bucketForDifficulty(next.difficulty);
+              next.lastAdjustReason = 'skip';
+              touched = true;
+            }
+
+            if (touched) {
+              newDatabase[key] = next;
               changed = true;
+              // Only the difficulty path needs a server write (the level is always
+              // re-derivable client-side); push those rows for one batched upsert.
+              if (next.difficulty !== current.difficulty) {
+                synced.push({
+                  wordId: current.jmdictEntryId,
+                  mastery: next.mastery,
+                  difficulty: next.difficulty ?? null,
+                  timesSeen: next.timesSeen,
+                  streak: next.streak,
+                  lastSeenTs: next.lastSeenTs,
+                });
+              }
             }
           }
           return changed ? { wordDatabase: newDatabase } : {};
         });
+
+        if (synced.length > 0) {
+          const uid = await currentUserId();
+          if (uid) {
+            const { upsertWordProgressBatch } = await import('./api');
+            upsertWordProgressBatch(uid, synced).catch(() => { /* best-effort sync */ });
+          }
+        }
       },
 
       checkDailyKanji: () => {
