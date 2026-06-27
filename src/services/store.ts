@@ -141,6 +141,7 @@ interface AppState {
   setWordMastery: (word: string, level: MasteryLevel) => void;
   checkDailyKanji: () => void;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
+  backfillMissingJlptLevels: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -480,6 +481,45 @@ export const useAppStore = create<AppState>()(
 
           if (changed) return { wordDatabase: newDatabase };
           return {};
+        });
+
+        // Repair words stored without a JLPT level (read-past / pre-enrichment
+        // grades, which land in the Progress "Other" bucket). They carry a JMDict
+        // entry id, so we can resolve the level from the dictionary and patch the
+        // local cache. Early-returns once everything is backfilled.
+        await get().backfillMissingJlptLevels();
+      },
+
+      // Fill in jlptLevel for any cached word that has a JMDict entry id but no
+      // level. Resolves official → kanji → frequency, matching enrichment.
+      backfillMissingJlptLevels: async () => {
+        const targets = Object.entries(get().wordDatabase)
+          .filter(([, w]) => w.jlptLevel == null && !!w.jmdictEntryId);
+        if (targets.length === 0) return;
+
+        const { fetchJlptByEntryIds } = await import('./jmdict');
+        let resolved: Map<string, { jlptLevel: number | null; jlptDerived: boolean }>;
+        try {
+          resolved = await fetchJlptByEntryIds(targets.map(([, w]) => w.jmdictEntryId!));
+        } catch (e) {
+          console.warn('[store] JLPT backfill failed:', e);
+          return;
+        }
+
+        set((state) => {
+          const newDatabase = { ...state.wordDatabase };
+          let changed = false;
+          for (const [key] of targets) {
+            // Re-read latest; a concurrent enrichment may have already set it.
+            const current = newDatabase[key];
+            if (!current || current.jlptLevel != null || !current.jmdictEntryId) continue;
+            const hit = resolved.get(current.jmdictEntryId);
+            if (hit && hit.jlptLevel != null) {
+              newDatabase[key] = { ...current, jlptLevel: hit.jlptLevel, jlptDerived: hit.jlptDerived };
+              changed = true;
+            }
+          }
+          return changed ? { wordDatabase: newDatabase } : {};
         });
       },
 

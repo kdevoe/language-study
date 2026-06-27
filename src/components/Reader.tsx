@@ -116,10 +116,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     gradedRef.current.add(key);
     const jlptLevel = details?.jlptLevel;
     // Make sure a never-seen word exists before grading it (read latest store state).
-    if (!useAppStore.getState().wordDatabase[key]) {
+    const existing = useAppStore.getState().wordDatabase[key];
+    if (!existing) {
       saveWordDefinition(key, details
         ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
         : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
+    } else if (details && existing.jlptLevel == null && details.jlptLevel != null) {
+      // Self-heal: the word was first stored before enrichment linked it (so it had
+      // no JLPT and sat in Progress's "Other"). Now that we have dictionary details,
+      // patch in the level and full definition.
+      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id });
     }
     recordWordSeen(key, true);
     // Count the read either way, but only seed a difficulty when the word is
