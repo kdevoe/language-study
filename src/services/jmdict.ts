@@ -285,6 +285,45 @@ export async function fetchJlptByEntryIds(
   return out;
 }
 
+/**
+ * Reconstruct full word details (surface, reading, meaning, JLPT, pos, furigana)
+ * for each JMDict entry id. Used to rehydrate the local word cache from the
+ * server after a reinstall/localStorage wipe, where only entry ids + SRS state
+ * survive. Keyed by entry id; `word` is the primary surface (kanji else kana).
+ */
+export async function fetchDetailsByEntryIds(
+  ids: string[],
+): Promise<Map<string, { word: string; reading: string; meaning: string; jlptLevel: number | null; jlptDerived: boolean; pos: string[]; furiganaMap: { kanji: string; kana: string }[]; jmdictEntryId: string }>> {
+  const out = new Map<string, { word: string; reading: string; meaning: string; jlptLevel: number | null; jlptDerived: boolean; pos: string[]; furiganaMap: { kanji: string; kana: string }[]; jmdictEntryId: string }>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return out;
+
+  const CHUNK = 300;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const entries = await fetchEntries(unique.slice(i, i + CHUNK));
+
+    const needKanji = new Set<string>();
+    for (const e of entries) {
+      if (e.jlptLevel == null) {
+        for (const form of e.kanji) for (const ch of form) if (hasKanji(ch)) needKanji.add(ch);
+      }
+    }
+    const kanjiLevels = await fetchKanjiJlpt(needKanji);
+
+    for (const e of entries) {
+      const surface = e.kanji[0] ?? e.readings[0] ?? '';
+      if (!surface) continue;
+      // jmdictToWordDetails reads result.derivedJlpt when the official tag is null.
+      const withDerived = e.jlptLevel == null
+        ? { ...e, derivedJlpt: deriveJlpt(e.kanji.join(''), e.freqRank, kanjiLevels) }
+        : e;
+      const d = jmdictToWordDetails(surface, withDerived);
+      out.set(e.entryId, { word: surface, ...d });
+    }
+  }
+  return out;
+}
+
 /** Coarse JLPT bucket from a frequency band (1 = most common … 48 = rare). */
 function freqRankToJlpt(rank: number | null): number | null {
   if (rank == null) return null;
