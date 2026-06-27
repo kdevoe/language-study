@@ -488,6 +488,32 @@ export const useAppStore = create<AppState>()(
         // records. They carry a JMDict entry id, so the level is recoverable and a
         // first-contact difficulty can be seeded. Early-returns once backfilled.
         await get().backfillWordProgress();
+
+        // Reconcile local → server: words graded locally but ungraded (or absent)
+        // on the server never had their grade persisted (legacy rows / failed past
+        // syncs). Local is authoritative — it reflects real reading — so push those
+        // grades up. We only FILL server nulls here; an existing server difficulty
+        // is left untouched, so this can't clobber a newer cross-device grade.
+        const toPush = Object.values(get().wordDatabase)
+          .filter((w) => {
+            if (!w.jmdictEntryId || w.difficulty == null) return false;
+            const remote = remoteProgress[w.jmdictEntryId];
+            return !remote || remote.difficulty == null;
+          })
+          .map((w) => ({
+            wordId: w.jmdictEntryId!,
+            mastery: w.mastery,
+            difficulty: w.difficulty!,
+            timesSeen: w.timesSeen,
+            streak: w.streak,
+            lastSeenTs: w.lastSeenTs,
+          }));
+        if (toPush.length > 0) {
+          const { upsertWordProgressBatch } = await import('./api');
+          await upsertWordProgressBatch(userId, toPush).catch((e) => {
+            console.warn('[store] local→server grade reconcile failed:', e);
+          });
+        }
       },
 
       // Backfill cached words that have a JMDict entry id but are missing a JLPT

@@ -499,17 +499,26 @@ export async function upsertWordProgressBatch(
   rows: { wordId: string; mastery: string; difficulty: number | null; timesSeen: number; streak: number; lastSeenTs: number }[]
 ) {
   if (rows.length === 0) return;
-  const { error } = await supabase
-    .from('user_word_progress')
-    .upsert(rows.map(r => ({
-      user_id: userId,
-      word_id: r.wordId,
-      mastery_level: r.mastery,
-      difficulty: r.difficulty ?? null,
-      times_seen: r.timesSeen,
-      streak: r.streak,
-      last_seen_at: new Date(r.lastSeenTs).toISOString()
-    })));
+  // last_seen_at is NOT NULL: a bad lastSeenTs (0/NaN/undefined) would make
+  // `new Date(ts).toISOString()` throw and abort the ENTIRE batch, so a single
+  // legacy row could silently sink every other write. Coerce to a valid instant.
+  const payload = rows
+    .filter(r => r.wordId)
+    .map(r => {
+      const ts = Number.isFinite(r.lastSeenTs) && r.lastSeenTs > 0 ? r.lastSeenTs : Date.now();
+      return {
+        user_id: userId,
+        word_id: r.wordId,
+        mastery_level: r.mastery,
+        difficulty: r.difficulty ?? null,
+        times_seen: r.timesSeen ?? 0,
+        streak: r.streak ?? 0,
+        last_seen_at: new Date(ts).toISOString(),
+      };
+    });
+  if (payload.length === 0) return;
+
+  const { error } = await supabase.from('user_word_progress').upsert(payload);
 
   if (error) console.error('Error batch-syncing word progress:', error);
 }
