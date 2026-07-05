@@ -36,3 +36,7 @@ backups/
 # Generated personal vocabulary report (contains user stats)
 vocab-summary.html
 .playwright-mcp/
+
+# Eval harness output (#65): reports are runtime artifacts; bundle is transient
+scripts/eval-reports/
+.tmp_rewrite_prompt.mjs

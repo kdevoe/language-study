@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-001",
+  "note": "Regression: で + ある (rentaikei, 'a certain') must not fuse into the copula である. See docs/phase-c-eval-notes.md EVAL-001.",
+  "source": {
+    "title": "A 2031 where the US and China dominate AI, and Europe falls behind",
+    "text": "This week, a widely shared essay imagines a certain future in the year 2031. In it, the United States and China dominate artificial intelligence, while Europe struggles to keep up. The essay describes European office workers offloading routine clerical work to AI assistants such as Claude, freeing them for other tasks. The author argues that Europe's slow adoption of new technology and heavy regulation left its companies behind, and warns that the gap in economic power could widen further over the coming decade.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 4,
+    "rtkLevel": 300,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 4
+  },
+  "palette": {
+    "known": ["世界", "未来", "話", "仕事", "会社", "使う", "技術", "国"],
+    "review": ["人工知能", "経済"],
+    "new": ["支配"],
+    "targetReview": 2,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": ["インターネットである"]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-004",
+  "note": "N4: economic news with a few review-band terms; tests palette adherence at targetReview 2.",
+  "source": {
+    "title": "Government announces new tariffs on imported goods",
+    "text": "The government announced new tariffs on several imported goods on Monday. Officials said the measure is meant to protect domestic companies from cheaper foreign products. Economists warned that the tariffs could raise prices for consumers and hurt trade with partner countries. Some exporters said they worry about losing access to overseas markets. The new rates take effect next month.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 4,
+    "rtkLevel": 400,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 4
+  },
+  "palette": {
+    "known": ["経済", "会社", "商品", "値段", "上がる", "政府", "問題", "国"],
+    "review": ["関税", "貿易"],
+    "new": ["輸出"],
+    "targetReview": 2,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}

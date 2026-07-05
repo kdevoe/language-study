@@ -7,11 +7,77 @@ recur.
 
 Part of the **Word Mastery Loop** plan — see [`word-mastery-loop-plan.md`](./word-mastery-loop-plan.md) Phase C.
 
-**How to use:** when you spot a bad rewrite in the app, add a case below. When #65's harness
-exists, port these into its golden set. When #66 edits the prompt, every change is measured
-against these (no blind prompt edits).
+**How to use:** when you spot a bad rewrite in the app, add a case below, then port it into
+the harness golden set (`scripts/eval-fixtures/`, one JSON per case — schema in that folder's
+README). When #66 edits the prompt, every change is measured against these (no blind prompt edits).
 
 **Severity:** 🔴 grammatically wrong / misleading to a learner · 🟡 unnatural but understandable · 🔵 nitpick.
+
+---
+
+## The eval harness (#65)
+
+`scripts/eval-article-rewrite.mjs` scores the Pass-1 rewrite on the frozen golden set in
+`scripts/eval-fixtures/` and prints a per-model scorecard. It builds the prompt with the SAME
+shared module the edge function ships (`supabase/functions/_shared/rewritePrompt.ts`, extracted
+so the harness tests the exact prompt production sends), and **freezes the palette per fixture**
+so the only variable measured is *prompt + model* — no Supabase/Groq calls.
+
+**Scored axes:** deterministic (JSON validity, markup cleanliness, paragraph count, ≥1 yugen-box,
+palette adherence via kuromoji, `mustNotContain` regressions like EVAL-001) + an LLM judge
+(Gemini 3.1 Pro, configurable) for factual fidelity, JLPT-appropriateness, naturalness — plus
+cost + latency.
+
+```bash
+node scripts/eval-article-rewrite.mjs --print-prompt EVAL-001   # offline: print the built prompt, no API key
+node scripts/eval-article-rewrite.mjs --list-models            # print the model ids your key can call
+node scripts/eval-article-rewrite.mjs --fixture EVAL-001        # one case (needs GEMINI_API_KEY)
+node scripts/eval-article-rewrite.mjs --models flash,pro        # the flash-vs-pro scorecard
+node scripts/eval-article-rewrite.mjs --judge off              # deterministic scores only
+```
+
+Requires `GEMINI_API_KEY` (or `VITE_GEMINI_API_KEY`); makes real paid Gemini calls. Reports land
+in `scripts/eval-reports/` (git-ignored).
+
+### Model landscape (July 2026)
+
+The flash-vs-pro decision (decision #2, 2026-06-20) is now answerable with numbers. Ids below
+are **confirmed via `--list-models`** against the project key (July 2026):
+
+| Alias      | Model id                  | Notes                                              | Price /1M (in/out) |
+|------------|---------------------------|----------------------------------------------------|--------------------|
+| `flash`    | `gemini-3.5-flash`        | GA, stable — **current pin**                       | $1.50 / $9         |
+| `pro`      | `gemini-3.1-pro-preview`  | newest Pro tier the key exposes — flash-vs-pro target | ~$4 / ~$20 (est.) |
+| `pro-3`    | `gemini-3-pro-preview`    | prior 3.x Pro                                      | ~$4 / ~$20 (est.)  |
+| `pro-2.5`  | `gemini-2.5-pro`          | GA 2.5 Pro                                          | $1.25 / $10        |
+| `flash-lite`| `gemini-3.1-flash-lite`  | cheapest tier                                      | ~$0.30 / ~$2.50 (est.) |
+
+There is **no `gemini-3.1-pro` or `gemini-3.5-pro` id** — the 3.1 Pro ships only as
+`-preview`, and a 3.5 Pro was never released. So the real flash-vs-pro target is
+`gemini-3.1-pro-preview` (also the default judge). Aliases/prices live at the top of the harness
+(`--list-models` refreshes them); "est." prices lack a confirmed public row — verify before
+quoting. Groq tasks (keyword extraction, clustering) stay on Groq — out of scope here.
+
+### Flash-vs-pro verdict (2026-07-05) → **stay on `gemini-3.5-flash`**
+
+First full-coverage run (7 fixtures, judge = `gemini-3.1-pro-preview`, 7/7 judged both):
+
+| Axis                              | `gemini-3.5-flash` | `gemini-3.1-pro-preview` |
+|-----------------------------------|:------------------:|:------------------------:|
+| JSON valid / markup / paras / assertions | 100%        | 100%                     |
+| factual fidelity (1–5)            | **4.00**           | 3.57                     |
+| JLPT fit (1–5)                    | 5.00               | 5.00                     |
+| naturalness (1–5)                 | **4.86**           | 4.57                     |
+| latency (avg)                     | **11.3 s**         | 20.4 s                   |
+| cost / article                    | **$0.0039**        | $0.0085                  |
+
+**flash ties or beats pro on every axis, at ~half the latency and ~46% the cost.** pro is a
+*thinking* model (~2.7k thought tokens/call); on this tight schema-and-palette rewrite the
+overhead buys nothing and its freer prose slightly *lowers* fidelity. The judge is pro grading
+both, and it scored *itself* below flash — so no self-serving bias inflates the flash win.
+Decision #2 is settled: keep `gemini-3.5-flash` (`_shared/models.ts`) as the pinned rewrite
+model; revisit only if a future model beats this scorecard. flash's fidelity 4.00 (not 5.00) is
+the headroom #66 targets.
 
 ---
 
@@ -40,8 +106,11 @@ homographic third** (で+ある → である; に+ある, と+ある, etc.).
 
 **Eval assertion (#65):** the rewrite must not contain `インターネットである` (or, more
 generally, `<place/means noun>である<noun>` where the source meant "a certain"); the
-"a certain future" reading must be preserved.
+"a certain future" reading must be preserved. **Implemented** as
+`scripts/eval-fixtures/eval-001-ai-europe.json` (`mustNotContain: ["インターネットである"]`).
 
 ---
 
-<!-- Add new cases above this line. Next id: EVAL-002. -->
+<!-- Add new FAILURE cases above this line. Next id: EVAL-008.
+     (EVAL-002–007 are baseline fixtures spanning N5–N2 in scripts/eval-fixtures/,
+     not observed failures, so they aren't logged here.) -->

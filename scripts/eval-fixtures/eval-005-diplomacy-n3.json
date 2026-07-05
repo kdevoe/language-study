@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-005",
+  "note": "N3: newspaper-style diplomacy piece; checks that N3 output uses natural news phrasing, not over-simplified sentences.",
+  "source": {
+    "title": "Leaders meet in London to discuss support for Ukraine",
+    "text": "Several European leaders met in London on Thursday to discuss continued support for Ukraine. The British prime minister hosted the summit, which was also attended by the German chancellor and the Ukrainian president. The leaders agreed to prepare a new package of financial and military aid. They also discussed a longer-term plan for security in the region and pledged to keep negotiating a path toward peace.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 3,
+    "rtkLevel": 700,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 4
+  },
+  "palette": {
+    "known": ["大統領", "首相", "会談", "準備", "参加", "支援", "平和", "計画"],
+    "review": ["交渉", "合意"],
+    "new": ["首脳"],
+    "targetReview": 2,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}
