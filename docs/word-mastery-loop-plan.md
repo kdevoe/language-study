@@ -18,12 +18,15 @@
 
 **Legend:** 🟢 cheap / high-leverage · 🟡 medium · 🔴 large · ✅ done · [/] in progress · [ ] not started
 
-**📍 You are here (2026-06-22):**
-- **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer.
+**📍 You are here (2026-07-05):**
+- **Phase A is complete** — #39 (canonical entry-id keying, PR #90), #37 (JMDict sense display), and #41 (sync/hydration, done across #85-88 + the ungraded-local merge fix) all shipped. Word tracking is now one record per canonical `entry_id`, and the Progress page / server sync agree.
+- **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer — and, post-#39, on de-fragmented data.
 - **Phase C is partially done** — models are pinned and upgraded to `gemini-3.5-flash` (#64 ✅). The eval harness (#65) and prompt restructure (#66) are next-up; the first concrete regression case is logged in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md).
 - Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
 
-> **➡️ NEXT UP (pick this up first): Phase A — #39.** Phase B's selection logic shipped, but it ranks on per-word signals (`times_seen`, `difficulty`, `last_seen_at`) that **Phase A says are currently fragmented/under-counted** — one word splits across multiple tracking keys (kuromoji lemma on reads, JMDict word on clicks, entry_id on sync). So the smart scoring is running on noisy data. **#39 (canonical entry-id keying) is the foundational fix** that retroactively sharpens the shipped B work *and* is a hard prerequisite for Phase D (FSRS schedules per-word — fragmented keys → fragmented schedules). Phase A was deferred this session only because B chained cleanly within the edge function while #39 is larger and lives in the client read/tracking path — **not** because it was deprioritized. Recommended order from here: **A (#39 → #37 → #41) → C #65 → D #67**. Start #39 by mapping the exact keying divergence before writing code.
+> **➡️ NEXT UP: Phase C #65 (eval harness) → Phase D #67 (FSRS engine).** Phase A is done, so the frontier is the eval harness (so model/prompt changes are measured) and then the real due-date engine. #67 directly benefits from #39's one-record-per-word foundation.
+>
+> **Scope note (2026-07-05, discovered during #39):** #39's original spec also targeted a *server-side* Pass 3 that first-match-linked JMDict entries and could override the client's disambiguation (Concern B). **That server pass has since been removed** — all tokenization + entry-linking is now client-side (kuromoji + `enrich.ts`, which attaches `jmdict_entry_id` at enrich time). So Concern B was moot; #39 shipped as purely the client-side canonical-keying fix (which also absorbed the folded-in #74 `times_seen` work).
 
 **Two decisions locked (2026-06-20):**
 1. **SRS foundation → real FSRS/SM-2 due-dates.** We add a genuine scheduling layer (intervals + `due_at`) on top of the existing `difficulty` signal — not a pseudo-due hack. This is the prerequisite for the flashcard deck (Phase D → E).
@@ -71,17 +74,17 @@ For words already promoted, a single comparable **priority score** decides which
 
 ---
 
-## Phase A — Foundation correctness (Goal 1: assign JLPT right · Goal 2: track right) — ⬅️ IMMEDIATE NEXT
-*Status: **open and now the top priority** (#39 → #37 → #41). Detailed in [`content-and-word-selection-plan.md`](./content-and-word-selection-plan.md) Tier 3. Deferred while Phase B shipped — see the NEXT UP callout above for why this should be picked up before Phase C/D.*
+## Phase A — Foundation correctness (Goal 1: assign JLPT right · Goal 2: track right) — ✅ COMPLETE (2026-07-05)
+*Status: shipped. Detailed in [`content-and-word-selection-plan.md`](./content-and-word-selection-plan.md) Tier 3.*
 
-Garbage-in guard: if JLPT/entry resolution is wrong **or reads aren't counted**, the SRS schedule, the LLM palette, and the flashcard deck all inherit the error. **This is no longer hypothetical: Phase B (#25/#51) is already live and ranking on `times_seen`/`difficulty`/`last_seen_at`, so the keying bug in #39 is silently degrading shipped features right now.** Do this ahead of Phase D.
+Garbage-in guard: if JLPT/entry resolution is wrong **or reads aren't counted**, the SRS schedule, the LLM palette, and the flashcard deck all inherit the error. Phase B (#25/#51) ranks on `times_seen`/`difficulty`/`last_seen_at`, so this foundation now feeds shipped features de-fragmented data — and it's the prerequisite for Phase D's per-word FSRS schedule.
 
-- [ ] **#39 — Unify entry resolution (displayed vs stored JLPT) + canonical `times_seen` keying** 🔴 *(do early — foundational)* — homographs must resolve to one canonical `entry_id` so the badge, SRS seed, and palette read the same entry; stop the server's first-match Pass-3 linking from overriding the client's disambiguation; align NULL-JLPT handling (client "hard" vs server "ignored"). **Now also absorbs the `times_seen` under-count fix (folded in from #74):** the same word fragments across key spaces — passive reads key by kuromoji `lemma`, clicks by JMDict `details.word`, sync by `entry_id` (`Reader.tsx:231/308/340`, `tokenizer.ts:123`, `store.ts:313`), and entry_id-less tokens never sync — so all tracking must key on one canonical `entry_id`. Distinct from #41 (sync/display layer).
-- [ ] **#37 — JMDict sense miss (手当て → "salary")** 🟢 — prefer the entry whose kanji form exactly matches the surface; consider context-disambiguating the sense.
-- [ ] **#41 — Sync gap: remote progress doesn't hydrate locally** 🟡 — Option B (server-side aggregate query for the Progress page) first, Option A (full per-field reconcile across devices) as follow-up. Required so the flashcard deck and Progress page reflect *all* tracked words, not just locally-seen ones.
+- ✅ **#39 — Canonical `entry_id` keying (PR #90)** 🔴 — all word tracking (the `wordDatabase` key, grade/click dedup sets, and the Supabase `word_id`) now keys on one canonical `entry_id` resolved at enrich time, so conjugations and kana/kanji variants collapse into one record and the local key equals the server `word_id`; surface/lemma became display-only (new `WordData.surface`). Added a `mergeWordData`/`mergeWordRecords` collapse path and a v5 persist migration (browser-tested). Absorbed the folded-in #74 `times_seen` under-count fix. **The server-side Pass-3 override (original Concern B) turned out to be already removed** — linking is client-side now — so #39 shipped as purely client-side keying.
+- ✅ **#37 — JMDict sense display (手当て → "salary")** 🟢 — 手当/手当て is one entry (`1598240`) with senses [salary…][medical care/treatment][preparation]; the modal flattened glosses and showed only sense 1. Now `summarizeSenses` leads a polysemous word with one gloss per sense ("salary; medical care; advance preparation") so the treatment sense surfaces; single-sense words keep their first-few synonyms.
+- ✅ **#41 — Sync/hydration gap** 🟡 — resolved across #85 (JLPT backfill → words leave Progress "Other"), #86 (local→server grade reconcile), #87 (rehydrate the cache from the server after a wipe), #88 (paginate `fetchUserWordProgress` past the 1000-row cap), plus a merge fix so a server grade reaches an already-used device even when it didn't bump `last_seen_at`. *Deferred as future work (not part of #41's acceptance): full per-field cross-device reconcile (original "Option A"); and local-only words with no `entry_id` still can't rehydrate (inherent — no server row).*
 - ✅ **Shipped 2026-06-19:** `seedDifficulty` null-JLPT default 9→6; no grading off un-enriched tokens; persist-v4 re-seed migration.
 
-**Phase-A exit:** a word shows one consistent, correct N-badge everywhere; a cleared device hydrates its full vocabulary after sync; mastery accrues against one entry_id per word.
+**Phase-A exit (met):** a word shows one consistent, correct N-badge everywhere; a cleared device hydrates its full vocabulary after sync; mastery accrues against one entry_id per word.
 
 ---
 
@@ -172,21 +175,21 @@ The decision: a genuine FSRS/SM-2 layer with `due_at` + intervals, on top of (no
 ## Dependencies & sequencing
 
 ```
-Phase A (correct data) ──┬─► Phase B (SRS→LLM selection)      [in flight]
+Phase A (correct data) ──┬─► Phase B (SRS→LLM selection)      ✅ both done
                          │
                          └─► Phase D (FSRS engine) ──► Phase E (flashcards)
                                                           ▲
 Phase C (prompt/model) ───────────[parallel]──────────────┘ (independent; improves output quality throughout)
 ```
 
-- **A is prerequisite** for D and E (and improves B): correct entry-resolution/JLPT before you schedule, queue, or feed words.
+- **A is ✅ complete** (2026-07-05) — #39 canonical keying + #37 sense display + #41 sync/hydration. It's the prerequisite for D and E (and retroactively de-noised B): tracking is now one record per canonical entry_id.
 - **The Word Priority Metric (#69) is the shared spine.** Born in Phase B (#25/#22) but built as a module so the intake queue (#68) and deck (#70/#72) reuse it. Note the two distinct orderings it serves: **intake = level↑ then freq↑ (foundation-first)**; **in-SRS surfacing = SRS + level-fit + freq**.
 - **B is ✅ complete** (2026-06-22) — the #69→#25→#22→#51 series shipped and deployed; #51's staleness heuristic is the bridge delivering due-word-feeding value until D's real `due_at` lands (#72).
 - **C is independent** and can run in parallel anytime; **#64 pinning is ✅ done**, so the **#65 eval harness** is next-up before any further prompt/model change (#66).
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → **NEXT: A (#39 canonical key / counts reads right → #37 → #41)** → #65 (eval) → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).
+~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → **NEXT: #65 (eval)** → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
@@ -207,12 +210,12 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 | [#72](https://github.com/kdevoe/language-study/issues/72) | Feed due words into article generation (upgrade #51 staleness → real due_at) | 🟡 | E | not started |
 | [#73](https://github.com/kdevoe/language-study/issues/73) | Study dashboard: due/new/learning health + daily goal on Progress page | 🟢 | E | not started |
 
-**Existing issues this plan organizes:** #39 (now also absorbs the #74 `times_seen` fix), #37, #41 (Phase A) · #25, #22, #51 (Phase B) · #8 (epic that Phases D+E fulfill; decompose into #67, #68, #70–#73).
+**Existing issues this plan organizes:** ✅ #39 (absorbed the #74 `times_seen` fix), #37, #41 (Phase A) · #25, #22, #51 (Phase B) · #8 (epic that Phases D+E fulfill; decompose into #67, #68, #70–#73).
 
 ---
 
 ## TL;DR
-Five goals are one loop, held together by a **shared Word Priority Metric** (SRS + level + frequency) and a **foundation-first intake queue** (level↑ then freq↑, paced by a daily new-word cap) that stops every-word-on-sight overwhelm. **Phase B is ✅ done** — the shared metric (#69) and all three consumers (#25/#22/#51) ship, so article word-selection reads one scorer. **Phase C is started** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); eval harness (#65) + prompt restructure (#66) remain. Still open: **Phase A** correctness (#39/#37/#41) and the **real FSRS due-date engine + intake queue** (Phase D), then the **flashcard deck** on top (Phase E) — at which point reading, scheduling, the deck, and article word-selection all share one SRS state.
+Five goals are one loop, held together by a **shared Word Priority Metric** (SRS + level + frequency) and a **foundation-first intake queue** (level↑ then freq↑, paced by a daily new-word cap) that stops every-word-on-sight overwhelm. **Phase A is ✅ done** — canonical entry_id keying (#39), sense display (#37), and sync/hydration (#41), so tracking is one record per word on correct data. **Phase B is ✅ done** — the shared metric (#69) and all three consumers (#25/#22/#51) ship, so article word-selection reads one scorer. **Phase C is started** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); eval harness (#65) + prompt restructure (#66) remain. Still open: the **real FSRS due-date engine + intake queue** (Phase D), then the **flashcard deck** on top (Phase E) — at which point reading, scheduling, the deck, and article word-selection all share one SRS state.
 
 ---
 comments:
