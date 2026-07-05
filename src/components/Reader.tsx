@@ -11,6 +11,7 @@ import {
 } from '../services/api';
 import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
+import { canonicalWordKey } from '../services/wordKey';
 import { touchLock } from '../services/touchLock';
 import { } from 'lucide-react'; // Empty block to show we're using icons elsewhere if needed, or just clear it.
 // Actually, let's just remove the line if no icons are used.
@@ -23,7 +24,7 @@ interface ReaderProps {
 
 // Minimal shape needed to grade a word: definition details (for a never-seen word)
 // and a jmdict id fallback. Article tokens carry more, but this is all grading reads.
-type GradeToken = { details?: WordDetails; jmdict_entry_id?: string };
+type GradeToken = { details?: WordDetails; jmdict_entry_id?: string; lemma?: string; text?: string };
 
 // Deterministic tap-target sizing. Kanji content words (furigana present) are
 // the ones users actually look up, so they get the widest hit area; short kana
@@ -89,6 +90,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   const recordWordSeen = useAppStore(s => s.recordWordSeen);
   const setWordMastery = useAppStore(s => s.setWordMastery);
   const applyDifficultyEvent = useAppStore(s => s.applyDifficultyEvent);
+  const mergeWordRecords = useAppStore(s => s.mergeWordRecords);
   const setCurrentArticle = useAppStore(s => s.setCurrentArticle);
   const saveProcessedArticle = useAppStore(s => s.saveProcessedArticle);
 
@@ -117,15 +119,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     const jlptLevel = details?.jlptLevel;
     // Make sure a never-seen word exists before grading it (read latest store state).
     const existing = useAppStore.getState().wordDatabase[key];
+    const surface = details?.word ?? token.lemma ?? token.text ?? key;
     if (!existing) {
       saveWordDefinition(key, details
-        ? { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
-        : { reading: '...', meaning: 'Implicitly parsed context', jmdictEntryId: token.jmdict_entry_id });
+        ? { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
+        : { reading: '...', meaning: 'Implicitly parsed context', surface, jmdictEntryId: token.jmdict_entry_id });
     } else if (details && existing.jlptLevel == null && details.jlptLevel != null) {
       // Self-heal: the word was first stored before enrichment linked it (so it had
       // no JLPT and sat in Progress's "Other"). Now that we have dictionary details,
       // patch in the level and full definition.
-      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id });
+      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id });
     }
     recordWordSeen(key, true);
     // Count the read either way, but only seed a difficulty when the word is
@@ -233,8 +236,9 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     currentArticle?.blocks.forEach(b => {
       if (b.content) b.content.forEach(w => {
         if (!w.isInteractive && !w.furigana) return;
-        // Key by lemma so conjugations collapse and the key matches clickedWords.
-        const key = w.lemma ?? w.details?.word ?? w.text;
+        // Canonical key: entry_id when linked (collapses conjugations/variants of one
+        // entry), else lemma/surface. Matches the grade-key and clickedWords sets.
+        const key = canonicalWordKey({ jmdictEntryId: w.details?.jmdictEntryId || w.jmdict_entry_id, lemma: w.lemma, word: w.details?.word, text: w.text });
         const existing = map.get(key);
         if (!existing || (!existing.details && (w.details || w.jmdict_entry_id))) map.set(key, w);
       });
@@ -311,18 +315,21 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       return;
     }
     determineAnchor(e);
-    recordWordSeen(details.word);
-    setClickedWords(prev => new Set(prev).add(details.word));
+    // Track under the canonical key (entry_id when linked, else the surface/lemma),
+    // so a click and a passive read of the same word land on one record (#39).
+    const key = canonicalWordKey({ jmdictEntryId: details.jmdictEntryId, word: details.word });
+    recordWordSeen(key);
+    setClickedWords(prev => new Set(prev).add(key));
 
-    const cached = wordDatabase[details.word];
+    const cached = wordDatabase[key];
     const merged = { ...details, grammarNote: cached?.grammarNote || details.grammarNote };
     setSelectedWord(merged);
     setSelectedSentence(null);
     setActiveHighlightId(tokenId);
     setTargetRect(e.currentTarget.getBoundingClientRect());
-    saveWordDefinition(details.word, details);
+    saveWordDefinition(key, { ...details, surface: details.word });
     // Looking a word up means it wasn't known: nudge its difficulty up.
-    applyDifficultyEvent(details.word, 'click', details.jlptLevel);
+    applyDifficultyEvent(key, 'click', details.jlptLevel);
 
     if (!merged.grammarNote) {
       fetchWordGrammarInsight(details.word, sentText).then(insight => {
@@ -330,7 +337,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           if (!prev || prev.word !== details.word) return prev;
           return { ...prev, grammarNote: insight };
         });
-        saveWordDefinition(details.word, { grammarNote: insight });
+        saveWordDefinition(key, { grammarNote: insight });
       });
     }
   };
@@ -343,15 +350,18 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       return;
     }
     determineAnchor(e);
-    recordWordSeen(word);
-    setClickedWords(prev => new Set(prev).add(word));
+    // Canonical key: the entry_id when the token was already linked, else the surface
+    // word (a lookup that discovers an id later re-keys onto it — see below) (#39).
+    const key = canonicalWordKey({ jmdictEntryId, word });
+    recordWordSeen(key);
+    setClickedWords(prev => new Set(prev).add(key));
     setSelectedSentence(null);
-    
-    const localData = wordDatabase[word];
-    // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID), 
+
+    const localData = wordDatabase[key];
+    // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID),
     // we allow the lookup to proceed to enrich the entry.
     if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context' && localData.jlptLevel && localData.jmdictEntryId) {
-      applyDifficultyEvent(word, 'click', localData.jlptLevel);
+      applyDifficultyEvent(key, 'click', localData.jlptLevel);
       setSelectedWord({
         word,
         reading: localData.reading,
@@ -371,7 +381,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
             if (!prev || prev.word !== word) return prev;
             return { ...prev, grammarNote: insight };
           });
-          saveWordDefinition(word, { grammarNote: insight });
+          saveWordDefinition(key, { grammarNote: insight });
         });
       }
       return;
@@ -401,7 +411,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         jmdictEntryId: quickDef.jmdictEntryId
       };
       setSelectedWord(combinedInitial);
-      
+
+      // The lookup may resolve an entry_id for a token that had none pre-linked. Its
+      // canonical key is that id — migrate the surface-keyed record we just created
+      // onto it so the word stays a single record (#39).
+      const canonKey = canonicalWordKey({ jmdictEntryId: quickDef.jmdictEntryId || jmdictEntryId, word });
+      if (canonKey !== key) {
+        mergeWordRecords(key, canonKey);
+        setClickedWords(prev => new Set(prev).add(canonKey)); // keep grade-dedup aligned
+      }
+
       // 2. SMART PATH (Gemini 3 Flash) - Parallel Context Analysis
       fetchWordGrammarInsight(word, contextSentence).then((insight) => {
         setSelectedWord(prev => {
@@ -409,13 +428,13 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
           return { ...prev, grammarNote: insight };
         });
         // Cache the full enriched result
-        saveWordDefinition(word, { ...combinedInitial, grammarNote: insight });
+        saveWordDefinition(canonKey, { ...combinedInitial, surface: word, grammarNote: insight });
       });
 
       // Cache initial quick data
-      saveWordDefinition(word, combinedInitial);
+      saveWordDefinition(canonKey, { ...combinedInitial, surface: word });
       // Now that the JLPT level is known, nudge difficulty up for this lookup.
-      applyDifficultyEvent(word, 'click', quickDef.jlptLevel);
+      applyDifficultyEvent(canonKey, 'click', quickDef.jlptLevel);
       setIsModalLoading(false);
     } catch (err) {
       console.error("Word lookup failed:", err);
@@ -448,7 +467,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
   };
 
   const handleSetMastery = (level: 'hard' | 'medium' | 'easy') => {
-    if (selectedWord) setWordMastery(selectedWord.word, level);
+    if (selectedWord) setWordMastery(canonicalWordKey({ jmdictEntryId: selectedWord.jmdictEntryId, word: selectedWord.word }), level);
   };
 
   const renderParagraph = (block: any, blockIdx: number) => {
@@ -499,8 +518,9 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         >
           {sentTokens.map((segment, j) => {
             if (segment.furigana || segment.isInteractive) {
-              // Key by lemma so the grade key matches clickedWords and the payload map.
-              const gradeKey = segment.lemma ?? segment.details?.word ?? segment.text;
+              // Canonical key (entry_id when linked, else lemma/surface) — must match
+              // the payload map and clickedWords so grading dedups correctly.
+              const gradeKey = canonicalWordKey({ jmdictEntryId: segment.details?.jmdictEntryId || segment.jmdict_entry_id, lemma: segment.lemma, word: segment.details?.word, text: segment.text });
               return (
                 // Inline wrapper carries the grade key and is the intersection target,
                 // so "fully visible for a dwell" grades this word (see grade-on-visible).
@@ -508,7 +528,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
                   <FuriganaText
                     word={segment.text}
                     furigana={segment.furigana}
-                    hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[segment.text]?.mastery)}
+                    hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[gradeKey]?.mastery)}
                     isSelected={activeHighlightId === `${sentenceId}-${j}`}
                     onClick={(e) => {
                       const tid = `${sentenceId}-${j}`;
