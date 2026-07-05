@@ -539,6 +539,13 @@ export const useAppStore = create<AppState>()(
               if (remoteData.lastSeenTs > localData.lastSeenTs) {
                 newDatabase[wordKey] = { ...localData, ...remoteData };
                 changed = true;
+              } else if (localData.difficulty == null && remoteData.difficulty != null) {
+                // Local never graded this word but the server has a grade — from
+                // another device, or a server-side change that didn't bump
+                // last_seen_at (which the plain LWW gate above would miss). Adopt
+                // the grade without disturbing local exposure counts (#41).
+                newDatabase[wordKey] = { ...localData, mastery: remoteData.mastery, difficulty: remoteData.difficulty };
+                changed = true;
               }
             }
           });

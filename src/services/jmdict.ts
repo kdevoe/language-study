@@ -407,6 +407,25 @@ Answer (just the number):`;
 }
 
 /**
+ * Build the modal's one-line meaning from an entry's senses.
+ *
+ * A single-sense word shows its first few synonymous glosses ("to run; to dash").
+ * A polysemous word instead leads with ONE gloss from each sense, so genuinely
+ * distinct meanings all surface instead of drowning in the first sense's synonyms.
+ * Without this, 手当て (手当/手当て, entry 1598240: [1] salary/pay/compensation…
+ * [2] medical care/treatment [3] preparation) displayed only "salary; pay;
+ * compensation" and the treatment sense — the one meant in a medical context —
+ * never appeared (#37).
+ */
+function summarizeSenses(senses: JMDictResult['senses'], limit = 4): string {
+  const withGloss = senses.filter(s => s.gloss.length > 0);
+  if (withGloss.length <= 1) {
+    return withGloss[0]?.gloss.slice(0, 3).join('; ') ?? '';
+  }
+  return withGloss.slice(0, limit).map(s => s.gloss[0]).filter(Boolean).join('; ');
+}
+
+/**
  * Convert a JMDictResult into a format compatible with WordDetails.
  * Generates a furiganaMap by splitting the word into kanji/kana segments.
  */
@@ -415,8 +434,7 @@ export function jmdictToWordDetails(
   result: JMDictResult
 ): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null; jlptDerived: boolean; furiganaMap: { kanji: string; kana: string }[] } {
   const reading = result.readings[0] || '';
-  const allGlosses = result.senses.flatMap(s => s.gloss);
-  const meaning = allGlosses.slice(0, 3).join('; ') || '';
+  const meaning = summarizeSenses(result.senses);
   const pos = [...new Set(result.senses.flatMap(s => s.pos))];
 
   // Prefer the official JLPT tag; fall back to the derived level when untagged.
