@@ -73,6 +73,44 @@ function syncConsumed(id: string, kind: 'read' | 'dismissed'): void {
   }).catch(() => { /* never block the UI on a sync failure */ });
 }
 
+/**
+ * Combine two tracking records that turned out to be the same word (#39): the same
+ * entry reached under two keys (e.g. a conjugation and its dictionary form, or a
+ * pre-link surface key and its later-resolved entry_id). Exposures are additive —
+ * they were genuinely separate sightings — while the graded SRS signal from the
+ * stronger source wins. `into` is treated as the surviving record.
+ */
+export function mergeWordData(into: WordData, from: WordData): WordData {
+  // Prefer an explicitly graded signal (manual > click > skip) over an ungraded one.
+  const rank = (w: WordData) =>
+    w.lastAdjustReason === 'manual' ? 3 : w.lastAdjustReason === 'click' ? 2 : w.difficulty != null ? 1 : 0;
+  const graded = rank(from) > rank(into) ? from : into;
+  const days = Array.from(new Set([...(into.uniqueDaysSeen ?? []), ...(from.uniqueDaysSeen ?? [])]));
+  return {
+    ...into,
+    // Richest display/definition fields win (a linked record over a placeholder).
+    reading: into.reading || from.reading,
+    meaning: into.meaning && into.meaning !== 'Implicitly parsed context' ? into.meaning : (from.meaning || into.meaning),
+    grammarNote: into.grammarNote ?? from.grammarNote,
+    furiganaMap: into.furiganaMap ?? from.furiganaMap,
+    pos: into.pos ?? from.pos,
+    jlptLevel: into.jlptLevel ?? from.jlptLevel,
+    jlptDerived: into.jlptLevel != null ? into.jlptDerived : from.jlptDerived,
+    surface: into.surface ?? from.surface,
+    jmdictEntryId: into.jmdictEntryId ?? from.jmdictEntryId,
+    // SRS state from whichever record carried the stronger grade.
+    difficulty: graded.difficulty ?? into.difficulty ?? from.difficulty,
+    mastery: graded.mastery ?? into.mastery,
+    lastAdjustedDay: graded.lastAdjustedDay ?? into.lastAdjustedDay,
+    lastAdjustReason: graded.lastAdjustReason ?? into.lastAdjustReason,
+    // Exposures are additive; recency and streak take the most recent.
+    timesSeen: (into.timesSeen ?? 0) + (from.timesSeen ?? 0),
+    uniqueDaysSeen: days,
+    lastSeenTs: Math.max(into.lastSeenTs ?? 0, from.lastSeenTs ?? 0),
+    streak: (into.lastSeenTs ?? 0) >= (from.lastSeenTs ?? 0) ? (into.streak ?? 0) : (from.streak ?? 0),
+  };
+}
+
 export interface WordData {
   reading: string;
   meaning: string;
@@ -82,6 +120,10 @@ export interface WordData {
   jlptDerived?: boolean;
   pos?: string[];
   jmdictEntryId?: string;
+  // Human-readable form for display/lists. Since the map key is the JMDict
+  // entry_id once a word is linked (#39 canonical keying), the surface can no
+  // longer be read off the key — it's carried here (the dictionary/lemma form).
+  surface?: string;
   mastery: MasteryLevel;          // derived bucket, kept in sync with `difficulty`
   difficulty?: number | null;     // 1..10 source of truth; null/undefined = unseen
   lastAdjustedDay?: string;       // YYYY-MM-DD of the last difficulty change (daily dedup)
@@ -139,6 +181,7 @@ interface AppState {
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
+  mergeWordRecords: (fromKey: string, toKey: string) => void;
   checkDailyKanji: () => void;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
   backfillWordProgress: () => Promise<void>;
@@ -290,7 +333,23 @@ export const useAppStore = create<AppState>()(
             }
           };
         }),
-        
+
+      // Collapse two records for one word onto a single key (#39). Used when a
+      // dictionary lookup resolves an entry_id for a token that was first tracked
+      // under its surface/lemma — the surface-keyed record is merged into the
+      // canonical entry_id key so the word stays one record (and one server row).
+      mergeWordRecords: (fromKey: string, toKey: string) =>
+        set((state) => {
+          if (fromKey === toKey) return {};
+          const from = state.wordDatabase[fromKey];
+          if (!from) return {};
+          const db = { ...state.wordDatabase };
+          const existing = db[toKey];
+          db[toKey] = existing ? mergeWordData(existing, from) : { ...from };
+          delete db[fromKey];
+          return { wordDatabase: db };
+        }),
+
         
       recordWordSeen: (word: string, withoutLookup = false) => 
         set((state) => {
@@ -469,9 +528,14 @@ export const useAppStore = create<AppState>()(
           let changed = false;
 
           Object.entries(remoteProgress).forEach(([wordId, remoteData]: [string, any]) => {
-            const localWord = Object.entries(newDatabase).find(([_, data]) => data.jmdictEntryId === wordId);
-            if (localWord) {
-              const [wordKey, localData] = localWord;
+            // Local records are keyed by entry_id (#39), so the server word_id is a
+            // direct lookup; fall back to a scan for any legacy surface-keyed record
+            // that still carries this entry_id.
+            const wordKey =
+              newDatabase[wordId] ? wordId
+              : Object.entries(newDatabase).find(([_, data]) => data.jmdictEntryId === wordId)?.[0];
+            if (wordKey) {
+              const localData = newDatabase[wordKey];
               if (remoteData.lastSeenTs > localData.lastSeenTs) {
                 newDatabase[wordKey] = { ...localData, ...remoteData };
                 changed = true;
@@ -503,11 +567,13 @@ export const useAppStore = create<AppState>()(
                 details.forEach((d, id) => {
                   const r = remoteProgress[id];
                   if (!r) return;
-                  // Don't overwrite a local entry already keyed by this surface.
-                  if (newDatabase[d.word]?.jmdictEntryId === id) return;
-                  newDatabase[d.word] = {
+                  // Keyed by entry_id (#39). Skip if already present (merge above
+                  // handled it); this only ADDS server-only words.
+                  if (newDatabase[id]) return;
+                  newDatabase[id] = {
                     reading: d.reading,
                     meaning: d.meaning,
+                    surface: d.word,
                     jlptLevel: d.jlptLevel,
                     jlptDerived: d.jlptDerived,
                     pos: d.pos,
@@ -665,7 +731,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
-      version: 4,
+      version: 5,
       // A persist write throws QuotaExceededError once localStorage fills up. That
       // exception used to propagate out of store actions (markArticleRead,
       // recordWordSeen, ...) and abort the tap handler — silently breaking article
@@ -754,6 +820,24 @@ export const useAppStore = create<AppState>()(
             }
           });
           state = { ...state, wordDatabase };
+        }
+        // v5: canonical entry_id keying (#39). Re-key every dictionary-linked record
+        // from its old surface/lemma key to its JMDict entry_id, carrying the old key
+        // over as the `surface` display form. Records that share an entry_id (a word
+        // tracked under a conjugation AND its base form, kana vs kanji, etc.) collapse
+        // into one via mergeWordData — summing exposures, keeping the stronger grade.
+        // Entry-less records (proper nouns, parse artifacts) keep their surface key.
+        if (version < 5 && state?.wordDatabase) {
+          const rekeyed: Record<string, WordData> = {};
+          Object.entries(state.wordDatabase as Record<string, WordData>).forEach(([key, w]) => {
+            if (!w) return;
+            const targetKey = w.jmdictEntryId || key;
+            const withSurface: WordData = { ...w, surface: w.surface ?? key };
+            rekeyed[targetKey] = rekeyed[targetKey]
+              ? mergeWordData(rekeyed[targetKey], withSurface)
+              : withSurface;
+          });
+          state = { ...state, wordDatabase: rekeyed };
         }
         return state;
       },

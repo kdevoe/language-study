@@ -35,3 +35,4 @@ backups/
 
 # Generated personal vocabulary report (contains user stats)
 vocab-summary.html
+.playwright-mcp/

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Sparkles } from 'lucide-react';
 import { useAppStore } from '../services/store';
+import { canonicalWordKey } from '../services/wordKey';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
 
@@ -105,7 +106,7 @@ export function WordModal({
     }
 
     if (!wordData) return null;
-    const stats = wordDatabase[wordData.word];
+    const stats = wordDatabase[canonicalWordKey({ jmdictEntryId: wordData.jmdictEntryId, word: wordData.word })];
     const activeMastery = (!stats || stats.mastery === 'unseen') ? 'medium' : stats.mastery;
 
     const getTrackedSegments = () => {

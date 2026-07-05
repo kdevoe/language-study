@@ -38,7 +38,8 @@ const levelKeyFor = (w: WordData): LevelKey =>
 const masteryOf = (w: WordData): MasteryLevel => w.mastery || 'unseen';
 
 interface WordRow extends WordData {
-  word: string;
+  word: string;   // display surface (the map key is now the JMDict entry_id, #39)
+  dbKey: string;  // the wordDatabase key — stable, unique React key
 }
 
 export function Progress() {
@@ -49,10 +50,10 @@ export function Progress() {
   const byLevel = useMemo(() => {
     const map = new Map<LevelKey, WordRow[]>();
     LEVELS.forEach((l) => map.set(l.value, []));
-    Object.entries(wordDatabase).forEach(([word, data]) => {
+    Object.entries(wordDatabase).forEach(([dbKey, data]) => {
       const key = levelKeyFor(data);
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ word, ...data });
+      map.get(key)!.push({ ...data, word: data.surface ?? dbKey, dbKey });
     });
     return map;
   }, [wordDatabase]);
@@ -442,7 +443,7 @@ export function Progress() {
             <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', overflow: 'hidden' }}>
               {visibleWords.map((w, i) => (
                 <WordRowView
-                  key={w.word}
+                  key={w.dbKey}
                   word={w.word}
                   reading={w.reading}
                   meaning={w.meaning}
