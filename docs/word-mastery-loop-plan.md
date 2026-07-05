@@ -21,7 +21,7 @@
 **📍 You are here (2026-07-05):**
 - **Phase A is complete** — #39 (canonical entry-id keying, PR #90), #37 (JMDict sense display), and #41 (sync/hydration, done across #85-88 + the ungraded-local merge fix) all shipped. Word tracking is now one record per canonical `entry_id`, and the Progress page / server sync agree.
 - **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer — and, post-#39, on de-fragmented data.
-- **Phase C is partially done** — models are pinned and upgraded to `gemini-3.5-flash` (#64 ✅). The eval harness (#65) and prompt restructure (#66) are next-up; the first concrete regression case is logged in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md).
+- **Phase C is mostly done** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); the **eval harness (#65 ✅)** ships — `scripts/eval-article-rewrite.mjs` scores rewrites on a frozen golden set (`scripts/eval-fixtures/`) via the extracted, shared prompt module, with EVAL-001 as an automated regression. Its first verdict: **flash beats/ties `gemini-3.1-pro-preview` on every axis at ~half latency/cost → stay on flash** (see [`phase-c-eval-notes.md`](./phase-c-eval-notes.md)). Only the **prompt restructure (#66)** remains in Phase C, now measurable against the harness.
 - Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
 
 > **➡️ NEXT UP: Phase C #65 (eval harness) → Phase D #67 (FSRS engine).** Phase A is done, so the frontier is the eval harness (so model/prompt changes are measured) and then the real due-date engine. #67 directly benefits from #39's one-record-per-word foundation.
@@ -112,12 +112,13 @@ No prompt-eval harness exists and models are unpinned. Make model choice data-dr
   - Centralized every model string in `supabase/functions/_shared/models.ts` (single bump point per model); imported across process-article, dictionary-lookup, fetch-raw-news.
   - **Upgraded** Gemini from the floating `gemini-3-flash-preview` alias to stable `gemini-3.5-flash` (verified live on both call paths). Groq IDs are themselves the version. Corrected the stale "Gemini 2.0-flash" reference in `CLAUDE.md`.
   - **Acceptance met:** no floating `-preview` strings; one place to bump each model.
-- [ ] **#65 Build a process-article eval harness + investigate latest Gemini flash** 🟡 *(next-up; first regression case logged in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md) — EVAL-001)*
-  - Investigate model availability — **specifically whether a newer flash (e.g. `gemini-3.5-flash`) exists** and is appropriate; record current options for flash vs pro. *(Note: #64 already moved the live model to `gemini-3.5-flash`; #65 still owns the flash-vs-pro per-task call against data.)*
-  - Capture a fixed set of ~15–20 real source articles + user profiles (varied JLPT/RTK/intensity) as a golden eval set.
-  - Score rewrites on: factual fidelity to source, JLPT-appropriateness, palette adherence (known/review/new ratios actually hit), furigana/markup cleanliness, plus cost + latency.
-  - Compare flash (current) vs newer-flash vs pro on the same set.
-  - **Acceptance:** a repeatable harness produces a per-model scorecard; we choose flash-vs-pro **per task** (cheap tasks stay on Groq/flash) from data, not vibes.
+- ✅ **#65 Build a process-article eval harness + investigate latest Gemini flash** 🟡 *(done 2026-07-05 — harness + golden set + flash-vs-pro verdict landed)*
+  - ✅ **Model investigation** — recorded the July-2026 landscape in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md), with ids confirmed via the harness's `--list-models`: `gemini-3.5-flash` is GA/pinned ($1.50/$9); there is **no `gemini-3.5-pro` or `gemini-3.1-pro` id** (3.1 Pro ships only as `-preview`), so the real flash-vs-pro target is `gemini-3.1-pro-preview`. Aliases + prices live at the top of the harness.
+  - ✅ **Prompt extracted** to `supabase/functions/_shared/rewritePrompt.ts` (byte-identical) so the harness tests the shipped prompt; `process-article` now imports it. De-risks #66.
+  - ✅ **Golden set + harness** — `scripts/eval-fixtures/*.json` (7 fixtures, N5–N2, incl. EVAL-001 as a `mustNotContain` regression) with a **frozen palette** so the harness makes no Supabase/Groq calls; `scripts/eval-article-rewrite.mjs` scores deterministic axes (JSON validity, markup cleanliness, paragraph count, yugen-box, palette adherence via kuromoji, regressions) + an LLM judge (Gemini 3.1 Pro, configurable) for fidelity/JLPT-fit/naturalness, plus cost + latency; emits a per-model scorecard + JSON report.
+  - ✅ **Flash-vs-pro run + verdict (2026-07-05)** — full-coverage scorecard (7 fixtures, judge = `gemini-3.1-pro-preview`): **flash ties or beats `gemini-3.1-pro-preview` on every axis** (fidelity 4.00 vs 3.57, naturalness 4.86 vs 4.57, equal JLPT-fit + 100% deterministic) at **~half the latency and ~46% the cost** → **stay on `gemini-3.5-flash`**. Recorded in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md).
+  - ⏳ **Optional follow-up:** grow the golden set toward ~15–20 real cases as failures surface (the set is designed to grow; not blocking).
+  - **Acceptance (met):** a repeatable harness produces a per-model scorecard, and the flash-vs-pro call is made **from data** — cheap tasks stay on flash/Groq. flash's fidelity 4.00 (not 5.00) is the headroom #66 targets against this same harness.
 - [ ] **#66 Restructure the article-rewrite prompt** 🟡
   - Tighten the `process-article` rewrite prompt: palette injection format, GOLDEN-RULE fidelity guardrail, kanji/vocab "preference mode" instructions, JSON-schema robustness. Consider native structured-output/JSON-schema mode over free-form array parsing.
   - Every change measured against #65's harness — no blind prompt edits.
@@ -200,7 +201,7 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 | Ref | Title | Size | Phase | Status |
 |-----|-------|------|-------|--------|
 | [#64](https://github.com/kdevoe/language-study/issues/64) | Audit & pin all LLM model versions across edge functions (+ fix stale CLAUDE.md "Gemini 2.0-flash") | 🟢 | C | ✅ done |
-| [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C | next-up |
+| [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C | ✅ done |
 | [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C | not started |
 | [#69](https://github.com/kdevoe/language-study/issues/69) | Extract the Word Priority Metric into a shared scoring module (SRS + level + frequency) | 🟡 | B (shared) | ✅ done |
 | [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS/SM-2 due-dates + intervals + review log atop existing difficulty | 🔴 | D | not started |

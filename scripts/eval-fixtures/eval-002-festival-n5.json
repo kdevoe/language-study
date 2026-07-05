@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-002",
+  "note": "N5 baseline: simple local-news topic, leisure intensity (mostly known vocab).",
+  "source": {
+    "title": "Spring flower festival opens in a small town",
+    "text": "A spring flower festival opened this weekend in a small town. The weather was sunny, and many people came to see the cherry blossoms in the park. Local shops sold food and drinks, and children played games. The town holds the festival every year in early April. Organizers said about three thousand people visited on the first day.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 5,
+    "rtkLevel": 120,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "leisure",
+    "targetParagraphs": 3
+  },
+  "palette": {
+    "known": ["天気", "今日", "雨", "町", "人", "見る", "春", "花", "公園", "食べる"],
+    "review": ["祭り"],
+    "new": ["開催"],
+    "targetReview": 1,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-007",
+  "note": "N2 + intensive intensity: densest review/new budget (targetReview 3). Stress-tests palette adherence at high token-share.",
+  "source": {
+    "title": "Stocks rise after central bank signals a pause in rate hikes",
+    "text": "Stock markets rose on Friday after the central bank signaled it may pause its interest rate hikes. The main index climbed nearly two percent, led by technology and banking shares. Investors welcomed comments from the bank's governor suggesting that inflation was slowing. Analysts cautioned that the currency remained volatile and that further data would be needed before any change in policy. Several large companies are due to report earnings next week.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 2,
+    "rtkLevel": 1500,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "intensive",
+    "targetParagraphs": 4
+  },
+  "palette": {
+    "known": ["株価", "市場", "投資", "企業", "上昇", "経済", "銀行"],
+    "review": ["金利", "為替", "物価"],
+    "new": ["指数"],
+    "targetReview": 3,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}

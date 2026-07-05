@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-003",
+  "note": "N5: concrete factual sports result. Tests that a short snippet stays short (3 paragraphs).",
+  "source": {
+    "title": "Home team wins the national championship final",
+    "text": "The home team won the national championship final on Sunday. They beat the visiting team three to one. A young forward scored two goals in the second half. It is the team's first title in ten years. Thousands of fans celebrated in the stadium after the match.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 5,
+    "rtkLevel": 150,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 3
+  },
+  "palette": {
+    "known": ["試合", "勝つ", "選手", "今日", "見る", "強い", "点"],
+    "review": ["優勝"],
+    "new": ["決勝"],
+    "targetReview": 1,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}

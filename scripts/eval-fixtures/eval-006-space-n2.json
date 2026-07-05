@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-006",
+  "note": "N2: science/technology news at near-natural complexity; longer full-source article.",
+  "source": {
+    "title": "Space agency successfully launches new lunar probe",
+    "text": "The national space agency successfully launched a new lunar probe early on Wednesday. The spacecraft separated from its rocket as planned and entered orbit around the Earth before beginning its journey to the Moon. Engineers said the probe will study the composition of the lunar surface and search for water ice near the south pole. If the mission succeeds, the data could support future crewed missions. The agency spent nearly a decade developing the probe's instruments.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 2,
+    "rtkLevel": 1200,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 5
+  },
+  "palette": {
+    "known": ["宇宙", "打ち上げ", "成功", "研究", "開発", "技術", "月"],
+    "review": ["探査", "衛星"],
+    "new": ["軌道"],
+    "targetReview": 2,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}
