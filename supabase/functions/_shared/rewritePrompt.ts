@@ -117,7 +117,11 @@ ${sourceText}
 
 SOURCE HANDLING: Build ONE coherent article around the first source as the main story. Where the other sources genuinely concern the same story, combine their overlapping facts and add their detail without repeating points. If a source is about a clearly different or unrelated story, IGNORE it — never stitch unrelated events together into one article.
 
-GOLDEN RULE: The article MUST accurately report only the events described in the Sources above. DO NOT invent facts not present in the Sources, and DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
+GOLDEN RULE — FACTUAL FIDELITY OVERRIDES EVERYTHING ELSE (length, palette, style):
+- Report ONLY the events, statements, and details present in the Sources above. DO NOT invent facts, quotes, statistics, reactions, sentiment, or motivations that are not in the Sources.
+- DO NOT add an editorial or concluding sentence (speculation about significance, what it means, or what happens next) unless it is stated in the Sources.
+- DO NOT pad to reach the paragraph target by fabricating filler. Reach the target by clearly explaining the facts that ARE in the Sources — not by adding new ones. If the Sources are too thin to fill ${targetParagraphs} paragraphs faithfully, write FEWER paragraphs; a shorter accurate article is always better than a padded one.
+- DO NOT use abstract, poetic, or metaphorical language. Stick to facts.
 ${palettePrompt}
 
 Rules:

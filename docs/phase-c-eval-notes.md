@@ -79,6 +79,39 @@ Decision #2 is settled: keep `gemini-3.5-flash` (`_shared/models.ts`) as the pin
 model; revisit only if a future model beats this scorecard. flash's fidelity 4.00 (not 5.00) is
 the headroom #66 targets.
 
+### Prompt restructure verdict (#66, 2026-07-06) → **fidelity 4.00 → 5.00, shipped**
+
+The #65 baseline localized the *entire* fidelity gap to one failure mode: on thin sources with a
+4–5 paragraph target, flash **padded to length by fabricating** — invented quotes/reactions and
+editorial conclusions (EVAL-006 → 2), invented market-sentiment filler (EVAL-007 → 2), an added
+explanatory sentence (EVAL-005 → 4). Every other axis was already at ceiling (JLPT 5.00,
+naturalness 4.86, palette targets all hit, JSON/markup 100%).
+
+So #66 is **one surgical edit, not a restructure** (deliberately — rewriting the maxed axes only
+risks them): the GOLDEN RULE in `_shared/rewritePrompt.ts` now names the failure mode and makes
+fidelity override length — forbids invented facts/quotes/reactions/sentiment, forbids editorial
+conclusions, and says *write FEWER paragraphs before padding*. Palette/kanji/vocab/JSON blocks are
+byte-identical. The rule is general ("don't invent, don't editorialize, don't pad"), not tuned to
+the 7 fixtures, so it can't overfit.
+
+Harness result (flash, judge = `gemini-3.1-pro-preview`, run `2026-07-06T00-07-15-785Z`):
+
+| Axis                    | before (#65) | after (#66) |
+|-------------------------|:------------:|:-----------:|
+| factual fidelity (1–5)  | 4.00         | **5.00**    |
+| EVAL-006 / EVAL-007     | 2 / 2        | **5 / 5**   |
+| JLPT fit (1–5)          | 5.00         | 5.00        |
+| paragraphs / JSON / markup / assertions | 100% | 100% |
+| cost / article          | $0.0039      | **$0.0037** |
+| latency (avg)           | 11.3 s       | **10.5 s**  |
+
+Fidelity maxed at **equal-or-lower cost** (less fabricated text = fewer tokens) — #66's acceptance
+bar cleared. Two accepted side-effects, logged not hidden: naturalness dipped 4.86 → 4.57 (EVAL-001/003
+each 5→4, N4/N5 text reads marginally more clipped — a ~0.3 wobble on a single judge, likely part
+noise); and EVAL-006's review-word count fell 2/2 → 1/2 (less prose to host it, within the palette's
+"guide not quota" intent). We accepted these rather than add scaffolding to chase a judge point back
+(that would be the overfitting #66 explicitly avoids).
+
 ---
 
 ## EVAL-001 — `で + ある` (rentaikei) fused into the copula `である` 🔴
