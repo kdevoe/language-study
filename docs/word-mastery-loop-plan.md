@@ -21,10 +21,10 @@
 **📍 You are here (2026-07-05):**
 - **Phase A is complete** — #39 (canonical entry-id keying, PR #90), #37 (JMDict sense display), and #41 (sync/hydration, done across #85-88 + the ungraded-local merge fix) all shipped. Word tracking is now one record per canonical `entry_id`, and the Progress page / server sync agree.
 - **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer — and, post-#39, on de-fragmented data.
-- **Phase C is mostly done** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); the **eval harness (#65 ✅)** ships — `scripts/eval-article-rewrite.mjs` scores rewrites on a frozen golden set (`scripts/eval-fixtures/`) via the extracted, shared prompt module, with EVAL-001 as an automated regression. Its first verdict: **flash beats/ties `gemini-3.1-pro-preview` on every axis at ~half latency/cost → stay on flash** (see [`phase-c-eval-notes.md`](./phase-c-eval-notes.md)). Only the **prompt restructure (#66)** remains in Phase C, now measurable against the harness.
+- **Phase C is complete** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); the **eval harness (#65 ✅)** ships — `scripts/eval-article-rewrite.mjs` scores rewrites on a frozen golden set (`scripts/eval-fixtures/`) via the extracted, shared prompt module, with EVAL-001 as an automated regression. Its verdict: **flash beats/ties `gemini-3.1-pro-preview` on every axis at ~half latency/cost → stay on flash**. The **prompt restructure (#66 ✅)** then closed the one remaining gap: a surgical GOLDEN-RULE anti-fabrication edit lifted factual fidelity **4.00 → 5.00** at equal-or-lower cost, measured against the harness (see [`phase-c-eval-notes.md`](./phase-c-eval-notes.md)).
 - Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
 
-> **➡️ NEXT UP: Phase C #65 (eval harness) → Phase D #67 (FSRS engine).** Phase A is done, so the frontier is the eval harness (so model/prompt changes are measured) and then the real due-date engine. #67 directly benefits from #39's one-record-per-word foundation.
+> **➡️ NEXT UP: Phase D #67 (FSRS engine) → #68 (intake queue).** Phases A, B, and C are all done, so the frontier is the real spaced-repetition due-date engine. #67 directly benefits from #39's one-record-per-word foundation.
 >
 > **Scope note (2026-07-05, discovered during #39):** #39's original spec also targeted a *server-side* Pass 3 that first-match-linked JMDict entries and could override the client's disambiguation (Concern B). **That server pass has since been removed** — all tokenization + entry-linking is now client-side (kuromoji + `enrich.ts`, which attaches `jmdict_entry_id` at enrich time). So Concern B was moot; #39 shipped as purely the client-side canonical-keying fix (which also absorbed the folded-in #74 `times_seen` work).
 
@@ -119,10 +119,11 @@ No prompt-eval harness exists and models are unpinned. Make model choice data-dr
   - ✅ **Flash-vs-pro run + verdict (2026-07-05)** — full-coverage scorecard (7 fixtures, judge = `gemini-3.1-pro-preview`): **flash ties or beats `gemini-3.1-pro-preview` on every axis** (fidelity 4.00 vs 3.57, naturalness 4.86 vs 4.57, equal JLPT-fit + 100% deterministic) at **~half the latency and ~46% the cost** → **stay on `gemini-3.5-flash`**. Recorded in [`phase-c-eval-notes.md`](./phase-c-eval-notes.md).
   - ⏳ **Optional follow-up:** grow the golden set toward ~15–20 real cases as failures surface (the set is designed to grow; not blocking).
   - **Acceptance (met):** a repeatable harness produces a per-model scorecard, and the flash-vs-pro call is made **from data** — cheap tasks stay on flash/Groq. flash's fidelity 4.00 (not 5.00) is the headroom #66 targets against this same harness.
-- [ ] **#66 Restructure the article-rewrite prompt** 🟡
-  - Tighten the `process-article` rewrite prompt: palette injection format, GOLDEN-RULE fidelity guardrail, kanji/vocab "preference mode" instructions, JSON-schema robustness. Consider native structured-output/JSON-schema mode over free-form array parsing.
-  - Every change measured against #65's harness — no blind prompt edits.
-  - **Acceptance:** measurable lift on the eval scorecard (palette adherence + fidelity) at equal-or-lower cost.
+- ✅ **#66 Restructure the article-rewrite prompt** 🟡 *(done 2026-07-06)*
+  - The #65 baseline localized the entire remaining gap to one failure mode: flash **padded thin sources by fabricating** (invented quotes/reactions, editorial conclusions) to hit the paragraph target — worst on the N2 fixtures (EVAL-006/007 fidelity 2). Every other axis was already at ceiling.
+  - **Surgical, not a restructure:** one GOLDEN-RULE edit in `_shared/rewritePrompt.ts` — forbids invented facts/quotes/reactions/sentiment + editorial conclusions, and makes fidelity override length (*write fewer paragraphs before padding*). Palette/kanji/vocab/JSON blocks left byte-identical (they were maxed; touching them is pure regression risk). The rule is general, not fixture-tuned — can't overfit.
+  - **Result (measured on the harness):** factual fidelity **4.00 → 5.00** (EVAL-006/007 2→5), at **equal-or-lower cost** ($0.0039→$0.0037) and latency (11.3s→10.5s); JLPT/JSON/markup/paragraphs still 100%. Accepted side-effects (logged): naturalness 4.86→4.57 (~0.3 judge wobble on N4/N5 text), EVAL-006 review words 2/2→1/2.
+  - **Acceptance (met):** measurable fidelity lift at equal-or-lower cost, every change gated by #65's harness — no blind prompt edits.
 
 **Phase-C exit:** model versions are reproducible; the flash-vs-pro question is answered with numbers; prompt changes are regression-guarded.
 
@@ -186,11 +187,11 @@ Phase C (prompt/model) ───────────[parallel]────�
 - **A is ✅ complete** (2026-07-05) — #39 canonical keying + #37 sense display + #41 sync/hydration. It's the prerequisite for D and E (and retroactively de-noised B): tracking is now one record per canonical entry_id.
 - **The Word Priority Metric (#69) is the shared spine.** Born in Phase B (#25/#22) but built as a module so the intake queue (#68) and deck (#70/#72) reuse it. Note the two distinct orderings it serves: **intake = level↑ then freq↑ (foundation-first)**; **in-SRS surfacing = SRS + level-fit + freq**.
 - **B is ✅ complete** (2026-06-22) — the #69→#25→#22→#51 series shipped and deployed; #51's staleness heuristic is the bridge delivering due-word-feeding value until D's real `due_at` lands (#72).
-- **C is independent** and can run in parallel anytime; **#64 pinning is ✅ done**, so the **#65 eval harness** is next-up before any further prompt/model change (#66).
+- **C is ✅ done** (independent workstream) — #64 pinned the models, #65's harness settled flash-vs-pro from data, and #66's harness-gated prompt edit lifted fidelity to 5.00.
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → **NEXT: #65 (eval)** → #67 (FSRS) → #68 (intake queue) → #66 (prompt) → #70→#71→#72→#73 (flashcards).
+~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → ~~C (#65 eval → #66 prompt)~~ ✅ → **NEXT: #67 (FSRS)** → #68 (intake queue) → #70→#71→#72→#73 (flashcards).
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
@@ -202,7 +203,7 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 |-----|-------|------|-------|--------|
 | [#64](https://github.com/kdevoe/language-study/issues/64) | Audit & pin all LLM model versions across edge functions (+ fix stale CLAUDE.md "Gemini 2.0-flash") | 🟢 | C | ✅ done |
 | [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C | ✅ done |
-| [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C | not started |
+| [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C | ✅ done |
 | [#69](https://github.com/kdevoe/language-study/issues/69) | Extract the Word Priority Metric into a shared scoring module (SRS + level + frequency) | 🟡 | B (shared) | ✅ done |
 | [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS/SM-2 due-dates + intervals + review log atop existing difficulty | 🔴 | D | not started |
 | [#68](https://github.com/kdevoe/language-study/issues/68) | Word intake queue + daily new-word limit, foundation-first promotion (level↑ then freq↑) | 🔴 | D | not started |
@@ -216,7 +217,7 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 ---
 
 ## TL;DR
-Five goals are one loop, held together by a **shared Word Priority Metric** (SRS + level + frequency) and a **foundation-first intake queue** (level↑ then freq↑, paced by a daily new-word cap) that stops every-word-on-sight overwhelm. **Phase A is ✅ done** — canonical entry_id keying (#39), sense display (#37), and sync/hydration (#41), so tracking is one record per word on correct data. **Phase B is ✅ done** — the shared metric (#69) and all three consumers (#25/#22/#51) ship, so article word-selection reads one scorer. **Phase C is started** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); eval harness (#65) + prompt restructure (#66) remain. Still open: the **real FSRS due-date engine + intake queue** (Phase D), then the **flashcard deck** on top (Phase E) — at which point reading, scheduling, the deck, and article word-selection all share one SRS state.
+Five goals are one loop, held together by a **shared Word Priority Metric** (SRS + level + frequency) and a **foundation-first intake queue** (level↑ then freq↑, paced by a daily new-word cap) that stops every-word-on-sight overwhelm. **Phase A is ✅ done** — canonical entry_id keying (#39), sense display (#37), and sync/hydration (#41), so tracking is one record per word on correct data. **Phase B is ✅ done** — the shared metric (#69) and all three consumers (#25/#22/#51) ship, so article word-selection reads one scorer. **Phase C is ✅ done** — models pinned + upgraded to `gemini-3.5-flash` (#64), the eval harness (#65) settled flash-vs-pro from data, and the prompt restructure (#66) lifted rewrite fidelity 4.00 → 5.00 on that harness. Still open: the **real FSRS due-date engine + intake queue** (Phase D), then the **flashcard deck** on top (Phase E) — at which point reading, scheduling, the deck, and article word-selection all share one SRS state.
 
 ---
 comments:
