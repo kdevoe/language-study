@@ -176,3 +176,25 @@
   - [ ] Known gap: words with no jmdictEntryId (proper nouns / tokenizer fragments,
         ~577) are never synced, so a reinstall still loses them. Future work: back
         them up via a string word_id (the table already allows it).
+- [x] #67 FSRS scheduling engine (Phase D, 2026-07-11): real spaced-repetition
+      due-dates on top of the coarse `difficulty` signal. Design + decisions in
+      docs/fsrs-engine-design-67.md.
+  - [x] src/services/srs.ts — pure `schedule(state,rating,now)` wrapping ts-fsrs
+        (FSRS-6, request_retention 0.85, deterministic) + `ratingForReaderEvent`
+        + `seedSrsFromDifficulty` (seeds initial stability from difficulty 1..10).
+  - [x] scripts/test-srs.mjs (`npm run test:srs`) — 18/18 standalone assertions
+        (esbuild-bundled, no framework): first review, monotonic growth, Again
+        lapse, D3 early-vs-due gain, seed gradient.
+  - [x] database/23_fsrs_scheduling.sql — scheduling columns + idx_uwp_due partial
+        index + append-only srs_review_log; one-time backfill from difficulty +
+        last_seen_at. APPLY BY HAND in Supabase, then vacuum analyze the table.
+  - [x] store.applyDifficultyEvent scheduling arm — read-past="Good", lookup=
+        "Again"; reading ALWAYS advances the schedule (push self-limited by FSRS
+        early-review math → shrinks the flashcard deck). Persist v5→v6 eager seed.
+  - [x] api.ts — scheduling columns in fetch/upsert (partial upsert never nulls a
+        schedule) + logSrsReviewToSupabase.
+  - [x] wordPriority.ts — dueAt/stability on WordSignal + compareByDue comparator
+        (provided; #72 wires compareStuck's callers over to it).
+  - Verified: 18/18 tests, tsc -b, full vite build (ts-fsrs bundles), 0 new lint.
+  - [ ] APPLY (your step): run database/23_fsrs_scheduling.sql in the Supabase SQL
+        editor, then `vacuum analyze public.user_word_progress;`.

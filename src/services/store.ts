@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
+import { schedule, ratingForReaderEvent, seedSrsFromDifficulty, type SrsState, type SrsStatus } from './srs';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -132,6 +133,16 @@ export interface WordData {
   uniqueDaysSeen: string[];
   lastSeenTs: number;
   streak: number;
+  // FSRS schedule (#67). Undefined until the word is first scheduled; `difficulty`
+  // stays the coarse palette signal and seeds the initial state. See services/srs.ts.
+  stability?: number | null;      // FSRS S, days
+  fsrsDifficulty?: number | null; // FSRS D, 1..10 (algorithm-managed; ≠ `difficulty`)
+  dueAt?: number | null;          // ms epoch — next review ("what's due")
+  lastReviewedTs?: number | null; // ms epoch — last scheduler event
+  intervalDays?: number | null;   // scheduled gap (days)
+  reps?: number | null;
+  lapses?: number | null;
+  srsStatus?: SrsStatus | null;
 }
 
 interface AppState {
@@ -434,12 +445,44 @@ export const useAppStore = create<AppState>()(
           }
           const mastery = bucketForDifficulty(difficulty);
 
+          // ── FSRS schedule (#67) ────────────────────────────────────────────
+          // Reading a word in context always advances its real spaced-repetition
+          // schedule (read-past = "Good", lookup = "Again"). The daily-dedup guard
+          // above already caps passive reads to one/day, and FSRS makes the push
+          // self-limiting (early reads gain little), so re-scrolls can't inflate it.
+          // The word joins the schedule seeded from its coarse `difficulty` the
+          // first time; thereafter the stored SRS state drives everything.
+          const now = Date.now();
+          const rating = ratingForReaderEvent(event);
+          const priorSrs: SrsState =
+            current.stability != null && current.dueAt != null
+              ? {
+                  stability: current.stability,
+                  fsrsDifficulty: current.fsrsDifficulty ?? difficulty,
+                  dueAt: current.dueAt,
+                  lastReviewedAt: current.lastReviewedTs ?? current.lastSeenTs ?? now,
+                  reps: current.reps ?? 0,
+                  lapses: current.lapses ?? 0,
+                  status: (current.srsStatus ?? 'review') as SrsStatus,
+                }
+              : seedSrsFromDifficulty(difficulty, current.lastSeenTs ?? now);
+          const elapsedDays = (now - priorSrs.lastReviewedAt) / 86_400_000;
+          const sched = schedule(priorSrs, rating, now);
+
           const updatedWord: WordData = {
             ...current,
             difficulty,
             mastery,
             lastAdjustedDay: today,
-            lastAdjustReason: event
+            lastAdjustReason: event,
+            stability: sched.stability,
+            fsrsDifficulty: sched.fsrsDifficulty,
+            dueAt: sched.dueAt,
+            lastReviewedTs: sched.lastReviewedAt,
+            intervalDays: sched.intervalDays,
+            reps: sched.reps,
+            lapses: sched.lapses,
+            srsStatus: sched.status,
           };
 
           currentUserId().then((uid) => {
@@ -450,9 +493,27 @@ export const useAppStore = create<AppState>()(
                   difficulty,
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
-                  lastSeenTs: updatedWord.lastSeenTs
+                  lastSeenTs: updatedWord.lastSeenTs,
+                  stability: sched.stability,
+                  fsrsDifficulty: sched.fsrsDifficulty,
+                  dueAt: sched.dueAt,
+                  lastReviewedTs: sched.lastReviewedAt,
+                  intervalDays: sched.intervalDays,
+                  reps: sched.reps,
+                  lapses: sched.lapses,
+                  srsStatus: sched.status,
                 });
                 m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { difficulty, mastery, event });
+                m.logSrsReviewToSupabase(uid, updatedWord.jmdictEntryId!, {
+                  rating,
+                  source: event === 'click' ? 'reader_click' : 'reader_skip',
+                  stabilityBefore: priorSrs.stability,
+                  stabilityAfter: sched.stability,
+                  difficultyBefore: priorSrs.fsrsDifficulty,
+                  difficultyAfter: sched.fsrsDifficulty,
+                  scheduledDays: sched.intervalDays,
+                  elapsedDays,
+                });
               });
             }
           });
@@ -738,7 +799,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
-      version: 5,
+      version: 6,
       // A persist write throws QuotaExceededError once localStorage fills up. That
       // exception used to propagate out of store actions (markArticleRead,
       // recordWordSeen, ...) and abort the tap handler — silently breaking article
@@ -845,6 +906,32 @@ export const useAppStore = create<AppState>()(
               : withSurface;
           });
           state = { ...state, wordDatabase: rekeyed };
+        }
+        // v6: FSRS scheduling (#67). Seed a real schedule for every already-graded
+        // word from its coarse `difficulty` + `lastSeenTs`, mirroring the server-side
+        // SQL backfill (database/23_fsrs_scheduling.sql) — easy words seed with a long
+        // interval, hard words come due soon. This also covers local-only words (no
+        // entry_id) that the SQL backfill can't reach. Ungraded words stay unscheduled
+        // (they belong in #68's intake queue); anything read after this seeds lazily.
+        if (version < 6 && state?.wordDatabase) {
+          const wordDatabase = { ...state.wordDatabase };
+          Object.keys(wordDatabase).forEach((key) => {
+            const w = wordDatabase[key];
+            if (!w || w.difficulty == null || w.stability != null) return;
+            const s = seedSrsFromDifficulty(w.difficulty, w.lastSeenTs ?? Date.now());
+            wordDatabase[key] = {
+              ...w,
+              stability: s.stability,
+              fsrsDifficulty: s.fsrsDifficulty,
+              dueAt: s.dueAt,
+              lastReviewedTs: s.lastReviewedAt,
+              intervalDays: (s.dueAt - s.lastReviewedAt) / 86_400_000,
+              reps: s.reps,
+              lapses: s.lapses,
+              srsStatus: s.status,
+            };
+          });
+          state = { ...state, wordDatabase };
         }
         return state;
       },

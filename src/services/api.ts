@@ -471,7 +471,16 @@ export async function fetchUserWordProgress(userId: string): Promise<Record<stri
         difficulty: row.difficulty ?? null,
         timesSeen: row.times_seen,
         streak: row.streak,
-        lastSeenTs: new Date(row.last_seen_at).getTime()
+        lastSeenTs: new Date(row.last_seen_at).getTime(),
+        // FSRS scheduling (#67) — null until the word has been scheduled.
+        stability: row.stability ?? null,
+        fsrsDifficulty: row.fsrs_difficulty ?? null,
+        dueAt: row.due_at ? new Date(row.due_at).getTime() : null,
+        lastReviewedTs: row.last_reviewed_at ? new Date(row.last_reviewed_at).getTime() : null,
+        intervalDays: row.interval_days ?? null,
+        reps: row.reps ?? 0,
+        lapses: row.lapses ?? 0,
+        srsStatus: row.srs_status ?? null,
       };
     });
 
@@ -480,10 +489,41 @@ export async function fetchUserWordProgress(userId: string): Promise<Record<stri
   return progress;
 }
 
+/**
+ * FSRS scheduling fields (#67), all optional. Included in an upsert only when
+ * present, so a caller that just touches difficulty never nulls out a word's
+ * existing schedule (PostgREST upsert only updates the columns it's given).
+ */
+export interface SrsSyncFields {
+  stability?: number | null;
+  fsrsDifficulty?: number | null;
+  dueAt?: number | null;          // ms epoch
+  lastReviewedTs?: number | null; // ms epoch
+  intervalDays?: number | null;
+  reps?: number | null;
+  lapses?: number | null;
+  srsStatus?: string | null;
+}
+
+// Map the SRS sync fields that are actually present onto snake_case columns
+// (ms → ISO for the two timestamps). Absent fields are omitted, not nulled.
+function srsColumns(p: SrsSyncFields): Record<string, unknown> {
+  const cols: Record<string, unknown> = {};
+  if (p.stability !== undefined) cols.stability = p.stability;
+  if (p.fsrsDifficulty !== undefined) cols.fsrs_difficulty = p.fsrsDifficulty;
+  if (p.dueAt !== undefined) cols.due_at = p.dueAt == null ? null : new Date(p.dueAt).toISOString();
+  if (p.lastReviewedTs !== undefined) cols.last_reviewed_at = p.lastReviewedTs == null ? null : new Date(p.lastReviewedTs).toISOString();
+  if (p.intervalDays !== undefined) cols.interval_days = p.intervalDays;
+  if (p.reps !== undefined) cols.reps = p.reps;
+  if (p.lapses !== undefined) cols.lapses = p.lapses;
+  if (p.srsStatus !== undefined) cols.srs_status = p.srsStatus;
+  return cols;
+}
+
 export async function upsertWordProgressToSupabase(
   userId: string,
   wordId: string,
-  progress: { mastery: string; difficulty?: number | null; timesSeen: number; streak: number; lastSeenTs: number }
+  progress: { mastery: string; difficulty?: number | null; timesSeen: number; streak: number; lastSeenTs: number } & SrsSyncFields
 ) {
   const { error } = await supabase
     .from('user_word_progress')
@@ -494,10 +534,46 @@ export async function upsertWordProgressToSupabase(
       difficulty: progress.difficulty ?? null,
       times_seen: progress.timesSeen,
       streak: progress.streak,
-      last_seen_at: new Date(progress.lastSeenTs).toISOString()
+      last_seen_at: new Date(progress.lastSeenTs).toISOString(),
+      ...srsColumns(progress),
     });
-    
+
   if (error) console.error(`Error syncing progress for ${wordId}:`, error);
+}
+
+/**
+ * Append a precise FSRS review record (rating + before/after state) to
+ * srs_review_log. Distinct from logStudyEventToSupabase (the coarse UX log):
+ * this is the scheduler-input audit trail for #67, used later for FSRS tuning.
+ */
+export async function logSrsReviewToSupabase(
+  userId: string,
+  wordId: string,
+  entry: {
+    rating: number;
+    source: 'reader_skip' | 'reader_click' | 'flashcard';
+    stabilityBefore?: number | null;
+    stabilityAfter?: number | null;
+    difficultyBefore?: number | null;
+    difficultyAfter?: number | null;
+    scheduledDays?: number | null;
+    elapsedDays?: number | null;
+  }
+) {
+  const { error } = await supabase.from('srs_review_log').insert({
+    user_id: userId,
+    word_id: wordId,
+    rating: entry.rating,
+    source: entry.source,
+    stability_before: entry.stabilityBefore ?? null,
+    stability_after: entry.stabilityAfter ?? null,
+    difficulty_before: entry.difficultyBefore ?? null,
+    difficulty_after: entry.difficultyAfter ?? null,
+    scheduled_days: entry.scheduledDays ?? null,
+    elapsed_days: entry.elapsedDays ?? null,
+  });
+
+  if (error) console.error(`Error logging SRS review for ${wordId}:`, error);
 }
 
 /**

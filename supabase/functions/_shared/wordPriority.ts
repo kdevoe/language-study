@@ -54,6 +54,14 @@ export interface WordSignal {
    * null/undefined = never tracked. Used for staleness ordering (#51).
    */
   lastSeenAt?: string | null;
+  /**
+   * ISO-8601 next-review time (`user_word_progress.due_at`) from the FSRS engine (#67).
+   * null/undefined = not yet scheduled. Kept as a string so it compares chronologically
+   * without date parsing (module stays Date-free). Consumed by #72.
+   */
+  dueAt?: string | null;
+  /** FSRS stability in days; lower = more fragile memory. null = unscheduled. (#67) */
+  stability?: number | null;
 }
 
 /**
@@ -174,6 +182,27 @@ export function compareStuck(a: WordSignal, b: WordSignal): number {
   const db = b.difficulty ?? 0;
   if (da !== db) return db - da; // hardest first
   return (a.timesSeen ?? 0) - (b.timesSeen ?? 0); // least-seen first
+}
+
+/**
+ * Due-date order for the in-SRS review floor, backed by the real FSRS schedule (#67).
+ * Genuinely-due words first (soonest `due_at` ahead of later ones); never-scheduled
+ * words (null due_at) sort last. Ties break by lower stability (more fragile memory
+ * first), then fall back to the staleness heuristic. dueAt is an ISO-8601 string so it
+ * compares chronologically without date parsing (module stays Date-free).
+ *
+ * #67 provides this comparator; #72 is where compareStuck's callers switch over to it,
+ * so the topic-independent review slot pulls genuinely-due words instead of merely stale
+ * ones. Not yet wired to a caller.
+ */
+export function compareByDue(a: WordSignal, b: WordSignal): number {
+  const da = a.dueAt ?? '￿'; // unscheduled sorts last (all ISO chars < ￿)
+  const db = b.dueAt ?? '￿';
+  if (da !== db) return da < db ? -1 : 1; // sooner due first
+  const sa = a.stability ?? Number.POSITIVE_INFINITY;
+  const sb = b.stability ?? Number.POSITIVE_INFINITY;
+  if (sa !== sb) return sa - sb; // more fragile (lower stability) first
+  return compareStuck(a, b);
 }
 
 /**

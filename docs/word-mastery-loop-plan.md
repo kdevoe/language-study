@@ -24,7 +24,7 @@
 - **Phase C is complete** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); the **eval harness (#65 ✅)** ships — `scripts/eval-article-rewrite.mjs` scores rewrites on a frozen golden set (`scripts/eval-fixtures/`) via the extracted, shared prompt module, with EVAL-001 as an automated regression. Its verdict: **flash beats/ties `gemini-3.1-pro-preview` on every axis at ~half latency/cost → stay on flash**. The **prompt restructure (#66 ✅)** then closed the one remaining gap: a surgical GOLDEN-RULE anti-fabrication edit lifted factual fidelity **4.00 → 5.00** at equal-or-lower cost, measured against the harness (see [`phase-c-eval-notes.md`](./phase-c-eval-notes.md)).
 - Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
 
-> **➡️ NEXT UP: Phase D #67 (FSRS engine) → #68 (intake queue).** Phases A, B, and C are all done, so the frontier is the real spaced-repetition due-date engine. #67 directly benefits from #39's one-record-per-word foundation.
+> **➡️ NEXT UP: Phase D #68 (intake queue).** #67 (FSRS engine) shipped 2026-07-11 — words now carry a real `due_at`/stability schedule seeded from `difficulty`, and in-context reads advance it (see [`fsrs-engine-design-67.md`](./fsrs-engine-design-67.md)). The frontier is now the foundation-first intake queue + daily new-word cap that gates words into that schedule.
 >
 > **Scope note (2026-07-05, discovered during #39):** #39's original spec also targeted a *server-side* Pass 3 that first-match-linked JMDict entries and could override the client's disambiguation (Concern B). **That server pass has since been removed** — all tokenization + entry-linking is now client-side (kuromoji + `enrich.ts`, which attaches `jmdict_entry_id` at enrich time). So Concern B was moot; #39 shipped as purely the client-side canonical-keying fix (which also absorbed the folded-in #74 `times_seen` work).
 
@@ -133,13 +133,13 @@ No prompt-eval harness exists and models are unpinned. Make model choice data-dr
 
 The decision: a genuine FSRS/SM-2 layer with `due_at` + intervals, on top of (not replacing) the existing `difficulty` signal, **plus the intake queue that gates words into it**. This is what makes "study what's due today," "feed due words to the LLM," and "pace new words" possible.
 
-- [ ] **#67 SRS scheduling layer (FSRS/SM-2)** 🔴
-  - **Schema:** extend `user_word_progress` (or a new `srs_state` table) with scheduling fields — interval, `due_at`, stability/ease (FSRS) or EF (SM-2), `last_reviewed_at`, lapse count. Add a `srs_review_log` append-only table (word_id, rating, scheduled_interval, reviewed_at) for auditability and future FSRS optimization.
-  - **Algorithm:** implement the chosen scheduler (recommend **FSRS** — better retention modeling, open-source params) as a pure function `schedule(state, rating, now) → newState`. Keep `difficulty` (1–10) as a *seed/prior* into initial stability so existing tracking isn't thrown away.
-  - **Migration:** backfill `due_at`/interval for existing rows from current `difficulty` + `last_seen_at` (mature/easy words → longer initial intervals; hard → due soon).
-  - **Reader integration (soft-bump):** a read-past on a due word counts as a "Good"-ish pass (extends interval); a lookup counts as "Again/Hard" (resets/shortens). This subsumes today's ±1/+2 nudge with schedule-aware logic.
-  - **Decisions to confirm at build time:** FSRS vs SM-2; new table vs extend; how aggressively read-past advances the schedule vs explicit flashcard grades.
-  - **Acceptance:** every *active* word has a `due_at`; reviewing/reading an active word reschedules it; a "due today" query returns the right set; existing difficulty data is preserved as the seed.
+- ✅ **#67 SRS scheduling layer (FSRS)** 🔴 *(done 2026-07-11 — see [`fsrs-engine-design-67.md`](./fsrs-engine-design-67.md))*
+  - **Schema** (`database/23_fsrs_scheduling.sql`): extended `user_word_progress` with `stability`, `fsrs_difficulty`, `due_at`, `last_reviewed_at`, `interval_days`, `reps`, `lapses`, `srs_status` + a `idx_uwp_due` partial index; added the append-only `srs_review_log` table (rating + before/after state + source). One-time SQL backfill seeds a schedule from `difficulty` + `last_seen_at`.
+  - **Algorithm** (`src/services/srs.ts`): pure `schedule(state, rating, now)` wrapping `ts-fsrs` (FSRS-6, `request_retention` 0.85, deterministic); `ratingForReaderEvent` + `seedSrsFromDifficulty` seed initial stability from the coarse `difficulty` so existing tracking is preserved. 18/18 unit tests (`scripts/test-srs.mjs`, `npm run test:srs`).
+  - **Reader integration:** `store.applyDifficultyEvent` gained a scheduling arm — read-past → "Good", lookup → "Again"; **reading always advances the schedule** (D3, revised in review) with the push self-limited by FSRS's early-review math, so in-context reading shrinks the flashcard deck. Persist bumped v5→v6 (eager client seed). Sync extended (`api.ts`): scheduling columns + `logSrsReviewToSupabase`.
+  - **#72 hook provided (not wired):** `wordPriority.ts` gained `dueAt`/`stability` on `WordSignal` + a `compareByDue` comparator; #72 flips `compareStuck`'s callers over to it.
+  - **Acceptance (met):** every active word gets a `due_at`; reading/reviewing reschedules it + writes a review-log row; the `idx_uwp_due` "due today" query is in place; `difficulty` preserved as the seed. **Decisions:** FSRS; extend-table + review-log; read-past always advances (early gain diminished).
+  - **Deploy note:** `database/23_fsrs_scheduling.sql` must be applied by hand in Supabase (migrations are manual); run `vacuum analyze user_word_progress` after the bulk backfill.
 - [ ] **#68 Word intake queue + daily new-word limit (foundation-first promotion)** 🔴
   - Add an intake queue so encountered-but-unscheduled words **wait** instead of being graded on sight. Model as a `status` on `user_word_progress` (`queued` → `active`) or a dedicated queue table.
   - **Promotion ordering: JLPT level ascending, then `freq_rank` ascending** (lowest level + most common first) — the foundation-first rule. Lower levels are fully drained before higher levels start promoting.
@@ -191,7 +191,7 @@ Phase C (prompt/model) ───────────[parallel]────�
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → ~~C (#65 eval → #66 prompt)~~ ✅ → **NEXT: #67 (FSRS)** → #68 (intake queue) → #70→#71→#72→#73 (flashcards).
+~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → ~~C (#65 eval → #66 prompt)~~ ✅ → ~~#67 (FSRS)~~ ✅ → **NEXT: #68 (intake queue)** → #70→#71→#72→#73 (flashcards).
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
@@ -205,7 +205,7 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 | [#65](https://github.com/kdevoe/language-study/issues/65) | process-article eval harness + investigate latest Gemini flash (3.5?) for flash-vs-pro decision | 🟡 | C | ✅ done |
 | [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C | ✅ done |
 | [#69](https://github.com/kdevoe/language-study/issues/69) | Extract the Word Priority Metric into a shared scoring module (SRS + level + frequency) | 🟡 | B (shared) | ✅ done |
-| [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS/SM-2 due-dates + intervals + review log atop existing difficulty | 🔴 | D | not started |
+| [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS due-dates + intervals + review log atop existing difficulty | 🔴 | D | ✅ done |
 | [#68](https://github.com/kdevoe/language-study/issues/68) | Word intake queue + daily new-word limit, foundation-first promotion (level↑ then freq↑) | 🔴 | D | not started |
 | [#70](https://github.com/kdevoe/language-study/issues/70) | Flashcard study UI (Zen front/back/reveal, Again/Hard/Good/Easy) wired to #67 | 🔴 | E | not started |
 | [#71](https://github.com/kdevoe/language-study/issues/71) | Reader ↔ flashcard synergy: converge read-past and graded reviews on one SRS state | 🟡 | E | not started |
