@@ -122,13 +122,13 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     const surface = details?.word ?? token.lemma ?? token.text ?? key;
     if (!existing) {
       saveWordDefinition(key, details
-        ? { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
+        ? { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, freqRank: details.freqRank, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
         : { reading: '...', meaning: 'Implicitly parsed context', surface, jmdictEntryId: token.jmdict_entry_id });
     } else if (details && existing.jlptLevel == null && details.jlptLevel != null) {
       // Self-heal: the word was first stored before enrichment linked it (so it had
       // no JLPT and sat in Progress's "Other"). Now that we have dictionary details,
       // patch in the level and full definition.
-      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id });
+      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, freqRank: details.freqRank, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id });
     }
     recordWordSeen(key, true);
     // Count the read either way, but only seed a difficulty when the word is

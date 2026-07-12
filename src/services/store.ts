@@ -4,6 +4,7 @@ import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, seedSrsFromDifficulty, type SrsState, type SrsStatus } from './srs';
+import { selectPromotions, type IntakeItem } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -46,6 +47,30 @@ export function seedDifficulty(jlptLevel: number | null | undefined, userLevel: 
   if (userLevel == null) return 5;      // unknown user level => neutral
   const delta = userLevel - jlptLevel;  // >0 => word harder than the user
   return clampDifficulty(6 + delta * 2);
+}
+
+// Promote a word from the intake queue into active FSRS scheduling (#68). Seeds an
+// initial schedule from `difficulty`, anchored at `now` (a freshly promoted word
+// becomes due ~one interval from promotion), and stamps it `active`. Pure: the caller
+// persists + syncs the returned record. Used by the daily promotion pass and by an
+// explicit manual mastery-set (the two paths that graduate a queued word).
+function activateWord(w: WordData, difficulty: number, now: number): WordData {
+  const srs = seedSrsFromDifficulty(difficulty, now);
+  return {
+    ...w,
+    difficulty,
+    mastery: bucketForDifficulty(difficulty),
+    intakeStatus: 'active',
+    promotedTs: now,
+    stability: srs.stability,
+    fsrsDifficulty: srs.fsrsDifficulty,
+    dueAt: srs.dueAt,
+    lastReviewedTs: srs.lastReviewedAt,
+    intervalDays: (srs.dueAt - srs.lastReviewedAt) / 86_400_000,
+    reps: srs.reps,
+    lapses: srs.lapses,
+    srsStatus: srs.status,
+  };
 }
 
 /**
@@ -143,6 +168,13 @@ export interface WordData {
   reps?: number | null;
   lapses?: number | null;
   srsStatus?: SrsStatus | null;
+  // Intake queue (#68). `queued` = encountered/candidate, exposure recorded but NOT on
+  // a schedule; `active` = promoted into FSRS scheduling. A word is promoted only by the
+  // daily new-word cap (foundation-first) or an explicit manual mastery-set. Undefined
+  // on legacy records until the v7 migration stamps them.
+  freqRank?: number | null;       // JMDict freq_rank (1 = most common); for compareIntake
+  intakeStatus?: 'queued' | 'active';
+  promotedTs?: number | null;     // ms epoch — when it entered active study
 }
 
 interface AppState {
@@ -156,6 +188,10 @@ interface AppState {
   // Target article length (paragraphs) by source fullness. Length follows how
   // much real source material the article was built from; JLPT drives complexity.
   targetParagraphs: { full: number; partial: number; snippet: number };
+  // Intake queue (#68): the Anki-style daily cap on how many new words graduate from
+  // the queue into active study, and when the last promotion pass ran (daily gate).
+  newWordsPerDay: number;
+  lastIntakePromotionTs: number | null;
 
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
@@ -177,6 +213,7 @@ interface AppState {
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setReadingIntensity: (intensity: 'leisure' | 'balanced' | 'intensive') => void;
   setTargetParagraphs: (kind: 'full' | 'partial' | 'snippet', value: number) => void;
+  setNewWordsPerDay: (n: number) => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
@@ -194,6 +231,7 @@ interface AppState {
   setWordMastery: (word: string, level: MasteryLevel) => void;
   mergeWordRecords: (fromKey: string, toKey: string) => void;
   checkDailyKanji: () => void;
+  promoteIntakeQueue: (now: number) => Promise<void>;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
   backfillWordProgress: () => Promise<void>;
 }
@@ -209,6 +247,8 @@ export const useAppStore = create<AppState>()(
       furiganaMode: 'dynamic',
       readingIntensity: 'balanced',
       targetParagraphs: { full: 5, partial: 4, snippet: 3 },
+      newWordsPerDay: 3,
+      lastIntakePromotionTs: null,
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
@@ -265,6 +305,13 @@ export const useAppStore = create<AppState>()(
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { [column]: v }));
         });
       },
+      setNewWordsPerDay: (n) => {
+        const v = Math.max(0, Math.min(50, Math.round(n)));
+        set({ newWordsPerDay: v });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { new_words_per_day: v }));
+        });
+      },
 
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
@@ -313,9 +360,10 @@ export const useAppStore = create<AppState>()(
           isOnboarded: false, 
           jlptLevel: null, 
           rtkLevel: null, 
-          wordDatabase: {}, 
-          studyKanji: [], 
-          lastRtkUpdateTs: null 
+          wordDatabase: {},
+          studyKanji: [],
+          lastRtkUpdateTs: null,
+          lastIntakePromotionTs: null,
         });
         
         // Wipe Supabase data
@@ -334,7 +382,8 @@ export const useAppStore = create<AppState>()(
       
       saveWordDefinition: (word, def) =>
         set((state) => {
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0 };
+          // New words enter the intake queue (#68) — 'queued', not yet scheduled.
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, intakeStatus: 'queued' as const };
           // Strip undefined values so partial saves don't erase cached fields (e.g. grammarNote)
           const cleanDef = Object.fromEntries(Object.entries(def).filter(([, v]) => v !== undefined));
           return {
@@ -365,8 +414,10 @@ export const useAppStore = create<AppState>()(
       recordWordSeen: (word: string, withoutLookup = false) => 
         set((state) => {
           const today = new Date().toISOString().split('T')[0];
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0 };
-          const newDays = current.uniqueDaysSeen.includes(today) 
+          // A word first met while reading enters the intake queue (#68) as 'queued':
+          // exposure is recorded here, but it waits for daily promotion before scheduling.
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0, intakeStatus: 'queued' as const };
+          const newDays = current.uniqueDaysSeen.includes(today)
             ? current.uniqueDaysSeen 
             : [...current.uniqueDaysSeen, today];
             
@@ -420,6 +471,14 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const current = state.wordDatabase[word];
           if (!current) return {}; // word must be saved first
+
+          // Intake gate (#68): a queued word is not yet on a schedule. Reading past it
+          // or looking it up records exposure (recordWordSeen, fired separately) but
+          // does NOT grade or schedule it — it waits for daily promotion, foundation-
+          // first. Only `active` words advance. (A stability-bearing legacy row with no
+          // intake_status is treated as active so grandfathered schedules still tick.)
+          const isActive = current.intakeStatus === 'active' || current.stability != null;
+          if (!isActive) return {};
 
           const today = new Date().toISOString().split('T')[0];
           if (current.lastAdjustedDay === today) {
@@ -531,23 +590,44 @@ export const useAppStore = create<AppState>()(
       // prevents passive sees later that day from overriding the user's call.
       setWordMastery: (word: string, level: MasteryLevel) =>
         set((state) => {
-          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0 };
+          const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0, intakeStatus: 'queued' as const };
           const today = new Date().toISOString().split('T')[0];
+          const now = Date.now();
           const difficulty = level === 'unseen' ? null : difficultyForBucket(level);
-          const updatedWord: WordData = { ...current, mastery: level, difficulty, lastAdjustedDay: today, lastAdjustReason: 'manual' };
+
+          // Explicit manual classification promotes a queued word into active study
+          // (#68, D3): opening the modal and declaring a word's difficulty is a direct
+          // statement of knowledge — unlike a passive read or a lookup, which only
+          // signal "I don't know it" and never fast-track promotion. Setting 'unseen'
+          // is not a promotion. Seeds the schedule from the chosen difficulty.
+          const shouldActivate = difficulty != null && current.intakeStatus !== 'active' && current.stability == null;
+          const base = shouldActivate ? activateWord(current, difficulty, now) : current;
+          const updatedWord: WordData = { ...base, mastery: level, difficulty, lastAdjustedDay: today, lastAdjustReason: 'manual' };
 
           // Sync to Supabase
           currentUserId().then((uid) => {
             if (uid && updatedWord.jmdictEntryId) {
               import('./api').then(m => {
-                const syncData = {
+                m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, {
                   mastery: updatedWord.mastery,
                   difficulty,
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
-                  lastSeenTs: updatedWord.lastSeenTs
-                };
-                m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
+                  lastSeenTs: updatedWord.lastSeenTs,
+                  // On promotion, persist the freshly-seeded schedule + intake status.
+                  ...(shouldActivate ? {
+                    intakeStatus: 'active',
+                    promotedTs: updatedWord.promotedTs,
+                    stability: updatedWord.stability,
+                    fsrsDifficulty: updatedWord.fsrsDifficulty,
+                    dueAt: updatedWord.dueAt,
+                    lastReviewedTs: updatedWord.lastReviewedTs,
+                    intervalDays: updatedWord.intervalDays,
+                    reps: updatedWord.reps,
+                    lapses: updatedWord.lapses,
+                    srsStatus: updatedWord.srsStatus,
+                  } : {}),
+                });
                 m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level, difficulty });
               });
             }
@@ -579,6 +659,7 @@ export const useAppStore = create<AppState>()(
               partial: remotePrefs.target_paragraphs_partial ?? state.targetParagraphs.partial,
               snippet: remotePrefs.target_paragraphs_snippet ?? state.targetParagraphs.snippet,
             },
+            newWordsPerDay: remotePrefs.new_words_per_day ?? state.newWordsPerDay,
           }));
         }
 
@@ -740,8 +821,12 @@ export const useAppStore = create<AppState>()(
 
             // 2. Seed a difficulty for seen-but-ungraded words → out of "Ungraded".
             //    Treat the past encounter as a read-past 'skip' (seed - 1), matching
-            //    first contact in applyDifficultyEvent.
-            if (next.difficulty == null && current.timesSeen >= 1) {
+            //    first contact in applyDifficultyEvent. Post-#68 this only applies to
+            //    ACTIVE words: a queued word is intentionally ungraded (it waits for
+            //    daily promotion), so backfill must not grade it on sight and re-open
+            //    the every-word-on-sight floodgate the intake queue exists to close.
+            const isActive = next.intakeStatus === 'active' || next.stability != null;
+            if (isActive && next.difficulty == null && current.timesSeen >= 1) {
               next.difficulty = clampDifficulty(seedDifficulty(next.jlptLevel ?? null, state.jlptLevel) - 1);
               next.mastery = bucketForDifficulty(next.difficulty);
               next.lastAdjustReason = 'skip';
@@ -795,11 +880,130 @@ export const useAppStore = create<AppState>()(
             lastRtkUpdateTs: now
           });
         }
+      },
+
+      // Daily intake promotion (#68). Graduates up to `newWordsPerDay` words from the
+      // intake queue into active FSRS scheduling, foundation-first (easiest level first,
+      // then most common). The queue draws from TWO sources — words the user has met
+      // while reading (local 'queued' records) and important common words at/below their
+      // level they haven't read yet (the get_intake_candidates RPC) — so the common
+      // backbone gets built even when articles skip it. Gated to once per 24h, mirroring
+      // checkDailyKanji; call it on app open alongside that pass.
+      promoteIntakeQueue: async (now: number) => {
+        const state = get();
+        if (state.lastIntakePromotionTs && now - state.lastIntakePromotionTs < 86400000) return;
+        // Stamp immediately so a re-entrant call (e.g. a double mount) can't double-promote.
+        set({ lastIntakePromotionTs: now });
+
+        const cap = state.newWordsPerDay ?? 3;
+        if (cap <= 0) return; // 0 = new words paused
+
+        // Source 1: words already encountered and waiting in the local queue.
+        const queuedItems: IntakeItem[] = Object.entries(state.wordDatabase)
+          .filter(([, w]) => w.intakeStatus === 'queued')
+          .map(([key, w]) => ({
+            key,
+            entryId: w.jmdictEntryId ?? key,
+            jlptLevel: w.jlptLevel ?? null,
+            freqRank: w.freqRank ?? null,
+            timesSeen: w.timesSeen ?? 0,
+          }));
+
+        // Source 2: important unseen-foundation words (virtual, server-sourced). Needs a
+        // session + a known level; skipped in dev/no-auth (queue then = local words only).
+        let candidateItems: IntakeItem[] = [];
+        const uid = await currentUserId();
+        const userJlpt = state.jlptLevel;
+        if (uid && userJlpt != null) {
+          try {
+            const seenIds = Object.values(get().wordDatabase)
+              .map((w) => w.jmdictEntryId)
+              .filter((id): id is string => !!id);
+            const { fetchIntakeCandidates } = await import('./jmdict');
+            const cands = await fetchIntakeCandidates(userJlpt, seenIds, cap + 20);
+            candidateItems = cands.map((c) => ({
+              key: null,
+              entryId: c.entryId,
+              jlptLevel: c.jlptLevel,
+              freqRank: c.freqRank,
+              timesSeen: 0,
+              candidate: c,
+            }));
+          } catch (e) {
+            console.warn('[store] intake candidate fetch failed:', e);
+          }
+        }
+
+        const winners = selectPromotions(queuedItems, candidateItems, cap);
+        if (winners.length === 0) return;
+
+        const toSync: WordData[] = [];
+        set((s) => {
+          const db = { ...s.wordDatabase };
+          for (const win of winners) {
+            let key: string;
+            let record: WordData;
+            if (win.key != null && db[win.key]) {
+              key = win.key;
+              record = db[key];
+            } else if (win.candidate) {
+              // Materialise a virtual unseen-foundation word, keyed by entry_id (#39).
+              key = win.entryId;
+              record = db[key] ?? {
+                reading: win.candidate.reading,
+                meaning: win.candidate.meaning,
+                surface: win.candidate.word,
+                jmdictEntryId: win.candidate.entryId,
+                jlptLevel: win.candidate.jlptLevel,
+                freqRank: win.candidate.freqRank,
+                mastery: 'unseen',
+                timesSeen: 0,
+                uniqueDaysSeen: [],
+                lastSeenTs: 0,
+                streak: 0,
+                intakeStatus: 'queued',
+              };
+            } else {
+              continue;
+            }
+            if (record.intakeStatus === 'active') continue; // already promoted; skip
+            const difficulty = record.difficulty ?? clampDifficulty(seedDifficulty(record.jlptLevel ?? null, s.jlptLevel));
+            const activated = activateWord(record, difficulty, now);
+            db[key] = activated;
+            toSync.push(activated);
+          }
+          return { wordDatabase: db };
+        });
+
+        // Persist promotions (schedule + intake status). Best-effort per row.
+        if (uid && toSync.length > 0) {
+          const { upsertWordProgressToSupabase } = await import('./api');
+          for (const w of toSync) {
+            if (!w.jmdictEntryId) continue;
+            upsertWordProgressToSupabase(uid, w.jmdictEntryId, {
+              mastery: w.mastery,
+              difficulty: w.difficulty ?? null,
+              timesSeen: w.timesSeen,
+              streak: w.streak,
+              lastSeenTs: w.lastSeenTs || now,
+              intakeStatus: 'active',
+              promotedTs: w.promotedTs,
+              stability: w.stability,
+              fsrsDifficulty: w.fsrsDifficulty,
+              dueAt: w.dueAt,
+              lastReviewedTs: w.lastReviewedTs,
+              intervalDays: w.intervalDays,
+              reps: w.reps,
+              lapses: w.lapses,
+              srsStatus: w.srsStatus,
+            }).catch(() => { /* best-effort */ });
+          }
+        }
       }
     }),
     {
       name: 'yugen-storage',
-      version: 6,
+      version: 7,
       // A persist write throws QuotaExceededError once localStorage fills up. That
       // exception used to propagate out of store actions (markArticleRead,
       // recordWordSeen, ...) and abort the tap handler — silently breaking article
@@ -832,6 +1036,8 @@ export const useAppStore = create<AppState>()(
         furiganaMode: state.furiganaMode,
         readingIntensity: state.readingIntensity,
         targetParagraphs: state.targetParagraphs,
+        newWordsPerDay: state.newWordsPerDay,
+        lastIntakePromotionTs: state.lastIntakePromotionTs,
         wordDatabase: state.wordDatabase,
         studyKanji: state.studyKanji,
         lastRtkUpdateTs: state.lastRtkUpdateTs,
@@ -930,6 +1136,22 @@ export const useAppStore = create<AppState>()(
               lapses: s.lapses,
               srsStatus: s.status,
             };
+          });
+          state = { ...state, wordDatabase };
+        }
+        // v7: intake queue (#68). Grandfather (D2) — stamp every existing word's
+        // intake_status so today's graded-on-sight words keep their schedule: a word
+        // already scheduled/graded is 'active'; an ungraded one becomes 'queued' (it
+        // now waits for daily promotion instead of being graded on next read). Mirrors
+        // the SQL backfill in database/24_intake_queue.sql. Non-destructive: no
+        // schedules touched. New words created after this migration default to 'queued'.
+        if (version < 7 && state?.wordDatabase) {
+          const wordDatabase = { ...state.wordDatabase };
+          Object.keys(wordDatabase).forEach((key) => {
+            const w = wordDatabase[key];
+            if (!w || w.intakeStatus) return;
+            const active = w.stability != null || w.difficulty != null;
+            wordDatabase[key] = { ...w, intakeStatus: active ? 'active' : 'queued' };
           });
           state = { ...state, wordDatabase };
         }

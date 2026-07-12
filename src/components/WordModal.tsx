@@ -16,6 +16,8 @@ export interface WordDetails {
   jlptLevel?: number | null;
   /** True when jlptLevel was inferred (kanji/frequency) rather than an official tag. */
   jlptDerived?: boolean;
+  /** JMDict freq_rank (1 = most common; null = rare/unranked). Feeds intake ordering (#68). */
+  freqRank?: number | null;
 }
 
 interface Props {

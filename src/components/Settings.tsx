@@ -33,6 +33,7 @@ export function Settings() {
     studyMode, setStudyMode,
     readingIntensity, setReadingIntensity,
     targetParagraphs, setTargetParagraphs,
+    newWordsPerDay, setNewWordsPerDay,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight
   } = useAppStore();
@@ -200,6 +201,36 @@ export function Settings() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* New Words Per Day (#68 — intake pacing) */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          New Words Per Day
+        </label>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+          How many new words graduate into active study each day, easiest and most common first — so the foundation gets built before harder words. Words you meet while reading wait in a queue until their turn. Set to 0 to pause new words.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>New words / day</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+            <button
+              onClick={() => setNewWordsPerDay(newWordsPerDay - 1)}
+              disabled={newWordsPerDay <= 0}
+              aria-label="Decrease new words per day"
+              style={stepperBtnStyle(newWordsPerDay <= 0)}
+            >−</button>
+            <span style={{ minWidth: '1.5rem', textAlign: 'center', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
+              {newWordsPerDay}
+            </span>
+            <button
+              onClick={() => setNewWordsPerDay(newWordsPerDay + 1)}
+              disabled={newWordsPerDay >= 50}
+              aria-label="Increase new words per day"
+              style={stepperBtnStyle(newWordsPerDay >= 50)}
+            >+</button>
+          </div>
+        </div>
       </div>
 
       {/* 3. Vocab Use */}
