@@ -4,6 +4,7 @@ import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
 import { Settings } from './components/Settings'
 import { Progress } from './components/Progress'
+import { Flashcards } from './components/Flashcards'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
@@ -17,7 +18,7 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  const [activeTab, setActiveTab] = useState<'news' | 'progress' | 'settings'>('news');
+  const [activeTab, setActiveTab] = useState<'news' | 'flashcards' | 'progress' | 'settings'>('news');
   const [showNav, setShowNav] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -650,6 +651,7 @@ function App() {
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} />
           )
         )}
+        {activeTab === 'flashcards' && <Flashcards />}
         {activeTab === 'progress' && <Progress />}
         {activeTab === 'settings' && <Settings />}
       </main>

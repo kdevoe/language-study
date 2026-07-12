@@ -1,14 +1,17 @@
-import { Newspaper, BarChart2, Settings } from 'lucide-react';
+import { Newspaper, Layers, BarChart2, Settings } from 'lucide-react';
+
+type Tab = 'news' | 'flashcards' | 'progress' | 'settings';
 
 interface Props {
-  activeTab: 'news' | 'progress' | 'settings';
-  onChange: (tab: 'news' | 'progress' | 'settings') => void;
+  activeTab: Tab;
+  onChange: (tab: Tab) => void;
   isVisible?: boolean;
 }
 
 export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
     { id: 'news', label: 'NEWS', icon: Newspaper },
+    { id: 'flashcards', label: 'STUDY', icon: Layers },
     { id: 'progress', label: 'PROGRESS', icon: BarChart2 },
     { id: 'settings', label: 'SETTINGS', icon: Settings }
   ] as const;
