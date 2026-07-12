@@ -62,6 +62,9 @@ export interface WordSignal {
   dueAt?: string | null;
   /** FSRS stability in days; lower = more fragile memory. null = unscheduled. (#67) */
   stability?: number | null;
+  /** FSRS scheduled interval in days (`user_word_progress.interval_days`). Drives the
+   * proportional pre-due surfacing window. null = unscheduled / legacy. */
+  intervalDays?: number | null;
 }
 
 /**
@@ -203,6 +206,67 @@ export function compareByDue(a: WordSignal, b: WordSignal): number {
   const sb = b.stability ?? Number.POSITIVE_INFINITY;
   if (sa !== sb) return sa - sb; // more fragile (lower stability) first
   return compareStuck(a, b);
+}
+
+// ── Pre-due surfacing window (flashcards augment reading) ────────────────────
+// A word shouldn't wait until it's due to be reviewable in the reader. For a window
+// BEFORE due — proportional to its interval — the article generator gets chances to
+// weave it in; reading past it advances the schedule and pushes due_at out, so it may
+// never reach the flashcard deck. The window scales with the interval (a 2-month card
+// gets ~a week; a 3-day card gets ~a day), so long-interval words start surfacing far
+// enough ahead to actually be reinforced. See docs/study-pacing-flood-fix.md.
+
+/** Fraction of a word's interval spent in its pre-due window (~a week for a 2-month card). */
+export const PREDUE_FRACTION = 0.12;
+/** Floor/ceiling on the window so tiny intervals still get a day and huge ones don't open weeks early. */
+export const PREDUE_MIN_WINDOW_DAYS = 1;
+export const PREDUE_MAX_WINDOW_DAYS = 21;
+const PREDUE_DAY_MS = 86_400_000;
+
+function clampNum(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/** The pre-due window width (days) for a word, from its interval (or stability fallback). */
+export function preDueWindowDays(w: WordSignal): number | null {
+  const iv = w.intervalDays ?? (w.stability != null ? 1.9 * w.stability : null);
+  if (iv == null || iv <= 0) return null;
+  return clampNum(PREDUE_FRACTION * iv, PREDUE_MIN_WINDOW_DAYS, PREDUE_MAX_WINDOW_DAYS);
+}
+
+/**
+ * How deep a word is into its pre-due window at `nowMs`: 0 = just entered, 1 = exactly
+ * due, >1 = overdue. `null` = not yet in window (don't surface for pre-due review) or
+ * unscheduled. Higher = more urgent to surface before it becomes a flashcard. A word
+ * with a due date but no interval signal only becomes "urgent" once actually due.
+ */
+export function preDueUrgency(w: WordSignal, nowMs: number): number | null {
+  if (!w.dueAt) return null;
+  const dueMs = Date.parse(w.dueAt);
+  if (Number.isNaN(dueMs)) return null;
+  const windowDays = preDueWindowDays(w);
+  if (windowDays == null) return dueMs <= nowMs ? (nowMs - dueMs) / PREDUE_DAY_MS : null;
+  const windowMs = windowDays * PREDUE_DAY_MS;
+  const startMs = dueMs - windowMs;
+  if (nowMs < startMs) return null; // not yet in its window
+  return (nowMs - startMs) / windowMs;
+}
+
+/**
+ * Pick the review-floor words to surface for pre-due reinforcement: those currently in
+ * their pre-due window (or overdue), most-urgent first, capped at `limit`. Unlike a
+ * plain soonest-due sort, this respects each word's PROPORTIONAL window, so a
+ * long-interval word gets surfaced early enough (in absolute days) to be reinforced
+ * before it falls due. Words not yet in window are excluded — surfacing them wastes the
+ * reader's few review slots on cards that aren't at risk yet.
+ */
+export function selectPreDueFloor(signals: WordSignal[], nowMs: number, limit: number): WordSignal[] {
+  return signals
+    .map((w) => ({ w, u: preDueUrgency(w, nowMs) }))
+    .filter((x): x is { w: WordSignal; u: number } => x.u !== null)
+    .sort((a, b) => b.u - a.u) // most urgent (deepest into window / most overdue) first
+    .slice(0, Math.max(0, limit))
+    .map((x) => x.w);
 }
 
 /**

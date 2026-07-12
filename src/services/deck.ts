@@ -99,14 +99,26 @@ export function isEligible(e: DeckEntry): boolean {
   return e.jlptLevel != null;
 }
 
+/** Options for deck assembly. */
+export interface DeckOptions {
+  /**
+   * Daily review ceiling (Anki-style). When set to a non-negative number, only the
+   * `reviewCap` MOST-OVERDUE reviews are surfaced; the rest defer to a later day.
+   * New cards are unaffected (#68 already paces them upstream). Omit / null = no cap
+   * (legacy behaviour). This is the one hard guarantee on daily load: without it, a
+   * back-catalog reseed can put review demand permanently above what a user can clear.
+   */
+  reviewCap?: number | null;
+}
+
 /**
- * Build today's ordered deck: all due reviews (most overdue first), then all new
- * cards (foundation-first). A word that is both due AND new counts once, as a
- * review (it's already scheduled and urgent). No session cap — #68 paces new
- * words upstream and hiding genuinely-due reviews would be wrong. Level-less words
- * are excluded (isEligible).
+ * Build today's ordered deck: due reviews (most overdue first), then new cards
+ * (foundation-first). A word that is both due AND new counts once, as a review
+ * (it's already scheduled and urgent). New words are paced upstream by #68; due
+ * reviews are bounded by `reviewCap` (opt-in) so a large scheduled backlog can't
+ * flood a session. Level-less words are excluded (isEligible).
  */
-export function selectDeck(entries: DeckEntry[], now: number): DeckCard[] {
+export function selectDeck(entries: DeckEntry[], now: number, opts: DeckOptions = {}): DeckCard[] {
   const reviews: DeckCard[] = [];
   const news: DeckCard[] = [];
   for (const e of entries) {
@@ -116,12 +128,16 @@ export function selectDeck(entries: DeckEntry[], now: number): DeckCard[] {
   }
   reviews.sort(compareDue);
   news.sort(compareNew);
-  return [...reviews, ...news];
+  const capped = opts.reviewCap != null && opts.reviewCap >= 0
+    ? reviews.slice(0, opts.reviewCap)   // keep the most-overdue `reviewCap`
+    : reviews;
+  return [...capped, ...news];
 }
 
 /** Deck-health tallies for the study dashboard (#73). */
 export interface DeckCounts {
-  due: number;       // active, scheduled, and come due (would head the deck)
+  due: number;       // active, scheduled, and come due (total backlog)
+  dueShown: number;  // reviews actually surfaced today after `reviewCap` (≤ due)
   new: number;       // promoted but never studied (reps 0) — Anki "new"
   learning: number;  // active + scheduled but neither due nor new (mid-interval)
   active: number;    // total words in FSRS scheduling (due + new + learning)
@@ -130,11 +146,13 @@ export interface DeckCounts {
 /**
  * Count the deck's health straight from the SAME predicates selectDeck uses, so the
  * dashboard's due/new/learning numbers always agree with what STUDY actually shows
- * (a word that is both due and new counts once, as due — mirroring the deck). Pure:
- * the caller projects its WordData into DeckEntry and passes the clock.
+ * (a word that is both due and new counts once, as due — mirroring the deck). When a
+ * `reviewCap` is set, `due` stays the true backlog while `dueShown` is what STUDY
+ * surfaces today — the dashboard can show "N due (M today)". Pure: the caller
+ * projects its WordData into DeckEntry and passes the clock.
  */
-export function deckCounts(entries: DeckEntry[], now: number): DeckCounts {
-  const c: DeckCounts = { due: 0, new: 0, learning: 0, active: 0 };
+export function deckCounts(entries: DeckEntry[], now: number, opts: DeckOptions = {}): DeckCounts {
+  const c: DeckCounts = { due: 0, dueShown: 0, new: 0, learning: 0, active: 0 };
   for (const e of entries) {
     if (!isEligible(e) || !isActive(e)) continue;
     c.active++;
@@ -142,5 +160,8 @@ export function deckCounts(entries: DeckEntry[], now: number): DeckCounts {
     else if (isNewCard(e)) c.new++;
     else c.learning++;
   }
+  c.dueShown = opts.reviewCap != null && opts.reviewCap >= 0
+    ? Math.min(c.due, opts.reviewCap)
+    : c.due;
   return c;
 }

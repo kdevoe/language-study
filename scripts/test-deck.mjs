@@ -134,6 +134,24 @@ async function main() {
   const dualDc = deckCounts([due('x', 2, { reps: 0, promotedTs: NOW - DAY })], NOW);
   check('a word both due AND new counts once, as due', dualDc.due === 1 && dualDc.new === 0, JSON.stringify(dualDc));
 
+  // Daily review cap (study-pacing flood fix) — bounds surfaced reviews, keeps new cards.
+  console.log('\nselectDeck — reviewCap bounds reviews, most-overdue kept');
+  const many = [due('a', 1), due('b', 5), due('c', 3), due('d', 10), fresh('n1'), fresh('n2')];
+  const capped = selectDeck(many, NOW, { reviewCap: 2 });
+  const cappedReviews = capped.filter((c) => c.kind === 'review');
+  const cappedNews = capped.filter((c) => c.kind === 'new');
+  check('cap limits reviews to 2', cappedReviews.length === 2, JSON.stringify(cappedReviews.map((c) => c.key)));
+  check('most-overdue reviews survive the cap', cappedReviews[0].key === 'd' && cappedReviews[1].key === 'b', JSON.stringify(cappedReviews.map((c) => c.key)));
+  check('new cards unaffected by review cap', cappedNews.length === 2);
+  check('reviewCap 0 hides all reviews, keeps new', selectDeck(many, NOW, { reviewCap: 0 }).every((c) => c.kind === 'new'));
+  check('no cap → all reviews (legacy)', selectDeck(many, NOW).filter((c) => c.kind === 'review').length === 4);
+
+  console.log('\ndeckCounts — dueShown reflects the cap, due stays the true backlog');
+  const capDc = deckCounts(many, NOW, { reviewCap: 2 });
+  check('due = true backlog (4)', capDc.due === 4, JSON.stringify(capDc));
+  check('dueShown = min(due, cap) = 2', capDc.dueShown === 2, JSON.stringify(capDc));
+  check('no cap → dueShown === due', deckCounts(many, NOW).dueShown === 4);
+
   console.log(`\n${passed} passed, ${failed} failed`);
   try { rmSync(TMP); } catch { /* ignore */ }
   if (failed > 0) process.exit(1);

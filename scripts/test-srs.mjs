@@ -49,7 +49,7 @@ async function main() {
     logLevel: 'silent',
   });
   const srs = await import(pathToFileURL(TMP).href);
-  const { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, seedStability, REQUEST_RETENTION } = srs;
+  const { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, seedStability, REQUEST_RETENTION, seedForwardFromHistory, estimateStability } = srs;
 
   console.log('\nFSRS scheduler (#67) — request_retention', REQUEST_RETENTION);
 
@@ -131,6 +131,26 @@ async function main() {
   check('hard word due soon', hard.dueAt - T0 < 3 * DAY, `+${Math.round((hard.dueAt - T0) / DAY)}d`);
   check('seeded words enter as review', hard.status === 'review' && easy.status === 'review',
     `hard=${hard.status} easy=${easy.status}`);
+
+  // Forward re-seed (study-pacing flood fix) — anchored at now, boosted by exposure.
+  console.log('\nseedForwardFromHistory — forward-anchored, exposure-boosted, spread');
+  const fwdOnce = seedForwardFromHistory(9, 1, T0);          // hard, seen once
+  const fwdMany = seedForwardFromHistory(9, 20, T0);         // same word, seen across 20 days
+  check('anchored at now, never in the past', fwdOnce.dueAt >= T0 && fwdMany.dueAt >= T0,
+    `once=+${Math.round((fwdOnce.dueAt - T0) / DAY)}d many=+${Math.round((fwdMany.dueAt - T0) / DAY)}d`);
+  check('respects the min-interval floor (hard/once not due <3d)', fwdOnce.dueAt - T0 >= 3 * DAY,
+    `+${Math.round((fwdOnce.dueAt - T0) / DAY)}d`);
+  check('exposure history lengthens the interval a lot', fwdMany.dueAt - T0 > (fwdOnce.dueAt - T0) * 3,
+    `once=+${Math.round((fwdOnce.dueAt - T0) / DAY)}d many=+${Math.round((fwdMany.dueAt - T0) / DAY)}d`);
+  check('estimateStability grows with distinct exposures', estimateStability(5, 10) > estimateStability(5, 1));
+  check('reps 0 / status review (never actually graded)', fwdMany.reps === 0 && fwdMany.status === 'review');
+  // Deterministic spread: same inputs + spreadFraction → same due date; extremes differ.
+  const sLo = seedForwardFromHistory(5, 5, T0, { spreadFraction: 0 });
+  const sHi = seedForwardFromHistory(5, 5, T0, { spreadFraction: 1 });
+  const sLo2 = seedForwardFromHistory(5, 5, T0, { spreadFraction: 0 });
+  check('spread is deterministic for a given fraction', sLo.dueAt === sLo2.dueAt);
+  check('spread fans a cohort across days (0 vs 1 differ)', sLo.dueAt < sHi.dueAt,
+    `lo=+${Math.round((sLo.dueAt - T0) / DAY)}d hi=+${Math.round((sHi.dueAt - T0) / DAY)}d`);
 
   console.log(`\n\x1b[1m${passed} passed, ${failed} failed\x1b[0m\n`);
 }

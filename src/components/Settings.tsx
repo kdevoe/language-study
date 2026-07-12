@@ -35,7 +35,8 @@ export function Settings() {
     targetParagraphs, setTargetParagraphs,
     newWordsPerDay, setNewWordsPerDay,
     readerFontSize, setReaderFontSize,
-    readerFontWeight, setReaderFontWeight
+    readerFontWeight, setReaderFontWeight,
+    lastStudyPacingResetTs
   } = useAppStore();
 
   const intensityOptions = ['leisure', 'balanced', 'intensive'] as const;
@@ -167,72 +168,6 @@ export function Settings() {
         </p>
       </div>
 
-      {/* 3. Article Length */}
-      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-          Article Length
-        </label>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
-          Target paragraphs by how much real source text each article was built from. Full-text sources support longer reads; thin snippets stay short to avoid padding. Your JLPT level still sets the difficulty.
-        </p>
-
-        {lengthRows.map(({ kind, label, hint }) => (
-          <div key={kind} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: kind === 'snippet' ? 0 : '1.1rem' }}>
-            <div style={{ marginRight: '1rem' }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>{label}</div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{hint}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
-              <button
-                onClick={() => setTargetParagraphs(kind, targetParagraphs[kind] - 1)}
-                disabled={targetParagraphs[kind] <= 1}
-                aria-label={`Decrease ${label} length`}
-                style={stepperBtnStyle(targetParagraphs[kind] <= 1)}
-              >−</button>
-              <span style={{ minWidth: '1.5rem', textAlign: 'center', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
-                {targetParagraphs[kind]}
-              </span>
-              <button
-                onClick={() => setTargetParagraphs(kind, targetParagraphs[kind] + 1)}
-                disabled={targetParagraphs[kind] >= 10}
-                aria-label={`Increase ${label} length`}
-                style={stepperBtnStyle(targetParagraphs[kind] >= 10)}
-              >+</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* New Words Per Day (#68 — intake pacing) */}
-      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-          New Words Per Day
-        </label>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
-          How many new words graduate into active study each day, easiest and most common first — so the foundation gets built before harder words. Words you meet while reading wait in a queue until their turn. Set to 0 to pause new words.
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>New words / day</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
-            <button
-              onClick={() => setNewWordsPerDay(newWordsPerDay - 1)}
-              disabled={newWordsPerDay <= 0}
-              aria-label="Decrease new words per day"
-              style={stepperBtnStyle(newWordsPerDay <= 0)}
-            >−</button>
-            <span style={{ minWidth: '1.5rem', textAlign: 'center', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
-              {newWordsPerDay}
-            </span>
-            <button
-              onClick={() => setNewWordsPerDay(newWordsPerDay + 1)}
-              disabled={newWordsPerDay >= 50}
-              aria-label="Increase new words per day"
-              style={stepperBtnStyle(newWordsPerDay >= 50)}
-            >+</button>
-          </div>
-        </div>
-      </div>
-
       {/* 3. Vocab Use */}
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
@@ -348,6 +283,72 @@ export function Settings() {
         </p>
       </div>
 
+      {/* Article Length */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          Article Length
+        </label>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+          Target paragraphs by how much real source text each article was built from. Full-text sources support longer reads; thin snippets stay short to avoid padding. Your JLPT level still sets the difficulty.
+        </p>
+
+        {lengthRows.map(({ kind, label, hint }) => (
+          <div key={kind} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: kind === 'snippet' ? 0 : '1.1rem' }}>
+            <div style={{ marginRight: '1rem' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>{label}</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{hint}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+              <button
+                onClick={() => setTargetParagraphs(kind, targetParagraphs[kind] - 1)}
+                disabled={targetParagraphs[kind] <= 1}
+                aria-label={`Decrease ${label} length`}
+                style={stepperBtnStyle(targetParagraphs[kind] <= 1)}
+              >−</button>
+              <span style={{ minWidth: '1.5rem', textAlign: 'center', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
+                {targetParagraphs[kind]}
+              </span>
+              <button
+                onClick={() => setTargetParagraphs(kind, targetParagraphs[kind] + 1)}
+                disabled={targetParagraphs[kind] >= 10}
+                aria-label={`Increase ${label} length`}
+                style={stepperBtnStyle(targetParagraphs[kind] >= 10)}
+              >+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* New Words Per Day (#68 — intake pacing) */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          New Words Per Day
+        </label>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+          How many new words graduate into active study each day, easiest and most common first — so the foundation gets built before harder words. Words you meet while reading wait in a queue until their turn. Set to 0 to pause new words.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>New words / day</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+            <button
+              onClick={() => setNewWordsPerDay(newWordsPerDay - 1)}
+              disabled={newWordsPerDay <= 0}
+              aria-label="Decrease new words per day"
+              style={stepperBtnStyle(newWordsPerDay <= 0)}
+            >−</button>
+            <span style={{ minWidth: '1.5rem', textAlign: 'center', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
+              {newWordsPerDay}
+            </span>
+            <button
+              onClick={() => setNewWordsPerDay(newWordsPerDay + 1)}
+              disabled={newWordsPerDay >= 50}
+              aria-label="Increase new words per day"
+              style={stepperBtnStyle(newWordsPerDay >= 50)}
+            >+</button>
+          </div>
+        </div>
+      </div>
+
       <style>{`
         details[open] .advanced-chevron {
           transform: rotate(-180deg);
@@ -436,6 +437,38 @@ export function Settings() {
               style={{ width: '100%', accentColor: 'var(--text-main)' }}
             />
           </div>
+          {/* Rebalance Flashcard Deck — one-time study-pacing correction (the #67
+              seed-on-sight flood). Self-hides once run: the queue + pre-due window keep
+              the deck healthy afterward, so it's a one-shot, not a recurring knob. */}
+          {lastStudyPacingResetTs == null && (
+            <>
+              <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', margin: '2rem 0' }} />
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+                  Rebalance Flashcard Deck
+                </label>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.2rem' }}>
+                  A one-time cleanup so flashcards augment reading instead of flooding you. Words you already find easy stay scheduled but pushed far out (reading keeps them fresh); harder words move back into the queue to drip in a few per day. Nothing is deleted. You only need to run this once.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('Rebalance your flashcard deck? Easy words get pushed far out; harder words return to the daily queue. Nothing is deleted. This is a one-time cleanup.')) return;
+                    const { useAppStore } = await import('../services/store');
+                    const r = await useAppStore.getState().resetStudyPacing();
+                    window.alert(`Study pacing reset.\n\n${r.keptActive} easy words kept on a far-out schedule.\n${r.requeued} words moved back to the queue (a few graduate into flashcards each day).`);
+                  }}
+                  style={{
+                    width: '100%', padding: '0.9rem', borderRadius: '12px', backgroundColor: 'transparent',
+                    color: 'var(--text-main)', border: '2px solid var(--border-light)', fontWeight: 700,
+                    fontSize: '0.9rem', cursor: 'pointer', letterSpacing: '0.03em',
+                  }}
+                >
+                  Rebalance Flashcard Deck
+                </button>
+              </div>
+            </>
+          )}
+
           {/* 5. Danger Zone */}
           <div style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid #ff444433', backgroundColor: '#ff444408', marginTop: '4rem', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#ff4444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>Danger Zone</h3>

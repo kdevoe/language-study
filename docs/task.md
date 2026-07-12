@@ -198,3 +198,25 @@
   - Verified: 18/18 tests, tsc -b, full vite build (ts-fsrs bundles), 0 new lint.
   - [ ] APPLY (your step): run database/23_fsrs_scheduling.sql in the Supabase SQL
         editor, then `vacuum analyze public.user_word_progress;`.
+- [/] Study-pacing flood fix — "flashcards augment reading" (see docs/study-pacing-flood-fix.md)
+  - Symptom: Study tab opened to ~1400 due at once. Cause: #67 seed anchored due_at
+    at last_seen_at, so the whole seed-on-sight back-catalog came due together; #68's
+    D2 grandfather kept it all `active`. NOT a queue-cap bug.
+  - Model (Policy F): easy (difficulty ≤ 3) → stay active, forward-reseeded FAR OUT;
+    medium+ → back to the intake queue (drip 3/day). No hard review cap (it only hides
+    genuinely-due cards); the natural cap is small inflow via the reseed + pre-due window.
+  - [x] audit-reseed.cjs — read-only policy sweep over real data (683 easy→SRS ~10/day,
+        1943→queue).
+  - [x] srs.ts — seedForwardFromHistory / estimateStability (now-anchored, exposure-boosted,
+        deterministic spread).
+  - [x] pacing.ts — decidePacing (Policy F) + isActiveForPacing + spreadFractionForKey.
+  - [x] store.resetStudyPacing + api.resetStudyPacingBatch (batched, writes nulls);
+        Settings → "Rebalance Flashcard Deck" button (confirm-gated).
+  - [x] deck.ts — latent, default-OFF reviewCap primitive (dueShown vs due).
+  - [x] Pre-due surfacing window: wordPriority.ts (preDueUrgency / selectPreDueFloor,
+        window = 12% of interval, 1–21d) + process-article/index.ts (interval_days, floor
+        by pre-due urgency).
+  - Verified: test-srs 36, test-deck 32, test-pacing 15, test-wordpriority 25,
+        test-intake 14 — all green; tsc clean; 0 new lint.
+  - [ ] ACTIVATE (your step): deploy process-article, then Settings → Rebalance Flashcard
+        Deck. No new DB column (reuses user_word_progress scheduling columns).
