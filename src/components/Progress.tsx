@@ -174,6 +174,11 @@ export function Progress() {
           : 'Words you encounter while reading will appear here.'}
       </p>
 
+      {/* Study dashboard (#73): global deck health + review-activity heatmap. Sits
+          up top, ahead of the per-JLPT-level breakdown, since it summarizes the
+          whole deck rather than the selected level. */}
+      <StudyDashboard />
+
       {/* JLPT level selector — segmented, scrollable */}
       <div
         style={{
@@ -276,9 +281,6 @@ export function Progress() {
           </p>
         </div>
       )}
-
-      {/* Study dashboard (#73): deck health + review-activity heatmap */}
-      <StudyDashboard />
 
       {/* Breakdown card: donut + legend (of the words you've engaged with) */}
       <div
