@@ -10,6 +10,7 @@
   --accent-primary: #d4e0e8; /* Soft blue */
   --accent-success: #dee5d5; /* Soft green */
   --accent-danger: #fde2da; /* Soft red / coral */
+  --accent-progress: #8fb0c4; /* Muted slate blue — legible on the pale track without shouting */
   --border-light: #e0e0d8;
 
   --font-serif: 'Shippori Mincho', serif;

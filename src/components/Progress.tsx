@@ -262,7 +262,7 @@ export function Progress() {
               style={{
                 height: '100%',
                 width: `${Math.max(coveragePct, 1.5)}%`,
-                backgroundColor: 'var(--accent-primary)',
+                backgroundColor: 'var(--accent-progress)',
                 borderRadius: '100px',
               }}
             />

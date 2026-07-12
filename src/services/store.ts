@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
-import { schedule, ratingForReaderEvent, seedSrsFromDifficulty, type SrsState, type SrsStatus } from './srs';
+import { schedule, ratingForReaderEvent, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating } from './srs';
 import { selectPromotions, type IntakeItem } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
@@ -228,6 +228,7 @@ interface AppState {
   saveWordDefinition: (word: string, def: Partial<WordData>) => void;
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) => void;
+  reviewWord: (word: string, rating: Rating, now: number) => void;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   mergeWordRecords: (fromKey: string, toKey: string) => void;
   checkDailyKanji: () => void;
@@ -629,6 +630,98 @@ export const useAppStore = create<AppState>()(
                   } : {}),
                 });
                 m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { level, difficulty });
+              });
+            }
+          });
+
+          return {
+            wordDatabase: {
+              ...state.wordDatabase,
+              [word]: updatedWord
+            }
+          };
+        }),
+
+      // Flashcard grade (#70). A deliberate review — the strongest, most explicit
+      // difficulty signal we get. It (1) advances the real FSRS schedule, (2) nudges
+      // the coarse difficulty/mastery so the Progress page + the LLM palette reflect
+      // study (D3: Again +2, Hard +1, Good -1, Easy -2), and (3) writes a
+      // `flashcard`-sourced review-log row. Unlike a passive read it bypasses the
+      // daily dedup and is never throttled. Rating: 1=Again 2=Hard 3=Good 4=Easy.
+      reviewWord: (word: string, rating: Rating, now: number) =>
+        set((state) => {
+          const current = state.wordDatabase[word];
+          if (!current) return {};
+
+          // Prior schedule, or a seed from `difficulty` if somehow unscheduled — the
+          // same fallback the reader path uses, so a card is always gradeable.
+          const baseDifficulty = current.difficulty ?? 5;
+          const priorSrs: SrsState =
+            current.stability != null && current.dueAt != null
+              ? {
+                  stability: current.stability,
+                  fsrsDifficulty: current.fsrsDifficulty ?? baseDifficulty,
+                  dueAt: current.dueAt,
+                  lastReviewedAt: current.lastReviewedTs ?? current.lastSeenTs ?? now,
+                  reps: current.reps ?? 0,
+                  lapses: current.lapses ?? 0,
+                  status: (current.srsStatus ?? 'review') as SrsStatus,
+                }
+              : seedSrsFromDifficulty(baseDifficulty, current.lastSeenTs ?? now);
+          const elapsedDays = (now - priorSrs.lastReviewedAt) / 86_400_000;
+          const sched = schedule(priorSrs, rating, now);
+
+          // Coarse difficulty nudge (D3), clamped 1..10, mirroring how reader events
+          // nudge the same signal — a repeatedly-failed card should *look* hard to the
+          // article generator, a repeatedly-easy one easy.
+          const nudge: Record<Rating, number> = { 1: 2, 2: 1, 3: -1, 4: -2 };
+          const difficulty = clampDifficulty(baseDifficulty + nudge[rating]);
+          const mastery = bucketForDifficulty(difficulty);
+
+          const updatedWord: WordData = {
+            ...current,
+            difficulty,
+            mastery,
+            lastAdjustReason: 'manual',
+            lastSeenTs: now,
+            stability: sched.stability,
+            fsrsDifficulty: sched.fsrsDifficulty,
+            dueAt: sched.dueAt,
+            lastReviewedTs: sched.lastReviewedAt,
+            intervalDays: sched.intervalDays,
+            reps: sched.reps,
+            lapses: sched.lapses,
+            srsStatus: sched.status,
+          };
+
+          currentUserId().then((uid) => {
+            if (uid && updatedWord.jmdictEntryId) {
+              import('./api').then(m => {
+                m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, {
+                  mastery: updatedWord.mastery,
+                  difficulty,
+                  timesSeen: updatedWord.timesSeen,
+                  streak: updatedWord.streak,
+                  lastSeenTs: updatedWord.lastSeenTs,
+                  stability: sched.stability,
+                  fsrsDifficulty: sched.fsrsDifficulty,
+                  dueAt: sched.dueAt,
+                  lastReviewedTs: sched.lastReviewedAt,
+                  intervalDays: sched.intervalDays,
+                  reps: sched.reps,
+                  lapses: sched.lapses,
+                  srsStatus: sched.status,
+                });
+                m.logSrsReviewToSupabase(uid, updatedWord.jmdictEntryId!, {
+                  rating,
+                  source: 'flashcard',
+                  stabilityBefore: priorSrs.stability,
+                  stabilityAfter: sched.stability,
+                  difficultyBefore: priorSrs.fsrsDifficulty,
+                  difficultyAfter: sched.fsrsDifficulty,
+                  scheduledDays: sched.intervalDays,
+                  elapsedDays,
+                });
               });
             }
           });
