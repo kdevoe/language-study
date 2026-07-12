@@ -19,13 +19,18 @@
 **Legend:** 🟢 cheap / high-leverage · 🟡 medium · 🔴 large · ✅ done · [/] in progress · [ ] not started
 
 **📍 You are here (2026-07-11):**
+- **Phases D & E are COMPLETE — the loop is closed.** Since the notes below were written, **#68 (intake queue)**, **#70 (flashcard UI)**, **#71 (reader ↔ flashcard synergy)**, **#72 (feed due words → LLM)**, and **#73 (study dashboard)** have all shipped. Reading, scheduling, the flashcard deck, and article word-selection now all share one FSRS state:
+  - **#71** — the reader and the deck advance the **same** schedule through **one shared daily-dedup gate** (`readerEventMayAdvance` in `src/services/srs.ts`); a flashcard grade stamps `lastAdjustedDay`, so a later passive read that day is deduped instead of double-counting.
+  - **#72** — the topic-independent review floor in `process-article` now orders its reserved slots by real `due_at` (`compareByDue`), so genuinely-due words surface in the next article's review palette (staleness is only the tiebreaker/fallback).
+  - **#73** — the Progress page carries a study dashboard: due/new/learning deck-health counts (from the same `deck.ts` predicates STUDY uses) + a review-activity heatmap fed by a local `reviewsByDay` tally.
+
 - **Phase A is complete** — #39 (canonical entry-id keying, PR #90), #37 (JMDict sense display), and #41 (sync/hydration, done across #85-88 + the ungraded-local merge fix) all shipped. Word tracking is now one record per canonical `entry_id`, and the Progress page / server sync agree.
 - **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer — and, post-#39, on de-fragmented data.
 - **Phase C is complete** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); the **eval harness (#65 ✅)** ships — `scripts/eval-article-rewrite.mjs` scores rewrites on a frozen golden set (`scripts/eval-fixtures/`) via the extracted, shared prompt module, with EVAL-001 as an automated regression. Its verdict: **flash beats/ties `gemini-3.1-pro-preview` on every axis at ~half latency/cost → stay on flash**. The **prompt restructure (#66 ✅)** then closed the one remaining gap: a surgical GOLDEN-RULE anti-fabrication edit lifted factual fidelity **4.00 → 5.00** at equal-or-lower cost, measured against the harness (see [`phase-c-eval-notes.md`](./phase-c-eval-notes.md)).
 - **Phase D is underway** — the **FSRS scheduling engine (#67 ✅, PR #94)** shipped: words now carry a real `due_at`/stability schedule (`ts-fsrs`, FSRS-6, retention 0.85) seeded from `difficulty`, and in-context reads advance it (design in [`fsrs-engine-design-67.md`](./fsrs-engine-design-67.md)). Its **#68 intake queue** (foundation-first promotion + daily new-word cap) is the next big build — the remaining half of Phase D.
 - Goals 5's remainder (the flashcard deck on top of the engine) is the open frontier after #68: **Phase E** (flashcards, #70–#73) closes the loop.
 
-> **➡️ NEXT UP: Phase D #68 (intake queue).** #67 (FSRS engine) shipped 2026-07-11 — words now carry a real `due_at`/stability schedule seeded from `difficulty`, and in-context reads advance it (see [`fsrs-engine-design-67.md`](./fsrs-engine-design-67.md)). The frontier is now the foundation-first intake queue + daily new-word cap that gates words into that schedule.
+> **➡️ The Word Mastery Loop is fully closed.** All five workstreams (A–E) have shipped: correct data (A) → SRS-driven LLM selection (B) → prompt/model optimization (C) → FSRS engine + intake queue (D) → flashcards, synergy, due-word feeding, and dashboard (E). Read ⇄ schedule ⇄ deck ⇄ article selection all share one SRS state.
 >
 > **Scope note (2026-07-05, discovered during #39):** #39's original spec also targeted a *server-side* Pass 3 that first-match-linked JMDict entries and could override the client's disambiguation (Concern B). **That server pass has since been removed** — all tokenization + entry-linking is now client-side (kuromoji + `enrich.ts`, which attaches `jmdict_entry_id` at enrich time). So Concern B was moot; #39 shipped as purely the client-side canonical-keying fix (which also absorbed the folded-in #74 `times_seen` work).
 
@@ -141,7 +146,7 @@ The decision: a genuine FSRS/SM-2 layer with `due_at` + intervals, on top of (no
   - **#72 hook provided (not wired):** `wordPriority.ts` gained `dueAt`/`stability` on `WordSignal` + a `compareByDue` comparator; #72 flips `compareStuck`'s callers over to it.
   - **Acceptance (met):** every active word gets a `due_at`; reading/reviewing reschedules it + writes a review-log row; the `idx_uwp_due` "due today" query is in place; `difficulty` preserved as the seed. **Decisions:** FSRS; extend-table + review-log; read-past always advances (early gain diminished).
   - **Deploy note:** `database/23_fsrs_scheduling.sql` must be applied by hand in Supabase (migrations are manual); run `vacuum analyze user_word_progress` after the bulk backfill.
-- [ ] **#68 Word intake queue + daily new-word limit (foundation-first promotion)** 🔴
+- ✅ **#68 Word intake queue + daily new-word limit (foundation-first promotion)** 🔴 *(done — merged)*
   - Add an intake queue so encountered-but-unscheduled words **wait** instead of being graded on sight. Model as a `status` on `user_word_progress` (`queued` → `active`) or a dedicated queue table.
   - **Promotion ordering: JLPT level ascending, then `freq_rank` ascending** (lowest level + most common first) — the foundation-first rule. Lower levels are fully drained before higher levels start promoting.
   - **Daily new-word limit:** a configurable cap promotes the top-of-queue words into active scheduling each day; expose it in Settings (Anki "new cards/day" analog). A daily promotion job (or on-open client pass) does the promoting.
@@ -156,20 +161,22 @@ The decision: a genuine FSRS/SM-2 layer with `due_at` + intervals, on top of (no
 
 `#8` is a good epic but bundles UI + algorithm + reader-synergy + article-feed + dashboard. With Phase D providing the engine, decompose #8 into shippable slices. Recommend **keeping #8 as the tracking epic** and opening focused children:
 
-- [ ] **#70 Flashcard study UI** 🔴
+- ✅ **#70 Flashcard study UI** 🔴 *(done — merged)*
   - Zen-minimalist front/back/reveal card; **Again / Hard / Good / Easy** rating buttons wired to Phase D's `schedule()`; micro-animations for transitions.
   - New `'flashcards'` tab: extend `activeTab` union (`App.tsx:20`), add a `BottomNav` entry (`BottomNav.tsx:10-14`), branch in the content switch (`App.tsx:632-651`). No nested hub/reading state needed.
   - Deck source = Phase D "due today" + new-word intake, reading from `wordDatabase` / `fetchUserWordProgress`.
   - **Acceptance:** a user can study a due deck; each rating reschedules the word and writes a review-log row.
-- [ ] **#71 Reader ↔ flashcard synergy (formalize soft-bump)** 🟡
-  - Ensure reading a due word in an article and grading it on a flashcard converge on the *same* SRS state (no double-counting; daily dedup respected). Mostly a Phase-D integration test + reconciliation, surfaced as its own slice because it's the loop's hinge.
-  - **Acceptance:** reading a due word advances its schedule; it then appears less often / later in the deck, and vice versa.
-- [ ] **#72 Feed due words into article generation** 🟡
-  - Upgrade #51's staleness heuristic to true **`due_at` ordering**: the topic-independent review slot pulls genuinely-due words. This is #8's "feed Due words as priority targets," now backed by a real engine.
-  - **Acceptance:** words due for review preferentially appear in the next generated article's review palette.
-- [ ] **#73 Study dashboard** 🟢
-  - Deck health (due / new / learning counts), daily-goal/heatmap, on the existing Progress page (which Phase A/#41 already makes accurate).
-  - **Acceptance:** the dashboard reflects the real due-queue and review history.
+- ✅ **#71 Reader ↔ flashcard synergy (formalize soft-bump)** 🟡 *(done 2026-07-11)*
+  - Both paths already advanced the *same* FSRS schedule (same `schedule()`, same columns, same review-log). The gap was **daily dedup across paths**: the flashcard `reviewWord` never stamped `lastAdjustedDay`, so a grade followed by a passive read of the same word that day double-advanced the schedule.
+  - **Fix:** extracted the reader's daily-dedup rule into one pure, tested gate — `readerEventMayAdvance(event, lastAdjustedDay, lastAdjustReason, today)` in `src/services/srs.ts` — and made **both** paths consult it. `reviewWord` now stamps `lastAdjustedDay` + a new `'flashcard'` `lastAdjustReason` (ranked strongest in `mergeWordData`), so after studying a word on a card, a later passive read-past that day is deduped instead of re-advancing. A flashcard grade still always applies (the deck surfaces a word once/day, so it can't stack on itself); a lookup (`click`→Again) that reschedules a word due again *within* the day is a legitimate distinct review and is intentionally not blocked. The deck already drops read-advanced words because `Flashcards` unmounts per tab-switch and rebuilds from live `due_at`.
+  - 11 convergence assertions added to `scripts/test-srs.mjs` (`npm run test:srs`, 29/29). **Known limit (consistent with the reader):** `lastAdjustedDay` is device-local, so cross-device same-day dedup is out of scope (tracked with the deferred full cross-device reconcile).
+  - **Acceptance (met):** reading a due word advances its schedule so it drops from the deck; grading it on a card advances the same schedule so a same-day read no longer double-counts.
+- ✅ **#72 Feed due words into article generation** 🟡 *(done 2026-07-11)*
+  - Swapped the topic-independent review floor in `process-article` from the `compareStuck` staleness heuristic to `compareByDue` (the comparator #67 pre-built): the reserved review slots now order by real FSRS `due_at` — genuinely-due words first, staleness only as a tiebreaker/fallback for tied or unscheduled words. Also extended the `user_word_progress` select to fetch `due_at`/`stability` (previously unqueried) and mapped them onto `WordSignal`. Added `scripts/test-wordpriority.mjs` (`npm run test:wordpriority`, 8/8) locking the ordering.
+  - **Acceptance (met):** words due for review preferentially appear in the next generated article's review palette.
+- ✅ **#73 Study dashboard** 🟢 *(done 2026-07-11)*
+  - Added a study dashboard to the Progress page: **due / new / learning** deck-health counts computed by a new pure `deckCounts` in `deck.ts` (reusing the exact `isDue`/`isNewCard`/`isActive` predicates the flashcard deck uses, so the numbers always agree with STUDY), plus a **review-activity heatmap** (~14 weeks) fed by a local, bounded `reviewsByDay` tally in the store that both reader advances and flashcard grades increment. `deckCounts` unit-tested in `test-deck.mjs` (24/24).
+  - **Acceptance (met):** the dashboard reflects the real due-queue (shared deck predicates) and review history (per-day review-event tally). *(Heatmap history is local/device-scoped and accrues going forward; a server-backed history read from `srs_review_log` is a possible future enhancement.)*
 
 **Phase-E exit:** the loop is closed — read ⇄ schedule ⇄ deck ⇄ article selection all share one SRS state.
 
@@ -192,7 +199,7 @@ Phase C (prompt/model) ───────────[parallel]────�
 - **D before E** — the engine **and intake queue (#68)** are the flashcard foundation. **#72** is where #51's interim heuristic graduates to real due-dates.
 
 ### Recommended order
-~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → ~~C (#65 eval → #66 prompt)~~ ✅ → ~~#67 (FSRS)~~ ✅ → **NEXT: #68 (intake queue)** → #70→#71→#72→#73 (flashcards).
+~~#64 (pin)~~ ✅ → ~~B (#69 metric → #25 → #22 → #51)~~ ✅ → ~~A (#39 canonical key → #37 → #41)~~ ✅ → ~~C (#65 eval → #66 prompt)~~ ✅ → ~~#67 (FSRS)~~ ✅ → ~~#68 (intake queue)~~ ✅ → ~~#70 (flashcard UI)~~ ✅ → ~~#71 (synergy)~~ ✅ → ~~#72 (feed due words → LLM)~~ ✅ → ~~#73 (dashboard)~~ ✅ — **loop complete.**
 
 Rationale: cheapest reproducibility win first; finish the in-flight selection refactor on correct data while extracting the shared metric; stand up the eval harness so model/prompt changes are measured; build the engine, then the intake queue that paces words into it; then the deck. Prompt restructure (#66) slots in once the harness exists and can run alongside D.
 
@@ -207,11 +214,11 @@ Rationale: cheapest reproducibility win first; finish the in-flight selection re
 | [#66](https://github.com/kdevoe/language-study/issues/66) | Restructure & optimize the article-rewrite prompt (measured against #65) | 🟡 | C | ✅ done |
 | [#69](https://github.com/kdevoe/language-study/issues/69) | Extract the Word Priority Metric into a shared scoring module (SRS + level + frequency) | 🟡 | B (shared) | ✅ done |
 | [#67](https://github.com/kdevoe/language-study/issues/67) | SRS scheduling engine: FSRS due-dates + intervals + review log atop existing difficulty | 🔴 | D | ✅ done |
-| [#68](https://github.com/kdevoe/language-study/issues/68) | Word intake queue + daily new-word limit, foundation-first promotion (level↑ then freq↑) | 🔴 | D | not started |
-| [#70](https://github.com/kdevoe/language-study/issues/70) | Flashcard study UI (Zen front/back/reveal, Again/Hard/Good/Easy) wired to #67 | 🔴 | E | not started |
-| [#71](https://github.com/kdevoe/language-study/issues/71) | Reader ↔ flashcard synergy: converge read-past and graded reviews on one SRS state | 🟡 | E | not started |
-| [#72](https://github.com/kdevoe/language-study/issues/72) | Feed due words into article generation (upgrade #51 staleness → real due_at) | 🟡 | E | not started |
-| [#73](https://github.com/kdevoe/language-study/issues/73) | Study dashboard: due/new/learning health + daily goal on Progress page | 🟢 | E | not started |
+| [#68](https://github.com/kdevoe/language-study/issues/68) | Word intake queue + daily new-word limit, foundation-first promotion (level↑ then freq↑) | 🔴 | D | ✅ done |
+| [#70](https://github.com/kdevoe/language-study/issues/70) | Flashcard study UI (Zen front/back/reveal, Again/Hard/Good/Easy) wired to #67 | 🔴 | E | ✅ done |
+| [#71](https://github.com/kdevoe/language-study/issues/71) | Reader ↔ flashcard synergy: converge read-past and graded reviews on one SRS state | 🟡 | E | ✅ done |
+| [#72](https://github.com/kdevoe/language-study/issues/72) | Feed due words into article generation (upgrade #51 staleness → real due_at) | 🟡 | E | ✅ done |
+| [#73](https://github.com/kdevoe/language-study/issues/73) | Study dashboard: due/new/learning health + daily goal on Progress page | 🟢 | E | ✅ done |
 
 **Existing issues this plan organizes:** ✅ #39 (absorbed the #74 `times_seen` fix), #37, #41 (Phase A) · #25, #22, #51 (Phase B) · #8 (epic that Phases D+E fulfill; decompose into #67, #68, #70–#73).
 

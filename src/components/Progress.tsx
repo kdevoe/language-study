@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
+import { deckCounts, type DeckEntry } from '../services/deck';
 
 // Mastery palette mirrors the generated vocab-summary report so the in-app
 // dashboard shares the same earthy, muted language as the rest of Yūgen.
@@ -172,6 +173,11 @@ export function Progress() {
           ? `Tracking ${totalWords} ${totalWords === 1 ? 'word' : 'words'} across your reading.`
           : 'Words you encounter while reading will appear here.'}
       </p>
+
+      {/* Study dashboard (#73): global deck health + review-activity heatmap. Sits
+          up top, ahead of the per-JLPT-level breakdown, since it summarizes the
+          whole deck rather than the selected level. */}
+      <StudyDashboard />
 
       {/* JLPT level selector — segmented, scrollable */}
       <div
@@ -680,5 +686,156 @@ function MasteryPill({ bucket, difficulty }: { bucket: MasteryLevel; difficulty?
         <span style={{ opacity: 0.7, fontWeight: 500 }}>{difficulty}/10</span>
       )}
     </span>
+  );
+}
+
+// --- Study dashboard (#73) --------------------------------------------------
+// Deck health (due / new / learning) straight from the SAME predicates the
+// flashcard deck uses (deckCounts), plus a review-activity heatmap fed by the
+// store's reviewsByDay tally — so the numbers agree with STUDY and the grid
+// reflects real reviews (read-past + flashcard grades both count).
+
+const DAY_MS = 86_400_000;
+const HEAT_WEEKS = 14; // ~3 months of activity, mobile-friendly width
+// Fixed intensity thresholds (stable across users, unlike a max-relative scale).
+const heatLevel = (n: number): number => (n === 0 ? 0 : n < 4 ? 1 : n < 10 ? 2 : n < 25 ? 3 : 4);
+const HEAT_COLORS = [
+  'var(--border-light)',
+  'rgba(91, 140, 90, 0.35)',
+  'rgba(91, 140, 90, 0.6)',
+  'rgba(91, 140, 90, 0.82)',
+  'rgba(91, 140, 90, 1)',
+];
+
+/** UTC day key (YYYY-MM-DD) for a ms timestamp — matches how the store stamps
+ * reviewsByDay (new Date().toISOString()), so the grid lines up with the tallies. */
+const utcDayKey = (ms: number): string => new Date(ms).toISOString().split('T')[0];
+
+function StudyDashboard() {
+  const wordDatabase = useAppStore((s) => s.wordDatabase);
+  const reviewsByDay = useAppStore((s) => s.reviewsByDay);
+  const newWordsPerDay = useAppStore((s) => s.newWordsPerDay);
+
+  const now = Date.now();
+
+  // Deck health — project each word into the deck's DeckEntry shape and reuse the
+  // exact due/new/learning predicates so this never drifts from the flashcard deck.
+  const counts = useMemo(() => {
+    const entries: DeckEntry[] = Object.entries(wordDatabase).map(([key, w]) => ({
+      key,
+      jlptLevel: w.jlptLevel ?? null,
+      freqRank: w.freqRank ?? null,
+      dueAt: w.dueAt ?? null,
+      reps: w.reps ?? null,
+      stability: w.stability ?? null,
+      intakeStatus: w.intakeStatus,
+      promotedTs: w.promotedTs ?? null,
+    }));
+    return deckCounts(entries, now);
+  }, [wordDatabase, now]);
+
+  // Heatmap columns: weeks × 7 weekday rows, oldest→newest, ending today. The first
+  // cell is aligned to a Sunday so columns are whole weeks (Sun..Sat).
+  const { columns, todayCount, windowTotal } = useMemo(() => {
+    const dow = new Date(now).getUTCDay(); // 0=Sun..6=Sat
+    const totalDays = (HEAT_WEEKS - 1) * 7 + dow + 1;
+    const cols: ({ key: string; count: number } | null)[][] = [];
+    let col: ({ key: string; count: number } | null)[] = new Array(7).fill(null);
+    let total = 0;
+    for (let i = totalDays - 1; i >= 0; i--) {
+      const ms = now - i * DAY_MS;
+      const key = utcDayKey(ms);
+      const count = reviewsByDay[key] ?? 0;
+      total += count;
+      const weekday = new Date(ms).getUTCDay();
+      col[weekday] = { key, count };
+      if (weekday === 6) {
+        cols.push(col);
+        col = new Array(7).fill(null);
+      }
+    }
+    if (col.some(Boolean)) cols.push(col);
+    return { columns: cols, todayCount: reviewsByDay[utcDayKey(now)] ?? 0, windowTotal: total };
+  }, [reviewsByDay, now]);
+
+  const stats: { label: string; value: number; color: string }[] = [
+    { label: 'Due', value: counts.due, color: '#c77b4a' },
+    { label: 'New', value: counts.new, color: 'var(--accent-primary)' },
+    { label: 'Learning', value: counts.learning, color: 'var(--text-muted)' },
+  ];
+
+  return (
+    <div
+      style={{
+        backgroundColor: 'var(--bg-card)',
+        padding: '1.4rem 1.5rem',
+        borderRadius: '16px',
+        marginBottom: '1.5rem',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1.1rem' }}>
+        <span className="sans" style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+          Study deck
+        </span>
+        <span className="sans" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          {newWordsPerDay} new / day
+        </span>
+      </div>
+
+      {/* Deck-health counts */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.4rem' }}>
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.15rem',
+              padding: '0.75rem 0.25rem',
+              backgroundColor: 'var(--bg-pure)',
+              borderRadius: '12px',
+            }}
+          >
+            <span className="serif" style={{ fontSize: '1.9rem', fontWeight: 700, lineHeight: 1, color: s.color }}>
+              {s.value}
+            </span>
+            <span className="sans" style={{ fontSize: '0.68rem', letterSpacing: '0.04em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Review-activity heatmap */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.55rem' }}>
+        <span className="sans" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Reviews today{' '}
+          <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{todayCount}</span>
+        </span>
+        <span className="sans" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          {windowTotal.toLocaleString()} in {HEAT_WEEKS} weeks
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: '3px', overflowX: 'auto' }}>
+        {columns.map((week, ci) => (
+          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {week.map((cell, ri) => (
+              <div
+                key={ri}
+                title={cell ? `${cell.key}: ${cell.count} review${cell.count === 1 ? '' : 's'}` : undefined}
+                style={{
+                  width: '11px',
+                  height: '11px',
+                  borderRadius: '3px',
+                  backgroundColor: cell ? HEAT_COLORS[heatLevel(cell.count)] : 'transparent',
+                }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

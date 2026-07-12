@@ -130,6 +130,40 @@ export function ratingForReaderEvent(event: 'skip' | 'click'): Rating {
   return event === 'click' ? 1 : 3;
 }
 
+/** Why a word's schedule last moved: a passive read-past (`skip`), an in-context
+ * lookup (`click`), an explicit modal set (`manual`), or a flashcard grade
+ * (`flashcard`). Ordered weakest→strongest as a study signal. */
+export type AdjustReason = 'skip' | 'click' | 'manual' | 'flashcard';
+
+/**
+ * Shared daily-dedup gate for the read⇄flashcard loop (#71). The reader and the
+ * flashcard deck advance the *same* FSRS schedule, so a word must not be counted
+ * twice in one day just because it was both read and reviewed. This is the one
+ * rule both paths consult, given the word's last same-day adjustment:
+ *
+ *   • At most one *passive* read advances the schedule per day — re-scrolling the
+ *     same article, or seeing a word across several articles, doesn't stack.
+ *   • A lookup (`click`) may override an earlier same-day read-past (`skip`) once:
+ *     a lookup is harder evidence the word isn't known than a silent read-past.
+ *   • A passive read NEVER stacks on top of a same-day *deliberate* review — a
+ *     flashcard grade (`flashcard`) or an explicit modal set (`manual`), nor on a
+ *     prior lookup. Reading a word you already studied today is not a new review.
+ *
+ * Deliberate reviews (flashcard/manual) are not throttled here: the deck only ever
+ * surfaces a word once per day, so a graded review can't stack on itself, and a
+ * lookup after a grade is caught by the same-day guard below. Returns whether a
+ * reader `event` should advance the schedule today.
+ */
+export function readerEventMayAdvance(
+  event: 'skip' | 'click',
+  lastAdjustedDay: string | undefined,
+  lastAdjustReason: AdjustReason | undefined,
+  today: string,
+): boolean {
+  if (lastAdjustedDay !== today) return true;
+  return event === 'click' && lastAdjustReason === 'skip';
+}
+
 // ── Seeding an existing word into the schedule ───────────────────────────────
 // A word already tracked by `difficulty` but not yet scheduled gets a synthesised
 // FSRS state so its first read/lookup advances a plausible schedule instead of

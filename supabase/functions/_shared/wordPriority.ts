@@ -191,9 +191,9 @@ export function compareStuck(a: WordSignal, b: WordSignal): number {
  * first), then fall back to the staleness heuristic. dueAt is an ISO-8601 string so it
  * compares chronologically without date parsing (module stays Date-free).
  *
- * #67 provides this comparator; #72 is where compareStuck's callers switch over to it,
- * so the topic-independent review slot pulls genuinely-due words instead of merely stale
- * ones. Not yet wired to a caller.
+ * #67 provides this comparator; #72 wired it into the topic-independent review floor
+ * in process-article, so those reserved slots now pull genuinely-due words instead of
+ * merely stale ones (compareStuck remains the fallback for ties / unscheduled words).
  */
 export function compareByDue(a: WordSignal, b: WordSignal): number {
   const da = a.dueAt ?? '￿'; // unscheduled sorts last (all ISO chars < ￿)

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
-import { schedule, ratingForReaderEvent, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating } from './srs';
+import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
 import { selectPromotions, type IntakeItem } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
@@ -107,9 +107,13 @@ function syncConsumed(id: string, kind: 'read' | 'dismissed'): void {
  * stronger source wins. `into` is treated as the surviving record.
  */
 export function mergeWordData(into: WordData, from: WordData): WordData {
-  // Prefer an explicitly graded signal (manual > click > skip) over an ungraded one.
+  // Prefer an explicitly graded signal (flashcard/manual > click > skip) over an
+  // ungraded one. A flashcard grade and a modal set are both deliberate (rank 3);
+  // a lookup outranks a passive read, which outranks a bare seeded difficulty.
   const rank = (w: WordData) =>
-    w.lastAdjustReason === 'manual' ? 3 : w.lastAdjustReason === 'click' ? 2 : w.difficulty != null ? 1 : 0;
+    w.lastAdjustReason === 'flashcard' || w.lastAdjustReason === 'manual' ? 3
+      : w.lastAdjustReason === 'click' ? 2
+      : w.difficulty != null ? 1 : 0;
   const graded = rank(from) > rank(into) ? from : into;
   const days = Array.from(new Set([...(into.uniqueDaysSeen ?? []), ...(from.uniqueDaysSeen ?? [])]));
   return {
@@ -153,7 +157,7 @@ export interface WordData {
   mastery: MasteryLevel;          // derived bucket, kept in sync with `difficulty`
   difficulty?: number | null;     // 1..10 source of truth; null/undefined = unseen
   lastAdjustedDay?: string;       // YYYY-MM-DD of the last difficulty change (daily dedup)
-  lastAdjustReason?: 'skip' | 'click' | 'manual';
+  lastAdjustReason?: AdjustReason;
   timesSeen: number;
   uniqueDaysSeen: string[];
   lastSeenTs: number;
@@ -192,6 +196,10 @@ interface AppState {
   // the queue into active study, and when the last promotion pass ran (daily gate).
   newWordsPerDay: number;
   lastIntakePromotionTs: number | null;
+  // Review-activity history (#73): count of schedule-advancing review events per
+  // calendar day (YYYY-MM-DD → count), powering the study dashboard's heatmap.
+  // Local-only, pruned to a rolling window so the persisted blob can't grow unbounded.
+  reviewsByDay: Record<string, number>;
 
   wordDatabase: Record<string, WordData>;
   studyKanji: string[];
@@ -237,6 +245,22 @@ interface AppState {
   backfillWordProgress: () => Promise<void>;
 }
 
+// #73: rolling window of review-activity history kept in localStorage. 180 tiny
+// "YYYY-MM-DD": count entries is a few KB — bounded so it can't bloat the persist
+// blob over time (see #54 / the localStorage-quota failure mode).
+const REVIEW_HISTORY_DAYS = 180;
+
+/** Increment `dayKey`'s review-event tally and prune to the rolling window. Pure;
+ * ISO date keys sort chronologically, so the oldest keys drop first. */
+function bumpReviewDay(byDay: Record<string, number>, dayKey: string): Record<string, number> {
+  const next = { ...byDay, [dayKey]: (byDay[dayKey] ?? 0) + 1 };
+  const keys = Object.keys(next);
+  if (keys.length > REVIEW_HISTORY_DAYS) {
+    for (const k of keys.sort().slice(0, keys.length - REVIEW_HISTORY_DAYS)) delete next[k];
+  }
+  return next;
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -250,6 +274,7 @@ export const useAppStore = create<AppState>()(
       targetParagraphs: { full: 5, partial: 4, snippet: 3 },
       newWordsPerDay: 3,
       lastIntakePromotionTs: null,
+      reviewsByDay: {},
       wordDatabase: {},
       studyKanji: [],
       lastRtkUpdateTs: null,
@@ -481,11 +506,11 @@ export const useAppStore = create<AppState>()(
           const isActive = current.intakeStatus === 'active' || current.stability != null;
           if (!isActive) return {};
 
+          // Shared daily-dedup gate (#71): the same rule the flashcard path stamps
+          // into `lastAdjustedDay`, so a passive read never double-counts on top of
+          // a same-day read OR a deliberate flashcard/manual review of this word.
           const today = new Date().toISOString().split('T')[0];
-          if (current.lastAdjustedDay === today) {
-            const overrides = event === 'click' && current.lastAdjustReason === 'skip';
-            if (!overrides) return {};
-          }
+          if (!readerEventMayAdvance(event, current.lastAdjustedDay, current.lastAdjustReason, today)) return {};
 
           // First contact (no prior numeric difficulty) seeds from the word's JLPT
           // level relative to the user. The skip/click signal is applied asymmetrically:
@@ -582,7 +607,10 @@ export const useAppStore = create<AppState>()(
             wordDatabase: {
               ...state.wordDatabase,
               [word]: updatedWord
-            }
+            },
+            // #73: this read advanced the schedule (the daily gate above passed), so
+            // it counts as one review event for the dashboard's activity history.
+            reviewsByDay: bumpReviewDay(state.reviewsByDay, today),
           };
         }),
 
@@ -646,8 +674,12 @@ export const useAppStore = create<AppState>()(
       // difficulty signal we get. It (1) advances the real FSRS schedule, (2) nudges
       // the coarse difficulty/mastery so the Progress page + the LLM palette reflect
       // study (D3: Again +2, Hard +1, Good -1, Easy -2), and (3) writes a
-      // `flashcard`-sourced review-log row. Unlike a passive read it bypasses the
-      // daily dedup and is never throttled. Rating: 1=Again 2=Hard 3=Good 4=Easy.
+      // `flashcard`-sourced review-log row. A grade always applies (the deck only
+      // surfaces a word once/day, so it can't stack on itself), but it now STAMPS
+      // the shared daily-dedup marker (#71): after studying a word on a card, a
+      // passive read-past of that same word later today is deduped by the reader
+      // gate instead of double-advancing the one schedule. Rating: 1=Again 2=Hard
+      // 3=Good 4=Easy.
       reviewWord: (word: string, rating: Rating, now: number) =>
         set((state) => {
           const current = state.wordDatabase[word];
@@ -678,11 +710,13 @@ export const useAppStore = create<AppState>()(
           const difficulty = clampDifficulty(baseDifficulty + nudge[rating]);
           const mastery = bucketForDifficulty(difficulty);
 
+          const today = new Date(now).toISOString().split('T')[0];
           const updatedWord: WordData = {
             ...current,
             difficulty,
             mastery,
-            lastAdjustReason: 'manual',
+            lastAdjustedDay: today,
+            lastAdjustReason: 'flashcard',
             lastSeenTs: now,
             stability: sched.stability,
             fsrsDifficulty: sched.fsrsDifficulty,
@@ -730,7 +764,9 @@ export const useAppStore = create<AppState>()(
             wordDatabase: {
               ...state.wordDatabase,
               [word]: updatedWord
-            }
+            },
+            // #73: a flashcard grade always advances the schedule → one review event.
+            reviewsByDay: bumpReviewDay(state.reviewsByDay, today),
           };
         }),
 
@@ -1131,6 +1167,7 @@ export const useAppStore = create<AppState>()(
         targetParagraphs: state.targetParagraphs,
         newWordsPerDay: state.newWordsPerDay,
         lastIntakePromotionTs: state.lastIntakePromotionTs,
+        reviewsByDay: state.reviewsByDay,
         wordDatabase: state.wordDatabase,
         studyKanji: state.studyKanji,
         lastRtkUpdateTs: state.lastRtkUpdateTs,
