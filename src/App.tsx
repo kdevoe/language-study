@@ -626,7 +626,10 @@ function App() {
 
       <main style={{ 
         flex: 1, 
-        paddingTop: 'calc(5rem + env(safe-area-inset-top))', // Space for fixed header
+        // Space for the fixed header. Mirror the header's own `max(1.5rem, safe-area)`
+        // top-padding floor — otherwise when the safe-area inset is small/zero, main
+        // under-reserves and the first card tucks ~4px under the header.
+        paddingTop: 'calc(5rem + max(1.5rem, env(safe-area-inset-top)))',
         paddingRight: '1.25rem',
         paddingBottom: newsView === 'reading' ? '1rem' : '0rem',
         paddingLeft: '1.25rem',
