@@ -99,7 +99,11 @@ export function Flashcards() {
   const previews = useMemo(() => {
     if (!card) return {} as Record<Rating, string>;
     const now = Date.now();
-    const prior = priorSrsFor(card.word, now);
+    // A never-studied "new" card previews from a fresh FSRS card (State.New) so the
+    // grades ladder (Again→Easy) instead of bunching around the synthetic
+    // difficulty-seed stability that promotion writes as status 'review'. Review
+    // cards preview from their real prior schedule. Mirrors store.reviewWord.
+    const prior = card.kind === 'new' ? null : priorSrsFor(card.word, now);
     const out = {} as Record<Rating, string>;
     for (const { rating } of RATINGS) out[rating] = formatInterval(schedule(prior, rating, now).intervalDays);
     return out;

@@ -693,8 +693,15 @@ export const useAppStore = create<AppState>()(
           // Prior schedule, or a seed from `difficulty` if somehow unscheduled — the
           // same fallback the reader path uses, so a card is always gradeable.
           const baseDifficulty = current.difficulty ?? 5;
-          const priorSrs: SrsState =
-            current.stability != null && current.dueAt != null
+          // A genuinely-new card (promoted from intake, never actually graded) grades
+          // from a fresh FSRS card so the first grade yields a real new-card ladder. Its
+          // stored stability is only a synthetic difficulty seed written as status
+          // 'review'; feeding that to FSRS would treat the word as an established review
+          // and bunch Hard/Good/Easy around the seed. Mirrors the Flashcards preview.
+          const isNewCard = current.promotedTs != null && (current.reps ?? 0) === 0;
+          const priorSrs: SrsState | null = isNewCard
+            ? null
+            : current.stability != null && current.dueAt != null
               ? {
                   stability: current.stability,
                   fsrsDifficulty: current.fsrsDifficulty ?? baseDifficulty,
@@ -705,7 +712,7 @@ export const useAppStore = create<AppState>()(
                   status: (current.srsStatus ?? 'review') as SrsStatus,
                 }
               : seedSrsFromDifficulty(baseDifficulty, current.lastSeenTs ?? now);
-          const elapsedDays = (now - priorSrs.lastReviewedAt) / 86_400_000;
+          const elapsedDays = priorSrs ? (now - priorSrs.lastReviewedAt) / 86_400_000 : 0;
           const sched = schedule(priorSrs, rating, now);
 
           // Coarse difficulty nudge (D3), clamped 1..10, mirroring how reader events
@@ -754,9 +761,9 @@ export const useAppStore = create<AppState>()(
                 m.logSrsReviewToSupabase(uid, updatedWord.jmdictEntryId!, {
                   rating,
                   source: 'flashcard',
-                  stabilityBefore: priorSrs.stability,
+                  stabilityBefore: priorSrs?.stability ?? 0,
                   stabilityAfter: sched.stability,
-                  difficultyBefore: priorSrs.fsrsDifficulty,
+                  difficultyBefore: priorSrs?.fsrsDifficulty ?? baseDifficulty,
                   difficultyAfter: sched.fsrsDifficulty,
                   scheduledDays: sched.intervalDays,
                   elapsedDays,
@@ -1015,6 +1022,45 @@ export const useAppStore = create<AppState>()(
       // Only seeds difficulty for words actually encountered (timesSeen >= 1) and
       // syncs the seeded grades to Supabase in one batched round-trip.
       backfillWordProgress: async () => {
+        // Heal words that entered via read-past (recordWordSeen creates them with an
+        // empty `reading`) or were promoted to the deck before ever being looked up:
+        // with no reading and no furiganaMap the flashcard front can't show furigana.
+        // Reading/furigana come straight from JMDict by entry_id (not per-user), so
+        // this is a client-only re-derive — no server write. Early-returns once whole.
+        const readingTargets = Object.entries(get().wordDatabase)
+          .filter(([, w]) => !!w.jmdictEntryId && !w.reading);
+        if (readingTargets.length > 0) {
+          try {
+            const { fetchDetailsByEntryIds } = await import('./jmdict');
+            const details = await fetchDetailsByEntryIds([
+              ...new Set(readingTargets.map(([, w]) => w.jmdictEntryId!)),
+            ]);
+            if (details.size > 0) {
+              set((state) => {
+                const newDatabase = { ...state.wordDatabase };
+                let changed = false;
+                for (const [key] of readingTargets) {
+                  const current = newDatabase[key];
+                  if (!current || !current.jmdictEntryId || current.reading) continue;
+                  const d = details.get(current.jmdictEntryId);
+                  if (!d || !d.reading) continue;
+                  newDatabase[key] = {
+                    ...current,
+                    reading: d.reading,
+                    furiganaMap: current.furiganaMap && current.furiganaMap.length > 0
+                      ? current.furiganaMap
+                      : d.furiganaMap,
+                  };
+                  changed = true;
+                }
+                return changed ? { wordDatabase: newDatabase } : {};
+              });
+            }
+          } catch (e) {
+            console.warn('[store] reading backfill failed:', e);
+          }
+        }
+
         const targets = Object.entries(get().wordDatabase)
           .filter(([, w]) => !!w.jmdictEntryId && (w.jlptLevel == null || w.difficulty == null));
         if (targets.length === 0) return;
