@@ -208,3 +208,68 @@ export function seedSrsFromDifficulty(difficulty: number, lastSeenAt: number): S
     status: 'review',
   };
 }
+
+// ── Re-seeding the back-catalog forward (study-pacing flood fix) ──────────────
+// The original seed anchored `dueAt` at `last_seen_at` — for a back-catalog seeded
+// all at once, every interval had already elapsed, so the whole history came due
+// simultaneously (see docs/study-pacing-flood-fix.md). The forward re-seed fixes
+// two things: it anchors at `now` (nothing is retroactively overdue), and it boosts
+// stability by real EXPOSURE history — a word met across many distinct days is far
+// more established than a once-seen word at the same `difficulty`, so it earns a
+// long interval and rarely resurfaces instead of joining a daily flood.
+
+/** Multiplier applied to the ±spread window, so an identical-stability cohort doesn't all land on one day. */
+const RESEED_SPREAD = 0.15;      // ±15%
+/** How much each distinct spaced exposure grows stability (conservative default; see audit). */
+const RESEED_BOOST_K = 0.2;
+/** Never re-seed a word due sooner than this — seed-on-sight `difficulty` is unreliable. */
+const RESEED_MIN_INTERVAL_D = 3;
+
+export interface ReseedOptions {
+  boostK?: number;          // exposure→stability growth (default RESEED_BOOST_K)
+  minIntervalDays?: number; // floor on the seeded interval (default RESEED_MIN_INTERVAL_D)
+  spreadFraction?: number;  // 0..1 deterministic jitter (e.g. hash of the word key); 0.5 = no shift
+}
+
+/**
+ * Estimated stability (days) for a re-seeded word: the difficulty seed grown by how
+ * many distinct times it was seen. `distinctExposures` is the count of separate
+ * study/read days (WordData.uniqueDaysSeen.length), the real spacing signal.
+ */
+export function estimateStability(difficulty: number, distinctExposures: number, boostK = RESEED_BOOST_K): number {
+  const base = seedStability(difficulty);
+  const extra = Math.max(0, (distinctExposures ?? 0) - 1);
+  return base * (1 + boostK * extra);
+}
+
+/**
+ * Build a forward-anchored `SrsState` from a word's `difficulty` + exposure history.
+ * `dueAt = now + interval(S_est)`, floored and jittered so a large cohort spreads
+ * across days instead of piling onto one. Deterministic: pass `spreadFraction` (a
+ * stable per-word value) rather than reading a clock or RNG. Enters as `review`,
+ * `reps: 0` (never actually graded) — mirroring seedSrsFromDifficulty's lifecycle.
+ */
+export function seedForwardFromHistory(
+  difficulty: number,
+  distinctExposures: number,
+  now: number,
+  opts: ReseedOptions = {},
+): SrsState {
+  const boostK = opts.boostK ?? RESEED_BOOST_K;
+  const minInterval = opts.minIntervalDays ?? RESEED_MIN_INTERVAL_D;
+  const stability = estimateStability(difficulty, distinctExposures, boostK);
+  const fsrsDifficulty = clamp(difficulty, 1, 10);
+  const base = Math.max(minInterval, scheduler.next_interval(stability, 0));
+  // spreadFraction 0.5 → no shift; 0 → −RESEED_SPREAD; 1 → +RESEED_SPREAD.
+  const jitter = opts.spreadFraction == null ? 1 : 1 + RESEED_SPREAD * (2 * clamp(opts.spreadFraction, 0, 1) - 1);
+  const intervalDays = Math.max(minInterval, base * jitter);
+  return {
+    stability,
+    fsrsDifficulty,
+    dueAt: now + intervalDays * DAY_MS,
+    lastReviewedAt: now,
+    reps: 0,
+    lapses: 0,
+    status: 'review',
+  };
+}

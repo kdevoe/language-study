@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
-import { classifyBucket, compareByProximity, compareKnown, compareStuck, compareByDue, type WordSignal } from '../_shared/wordPriority.ts';
+import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, type WordSignal } from '../_shared/wordPriority.ts';
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
 
 const corsHeaders = {
@@ -313,14 +313,15 @@ Deno.serve(async (req) => {
     // story orphan (seen once, topic never recurs) and never drift easier. Reserve a
     // couple of review slots for the user's most-stuck hard/medium words and blend them
     // in regardless of topic. Post-#67 the FSRS engine gives every active word a real
-    // `due_at`, so #72 routes these slots by true due-date order (compareByDue): genuinely
-    // due words surface first, falling back to the old staleness heuristic (compareStuck)
-    // for words that share a due date or aren't scheduled yet.
+    // `due_at` + `interval_days`, so these slots route by the PRE-DUE window
+    // (selectPreDueFloor): words entering their proportional window before due surface
+    // first (most urgent first), giving reading a chance to reinforce them before they
+    // reach the flashcard deck. Words not yet in-window are skipped.
     const stuckFloor = Math.min(STUCK_REVIEW_FLOOR, Math.max(1, targetReview));
     try {
       const { data: stuckRows } = await supabase
         .from('user_word_progress')
-        .select('word_id, mastery_level, difficulty, times_seen, last_seen_at, due_at, stability')
+        .select('word_id, mastery_level, difficulty, times_seen, last_seen_at, due_at, stability, interval_days')
         .eq('user_id', userId)
         .in('mastery_level', ['hard', 'medium'])
         // Intake gate (#68): never surface a word that's still queued (waiting for daily
@@ -337,13 +338,16 @@ Deno.serve(async (req) => {
         difficulty: r.difficulty ?? null,
         timesSeen: r.times_seen ?? null,
         lastSeenAt: r.last_seen_at ?? null,
-        // #72: real FSRS schedule so compareByDue can rank genuinely-due words first.
+        // #72: real FSRS schedule so the review floor can rank by true due-date.
         dueAt: r.due_at ?? null,
         stability: r.stability ?? null,
+        intervalDays: r.interval_days ?? null,
       }));
-      // #72: due-date order (due words first), staleness only as a tiebreaker/fallback.
-      stuckSignals.sort(compareByDue);
-      const stuckIds = stuckSignals.slice(0, stuckFloor).map((s) => s.entryId);
+      // Pre-due surfacing window: reinforce words approaching due (proportional to their
+      // interval) so reading can push them out before they hit the flashcard deck. Only
+      // in-window / overdue words qualify, most-urgent first — spending the reader's few
+      // review slots on cards actually at risk, not ones due months out.
+      const stuckIds = selectPreDueFloor(stuckSignals, Date.now(), stuckFloor).map((s) => s.entryId);
       if (stuckIds.length > 0) {
         // Resolve surface forms (kanji preferred, kana fallback), preserving stuck order.
         const [{ data: kanjiRows }, { data: kanaRows }] = await Promise.all([

@@ -41,6 +41,7 @@ const sig = (entryId, o = {}) => ({
   isCommon: false,
   dueAt: o.dueAt ?? null,
   stability: o.stability ?? null,
+  intervalDays: o.intervalDays ?? null,
   difficulty: o.difficulty ?? null,
   timesSeen: o.timesSeen ?? null,
   lastSeenAt: o.lastSeenAt ?? null,
@@ -56,7 +57,7 @@ async function main() {
     outfile: TMP,
     logLevel: 'silent',
   });
-  const { compareByDue, compareStuck } = await import(pathToFileURL(TMP).href);
+  const { compareByDue, compareStuck, preDueUrgency, selectPreDueFloor, preDueWindowDays } = await import(pathToFileURL(TMP).href);
 
   console.log('\ncompareByDue — genuinely-due words first (#72)');
   // Two overdue words, one future, one never-scheduled. Expect: most-overdue → later
@@ -91,6 +92,44 @@ async function main() {
   const hard = sig('hard', { lastSeenAt: '2026-07-01T00:00:00.000Z', difficulty: 9 });
   const easy = sig('easy', { lastSeenAt: '2026-07-01T00:00:00.000Z', difficulty: 3 });
   check('same last-seen → hardest first', [easy, hard].sort(compareStuck)[0].entryId === 'hard');
+
+  // ── Pre-due surfacing window (flashcards augment reading) ──────────────────
+  const NOW_MS = Date.parse('2026-07-12T00:00:00.000Z');
+  const inDays = (d) => new Date(NOW_MS + d * 86_400_000).toISOString();
+
+  console.log('\npreDueWindowDays — proportional to interval, clamped');
+  check('~a week for a 2-month card', Math.round(preDueWindowDays(sig('x', { intervalDays: 60 }))) === 7,
+    String(preDueWindowDays(sig('x', { intervalDays: 60 }))));
+  check('tiny interval floored to ≥1 day', preDueWindowDays(sig('x', { intervalDays: 3 })) === 1);
+  check('huge interval capped at 21 days', preDueWindowDays(sig('x', { intervalDays: 365 })) === 21);
+  check('falls back to stability when no interval', preDueWindowDays(sig('x', { stability: 30 })) > 0);
+  check('unscheduled → null window', preDueWindowDays(sig('x', {})) === null);
+
+  console.log('\npreDueUrgency — 0 at window start, 1 at due, >1 overdue, null before window');
+  // 60-day card → 7-day window. Due in 10 days → not yet in window.
+  check('due beyond its window → null (not surfaced)', preDueUrgency(sig('x', { intervalDays: 60, dueAt: inDays(10) }), NOW_MS) === null);
+  // Due in 3 days, 7-day window → in window, urgency ~0.57.
+  const u = preDueUrgency(sig('x', { intervalDays: 60, dueAt: inDays(3) }), NOW_MS);
+  check('inside window → urgency in (0,1)', u > 0 && u < 1, String(u));
+  check('exactly due → urgency ~1', Math.abs(preDueUrgency(sig('x', { intervalDays: 60, dueAt: inDays(0) }), NOW_MS) - 1) < 0.01);
+  check('overdue → urgency > 1', preDueUrgency(sig('x', { intervalDays: 60, dueAt: inDays(-5) }), NOW_MS) > 1);
+  check('unscheduled (no dueAt) → null', preDueUrgency(sig('x', { intervalDays: 60, dueAt: null }), NOW_MS) === null);
+  // No interval signal: only urgent once actually due.
+  check('no-interval word not urgent before due', preDueUrgency(sig('x', { dueAt: inDays(2) }), NOW_MS) === null);
+  check('no-interval word urgent once due', preDueUrgency(sig('x', { dueAt: inDays(-1) }), NOW_MS) > 0);
+
+  console.log('\nselectPreDueFloor — most-urgent in-window words first, capped');
+  // Long-interval word gets its window EARLY (absolute days) vs a short one.
+  const pdLong = sig('long', { intervalDays: 120, dueAt: inDays(10) });   // 14d window → in window now
+  const pdShort = sig('short', { intervalDays: 5, dueAt: inDays(3) });     // 1d window → NOT in window
+  const pdOverdue = sig('overdue', { intervalDays: 30, dueAt: inDays(-2) }); // overdue → most urgent
+  const pdNotYet = sig('notYet', { intervalDays: 30, dueAt: inDays(20) });   // due far off → excluded
+  const picked = selectPreDueFloor([pdLong, pdShort, pdOverdue, pdNotYet], NOW_MS, 2).map((s) => s.entryId);
+  check('overdue word surfaces first', picked[0] === 'overdue', picked.join(','));
+  check('long-interval word in its early window is included', picked.includes('long'), picked.join(','));
+  check('short-card not-yet-in-window excluded', !picked.includes('short'), picked.join(','));
+  check('due-far-off word excluded', !picked.includes('notYet'), picked.join(','));
+  check('respects the limit', picked.length === 2, picked.join(','));
 
   console.log(`\n\x1b[1m${passed} passed, ${failed} failed\x1b[0m\n`);
 }

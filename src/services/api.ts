@@ -621,6 +621,67 @@ export async function upsertWordProgressBatch(
   if (error) console.error('Error batch-syncing word progress:', error);
 }
 
+/** A word's full re-classified state after a study-pacing reset (forward-reseed / re-queue). */
+export interface PacingResetRow {
+  wordId: string;
+  mastery: string;
+  difficulty: number | null;
+  timesSeen: number;
+  streak: number;
+  lastSeenTs: number;
+  intakeStatus: string | null;
+  promotedTs: number | null;
+  stability: number | null;
+  fsrsDifficulty: number | null;
+  dueAt: number | null;          // ms epoch
+  lastReviewedTs: number | null; // ms epoch
+  intervalDays: number | null;
+  reps: number | null;
+  lapses: number | null;
+  srsStatus: string | null;
+}
+
+/**
+ * Persist a study-pacing reset (the flood fix) — one bulk write per chunk. UNLIKE the
+ * present-only upserts elsewhere, this one WRITES nulls: re-queuing a word must clear
+ * its synthetic schedule (stability/due_at/… → null), and forward-reseeding writes a
+ * fresh schedule, so every scheduling column is set explicitly. Chunked so a 2000+
+ * word back-catalog is a handful of round-trips, not one giant payload. See
+ * docs/study-pacing-flood-fix.md.
+ */
+export async function resetStudyPacingBatch(userId: string, rows: PacingResetRow[]) {
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const payload = rows.slice(i, i + CHUNK)
+      .filter((r) => r.wordId)
+      .map((r) => {
+        const ts = Number.isFinite(r.lastSeenTs) && r.lastSeenTs > 0 ? r.lastSeenTs : Date.now();
+        return {
+          user_id: userId,
+          word_id: r.wordId,
+          mastery_level: r.mastery,
+          difficulty: r.difficulty,
+          times_seen: r.timesSeen ?? 0,
+          streak: r.streak ?? 0,
+          last_seen_at: new Date(ts).toISOString(),
+          intake_status: r.intakeStatus,
+          promoted_at: r.promotedTs == null ? null : new Date(r.promotedTs).toISOString(),
+          stability: r.stability,
+          fsrs_difficulty: r.fsrsDifficulty,
+          due_at: r.dueAt == null ? null : new Date(r.dueAt).toISOString(),
+          last_reviewed_at: r.lastReviewedTs == null ? null : new Date(r.lastReviewedTs).toISOString(),
+          interval_days: r.intervalDays,
+          reps: r.reps ?? 0,
+          lapses: r.lapses ?? 0,
+          srs_status: r.srsStatus,
+        };
+      });
+    if (payload.length === 0) continue;
+    const { error } = await supabase.from('user_word_progress').upsert(payload);
+    if (error) { console.error('Error syncing study-pacing reset:', error); return; }
+  }
+}
+
 export async function logStudyEventToSupabase(
   userId: string, 
   wordId: string, 

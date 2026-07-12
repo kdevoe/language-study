@@ -4,6 +4,7 @@ import { rtkKanjiList } from '../data/rtkKanji';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
+import { decidePacing, isActiveForPacing } from './pacing';
 import { selectPromotions, type IntakeItem } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
@@ -205,6 +206,8 @@ interface AppState {
   studyKanji: string[];
   lastRtkUpdateTs: number | null;
   lastResetTs: number | null;
+  // Study-pacing flood fix: when the one-time forward-reseed / re-queue last ran.
+  lastStudyPacingResetTs: number | null;
   currentArticle: NewsArticle | null;
   articlesCache: Record<string, NewsArticle>;
   processingArticles: string[];
@@ -237,6 +240,7 @@ interface AppState {
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) => void;
   reviewWord: (word: string, rating: Rating, now: number) => void;
+  resetStudyPacing: () => Promise<{ keptActive: number; requeued: number }>;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   mergeWordRecords: (fromKey: string, toKey: string) => void;
   checkDailyKanji: () => void;
@@ -279,6 +283,7 @@ export const useAppStore = create<AppState>()(
       studyKanji: [],
       lastRtkUpdateTs: null,
       lastResetTs: null,
+      lastStudyPacingResetTs: null,
       currentArticle: null,
       articlesCache: {},
       processingArticles: [],
@@ -770,6 +775,101 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
+      // One-time study-pacing reset (the flood fix). Reclassifies the whole active
+      // back-catalog under Policy F (see services/pacing.ts + docs/study-pacing-flood-fix.md):
+      // easy words (difficulty ≤ 3) are kept active but forward-reseeded FAR OUT so they
+      // rarely surface as flashcards; medium+ words go back to the intake queue to drip in
+      // at the daily cap. Clears lastIntakePromotionTs so the next open promotes a fresh
+      // batch. Syncs every touched row to Supabase (writing nulls to clear cleared
+      // schedules). Idempotent-ish: re-running just re-applies the same rule.
+      resetStudyPacing: async () => {
+        const now = Date.now();
+        const touched: WordData[] = [];
+        set((state) => {
+          const db = { ...state.wordDatabase };
+          for (const [key, w] of Object.entries(db)) {
+            if (!w) continue;
+            const input = {
+              key,
+              difficulty: w.difficulty ?? null,
+              distinctExposures: w.uniqueDaysSeen?.length ?? (w.timesSeen ? 1 : 0),
+              intakeStatus: w.intakeStatus,
+              stability: w.stability ?? null,
+            };
+            if (!isActiveForPacing(input)) continue; // queued/unscheduled words already paced
+            const decision = decidePacing(input, now);
+            let next: WordData;
+            if (decision.action === 'keep-active') {
+              const s = decision.srs;
+              next = {
+                ...w,
+                intakeStatus: 'active',
+                mastery: bucketForDifficulty(w.difficulty ?? 3),
+                stability: s.stability,
+                fsrsDifficulty: s.fsrsDifficulty,
+                dueAt: s.dueAt,
+                lastReviewedTs: s.lastReviewedAt,
+                intervalDays: (s.dueAt - s.lastReviewedAt) / 86_400_000,
+                reps: s.reps,
+                lapses: s.lapses,
+                srsStatus: s.status,
+              };
+            } else {
+              // Medium+ → back to the queue. Clear the synthetic schedule but KEEP
+              // difficulty/mastery (the learning signal; re-promotion re-seeds from it).
+              next = {
+                ...w,
+                intakeStatus: 'queued',
+                promotedTs: null,
+                stability: null,
+                fsrsDifficulty: null,
+                dueAt: null,
+                lastReviewedTs: null,
+                intervalDays: null,
+                reps: 0,
+                lapses: 0,
+                srsStatus: null,
+              };
+            }
+            db[key] = next;
+            touched.push(next);
+          }
+          return { wordDatabase: db, lastStudyPacingResetTs: now, lastIntakePromotionTs: null };
+        });
+
+        // Persist every touched row (entry-id-backed only), batched. Writes nulls so a
+        // re-queued word's cleared schedule sticks server-side (cross-device + rehydrate).
+        const uid = await currentUserId();
+        if (uid && touched.length > 0) {
+          const { resetStudyPacingBatch } = await import('./api');
+          const rows = touched
+            .filter((w) => w.jmdictEntryId)
+            .map((w) => ({
+              wordId: w.jmdictEntryId!,
+              mastery: w.mastery,
+              difficulty: w.difficulty ?? null,
+              timesSeen: w.timesSeen,
+              streak: w.streak,
+              lastSeenTs: w.lastSeenTs || now,
+              intakeStatus: w.intakeStatus ?? null,
+              promotedTs: w.promotedTs ?? null,
+              stability: w.stability ?? null,
+              fsrsDifficulty: w.fsrsDifficulty ?? null,
+              dueAt: w.dueAt ?? null,
+              lastReviewedTs: w.lastReviewedTs ?? null,
+              intervalDays: w.intervalDays ?? null,
+              reps: w.reps ?? 0,
+              lapses: w.lapses ?? 0,
+              srsStatus: w.srsStatus ?? null,
+            }));
+          await resetStudyPacingBatch(uid, rows).catch((e) =>
+            console.warn('[store] study-pacing reset sync failed:', e));
+        }
+
+        const keptActive = touched.filter((w) => w.intakeStatus === 'active').length;
+        return { keptActive, requeued: touched.length - keptActive };
+      },
+
       syncSrsWithSupabase: async (userId) => {
         const { fetchUserWordProgress, fetchUserPreferences } = await import('./api');
 
@@ -1172,6 +1272,7 @@ export const useAppStore = create<AppState>()(
         studyKanji: state.studyKanji,
         lastRtkUpdateTs: state.lastRtkUpdateTs,
         lastResetTs: state.lastResetTs,
+        lastStudyPacingResetTs: state.lastStudyPacingResetTs,
         dismissedArticleIds: state.dismissedArticleIds,
         readArticleIds: state.readArticleIds,
         readerFontSize: state.readerFontSize,
