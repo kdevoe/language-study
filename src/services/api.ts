@@ -481,6 +481,9 @@ export async function fetchUserWordProgress(userId: string): Promise<Record<stri
         reps: row.reps ?? 0,
         lapses: row.lapses ?? 0,
         srsStatus: row.srs_status ?? null,
+        // Intake queue (#68) — 'queued' waits; 'active' is on the FSRS schedule.
+        intakeStatus: row.intake_status ?? null,
+        promotedTs: row.promoted_at ? new Date(row.promoted_at).getTime() : null,
       };
     });
 
@@ -523,7 +526,12 @@ function srsColumns(p: SrsSyncFields): Record<string, unknown> {
 export async function upsertWordProgressToSupabase(
   userId: string,
   wordId: string,
-  progress: { mastery: string; difficulty?: number | null; timesSeen: number; streak: number; lastSeenTs: number } & SrsSyncFields
+  progress: { mastery: string; difficulty?: number | null; timesSeen: number; streak: number; lastSeenTs: number }
+    & SrsSyncFields
+    // Intake queue (#68). Present-only, like the SRS fields: a caller that just touches
+    // difficulty (a normal grade) omits these, so an upsert never nulls a word's
+    // intake_status/promoted_at. Set them only when promoting (queued → active).
+    & { intakeStatus?: string | null; promotedTs?: number | null }
 ) {
   const { error } = await supabase
     .from('user_word_progress')
@@ -536,6 +544,10 @@ export async function upsertWordProgressToSupabase(
       streak: progress.streak,
       last_seen_at: new Date(progress.lastSeenTs).toISOString(),
       ...srsColumns(progress),
+      ...(progress.intakeStatus !== undefined ? { intake_status: progress.intakeStatus } : {}),
+      ...(progress.promotedTs !== undefined
+        ? { promoted_at: progress.promotedTs == null ? null : new Date(progress.promotedTs).toISOString() }
+        : {}),
     });
 
   if (error) console.error(`Error syncing progress for ${wordId}:`, error);
@@ -653,6 +665,7 @@ export async function upsertUserPreferences(
     target_paragraphs_full?: number;
     target_paragraphs_partial?: number;
     target_paragraphs_snippet?: number;
+    new_words_per_day?: number;
   }
 ) {
   const { error } = await supabase

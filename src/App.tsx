@@ -345,7 +345,11 @@ function App() {
         loadedCacheForUser.current = session.user.id;
         loadGlobalCache(session.user.id);
       }
-      useAppStore.getState().syncSrsWithSupabase(session.user.id);
+      // Sync first (hydrates remote progress + the new-words/day preference), then run
+      // the daily intake promotion (#68) so it sees the up-to-date queue + cap.
+      useAppStore.getState().syncSrsWithSupabase(session.user.id)
+        .then(() => useAppStore.getState().promoteIntakeQueue(Date.now()))
+        .catch((e) => console.warn('[app] SRS sync / intake promotion failed:', e));
     }
   }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
 

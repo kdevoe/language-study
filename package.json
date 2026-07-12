@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:srs": "node scripts/test-srs.mjs"
+    "test:srs": "node scripts/test-srs.mjs",
+    "test:intake": "node scripts/test-intake.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

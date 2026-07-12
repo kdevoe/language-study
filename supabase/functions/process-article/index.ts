@@ -321,6 +321,10 @@ Deno.serve(async (req) => {
         .select('word_id, mastery_level, difficulty, times_seen, last_seen_at')
         .eq('user_id', userId)
         .in('mastery_level', ['hard', 'medium'])
+        // Intake gate (#68): never surface a word that's still queued (waiting for daily
+        // promotion) as a review target. `is null` keeps pre-migration rows eligible, so
+        // this is safe to deploy before database/24 is applied by hand.
+        .or('intake_status.is.null,intake_status.eq.active')
         .limit(200);
       const stuckSignals: WordSignal[] = (stuckRows as any[] ?? []).map((r) => ({
         entryId: r.word_id,

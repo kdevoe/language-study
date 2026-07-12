@@ -9,6 +9,7 @@
 import { supabase } from './supabase';
 import { alignReading, hasKanji } from './furigana';
 import type { CoarsePos } from './tokenizer';
+import type { IntakeCandidate } from './intake';
 
 export interface JMDictResult {
   entryId: string;
@@ -293,8 +294,8 @@ export async function fetchJlptByEntryIds(
  */
 export async function fetchDetailsByEntryIds(
   ids: string[],
-): Promise<Map<string, { word: string; reading: string; meaning: string; jlptLevel: number | null; jlptDerived: boolean; pos: string[]; furiganaMap: { kanji: string; kana: string }[]; jmdictEntryId: string }>> {
-  const out = new Map<string, { word: string; reading: string; meaning: string; jlptLevel: number | null; jlptDerived: boolean; pos: string[]; furiganaMap: { kanji: string; kana: string }[]; jmdictEntryId: string }>();
+): Promise<Map<string, { word: string; reading: string; meaning: string; jlptLevel: number | null; jlptDerived: boolean; freqRank: number | null; pos: string[]; furiganaMap: { kanji: string; kana: string }[]; jmdictEntryId: string }>> {
+  const out = new Map<string, { word: string; reading: string; meaning: string; jlptLevel: number | null; jlptDerived: boolean; freqRank: number | null; pos: string[]; furiganaMap: { kanji: string; kana: string }[]; jmdictEntryId: string }>();
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return out;
 
@@ -432,7 +433,7 @@ function summarizeSenses(senses: JMDictResult['senses'], limit = 4): string {
 export function jmdictToWordDetails(
   word: string,
   result: JMDictResult
-): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null; jlptDerived: boolean; furiganaMap: { kanji: string; kana: string }[] } {
+): { reading: string; meaning: string; jmdictEntryId: string; pos: string[]; jlptLevel: number | null; jlptDerived: boolean; freqRank: number | null; furiganaMap: { kanji: string; kana: string }[] } {
   const reading = result.readings[0] || '';
   const meaning = summarizeSenses(result.senses);
   const pos = [...new Set(result.senses.flatMap(s => s.pos))];
@@ -451,6 +452,7 @@ export function jmdictToWordDetails(
     pos,
     jlptLevel,
     jlptDerived,
+    freqRank: result.freqRank ?? null,
     furiganaMap,
   };
 }
@@ -533,6 +535,58 @@ export async function fetchUnseenCommonWords(
     reading: r.reading || '',
     meaning: r.meaning || '',
     rank: r.rank,
+  }));
+}
+
+/**
+ * Fetch unseen-foundation intake candidates (#68): important common words at or
+ * BELOW the user's JLPT level that they have not yet tracked, ordered foundation-first
+ * (easiest level first, then most common). This is the "important words the user hasn't
+ * read yet" half of the intake queue — merged with locally-queued encountered words by
+ * store.promoteIntakeQueue before the daily cap picks the top few.
+ *
+ * Backed by the `get_intake_candidates` RPC (database/24): a sibling of
+ * get_unseen_common_words that scans all levels ≥ p_user_jlpt in one call, excludes
+ * already-tracked words by canonical entry_id (#39), and returns entry_id + level so a
+ * promoted word can be canonically keyed and ordered by compareIntake.
+ */
+export async function fetchIntakeCandidates(
+  userJlpt: number,
+  seenIds: string[],
+  limit = 50,
+): Promise<IntakeCandidate[]> {
+  let data: unknown;
+  let error: unknown;
+  try {
+    ({ data, error } = await withTimeout(
+      supabase.rpc('get_intake_candidates', {
+        p_user_jlpt: userJlpt,
+        p_seen_ids: seenIds,
+        p_limit: limit,
+      }),
+      LOOKUP_TIMEOUT_MS,
+      'get_intake_candidates',
+    ));
+  } catch (e) {
+    console.warn('get_intake_candidates timed out or failed:', e);
+    return [];
+  }
+  if (error || !data) return [];
+
+  return (data as Array<{
+    entry_id: string;
+    jlpt_level: number | null;
+    freq_rank: number | null;
+    word: string;
+    reading: string | null;
+    meaning: string | null;
+  }>).map((r) => ({
+    entryId: r.entry_id,
+    jlptLevel: r.jlpt_level ?? null,
+    freqRank: r.freq_rank ?? null,
+    word: r.word,
+    reading: r.reading || '',
+    meaning: r.meaning || '',
   }));
 }
 

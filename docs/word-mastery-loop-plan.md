@@ -18,11 +18,12 @@
 
 **Legend:** 🟢 cheap / high-leverage · 🟡 medium · 🔴 large · ✅ done · [/] in progress · [ ] not started
 
-**📍 You are here (2026-07-05):**
+**📍 You are here (2026-07-11):**
 - **Phase A is complete** — #39 (canonical entry-id keying, PR #90), #37 (JMDict sense display), and #41 (sync/hydration, done across #85-88 + the ungraded-local merge fix) all shipped. Word tracking is now one record per canonical `entry_id`, and the Progress page / server sync agree.
 - **Phase B is complete and deployed** — the shared Word Priority Metric (#69) and all three consumers shipped: prefer confirmed-familiar backbone (#25), JLPT-proximity + stretch words (#22), and the topic-independent review floor (#51). Article word-selection now reads one shared scorer — and, post-#39, on de-fragmented data.
 - **Phase C is complete** — models pinned + upgraded to `gemini-3.5-flash` (#64 ✅); the **eval harness (#65 ✅)** ships — `scripts/eval-article-rewrite.mjs` scores rewrites on a frozen golden set (`scripts/eval-fixtures/`) via the extracted, shared prompt module, with EVAL-001 as an automated regression. Its verdict: **flash beats/ties `gemini-3.1-pro-preview` on every axis at ~half latency/cost → stay on flash**. The **prompt restructure (#66 ✅)** then closed the one remaining gap: a surgical GOLDEN-RULE anti-fabrication edit lifted factual fidelity **4.00 → 5.00** at equal-or-lower cost, measured against the harness (see [`phase-c-eval-notes.md`](./phase-c-eval-notes.md)).
-- Goals 4–5's remainder (eval/prompt, then the real SRS engine + flashcards) are the open frontier: **Phase C** (#65/#66) can run anytime; **Phase D** (#67 FSRS engine + #68 intake queue) is the next big build, with **Phase E** (flashcards) on top.
+- **Phase D is underway** — the **FSRS scheduling engine (#67 ✅, PR #94)** shipped: words now carry a real `due_at`/stability schedule (`ts-fsrs`, FSRS-6, retention 0.85) seeded from `difficulty`, and in-context reads advance it (design in [`fsrs-engine-design-67.md`](./fsrs-engine-design-67.md)). Its **#68 intake queue** (foundation-first promotion + daily new-word cap) is the next big build — the remaining half of Phase D.
+- Goals 5's remainder (the flashcard deck on top of the engine) is the open frontier after #68: **Phase E** (flashcards, #70–#73) closes the loop.
 
 > **➡️ NEXT UP: Phase D #68 (intake queue).** #67 (FSRS engine) shipped 2026-07-11 — words now carry a real `due_at`/stability schedule seeded from `difficulty`, and in-context reads advance it (see [`fsrs-engine-design-67.md`](./fsrs-engine-design-67.md)). The frontier is now the foundation-first intake queue + daily new-word cap that gates words into that schedule.
 >
