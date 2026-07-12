@@ -64,7 +64,7 @@ async function main() {
     outfile: TMP,
     logLevel: 'silent',
   });
-  const { selectDeck, isDue, isNewCard } = await import(pathToFileURL(TMP).href);
+  const { selectDeck, isDue, isNewCard, deckCounts } = await import(pathToFileURL(TMP).href);
 
   console.log('\nmembership');
   check('a due active word is due', isDue(due('d', 1), NOW));
@@ -117,6 +117,22 @@ async function main() {
 
   console.log('\nselectDeck — empty deck when nothing is due or new');
   check('all-future/studied → empty', selectDeck([entry('a'), entry('b')], NOW).length === 0);
+
+  // Dashboard health tallies (#73) — must agree with the deck's own predicates.
+  console.log('\ndeckCounts — due / new / learning agree with the deck');
+  const dc = deckCounts([
+    due('d1', 1), due('d2', 3),                       // 2 due
+    fresh('n1'), fresh('n2'), fresh('n3'),            // 3 new
+    entry('l1'), entry('l2'),                         // 2 learning (active, scheduled, not due/new)
+    entry('q1', { intakeStatus: 'queued' }),          // queued → not counted
+    due('junk', 1, { jlptLevel: null }),              // level-less → excluded
+  ], NOW);
+  check('due count', dc.due === 2, JSON.stringify(dc));
+  check('new count', dc.new === 3, JSON.stringify(dc));
+  check('learning count', dc.learning === 2, JSON.stringify(dc));
+  check('active = due + new + learning (queued/level-less excluded)', dc.active === 7, JSON.stringify(dc));
+  const dualDc = deckCounts([due('x', 2, { reps: 0, promotedTs: NOW - DAY })], NOW);
+  check('a word both due AND new counts once, as due', dualDc.due === 1 && dualDc.new === 0, JSON.stringify(dualDc));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   try { rmSync(TMP); } catch { /* ignore */ }

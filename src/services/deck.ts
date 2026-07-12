@@ -118,3 +118,29 @@ export function selectDeck(entries: DeckEntry[], now: number): DeckCard[] {
   news.sort(compareNew);
   return [...reviews, ...news];
 }
+
+/** Deck-health tallies for the study dashboard (#73). */
+export interface DeckCounts {
+  due: number;       // active, scheduled, and come due (would head the deck)
+  new: number;       // promoted but never studied (reps 0) — Anki "new"
+  learning: number;  // active + scheduled but neither due nor new (mid-interval)
+  active: number;    // total words in FSRS scheduling (due + new + learning)
+}
+
+/**
+ * Count the deck's health straight from the SAME predicates selectDeck uses, so the
+ * dashboard's due/new/learning numbers always agree with what STUDY actually shows
+ * (a word that is both due and new counts once, as due — mirroring the deck). Pure:
+ * the caller projects its WordData into DeckEntry and passes the clock.
+ */
+export function deckCounts(entries: DeckEntry[], now: number): DeckCounts {
+  const c: DeckCounts = { due: 0, new: 0, learning: 0, active: 0 };
+  for (const e of entries) {
+    if (!isEligible(e) || !isActive(e)) continue;
+    c.active++;
+    if (isDue(e, now)) c.due++;
+    else if (isNewCard(e)) c.new++;
+    else c.learning++;
+  }
+  return c;
+}

@@ -49,13 +49,36 @@ async function main() {
     logLevel: 'silent',
   });
   const srs = await import(pathToFileURL(TMP).href);
-  const { schedule, ratingForReaderEvent, seedSrsFromDifficulty, seedStability, REQUEST_RETENTION } = srs;
+  const { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, seedStability, REQUEST_RETENTION } = srs;
 
   console.log('\nFSRS scheduler (#67) — request_retention', REQUEST_RETENTION);
 
   console.log('\nratingForReaderEvent');
   check('skip → Good (3)', ratingForReaderEvent('skip') === 3);
   check('click → Again (1)', ratingForReaderEvent('click') === 1);
+
+  // Read⇄flashcard convergence (#71): the shared daily-dedup gate both the reader
+  // and the flashcard path consult, so one word can't double-count in a day.
+  console.log('\nreaderEventMayAdvance — shared daily gate (#71)');
+  const DAY0 = '2026-07-01';
+  const DAY1 = '2026-07-02';
+  // Fresh day (no same-day adjustment): both events advance.
+  check('untouched today → skip advances', readerEventMayAdvance('skip', undefined, undefined, DAY0) === true);
+  check('untouched today → click advances', readerEventMayAdvance('click', undefined, undefined, DAY0) === true);
+  check('adjusted a PRIOR day → skip advances', readerEventMayAdvance('skip', DAY1, 'skip', DAY0) === true);
+  // Same-day passive read already happened: re-scroll skip deduped; a lookup upgrades.
+  check('after same-day skip → another skip deduped', readerEventMayAdvance('skip', DAY0, 'skip', DAY0) === false);
+  check('after same-day skip → a click overrides (upgrades)', readerEventMayAdvance('click', DAY0, 'skip', DAY0) === true);
+  // Same-day lookup already happened: nothing passive stacks on it.
+  check('after same-day click → skip deduped', readerEventMayAdvance('skip', DAY0, 'click', DAY0) === false);
+  check('after same-day click → another click deduped', readerEventMayAdvance('click', DAY0, 'click', DAY0) === false);
+  // The #71 fix: a flashcard grade stamps the day, so a later passive read of the
+  // SAME word doesn't double-advance the one schedule (nor does a lookup restack).
+  check('after same-day flashcard → skip deduped', readerEventMayAdvance('skip', DAY0, 'flashcard', DAY0) === false);
+  check('after same-day flashcard → click deduped', readerEventMayAdvance('click', DAY0, 'flashcard', DAY0) === false);
+  // A manual modal set is likewise deliberate — passive reads don't stack on it.
+  check('after same-day manual → skip deduped', readerEventMayAdvance('skip', DAY0, 'manual', DAY0) === false);
+  check('after same-day manual → click deduped', readerEventMayAdvance('click', DAY0, 'manual', DAY0) === false);
 
   console.log('\nschedule(null, …) — first review');
   const first = schedule(null, 3 /* Good */, T0);

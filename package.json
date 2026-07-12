@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test:srs": "node scripts/test-srs.mjs",
     "test:intake": "node scripts/test-intake.mjs",
-    "test:deck": "node scripts/test-deck.mjs"
+    "test:deck": "node scripts/test-deck.mjs",
+    "test:wordpriority": "node scripts/test-wordpriority.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
