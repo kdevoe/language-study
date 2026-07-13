@@ -243,3 +243,8 @@
   - [x] Grade-strip restyle (variant A): floating white capsule pills, grade color
         carried ONLY by a soft tinted shadow (no dots, no divider grid); JLPT tag
         de-pilled to plain text so it doesn't read as a fifth button.
+  - [x] D3 revision (Policy F): a modal mastery-tap no longer fast-tracks a word
+        into the deck. Hard/medium record the grade and STAY QUEUED (daily
+        foundation-first cap seeds from the grade at promotion); EASY activates
+        into far-out maintenance via decidePacing (promotedTs null → never a
+        "new" card, doesn't spend a daily slot). Was how 出口 jumped the queue.
