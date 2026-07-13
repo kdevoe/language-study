@@ -178,8 +178,9 @@ But running the REAL cluster query (not hand-curated) exposed quality gaps the e
 Net: the difficulty ceiling + good action-net clusters help (matching the eval), but topic-noun noise and the tag gate dilute it. The LLM shrugs off obviously-wrong suggestions (it won't say 大丈夫 for a fine), so the deployed version is not worse — but it's below the eval's ceiling until the noise filters land.
 
 ### Recommended follow-up pass (turns the eval's 5/5 into the real-pipeline result)
+- **Concept↔SRS strong-matching phase (#103) — do this first.** Reverse-query the reader's `user_word_progress` per concept (gloss ⋈ synonym set) so the article prefers words the reader is actually studying, ranked due-first (reinforce, glossed) then mastered-first (backbone). This is the *principled* version of the untagged-word fallback below — the reader's SRS is the authority on "known", not JLPT tags — and it bypasses the tag gate (finding #3) while closing the reader⇄flashcard loop (#71/#72). Synonyms are load-bearing here: they raise the concept↔SRS hit rate (見張り matches «watch», not «surveillance»).
 - **Whole-word gloss match** + **POS filter** (match action concepts to verb/adj entries, topic to nouns) — kills polysemy junk.
-- **Untagged-word fallback** — when a concept's tagged candidates are all above level, allow common untagged entries (by `freq_rank`/`is_common`) so 見張り-type downgrades survive. (RPC change → manual migration.)
+- **Untagged-word fallback** — when a concept's tagged candidates are all above level, allow common untagged entries (by `freq_rank`/`is_common`) so 見張り-type downgrades survive even for concepts the reader hasn't studied. (RPC change → manual migration. Largely subsumed by #103 for studied words.)
 - **Skip proper-noun topic concepts** — ask Groq to flag entities, or drop concepts whose candidates are all low-frequency noise.
 - **Commonness floor** on cluster members so easy-but-irrelevant junk (何, 意味) can't be promoted by the known-filter.
 
