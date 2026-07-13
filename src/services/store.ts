@@ -142,6 +142,14 @@ export function mergeWordData(into: WordData, from: WordData): WordData {
   };
 }
 
+/** True when two ms-epoch timestamps fall on the same LOCAL calendar day. Daily
+ * gates (intake promotion, RTK bump) compare days rather than elapsed hours: a
+ * rolling `now - last >= 24h` check only fires while the app happens to be open,
+ * so its fire time drifts later every day and mornings come up empty. */
+function sameLocalDay(a: number, b: number): boolean {
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
 export interface WordData {
   reading: string;
   meaning: string;
@@ -970,6 +978,20 @@ export const useAppStore = create<AppState>()(
                     streak: r.streak ?? 0,
                     lastSeenTs: r.lastSeenTs ?? Date.now(),
                     uniqueDaysSeen: [],
+                    // FSRS schedule + intake state (#67/#68). Dropping these here made
+                    // a word promoted on ANOTHER device rehydrate as unscheduled — its
+                    // promotedTs/stability vanished, so it never surfaced in the deck
+                    // and never counted against the daily new-word cap.
+                    stability: r.stability ?? null,
+                    fsrsDifficulty: r.fsrsDifficulty ?? null,
+                    dueAt: r.dueAt ?? null,
+                    lastReviewedTs: r.lastReviewedTs ?? null,
+                    intervalDays: r.intervalDays ?? null,
+                    reps: r.reps ?? 0,
+                    lapses: r.lapses ?? 0,
+                    srsStatus: r.srsStatus ?? null,
+                    intakeStatus: r.intakeStatus ?? undefined,
+                    promotedTs: r.promotedTs ?? null,
                   };
                 });
                 return { wordDatabase: newDatabase };
@@ -1140,8 +1162,9 @@ export const useAppStore = create<AppState>()(
       checkDailyKanji: () => {
         const now = Date.now();
         const state = get();
-        // If it's the first time or 24 hours (86400000 ms) have passed
-        if (!state.lastRtkUpdateTs || now - state.lastRtkUpdateTs > 86400000) {
+        // First time, or a new local calendar day (a rolling 24h gate drifts later
+        // every day — see sameLocalDay).
+        if (!state.lastRtkUpdateTs || !sameLocalDay(state.lastRtkUpdateTs, now)) {
           let currentLevel = state.rtkLevel || 122;
           if (currentLevel < 122) currentLevel = 122; // One-time alignment
           const newLevel = Math.min(currentLevel + 3, rtkKanjiList.length);
@@ -1162,20 +1185,34 @@ export const useAppStore = create<AppState>()(
       // then most common). The queue draws from TWO sources — words the user has met
       // while reading (local 'queued' records) and important common words at/below their
       // level they haven't read yet (the get_intake_candidates RPC) — so the common
-      // backbone gets built even when articles skip it. Gated to once per 24h, mirroring
-      // checkDailyKanji; call it on app open alongside that pass.
+      // backbone gets built even when articles skip it. Gated to once per LOCAL CALENDAR
+      // DAY: a rolling 24h gate ratchets the promotion time later every day (it only
+      // fires while the app is open), so a morning open kept finding yesterday's stamp
+      // too fresh and produced no cards. Call it on app open, AFTER syncSrsWithSupabase.
       promoteIntakeQueue: async (now: number) => {
         const state = get();
-        if (state.lastIntakePromotionTs && now - state.lastIntakePromotionTs < 86400000) return;
+        if (state.lastIntakePromotionTs && sameLocalDay(state.lastIntakePromotionTs, now)) return;
         // Stamp immediately so a re-entrant call (e.g. a double mount) can't double-promote.
         set({ lastIntakePromotionTs: now });
 
-        const cap = state.newWordsPerDay ?? 3;
-        if (cap <= 0) return; // 0 = new words paused
+        const capPref = state.newWordsPerDay ?? 3;
+        if (capPref <= 0) return; // 0 = new words paused
 
-        // Source 1: words already encountered and waiting in the local queue.
+        // Words already promoted TODAY count against the cap. `promotedTs` stamps ride
+        // the sync (this runs after syncSrsWithSupabase), so a batch promoted on another
+        // device — or a manual modal mastery-set — spends today's slots instead of
+        // stacking a second full batch on top.
+        const promotedToday = Object.values(state.wordDatabase)
+          .filter((w) => w.promotedTs != null && sameLocalDay(w.promotedTs, now)).length;
+        const cap = capPref - promotedToday;
+        if (cap <= 0) return;
+
+        // Source 1: words already encountered and waiting in the local queue. Only
+        // deck-eligible words (JLPT level known — mirrors deck.isEligible) may compete:
+        // a level-less fragment that wins a slot becomes an *invisible* active word,
+        // silently burning the day's cap on cards the deck refuses to show.
         const queuedItems: IntakeItem[] = Object.entries(state.wordDatabase)
-          .filter(([, w]) => w.intakeStatus === 'queued')
+          .filter(([, w]) => w.intakeStatus === 'queued' && w.jlptLevel != null)
           .map(([key, w]) => ({
             key,
             entryId: w.jmdictEntryId ?? key,
