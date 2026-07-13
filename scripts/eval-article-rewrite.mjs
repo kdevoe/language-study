@@ -158,6 +158,10 @@ function toRewriteInput(fx) {
     reviewPalette,
     newPalette: fx.palette.new ?? [],
     vocabTargets: reviewPalette.slice(0, 5), // mirrors index.ts: vocabTargets = reviewPalette.slice(0,5)
+    // New cluster path (docs/vocab-palette-redesign.md): undefined for legacy fixtures →
+    // the shared builder renders the old flat palette unchanged. A fixture that ships
+    // `palette.clusters` exercises the concept-cluster prompt production now sends.
+    clusters: fx.palette.clusters,
   };
 }
 
