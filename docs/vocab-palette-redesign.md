@@ -178,10 +178,25 @@ But running the REAL cluster query (not hand-curated) exposed quality gaps the e
 Net: the difficulty ceiling + good action-net clusters help (matching the eval), but topic-noun noise and the tag gate dilute it. The LLM shrugs off obviously-wrong suggestions (it won't say 大丈夫 for a fine), so the deployed version is not worse — but it's below the eval's ceiling until the noise filters land.
 
 ### Recommended follow-up pass (turns the eval's 5/5 into the real-pipeline result)
+- **Concept↔SRS strong-matching phase (#103) — do this first.** Reverse-query the reader's `user_word_progress` per concept (gloss ⋈ synonym set) so the article prefers words the reader is actually studying, ranked due-first (reinforce, glossed) then mastered-first (backbone). This is the *principled* version of the untagged-word fallback below — the reader's SRS is the authority on "known", not JLPT tags — and it bypasses the tag gate (finding #3) while closing the reader⇄flashcard loop (#71/#72). Synonyms are load-bearing here: they raise the concept↔SRS hit rate (見張り matches «watch», not «surveillance»).
 - **Whole-word gloss match** + **POS filter** (match action concepts to verb/adj entries, topic to nouns) — kills polysemy junk.
-- **Untagged-word fallback** — when a concept's tagged candidates are all above level, allow common untagged entries (by `freq_rank`/`is_common`) so 見張り-type downgrades survive. (RPC change → manual migration.)
+- **Untagged-word fallback** — when a concept's tagged candidates are all above level, allow common untagged entries (by `freq_rank`/`is_common`) so 見張り-type downgrades survive even for concepts the reader hasn't studied. (RPC change → manual migration. Largely subsumed by #103 for studied words.)
 - **Skip proper-noun topic concepts** — ask Groq to flag entities, or drop concepts whose candidates are all low-frequency noise.
 - **Commonness floor** on cluster members so easy-but-irrelevant junk (何, 意味) can't be promoted by the known-filter.
+
+## Phase 2 (2026-07-13): controlled-vocabulary lexicon — the primary mechanism
+
+A production N4 article (vaccine story) still measured **39% of content words in the reader's medium/hard/unknown tiers** (target ~5%). Diagnosis flipped the design:
+
+- The model already wrote **92% inside the reader's ENCOUNTERED vocabulary** — but it can't see the mastery boundary (影響 easy-for-this-reader vs 費用 not), and clusters exposed only ~40 of ~2,270 known words. **The reader's SRS is substantially a struggle-list** (seed-on-sight: words get in *because* they were looked up), so "in SRS" ≠ "known".
+- Fix: inject the **full known lexicon** (confirmed-easy SRS + assumed-known N5/N4, minus words the reader graded medium/hard) as a controlled vocabulary — the allowed list IS the level; no JLPT self-assessment, no Groq in the critical path. ~1,300 surfaces ≈ ~3k tokens ≈ ~$0.005/article.
+- Prompt: "every content word MUST come from the ALLOWED LIST" + exceptions (proper nouns/katakana free; ≤3 topic words, each force-glossed in a yugen-box; ~targetReview pre-due review words) + "rephrase with allowed words beats one precise disallowed word" with examples.
+- **Katakana loanwords are excluded from the list and from review-floor slots** (user feedback): they read for free, the blanket exception covers them, and they'd otherwise clutter the lexicon (~120 of 1,416 surfaces) and waste review slots.
+- Precedence: lexicon > clusters > legacy flat palette. Clusters remain the fallback when the lexicon can't be built (< 300 words). Legacy stays byte-identical for the eval baseline.
+
+**Measured**: naive experiment 39% → 21% struggling share; net of self-inflicted noise (unranked review picks) and force-glossed topic words, **~10% real**. Eval EVAL-010 (real reader lexicon, same vaccine story): **jlptFit 5/5** at N4, review 2/2, fidelity 4/5 + naturalness 4/5 (minor paraphrase-pressure nits: one invented detail, one redundant phrase — the accepted trade).
+
+**Follow-ups**: lexicon caching (rebuild ~8 queries/article today; fine at current scale), fidelity guard wording, and #103 (concept↔SRS alignment) now serves review-targeting rather than the backbone.
 
 ## Deferred (not in first cut)
 - WordNet / real thesaurus import (upgrade to cluster recall if English-synonym coverage proves thin).

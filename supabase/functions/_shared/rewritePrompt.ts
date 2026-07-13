@@ -44,6 +44,23 @@ export interface RewriteInput {
    * unchanged, so the eval harness baseline is preserved.
    */
   clusters?: { concept: string; words: string[] }[];
+  /**
+   * Controlled vocabulary (docs/vocab-palette-redesign.md, phase 2): the reader's FULL
+   * known lexicon (confirmed-easy SRS words + assumed-known JLPT levels), injected whole
+   * so the allowed list IS the difficulty level — no JLPT self-assessment by the model.
+   * Measured on a real N4 article: struggling-word share 39% → ~10% (net of glossed
+   * topic words). Katakana loanwords are excluded upstream — they read for free and are
+   * covered by a blanket exception. When present this supersedes BOTH `clusters` and the
+   * flat palette; `clusters` remains the fallback when the lexicon can't be built.
+   */
+  lexicon?: {
+    /** Allowed content words (surfaces), known-first. */
+    words: string[];
+    /** Pre-due SRS review words to weave in (~targetReview of them). */
+    reviewWords: string[];
+    /** Max out-of-list topic words the story may use, each force-glossed. Default 3. */
+    maxTopicWords?: number;
+  };
 }
 
 // JLPT level controls COMPLEXITY only (grammar/vocab difficulty). Article
@@ -77,7 +94,7 @@ export function buildRewritePrompt(input: RewriteInput): string {
   const {
     title, sourceText, targetParagraphs, jlptLevel, rtkLevel,
     studyMode, vocabMode, ratios, targetReview, targetNew,
-    knownPalette, reviewPalette, newPalette, vocabTargets, clusters,
+    knownPalette, reviewPalette, newPalette, vocabTargets, clusters, lexicon,
   } = input;
 
   const jlptStr = `N${jlptLevel}`;
@@ -103,12 +120,24 @@ export function buildRewritePrompt(input: RewriteInput): string {
   }
 
   // Build targeted vocab palette block (empty string if pipeline produced nothing).
-  // Two shapes: the concept-cluster block (new input-side difficulty control) when the
-  // caller supplies `clusters`, else the legacy flat known/review/new palette. The legacy
-  // branch is kept byte-for-byte so the eval harness's frozen fixtures stay a valid
-  // regression baseline (scripts/eval-article-rewrite.mjs).
+  // Three shapes by precedence: controlled-vocabulary lexicon (phase 2) > concept
+  // clusters > the legacy flat known/review/new palette. The legacy branch is kept
+  // byte-for-byte so the eval harness's frozen fixtures stay a valid regression
+  // baseline (scripts/eval-article-rewrite.mjs).
   let palettePrompt = '';
-  if (clusters && clusters.length > 0) {
+  if (lexicon && lexicon.words.length > 0) {
+    const maxTopic = lexicon.maxTopicWords ?? 3;
+    palettePrompt = `
+CONTROLLED VOCABULARY — THE MOST IMPORTANT RULE OF THIS TASK:
+The reader knows ONLY the words in the ALLOWED LIST below. Every content word you write (nouns, verbs, adjectives, adverbs) MUST come from the ALLOWED LIST, with exactly these exceptions:
+1. Proper nouns and katakana loanwords — always fine.
+2. TOPIC WORDS: if the story cannot be told without a specific word that is not in the list, you may use up to ${maxTopic} such words TOTAL — and you MUST explain each one in a yugen-box.
+3. REVIEW WORDS — work about ${targetReview} of these in where they fit the facts naturally: ${lexicon.reviewWords.join('、') || '(none)'}
+When an idea's precise word is not allowed, REPHRASE the idea with allowed words (e.g. 費用→お金を払う, 民間の→普通の, 幼い→小さい). Simpler, longer phrasing built from allowed words ALWAYS beats one precise disallowed word. Grammar particles and auxiliaries are unrestricted; keep grammar at ${jlptStr}.
+
+ALLOWED LIST:
+${lexicon.words.join('、')}`;
+  } else if (clusters && clusters.length > 0) {
     const clusterLines = clusters
       .map((c) => `- «${c.concept}»: ${c.words.join(' / ')}`)
       .join('\n');

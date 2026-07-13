@@ -65,9 +65,11 @@ const PRICES = {
   'gemini-3-flash-preview': { in: 1, out: 6 }, // est.
 };
 const DEFAULT_JUDGE = 'gemini-3.1-pro-preview';
-// Generous cap so *thinking* models (e.g. 3.1-pro-preview burns ~2.7k thought
-// tokens) don't truncate the JSON answer before its closing bracket.
-const MAX_OUTPUT_TOKENS = 8192;
+// Generous cap so *thinking* models don't truncate the JSON answer before its
+// closing bracket. 3.1-pro-preview burns ~2.7k thought tokens on a judge call;
+// flash burned ~4.9k on a lexicon-fixture rewrite (thoughts count against this
+// cap), which truncated at 8192 — hence 16384. Production sets NO output cap.
+const MAX_OUTPUT_TOKENS = 16384;
 
 // reading_intensity → known/review/new token-share (mirrors process-article/index.ts).
 const INTENSITY_RATIOS = {
@@ -162,6 +164,9 @@ function toRewriteInput(fx) {
     // the shared builder renders the old flat palette unchanged. A fixture that ships
     // `palette.clusters` exercises the concept-cluster prompt production now sends.
     clusters: fx.palette.clusters,
+    // Controlled-vocabulary path (phase 2): a fixture that ships `palette.lexicon`
+    // ({words, reviewWords}) exercises the allowed-list prompt, which supersedes both.
+    lexicon: fx.palette.lexicon,
   };
 }
 
@@ -261,7 +266,8 @@ function scoreDeterministic(raw, fx, tokenizer) {
   const newHit = hits(fx.palette.new);
   const tokens = tokenizer.tokenize(body);
   const contentTokens = tokens.filter((t) => t.pos === '名詞' || t.pos === '動詞' || t.pos === '形容詞');
-  const knownSet = new Set(fx.palette.known ?? []);
+  // Lexicon fixtures: the allowed list IS the known set for the token-share metric.
+  const knownSet = new Set([...(fx.palette.known ?? []), ...(fx.palette.lexicon?.words ?? [])]);
   const knownTokenShare = contentTokens.length
     ? contentTokens.filter((t) => knownSet.has(t.surface_form)).length / contentTokens.length
     : 0;
