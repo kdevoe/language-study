@@ -205,10 +205,18 @@ export function WordModal({
       ),
       translation: (
         <div key="translation" style={{ marginBottom: '1.5rem', textAlign: anchor === 'top' ? 'center' : 'left' }}>
-          {(!wordData.meaning || (isLoading && wordData.meaning === '...')) ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: anchor === 'top' ? 'center' : 'flex-start', gap: '0.4rem' }}>
-              <Skeleton width="80%" height="1.25rem" />
-            </div>
+          {!wordData.meaning ? (
+            isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: anchor === 'top' ? 'center' : 'flex-start', gap: '0.4rem' }}>
+                <Skeleton width="80%" height="1.25rem" />
+              </div>
+            ) : (
+              // Terminal state: the lookup finished with no gloss. Never leave a
+              // skeleton up when nothing more is coming, or it reads as a hang.
+              <p className="serif" style={{ fontSize: '1.1rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                No dictionary definition available.
+              </p>
+            )
           ) : (
             <>
               <motion.p 

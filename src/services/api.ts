@@ -300,7 +300,10 @@ export async function fetchWordDefinitionQuick(word: string, contextSentence: st
 
     if (result) {
       const details = jmdictToWordDetails(word, result);
-      return { word, ...details };
+      // A JMDict entry with no glosses yields an empty meaning. Don't return that
+      // (it strands the modal on a placeholder) — fall through to the Groq edge
+      // fn, which produces a real definition.
+      if (details.meaning) return { word, ...details };
     }
   } catch (e) {
     console.warn('JMDict lookup failed, falling back to Edge Fn:', e);
