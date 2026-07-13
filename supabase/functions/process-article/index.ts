@@ -192,6 +192,40 @@ const MAX_SYNONYMS_PER_CONCEPT = 3;
 // (and rotate for variety) without bloating the prompt.
 const CLUSTER_WORDS_MAX = 4;
 
+// ── Controlled-vocabulary lexicon (docs/vocab-palette-redesign.md, phase 2) ──
+// The reader's full known lexicon is injected whole so the allowed list IS the level.
+// Katakana-only surfaces are excluded: loanwords read for free (they're English), the
+// prompt's blanket exception covers them, and keeping them out both saves tokens and
+// stops them cluttering the known-vocabulary list (user feedback).
+const KATAKANA_ONLY_RE = /^[ァ-ヶヽヾー・゠]+$/;
+// Prompt-size safety cap (~4k surfaces ≈ ~9k tokens) — known-first order means the
+// cap drops assumed-known tail words, never confirmed-easy ones.
+const LEXICON_MAX_WORDS = 4000;
+// Below this the list can't carry an article — fall back to the cluster pipeline.
+const LEXICON_MIN_WORDS = 300;
+
+// Page past supabase's 1000-row response cap (unranged .select() silently truncates).
+async function fetchAllRows<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  const SIZE = 1000;
+  for (let from = 0; ; from += SIZE) {
+    const { data, error } = await page(from, from + SIZE - 1);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if ((data ?? []).length < SIZE) break;
+  }
+  return out;
+}
+
+type EmbeddedEntry = { id: string; jmdict_kanji: { text: string; common: boolean }[]; jmdict_kana: { text: string; common: boolean }[] };
+
+// Preferred display surface for an entry: common kanji > common kana > any kanji > any kana.
+function pickSurface(e: EmbeddedEntry): string | null {
+  const first = (rows: { text: string; common: boolean }[]) =>
+    rows.find((r) => r.common)?.text ?? rows[0]?.text ?? null;
+  return first(e.jmdict_kanji ?? []) ?? first(e.jmdict_kana ?? []);
+}
+
 function normalizeConcepts(raw: unknown): Concept[] {
   if (!Array.isArray(raw)) return [];
   const out: Concept[] = [];
@@ -324,7 +358,58 @@ Deno.serve(async (req) => {
     const targetNew = Math.max(1, Math.round(ratios.new * wordsBudget));
     console.log(`[process-article] length: ${targetParagraphs} paragraphs (sourceKind=${sourceKind}), vocab budget ${wordsBudget} -> ${targetReview} review / ${targetNew} new`);
 
-    // 2. Vocabulary palette pipeline (docs/vocab-palette-redesign.md)
+    // 2a. Controlled-vocabulary lexicon — PRIMARY difficulty mechanism (phase 2).
+    // Diagnosis on a real N4 article: the model already wrote 92% inside the reader's
+    // ENCOUNTERED vocabulary, but 39% of content words sat in the medium/hard/unknown
+    // tiers (target ~5%) — it couldn't see the mastery boundary, and clusters exposed
+    // only ~40 of ~2,270 known words. Injecting the full known lexicon (confirmed-easy
+    // SRS + assumed-known N5/N4, minus words the reader graded medium/hard) makes the
+    // allowed list itself the level: measured 39% → ~10% struggling share net of
+    // glossed topic words. See docs/vocab-palette-redesign.md (live-check + phase 2).
+    let lexicon: { words: string[] } | undefined;
+    try {
+      const [srsRows, n54Entries] = await Promise.all([
+        fetchAllRows<{ word_id: string; mastery_level: string }>((from, to) =>
+          supabase.from('user_word_progress').select('word_id, mastery_level').eq('user_id', userId).range(from, to)),
+        fetchAllRows<EmbeddedEntry>((from, to) =>
+          supabase.from('jmdict_entries').select('id, jmdict_kanji(text, common), jmdict_kana(text, common)').gte('jlpt_level', 4).range(from, to)),
+      ]);
+      const struggling = new Set(srsRows.filter((r) => r.mastery_level === 'medium' || r.mastery_level === 'hard').map((r) => r.word_id));
+      const easyIds = srsRows.filter((r) => r.mastery_level === 'easy').map((r) => r.word_id);
+      // Surfaces for confirmed-easy words above N4 (not covered by the N5/N4 fetch).
+      const n54ById = new Map(n54Entries.map((e) => [e.id, e]));
+      const missingEasy = easyIds.filter((id) => !n54ById.has(id));
+      const easyById = new Map<string, EmbeddedEntry>();
+      for (let i = 0; i < missingEasy.length; i += 200) {
+        const { data } = await supabase
+          .from('jmdict_entries')
+          .select('id, jmdict_kanji(text, common), jmdict_kana(text, common)')
+          .in('id', missingEasy.slice(i, i + 200));
+        for (const e of (data ?? []) as EmbeddedEntry[]) easyById.set(e.id, e);
+      }
+      // Known-first order: confirmed-easy leads, then assumed-known N5/N4 — minus words
+      // the reader actually graded medium/hard (their own evidence beats the JLPT tag).
+      const ordered = [
+        ...easyIds.map((id) => easyById.get(id) ?? n54ById.get(id)),
+        ...n54Entries.filter((e) => !struggling.has(e.id)),
+      ];
+      const words: string[] = [];
+      const seen = new Set<string>();
+      for (const e of ordered) {
+        if (!e) continue;
+        const s = pickSurface(e);
+        if (!s || seen.has(s) || KATAKANA_ONLY_RE.test(s)) continue;
+        seen.add(s);
+        words.push(s);
+        if (words.length >= LEXICON_MAX_WORDS) break;
+      }
+      if (words.length >= LEXICON_MIN_WORDS) lexicon = { words };
+      console.log(`[process-article] Lexicon: ${words.length} allowed word(s)${lexicon ? '' : ` — below floor ${LEXICON_MIN_WORDS}, falling back to clusters`}`);
+    } catch (lexErr) {
+      console.error('[process-article] Lexicon build failed (falling back to clusters):', lexErr);
+    }
+
+    // 2b. Concept-cluster pipeline — FALLBACK when the lexicon can't be built.
     //    a) Extract the story's concepts in two nets — topics + actions (Groq)
     //    b) For each concept, gloss-match its English synonyms in JMDict, ONE RPC per
     //       concept (parallel) so each synonym cluster stays grouped, not flattened
@@ -338,7 +423,7 @@ Deno.serve(async (req) => {
     const newPalette: string[] = [];
     let vocabTargets: string[] = []; // legacy: kept for vocab_mode prompt back-compat
     const clusters: { concept: string; words: string[] }[] = [];
-    try {
+    if (!lexicon) try {
       const { topics, actions } = await extractConceptsWithGroq(title, sourceText.slice(0, 2000), groqKey);
       const concepts = [...topics, ...actions];
       if (concepts.length > 0) {
@@ -460,7 +545,10 @@ Deno.serve(async (req) => {
       // interval) so reading can push them out before they hit the flashcard deck. Only
       // in-window / overdue words qualify, most-urgent first — spending the reader's few
       // review slots on cards actually at risk, not ones due months out.
-      const stuckIds = selectPreDueFloor(stuckSignals, Date.now(), stuckFloor).map((s) => s.entryId);
+      // Over-pick so katakana loanwords can be dropped after surface resolution without
+      // costing floor slots — reading a loanword is free (it's English in katakana), so
+      // it shouldn't consume one of the few review slots (user feedback).
+      const stuckIds = selectPreDueFloor(stuckSignals, Date.now(), stuckFloor + 4).map((s) => s.entryId);
       if (stuckIds.length > 0) {
         // Resolve surface forms (kanji preferred, kana fallback), preserving stuck order.
         const [{ data: kanjiRows }, { data: kanaRows }] = await Promise.all([
@@ -476,7 +564,9 @@ Deno.serve(async (req) => {
         const kanaMap = firstByEntry(kanaRows);
         const stuckReview = stuckIds
           .map((id) => kanjiMap.get(id) ?? kanaMap.get(id))
-          .filter((t): t is string => !!t);
+          .filter((t): t is string => !!t)
+          .filter((t) => !KATAKANA_ONLY_RE.test(t))
+          .slice(0, stuckFloor);
         // Floor first (guaranteed to survive the slice), then topic-relevant review; dedupe.
         reviewPalette = Array.from(new Set([...stuckReview, ...reviewPalette])).slice(0, Math.max(5, targetReview + 2));
         console.log(`[process-article] Review floor: blended ${stuckReview.length} stuck word(s) [${stuckReview.join(', ')}]`);
@@ -510,6 +600,8 @@ Deno.serve(async (req) => {
       newPalette,
       vocabTargets,
       clusters,
+      // Review words ride the lexicon block: the (katakana-filtered) pre-due floor.
+      lexicon: lexicon ? { words: lexicon.words, reviewWords: reviewPalette } : undefined,
     });
 
     console.log(`[process-article] Pass 1 for user ${userId}`);
