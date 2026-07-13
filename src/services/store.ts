@@ -53,8 +53,9 @@ export function seedDifficulty(jlptLevel: number | null | undefined, userLevel: 
 // Promote a word from the intake queue into active FSRS scheduling (#68). Seeds an
 // initial schedule from `difficulty`, anchored at `now` (a freshly promoted word
 // becomes due ~one interval from promotion), and stamps it `active`. Pure: the caller
-// persists + syncs the returned record. Used by the daily promotion pass and by an
-// explicit manual mastery-set (the two paths that graduate a queued word).
+// persists + syncs the returned record. Used ONLY by the daily promotion pass — the
+// one path that mints a "new" flashcard (a manual easy-set activates into far-out
+// maintenance instead, without a promotedTs; see setWordMastery).
 function activateWord(w: WordData, difficulty: number, now: number): WordData {
   const srs = seedSrsFromDifficulty(difficulty, now);
   return {
@@ -182,9 +183,10 @@ export interface WordData {
   lapses?: number | null;
   srsStatus?: SrsStatus | null;
   // Intake queue (#68). `queued` = encountered/candidate, exposure recorded but NOT on
-  // a schedule; `active` = promoted into FSRS scheduling. A word is promoted only by the
-  // daily new-word cap (foundation-first) or an explicit manual mastery-set. Undefined
-  // on legacy records until the v7 migration stamps them.
+  // a schedule; `active` = promoted into FSRS scheduling. Only the daily new-word cap
+  // (foundation-first) mints a NEW card (promotedTs stamped); a manual easy-set
+  // activates into far-out maintenance with promotedTs null (Policy F — known words
+  // aren't drilled). Undefined on legacy records until the v7 migration stamps them.
   freqRank?: number | null;       // JMDict freq_rank (1 = most common); for compareIntake
   intakeStatus?: 'queued' | 'active';
   promotedTs?: number | null;     // ms epoch — when it entered active study
@@ -637,13 +639,46 @@ export const useAppStore = create<AppState>()(
           const now = Date.now();
           const difficulty = level === 'unseen' ? null : difficultyForBucket(level);
 
-          // Explicit manual classification promotes a queued word into active study
-          // (#68, D3): opening the modal and declaring a word's difficulty is a direct
-          // statement of knowledge — unlike a passive read or a lookup, which only
-          // signal "I don't know it" and never fast-track promotion. Setting 'unseen'
-          // is not a promotion. Seeds the schedule from the chosen difficulty.
-          const shouldActivate = difficulty != null && current.intakeStatus !== 'active' && current.stability == null;
-          const base = shouldActivate ? activateWord(current, difficulty, now) : current;
+          // #68 D3, revised under Policy F ("flashcards augment reading"): a manual
+          // grade no longer fast-tracks a word into the flashcard deck. For a word
+          // not yet in active study, decidePacing classifies the declaration:
+          //   • hard/medium ("I'm learning this") — just record the grade; the word
+          //     STAYS QUEUED and exits via the daily foundation-first cap, which
+          //     seeds its schedule from this grade when it wins a slot.
+          //   • easy ("I know this") — drilling a known word wastes a daily slot, so
+          //     it skips the queue INTO FAR-OUT MAINTENANCE: the same forward reseed
+          //     the pacing rebalance uses, with promotedTs left null so it never
+          //     surfaces as a "new" card. Reading pushes it further out from there.
+          // Setting 'unseen' is never a promotion.
+          const notActive = current.intakeStatus !== 'active' && current.stability == null;
+          let base = current;
+          let toMaintenance = false;
+          if (difficulty != null && notActive) {
+            const decision = decidePacing({
+              key: word,
+              difficulty,
+              distinctExposures: current.uniqueDaysSeen?.length ?? 0,
+              intakeStatus: current.intakeStatus,
+              stability: current.stability,
+            }, now);
+            if (decision.action === 'keep-active') {
+              const srs = decision.srs;
+              toMaintenance = true;
+              base = {
+                ...current,
+                intakeStatus: 'active',
+                promotedTs: null,
+                stability: srs.stability,
+                fsrsDifficulty: srs.fsrsDifficulty,
+                dueAt: srs.dueAt,
+                lastReviewedTs: srs.lastReviewedAt,
+                intervalDays: (srs.dueAt - srs.lastReviewedAt) / 86_400_000,
+                reps: srs.reps,
+                lapses: srs.lapses,
+                srsStatus: srs.status,
+              };
+            }
+          }
           const updatedWord: WordData = { ...base, mastery: level, difficulty, lastAdjustedDay: today, lastAdjustReason: 'manual' };
 
           // Sync to Supabase
@@ -656,10 +691,10 @@ export const useAppStore = create<AppState>()(
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
                   lastSeenTs: updatedWord.lastSeenTs,
-                  // On promotion, persist the freshly-seeded schedule + intake status.
-                  ...(shouldActivate ? {
+                  // On a maintenance activation, persist the far-out schedule +
+                  // intake status (promotedTs stays null — not a "new" card).
+                  ...(toMaintenance ? {
                     intakeStatus: 'active',
-                    promotedTs: updatedWord.promotedTs,
                     stability: updatedWord.stability,
                     fsrsDifficulty: updatedWord.fsrsDifficulty,
                     dueAt: updatedWord.dueAt,
