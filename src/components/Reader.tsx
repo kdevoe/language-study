@@ -106,12 +106,15 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     if (!token) return;
     const details = token.details;
     const entryId = details?.jmdictEntryId || token.jmdict_entry_id;
-    // Don't grade off a raw, un-enriched token: with no dictionary link the JLPT
-    // is unknown, so seeding difficulty here would assume the word is hard (and it
-    // can't sync without an entry id). If the article hasn't been dictionary-linked
-    // yet, defer — leave the word un-marked so it grades correctly once enrichment
-    // swaps in linked tokens and it scrolls into view again.
-    if (!details && !entryId) {
+    // Only an entry id makes a token dictionary-linked. Fallback details from a
+    // partially-failed enrichment (reading-only, empty meaning, no entry id) must
+    // not be trusted here: grading off them stored degraded records — conjugated
+    // reading, blank meaning, no JLPT (→ stuck in Progress's "Other") — that can
+    // never sync. While the article isn't fully enriched the link may still
+    // arrive, so defer: leave the word un-marked and it grades correctly once
+    // enrichment swaps in linked tokens and it scrolls into view again.
+    const linked = !!entryId;
+    if (!linked) {
       const blocks = useAppStore.getState().currentArticle?.blocks;
       if (blocks && !isEnriched(blocks)) return;
     }
@@ -121,20 +124,20 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
     const existing = useAppStore.getState().wordDatabase[key];
     const surface = details?.word ?? token.lemma ?? token.text ?? key;
     if (!existing) {
-      saveWordDefinition(key, details
-        ? { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, freqRank: details.freqRank, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id }
-        : { reading: '...', meaning: 'Implicitly parsed context', surface, jmdictEntryId: token.jmdict_entry_id });
-    } else if (details && existing.jlptLevel == null && details.jlptLevel != null) {
+      saveWordDefinition(key, linked && details
+        ? { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, freqRank: details.freqRank, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: entryId }
+        : { reading: details?.reading || '...', meaning: 'Implicitly parsed context', surface, furiganaMap: details?.furiganaMap, jmdictEntryId: entryId });
+    } else if (linked && details && existing.jlptLevel == null && details.jlptLevel != null) {
       // Self-heal: the word was first stored before enrichment linked it (so it had
       // no JLPT and sat in Progress's "Other"). Now that we have dictionary details,
       // patch in the level and full definition.
-      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, freqRank: details.freqRank, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: details.jmdictEntryId || token.jmdict_entry_id });
+      saveWordDefinition(key, { reading: details.reading, meaning: details.meaning, surface, jlptLevel: details.jlptLevel, jlptDerived: details.jlptDerived, freqRank: details.freqRank, furiganaMap: details.furiganaMap, pos: details.pos, jmdictEntryId: entryId });
     }
     recordWordSeen(key, true);
     // Count the read either way, but only seed a difficulty when the word is
-    // dictionary-linked (official or freq-derived JLPT). A wholly unlinkable word
-    // stays ungraded rather than being guessed as hard.
-    if (details || entryId) applyDifficultyEvent(key, 'skip', jlptLevel);
+    // dictionary-linked (entry id present). A wholly unlinkable word stays
+    // ungraded rather than being guessed as hard.
+    if (linked) applyDifficultyEvent(key, 'skip', jlptLevel);
   };
   gradeRef.current = gradeWordByKey;
 
