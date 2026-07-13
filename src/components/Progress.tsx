@@ -228,15 +228,22 @@ export function Progress() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          // Fill the row: equal gaps sized by the container, so the donuts span
-          // the full width on any screen and never clip. When the active donut
-          // grows, flexbox re-spreads every frame — neighbors slide smoothly.
+          // Fluid row: on narrow screens the donuts SHRINK proportionally (via
+          // flex-grow ratios on the buttons) so all six always fit with at least
+          // the fixed gap between them; on wide screens they cap at full size
+          // and space-between spreads the leftover as extra spacing. When the
+          // active donut grows, flexbox re-spreads every frame — neighbors
+          // slide smoothly.
           justifyContent: 'space-between',
+          gap: '8px',
           overflowX: 'auto',
           // Generous padding so the active donut's shadow (14px blur) never
           // clips against the overflow scroller on any edge.
           padding: '0.5rem 0.9rem 1.25rem',
-          margin: '0 0 1rem',
+          // Bleed through main's 1.25rem side padding: the row isn't a card, so
+          // it may run wider than the cards — on phones that slack goes straight
+          // into bigger donuts (the fluid sizing absorbs it).
+          margin: '0 -1.25rem 1rem',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
         }}
@@ -254,10 +261,15 @@ export function Progress() {
               onClick={() => switchLevel(l.value)}
               className="sans"
               style={{
-                // Width follows the donut so its size change animates the row's
-                // layout (neighbors slide as it grows/shrinks). Height is fixed
-                // so nothing below the row ever moves vertically.
-                flex: '0 0 auto',
+                // Fluid width: grow factors carry the 64:80 inactive:active
+                // ratio, so donuts scale down together on narrow screens (the
+                // fluid svg inside tracks the button width); max-width caps them
+                // at full size on wide screens. min-width floors legibility —
+                // below it the row overflows into a scroll with gaps intact.
+                // Height is fixed so nothing below the row moves vertically.
+                flex: `${isActive ? 80 : 64} 1 0px`,
+                maxWidth: isActive ? '80px' : '64px',
+                minWidth: isActive ? '54px' : '43px',
                 height: '84px',
                 display: 'flex',
                 alignItems: 'center',
@@ -267,7 +279,7 @@ export function Progress() {
                 cursor: 'pointer',
                 background: 'none',
                 color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
-                transition: 'color 0.2s',
+                transition: 'color 0.2s, flex-grow 0.25s ease, max-width 0.25s ease, min-width 0.25s ease',
               }}
             >
               {/* Round wrapper carries a box-shadow (border-radius 50%) instead of
@@ -277,6 +289,7 @@ export function Progress() {
               <span
                 style={{
                   display: 'flex',
+                  width: '100%',
                   borderRadius: '50%',
                   boxShadow: isActive
                     ? '0 6px 14px rgba(0,0,0,0.24)'
@@ -290,7 +303,7 @@ export function Progress() {
                   activeBucket={null}
                   size={56}
                   strokeWidth={8}
-                  displaySize={isActive ? 80 : 64}
+                  fluid
                   showText={false}
                   centerLabel={l.label}
                   centerText={total.toLocaleString()}
@@ -608,6 +621,7 @@ function Donut({
   centerLabel,
   displaySize,
   holeFill,
+  fluid = false,
 }: {
   counts: Record<BucketKey, number>;
   total: number;
@@ -619,6 +633,7 @@ function Donut({
   centerLabel?: string; // compact center label above the count (e.g. "N4")
   displaySize?: number; // rendered size; defaults to `size` (the viewBox scale)
   holeFill?: string;    // center fill; omit for a transparent hole
+  fluid?: boolean;      // fill the parent's width (square) instead of fixed px
 }) {
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
@@ -648,12 +663,18 @@ function Donut({
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      style={{
-        flex: '0 0 auto',
-        width: rendered,
-        height: rendered,
-        transition: 'width 0.25s ease, height 0.25s ease',
-      }}
+      style={
+        fluid
+          ? // Track the parent's (animated) width; the viewBox scales all
+            // geometry and text vectorially, so any rendered size stays crisp.
+            { width: '100%', height: 'auto', aspectRatio: '1 / 1' }
+          : {
+              flex: '0 0 auto',
+              width: rendered,
+              height: rendered,
+              transition: 'width 0.25s ease, height 0.25s ease',
+            }
+      }
     >
       {holeFill && <circle cx={center} cy={center} r={r} fill={holeFill} />}
       {/* track */}
