@@ -21,6 +21,28 @@ const MASTERY_COLOR: Record<MasteryLevel, string> = {
   unseen: '#cfc9bd',
 };
 
+// Donut buckets = the four mastery buckets plus 'notSeen': words in the level's
+// corpus the user has never encountered. This replaces the old coverage bar —
+// the donut now represents ALL words at the level, seen or not.
+type BucketKey = MasteryLevel | 'notSeen';
+const BUCKETS: { key: BucketKey; label: string; color: string }[] = [
+  ...MASTERY,
+  { key: 'notSeen', label: 'Unseen', color: 'var(--border-light)' },
+];
+const BUCKET_COLOR: Record<BucketKey, string> = {
+  ...MASTERY_COLOR,
+  notSeen: 'var(--border-light)',
+};
+const BUCKET_ORDER: BucketKey[] = ['easy', 'medium', 'hard', 'unseen', 'notSeen'];
+
+const emptyBuckets = (): Record<BucketKey, number> => ({
+  easy: 0,
+  medium: 0,
+  hard: 0,
+  unseen: 0,
+  notSeen: 0,
+});
+
 // JLPT numbering: 5 = N5 (easiest) ... 1 = N1 (hardest). `'other'` collects
 // words JMDict has no JLPT tag for.
 type LevelKey = number | 'other';
@@ -86,7 +108,7 @@ export function Progress() {
 
   const [activeLevel, setActiveLevel] = useState<LevelKey>(defaultLevel);
   // null = show all buckets; otherwise filter the word list to one bucket.
-  const [activeBucket, setActiveBucket] = useState<MasteryLevel | null>(null);
+  const [activeBucket, setActiveBucket] = useState<BucketKey | null>(null);
   const [listMode, setListMode] = useState<'seen' | 'discover'>('seen');
 
   // Corpus totals per JLPT level (denominator for coverage). Fetched once.
@@ -127,21 +149,42 @@ export function Progress() {
     };
   }, [activeLevel, listMode]);
 
-  const words = byLevel.get(activeLevel) ?? [];
+  const words = useMemo(() => byLevel.get(activeLevel) ?? [], [byLevel, activeLevel]);
 
-  // Bucket counts for the active level.
-  const counts = useMemo(() => {
-    const c: Record<MasteryLevel, number> = { easy: 0, medium: 0, hard: 0, unseen: 0 };
-    words.forEach((w) => {
-      c[masteryOf(w)] += 1;
+  // Bucket counts per level: the four mastery buckets from tracked words, plus
+  // 'notSeen' = corpus total minus tracked (levels without a corpus total —
+  // 'Other', or totals still loading — get notSeen 0). Feeds both the mini
+  // donuts in the level buttons and the detail donut below.
+  const levelBucketCounts = useMemo(() => {
+    const m = new Map<LevelKey, Record<BucketKey, number>>();
+    LEVELS.forEach((l) => {
+      const levelWords = byLevel.get(l.value) ?? [];
+      const c = emptyBuckets();
+      levelWords.forEach((w) => {
+        c[masteryOf(w)] += 1;
+      });
+      if (typeof l.value === 'number') {
+        const corpus = levelTotals[l.value];
+        if (corpus) c.notSeen = Math.max(0, corpus - levelWords.length);
+      }
+      m.set(l.value, c);
     });
-    return c;
-  }, [words]);
+    return m;
+  }, [byLevel, levelTotals]);
 
+  const counts = levelBucketCounts.get(activeLevel) ?? emptyBuckets();
   const levelTotal = words.length;
+  // Everything the donut represents: all corpus words at this level (or just
+  // tracked words where no corpus total exists).
+  const donutTotal = levelTotal + counts.notSeen;
 
   const visibleWords = useMemo(() => {
-    const filtered = activeBucket ? words.filter((w) => masteryOf(w) === activeBucket) : words;
+    const filtered =
+      activeBucket == null
+        ? words
+        : activeBucket === 'notSeen'
+        ? [] // never-encountered words aren't tracked; the Discover list covers them
+        : words.filter((w) => masteryOf(w) === activeBucket);
     return [...filtered].sort((a, b) => (b.timesSeen || 0) - (a.timesSeen || 0));
   }, [words, activeBucket]);
 
@@ -150,12 +193,13 @@ export function Progress() {
     setActiveBucket(null);
   };
 
-  // Coverage: how much of this level's full vocabulary the user has encountered.
-  const corpusTotal = typeof activeLevel === 'number' ? levelTotals[activeLevel] : undefined;
-  const coveragePct =
-    corpusTotal && corpusTotal > 0 ? (levelTotal / corpusTotal) * 100 : null;
-  const coverageLabel =
-    coveragePct == null ? '' : coveragePct >= 10 ? `${Math.round(coveragePct)}%` : coveragePct >= 1 ? `${coveragePct.toFixed(1)}%` : '<1%';
+  const toggleBucket = (key: BucketKey) => {
+    const next = activeBucket === key ? null : key;
+    setActiveBucket(next);
+    // Unseen words only exist in the Discover list; graded/ungraded ones in Seen.
+    if (next === 'notSeen' && typeof activeLevel === 'number') setListMode('discover');
+    else if (next != null && next !== 'notSeen') setListMode('seen');
+  };
 
   return (
     <div className="fade-in" style={{ paddingBottom: '6rem' }}>
@@ -183,106 +227,83 @@ export function Progress() {
       <div
         style={{
           display: 'flex',
-          gap: '0.4rem',
+          alignItems: 'center',
+          // Fill the row: equal gaps sized by the container, so the donuts span
+          // the full width on any screen and never clip. When the active donut
+          // grows, flexbox re-spreads every frame — neighbors slide smoothly.
+          justifyContent: 'space-between',
           overflowX: 'auto',
-          paddingBottom: '0.4rem',
-          marginBottom: '1.5rem',
+          // Generous padding so the active donut's shadow (14px blur) never
+          // clips against the overflow scroller on any edge.
+          padding: '0.5rem 0.9rem 1.25rem',
+          margin: '0 0 1rem',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
         }}
       >
         {LEVELS.map((l) => {
           const isActive = l.value === activeLevel;
-          const count = byLevel.get(l.value)?.length ?? 0;
+          const bucketCounts = levelBucketCounts.get(l.value) ?? emptyBuckets();
+          const tracked = byLevel.get(l.value)?.length ?? 0;
+          // Full corpus size for JLPT levels; 'Other' has no corpus, so tracked.
+          const total =
+            typeof l.value === 'number' ? levelTotals[l.value] ?? tracked : tracked;
           return (
             <button
               key={String(l.value)}
               onClick={() => switchLevel(l.value)}
               className="sans"
               style={{
+                // Width follows the donut so its size change animates the row's
+                // layout (neighbors slide as it grows/shrinks). Height is fixed
+                // so nothing below the row ever moves vertically.
                 flex: '0 0 auto',
+                height: '84px',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '2px',
-                minWidth: '3.4rem',
-                padding: '0.55rem 0.7rem',
-                borderRadius: '14px',
+                justifyContent: 'center',
+                padding: 0,
                 border: 'none',
                 cursor: 'pointer',
-                backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-card)',
+                background: 'none',
                 color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
-                transition: 'background-color 0.2s, color 0.2s',
+                transition: 'color 0.2s',
               }}
             >
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.03em' }}>
-                {l.label}
+              {/* Round wrapper carries a box-shadow (border-radius 50%) instead of
+                  a CSS filter: drop-shadow rasterizes the layer, which both blurs
+                  it and shifts its color against the page background. box-shadow
+                  keeps the ring vector-crisp and the hole truly transparent. */}
+              <span
+                style={{
+                  display: 'flex',
+                  borderRadius: '50%',
+                  boxShadow: isActive
+                    ? '0 6px 14px rgba(0,0,0,0.24)'
+                    : '0 1px 3px rgba(0,0,0,0.10)',
+                  transition: 'box-shadow 0.25s ease',
+                }}
+              >
+                <Donut
+                  counts={bucketCounts}
+                  total={tracked + bucketCounts.notSeen}
+                  activeBucket={null}
+                  size={56}
+                  strokeWidth={8}
+                  displaySize={isActive ? 80 : 64}
+                  showText={false}
+                  centerLabel={l.label}
+                  centerText={total.toLocaleString()}
+                  holeFill={isActive ? 'var(--bg-card)' : undefined}
+                />
               </span>
-              <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.75 }}>{count}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Coverage strip — encountered vs. the full vocabulary pool of this level */}
-      {coveragePct != null && corpusTotal && (
-        <div
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            padding: '1.1rem 1.25rem',
-            borderRadius: '16px',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              marginBottom: '0.6rem',
-            }}
-          >
-            <span className="sans" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Encountered{' '}
-              <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>
-                {levelTotal.toLocaleString()}
-              </span>{' '}
-              of {corpusTotal.toLocaleString()} words
-            </span>
-            <span
-              className="serif"
-              style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}
-            >
-              {coverageLabel}
-            </span>
-          </div>
-          <div
-            style={{
-              height: '8px',
-              borderRadius: '100px',
-              backgroundColor: 'var(--border-light)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                width: `${Math.max(coveragePct, 1.5)}%`,
-                backgroundColor: 'var(--accent-progress)',
-                borderRadius: '100px',
-              }}
-            />
-          </div>
-          <p
-            className="sans"
-            style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}
-          >
-            {(corpusTotal - levelTotal).toLocaleString()} more {LEVELS.find((l) => l.value === activeLevel)?.label} words to discover.
-          </p>
-        </div>
-      )}
-
-      {/* Breakdown card: donut + legend (of the words you've engaged with) */}
+      {/* Breakdown card: donut + legend over ALL words at this level — the four
+          mastery buckets plus corpus words never encountered ("Unseen"). */}
       <div
         style={{
           backgroundColor: 'var(--bg-card)',
@@ -291,7 +312,7 @@ export function Progress() {
           marginBottom: '1.5rem',
         }}
       >
-        {levelTotal === 0 ? (
+        {donutTotal === 0 ? (
           <p
             className="sans"
             style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', padding: '1.5rem 0' }}
@@ -308,17 +329,17 @@ export function Progress() {
               justifyContent: 'center',
             }}
           >
-            <Donut counts={counts} total={levelTotal} activeBucket={activeBucket} />
+            <Donut counts={counts} total={donutTotal} activeBucket={activeBucket} />
             <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
-              {MASTERY.map((m) => {
+              {BUCKETS.filter((m) => m.key !== 'notSeen' || counts.notSeen > 0).map((m) => {
                 const value = counts[m.key];
-                const pct = levelTotal > 0 ? Math.round((value / levelTotal) * 100) : 0;
+                const pct = donutTotal > 0 ? Math.round((value / donutTotal) * 100) : 0;
                 const isActive = activeBucket === m.key;
                 const dimmed = activeBucket != null && !isActive;
                 return (
                   <button
                     key={m.key}
-                    onClick={() => setActiveBucket(isActive ? null : m.key)}
+                    onClick={() => toggleBucket(m.key)}
                     className="sans"
                     style={{
                       display: 'flex',
@@ -353,7 +374,7 @@ export function Progress() {
                     <span
                       style={{ fontSize: '0.8rem', color: 'var(--text-muted)', minWidth: '1.6rem', textAlign: 'right' }}
                     >
-                      {value}
+                      {value.toLocaleString()}
                     </span>
                   </button>
                 );
@@ -445,7 +466,7 @@ export function Progress() {
 
         {/* SEEN list */}
         {listMode === 'seen' &&
-          (levelTotal === 0 ? null : (
+          (visibleWords.length === 0 ? null : (
             <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', overflow: 'hidden' }}>
               {visibleWords.map((w, i) => (
                 <WordRowView
@@ -580,24 +601,35 @@ function Donut({
   counts,
   total,
   activeBucket,
+  size = 150,
+  strokeWidth = 20,
+  showText = true,
+  centerText,
+  centerLabel,
+  displaySize,
+  holeFill,
 }: {
-  counts: Record<MasteryLevel, number>;
+  counts: Record<BucketKey, number>;
   total: number;
-  activeBucket: MasteryLevel | null;
+  activeBucket: BucketKey | null;
+  size?: number;
+  strokeWidth?: number;
+  showText?: boolean;
+  centerText?: string;  // compact center count (mini donuts)
+  centerLabel?: string; // compact center label above the count (e.g. "N4")
+  displaySize?: number; // rendered size; defaults to `size` (the viewBox scale)
+  holeFill?: string;    // center fill; omit for a transparent hole
 }) {
-  const size = 150;
-  const stroke = 20;
-  const r = (size - stroke) / 2;
+  const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const center = size / 2;
 
   // Build segments in legend order; skip empty buckets.
-  const order: MasteryLevel[] = ['easy', 'medium', 'hard', 'unseen'];
   let offset = 0;
-  const segments = order
+  const segments = BUCKET_ORDER
     .filter((k) => counts[k] > 0)
     .map((k) => {
-      const frac = counts[k] / total;
+      const frac = total > 0 ? counts[k] / total : 0;
       const len = frac * c;
       const seg = { key: k, len, offset };
       offset += len;
@@ -607,15 +639,25 @@ function Donut({
   // Headline = the active bucket's share, else "words" total.
   const headlineNum = activeBucket
     ? `${total > 0 ? Math.round((counts[activeBucket] / total) * 100) : 0}%`
-    : String(total);
+    : total.toLocaleString();
   const headlineLbl = activeBucket
-    ? MASTERY.find((m) => m.key === activeBucket)!.label
+    ? BUCKETS.find((m) => m.key === activeBucket)!.label
     : total === 1 ? 'word' : 'words';
 
+  const rendered = displaySize ?? size;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flex: '0 0 auto' }}>
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      style={{
+        flex: '0 0 auto',
+        width: rendered,
+        height: rendered,
+        transition: 'width 0.25s ease, height 0.25s ease',
+      }}
+    >
+      {holeFill && <circle cx={center} cy={center} r={r} fill={holeFill} />}
       {/* track */}
-      <circle cx={center} cy={center} r={r} fill="none" stroke="var(--border-light)" strokeWidth={stroke} />
+      <circle cx={center} cy={center} r={r} fill="none" stroke="var(--border-light)" strokeWidth={strokeWidth} />
       <g transform={`rotate(-90 ${center} ${center})`}>
         {segments.map((s) => {
           const dim = activeBucket != null && s.key !== activeBucket;
@@ -626,8 +668,8 @@ function Donut({
               cy={center}
               r={r}
               fill="none"
-              stroke={MASTERY_COLOR[s.key]}
-              strokeWidth={stroke}
+              stroke={BUCKET_COLOR[s.key]}
+              strokeWidth={strokeWidth}
               strokeDasharray={`${s.len} ${c - s.len}`}
               strokeDashoffset={-s.offset}
               strokeLinecap="butt"
@@ -636,24 +678,66 @@ function Donut({
           );
         })}
       </g>
-      <text
-        x={center}
-        y={center - 4}
-        textAnchor="middle"
-        className="serif"
-        style={{ fontSize: '1.7rem', fontWeight: 700, fill: 'var(--text-main)' }}
-      >
-        {headlineNum}
-      </text>
-      <text
-        x={center}
-        y={center + 16}
-        textAnchor="middle"
-        className="sans"
-        style={{ fontSize: '0.7rem', fill: 'var(--text-muted)', letterSpacing: '0.04em' }}
-      >
-        {headlineLbl}
-      </text>
+      {!showText && (centerLabel != null || centerText != null) && (
+        <>
+          {centerLabel != null && (
+            <text
+              x={center}
+              y={centerText != null ? center - 4 : center}
+              dominantBaseline="central"
+              textAnchor="middle"
+              className="sans"
+              style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.02em', fill: 'currentColor' }}
+            >
+              {centerLabel}
+            </text>
+          )}
+          {centerText != null && (
+            <text
+              x={center}
+              y={centerLabel != null ? center + 8 : center}
+              dominantBaseline="central"
+              textAnchor="middle"
+              className="sans"
+              style={{
+                // Shrink to fit the hole: ~0.62em average glyph width for digits.
+                fontSize: `${Math.min(9.5, (size - strokeWidth * 2 - 4) / (Math.max(centerText.length, 1) * 0.62))}px`,
+                fontWeight: 600,
+                opacity: 0.75,
+                fill: 'currentColor',
+              }}
+            >
+              {centerText}
+            </text>
+          )}
+        </>
+      )}
+      {showText && (
+        <>
+          <text
+            x={center}
+            y={center - 4}
+            textAnchor="middle"
+            className="serif"
+            style={{
+              fontSize: headlineNum.length > 4 ? '1.35rem' : '1.7rem',
+              fontWeight: 700,
+              fill: 'var(--text-main)',
+            }}
+          >
+            {headlineNum}
+          </text>
+          <text
+            x={center}
+            y={center + 16}
+            textAnchor="middle"
+            className="sans"
+            style={{ fontSize: '0.7rem', fill: 'var(--text-muted)', letterSpacing: '0.04em' }}
+          >
+            {headlineLbl}
+          </text>
+        </>
+      )}
     </svg>
   );
 }
