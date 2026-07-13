@@ -56,6 +56,18 @@ function isAuthError(error: any): boolean {
   return msg.includes('jwt') || msg.includes('token') || msg.includes('unauthorized');
 }
 
+/** True when a failed edge-function call reflects a transiently-busy upstream
+ *  (LLM overloaded/rate-limited) rather than a real bug — process-article maps
+ *  these to HTTP 503, and a platform 429/503 counts too. Lets the UI show
+ *  "try again in a moment" instead of a generic failure. */
+export function isServerBusyError(error: unknown): boolean {
+  const e = error as { status?: number; context?: { status?: number }; message?: string } | null;
+  const status = e?.status ?? e?.context?.status;
+  if (status === 503 || status === 429) return true;
+  const msg = String(e?.message || '').toLowerCase();
+  return msg.includes('overload') || msg.includes('rate limit') || msg.includes('busy');
+}
+
 async function invokeEdgeFn<T = any>(name: string, body: object, timeoutMs?: number): Promise<T> {
   const run = () => {
     const invocation = supabase.functions.invoke(name, { body });
