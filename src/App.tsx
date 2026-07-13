@@ -9,7 +9,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { fetchNewsFeed, NewsArticle, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer } from './services/api'
+import { fetchNewsFeed, NewsArticle, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -39,7 +39,6 @@ function App() {
   const dismissedArticleIds = useAppStore(state => state.dismissedArticleIds || []);
   const dismissArticle = useAppStore(state => state.dismissArticle);
   const markArticleRead = useAppStore(state => state.markArticleRead);
-  const [failedArticleIds, setFailedArticleIds] = useState<Set<string>>(new Set());
   // Transient, user-visible message for failures that would otherwise be silent
   // (e.g. an article that does nothing when tapped because processing failed).
   const [actionError, setActionError] = useState<string | null>(null);
@@ -50,7 +49,13 @@ function App() {
   }, [actionError]);
 
   const handleProcessArticle = useCallback(async (article: NewsArticle): Promise<NewsArticle | null> => {
-    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id) || failedArticleIds.has(article.id)) return null;
+    // null return = a no-op guard (already cached or a tap while a prior run for
+    // this same article is still in flight), NOT a failure. Real failures throw,
+    // so the caller can classify them and show accurate copy. We deliberately do
+    // NOT remember failures: the only caller is an explicit user tap (the client
+    // JIT pre-processor is retired), so a re-tap should always retry — a single
+    // transient blip must never permanently brick a card for the session.
+    if (!article.id || articlesCache[article.id] || (processingArticles || []).includes(article.id)) return null;
 
     setProcessing(article.id, true);
     try {
@@ -73,15 +78,14 @@ function App() {
       );
       const processed = { ...article, blocks: processedBlocks };
       saveProcessedArticle(article.id, processed);
-      setProcessing(article.id, false);
       return processed;
     } catch (e) {
       console.error('[process] Failed for article:', article.id, article.title, e);
-      setFailedArticleIds(prev => new Set(prev).add(article.id));
+      throw e;
+    } finally {
+      setProcessing(article.id, false);
     }
-    setProcessing(article.id, false);
-    return null;
-  }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle, failedArticleIds]);
+  }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
 
   const replenishFeedAtBottom = useCallback(async () => {
     if (isReplenishing || isLoadingFeed || isEndOfFeed) return;
@@ -454,17 +458,18 @@ function App() {
 
       // Genuinely not processed yet — process on demand, then open the Reader.
       const processed = await handleProcessArticle(article);
-      if (processed) {
-        // Don't yank the user in if they moved on during the long processing wait.
-        if (pendingOpenIdRef.current === article.id) openReader(processed);
-      } else {
-        // handleProcessArticle swallows its error into failedArticleIds; surface
-        // it here so the tap doesn't just silently do nothing.
-        setActionError("Couldn't load this article — the server may be busy. Please try another.");
-      }
+      // A null (non-throwing) result means a no-op guard fired — most likely a
+      // tap while a prior run for this same article is still in flight. Don't
+      // show an error; the in-flight run will open it.
+      if (processed && pendingOpenIdRef.current === article.id) openReader(processed);
     } catch (e) {
       console.error('[select] Failed to open article:', article.id, e);
-      setActionError("Couldn't load this article — the server may be busy. Please try another.");
+      const busy = isServerBusyError(e);
+      setActionError(
+        busy
+          ? "The server's busy right now — give it a moment and tap again."
+          : "Couldn't load this article. Please try again, or pick another."
+      );
     }
   };
 

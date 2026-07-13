@@ -11,6 +11,56 @@ const corsHeaders = {
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// ── Transient LLM failure retry ──────────────────────────────────────────────
+// Gemini flash intermittently returns 429 (rate limit) / 503 (model overloaded)
+// and, less often, a truncated/empty body that fails JSON.parse. A single blip
+// used to brick the whole article — the user just saw "the server may be busy."
+// Retry the rewrite (generate + parse together, since a bad parse means we need
+// a fresh generation) with exponential backoff before giving up.
+const REWRITE_MAX_ATTEMPTS = 3;
+const REWRITE_BACKOFF_MS = [500, 1000, 2000];
+
+/** True for the transient upstream failures worth retrying: LLM rate-limit /
+ *  overload / 5xx, and malformed-JSON (empty or truncated) generations. */
+function isTransientLlmError(err: unknown): boolean {
+  if (err instanceof SyntaxError) return true; // truncated/empty JSON → regenerate
+  const status = (err as { status?: number; code?: number })?.status
+    ?? (err as { code?: number })?.code;
+  if (status === 429 || status === 500 || status === 503) return true;
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return /\b(429|500|503)\b|overload|unavailable|rate.?limit|resource.?exhausted|deadline|timeout/.test(msg);
+}
+
+/** Run the Pass-1 rewrite (Gemini generate + JSON.parse) with backoff on
+ *  transient failures. Non-transient errors throw immediately. */
+async function runRewriteWithRetry(ai: GoogleGenAI, prompt: string): Promise<any> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < REWRITE_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await ai.models.generateContent({
+        model: GEMINI_FLASH,
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      const rawText = (result.text ?? '')
+        .replace(/^```(json)?[\s\n]*/i, '')
+        .replace(/[\s\n]*```$/i, '')
+        .trim();
+      return JSON.parse(rawText);
+    } catch (err) {
+      lastErr = err;
+      const transient = isTransientLlmError(err);
+      console.warn(
+        `[process-article] rewrite attempt ${attempt + 1}/${REWRITE_MAX_ATTEMPTS} failed (transient=${transient}):`,
+        err instanceof Error ? err.message : err,
+      );
+      if (!transient || attempt === REWRITE_MAX_ATTEMPTS - 1) throw err;
+      await new Promise((r) => setTimeout(r, REWRITE_BACKOFF_MS[attempt]));
+    }
+  }
+  throw lastErr;
+}
+
 // ── Opportunistic full-text extraction ──────────────────────────────────────
 // A NewsAPI/RSS teaser is ~150-200 chars; the real article body is 10-100x
 // richer. We pull it from the source URL via Jina Reader, but only for sources
@@ -463,13 +513,10 @@ Deno.serve(async (req) => {
     });
 
     console.log(`[process-article] Pass 1 for user ${userId}`);
-    const result1 = await ai.models.generateContent({
-      model: GEMINI_FLASH,
-      contents: prompt1,
-      config: { responseMimeType: 'application/json' },
-    });
-    const rawText1 = (result1.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
-    const rawBlocks = JSON.parse(rawText1);
+    // Retries transient Gemini overload/rate-limit and malformed-JSON blips with
+    // backoff (see runRewriteWithRetry) so one upstream hiccup no longer surfaces
+    // as "the server may be busy."
+    const rawBlocks = await runRewriteWithRetry(ai, prompt1);
 
     // Store paragraphs as raw text ({type, text}); the client tokenizes, adds
     // furigana, and links JMDict entries with a real morphological analyzer
@@ -525,9 +572,21 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    console.error('[process-article] Error:', err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Distinguish a genuinely-busy upstream (LLM overloaded/rate-limited even
+    // after retries) from a real server bug, so the client can show accurate
+    // copy instead of always blaming a busy server. `errorKind: 'llm_busy'` +
+    // HTTP 503 → "try again in a moment"; anything else → generic failure.
+    const busy = isTransientLlmError(err);
+    console.error(`[process-article] Error (busy=${busy}):`, err);
+    return new Response(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
+        errorKind: busy ? 'llm_busy' : 'server_error',
+      }),
+      {
+        status: busy ? 503 : 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    );
   }
 });
