@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { useAppStore, WordData } from '../services/store';
@@ -14,14 +14,15 @@ const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 // (#67) and writes a `flashcard` review-log row. The deck is SNAPSHOTTED at mount
 // (tab open) so grading a card doesn't reshuffle the pile underfoot.
 
-// Grade color is carried by a small dot (not a full fill) so the buttons read as
-// part of the card's white/hairline aesthetic while keeping the red→green
-// traffic-light cue. Dots are muted tones from the same palette family.
-const RATINGS: { rating: Rating; label: string; dot: string }[] = [
-  { rating: 1, label: 'Again', dot: '#cf7d6b' },
-  { rating: 2, label: 'Hard', dot: '#c2a058' },
-  { rating: 3, label: 'Good', dot: '#8fb0c4' },
-  { rating: 4, label: 'Easy', dot: '#8faa74' },
+// Grade color is carried entirely by a soft tinted shadow under each white pill —
+// no dot, no fill, no colored border — so the buttons keep the card's hairline
+// aesthetic while the red→green traffic-light cue glows quietly beneath them.
+// Tones are the same muted palette family the dots used.
+const RATINGS: { rating: Rating; label: string; shadow: string }[] = [
+  { rating: 1, label: 'Again', shadow: '0 3px 10px rgba(207, 125, 107, 0.30)' },
+  { rating: 2, label: 'Hard', shadow: '0 3px 10px rgba(194, 160, 88, 0.30)' },
+  { rating: 3, label: 'Good', shadow: '0 3px 10px rgba(143, 176, 196, 0.35)' },
+  { rating: 4, label: 'Easy', shadow: '0 3px 10px rgba(143, 170, 116, 0.32)' },
 ];
 
 // A card carries the full word plus which source (due review / new) put it here.
@@ -87,6 +88,21 @@ export function Flashcards() {
 
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+
+  // The app-open promotion pass (sync → promoteIntakeQueue) is async and can land
+  // AFTER this tab mounted with an empty deck. While the deck is empty, rebuild the
+  // snapshot whenever words change so freshly promoted cards surface without a
+  // tab-away round trip. Once a deck exists it stays snapshotted (no reshuffling).
+  const wordDatabase = useAppStore((s) => s.wordDatabase);
+  useEffect(() => {
+    if (cards.length > 0) return;
+    const fresh = buildDeck();
+    if (fresh.length > 0) {
+      setCards(fresh);
+      setIndex(0);
+      setRevealed(false);
+    }
+  }, [cards.length, wordDatabase]);
 
   // Dev-only: seed a demo deck, then rebuild the snapshot in place (no reload).
   function seedAndReload() {
@@ -185,10 +201,10 @@ export function Flashcards() {
         </div>
       </div>
 
-      {/* Card + grade group — the FRONT card grows down into the button zone so the
-          flip target sits where the thumb already rests. On flip the card shrinks
-          up and the grade buttons slide into the space it vacated. Both live in one
-          centered column so the whole unit stays put. */}
+      {/* The card is a single FIXED-HEIGHT flip surface. The grade buttons live
+          INSIDE the back face, as a hairline-divided strip along its bottom edge —
+          so flipping never changes the card's height or shifts the layout, and the
+          buttons arrive with the flip itself (no second animation). */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
         <AnimatePresence mode="wait">
           {/* Outer wrapper handles the between-cards slide/fade. */}
@@ -197,10 +213,10 @@ export function Flashcards() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }}
             exit={{ opacity: 0, y: -10, transition: { duration: 0.11, ease: 'easeIn' } }}
-            style={{ width: '100%', maxWidth: '340px', display: 'flex', flexDirection: 'column' }}
+            style={{ width: '100%', maxWidth: '340px' }}
           >
-            {/* Inner element rotates in 3D — front and back are its two faces. Its
-                height shrinks on reveal (540→440) to open room for the buttons. */}
+            {/* Inner element rotates in 3D — front and back are its two faces.
+                Capped in px but scaled by vh so it never tucks under the nav. */}
             <motion.div
               onClick={() => !revealed && setRevealed(true)}
               initial={false}
@@ -209,11 +225,7 @@ export function Flashcards() {
               style={{
                 position: 'relative',
                 width: '100%',
-                // Front grows into the button zone; shrinks on reveal. Capped in px but
-                // scaled by vh so it never tucks under the nav on short screens.
-                // (Height rides a CSS transition since framer can't tween a min() calc.)
-                height: revealed ? 'min(440px, 50vh)' : 'min(540px, 62vh)',
-                transition: 'height 0.55s cubic-bezier(0.22, 1, 0.36, 1)',
+                height: 'min(540px, 62vh)',
                 transformStyle: 'preserve-3d',
                 cursor: revealed ? 'default' : 'pointer',
               }}
@@ -226,8 +238,38 @@ export function Flashcards() {
                 </div>
               </CardFace>
 
-              {/* BACK — reading (furigana) + meaning + grammar note + JLPT pill. */}
-              <CardFace back>
+              {/* BACK — reading (furigana) + meaning + grammar note + JLPT level,
+                  with the grade pills floating along the bottom edge. */}
+              <CardFace
+                back
+                footer={
+                  <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
+                    {RATINGS.map(({ rating, label, shadow }) => (
+                      <button
+                        key={rating}
+                        onClick={() => grade(rating)}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          padding: '0.55rem 0 0.6rem',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '999px',
+                          backgroundColor: 'var(--bg-pure)',
+                          boxShadow: shadow,
+                          color: 'var(--text-main)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{label}</span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{previews[rating]}</span>
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
                 <FuriganaWord word={card.word} reveal={true} />
                 <div style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginTop: '1.5rem', lineHeight: 1.6, maxWidth: '28ch' }}>
                   {card.word.meaning}
@@ -237,16 +279,14 @@ export function Flashcards() {
                     {card.word.grammarNote}
                   </div>
                 )}
+                {/* Plain text (no pill chrome) — a pill here would read as a fifth
+                    button now that the grade pills share the card. */}
                 {card.word.jlptLevel != null && (
                   <span
                     className="sans"
                     title={card.word.jlptDerived ? 'Approximate level (inferred from kanji / frequency)' : undefined}
                     style={{
                       marginTop: '1.5rem',
-                      padding: '0.25rem 0.75rem',
-                      border: '1px solid var(--border-light)',
-                      borderRadius: '999px',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
                       fontSize: '0.7rem',
                       fontWeight: 800,
                       letterSpacing: '0.04em',
@@ -259,46 +299,6 @@ export function Flashcards() {
                 )}
               </CardFace>
             </motion.div>
-
-            {/* Grade buttons — slide into the space the shrinking card vacated,
-                so they land right under the thumb that just tapped to flip. */}
-            <AnimatePresence>
-              {revealed && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                  style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}
-                >
-                  {RATINGS.map(({ rating, label, dot }) => (
-                <button
-                  key={rating}
-                  onClick={() => grade(rating)}
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    padding: '0.7rem 0.25rem',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '14px',
-                    backgroundColor: 'var(--bg-pure)',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                    color: 'var(--text-main)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
-                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: dot }} />
-                    {label}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{previews[rating]}</span>
-                </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.div>
         </AnimatePresence>
       </div>
@@ -362,8 +362,9 @@ function FuriganaWord({ word, reveal }: { word: WordData; reveal: boolean }) {
 // One face of the flip card — a minimal white card surface (hairline border, soft
 // shadow). Both faces stack via absolute positioning; the back is pre-rotated 180°
 // so it reads correctly once the card flips. `backface-visibility: hidden` hides
-// whichever face currently points away from the viewer.
-function CardFace({ children, back = false }: { children: React.ReactNode; back?: boolean }) {
+// whichever face currently points away from the viewer. `footer` renders flush
+// against the face's bottom edge, outside the content padding (the grade strip).
+function CardFace({ children, back = false, footer }: { children: React.ReactNode; back?: boolean; footer?: React.ReactNode }) {
   return (
     <div
       style={{
@@ -371,10 +372,6 @@ function CardFace({ children, back = false }: { children: React.ReactNode; back?
         inset: 0,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: '2rem 1.75rem',
         backgroundColor: 'var(--bg-pure)',
         border: '1px solid var(--border-light)',
         borderRadius: '22px',
@@ -385,7 +382,22 @@ function CardFace({ children, back = false }: { children: React.ReactNode; back?
         overflow: 'hidden',
       }}
     >
-      {children}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '2rem 1.75rem',
+        }}
+      >
+        {children}
+      </div>
+      {footer}
     </div>
   );
 }

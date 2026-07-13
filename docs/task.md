@@ -220,3 +220,26 @@
         test-intake 14 — all green; tsc clean; 0 new lint.
   - [ ] ACTIVATE (your step): deploy process-article, then Settings → Rebalance Flashcard
         Deck. No new DB column (reuses user_word_progress scheduling columns).
+- [x] Morning-empty-deck fix + in-card grade strip (Jul 13)
+  - Symptom: 0 cards at 9:36am, then a single NEW card (出口) that was just read.
+    Verified against prod data: 出口 was a WordModal mastery-tap promotion (by
+    design); the daily batch never ran (rolling 24h gate — phone last promoted
+    12:17pm Jul 12); and Jul 11's 3 promoted words (reps 0 server-side) were
+    invisible because rehydrate dropped promotedTs/intakeStatus/schedule fields.
+  - [x] store.promoteIntakeQueue — gate by LOCAL CALENDAR DAY (sameLocalDay), not
+        rolling 24h; count words already promoted today (promotedTs, rides the
+        sync — cross-device + manual modal promotions) against newWordsPerDay;
+        only deck-eligible (JLPT-leveled) queued words may win slots.
+  - [x] store.checkDailyKanji — same calendar-day gate (same drift bug).
+  - [x] syncSrsWithSupabase rehydrate — carry stability/dueAt/reps/lapses/
+        srsStatus/intervalDays/fsrsDifficulty/lastReviewedTs/intakeStatus/promotedTs
+        so cross-device promotions surface in the deck.
+  - [x] Flashcards.tsx — constant card height (min(540px,62vh) both faces); the 4
+        grade buttons now live INSIDE the back face as a hairline-divided bottom
+        strip (no height change on flip); empty-deck snapshot rebuilds when the
+        async app-open promotion lands.
+  - Verified: all 5 test runners green (122 total), tsc -b + vite build clean,
+    0 new lint; Playwright walkthrough (front → flip → grade → next card).
+  - [x] Grade-strip restyle (variant A): floating white capsule pills, grade color
+        carried ONLY by a soft tinted shadow (no dots, no divider grid); JLPT tag
+        de-pilled to plain text so it doesn't read as a fifth button.
