@@ -240,7 +240,10 @@ export function Progress() {
           // Generous padding so the active donut's shadow (14px blur) never
           // clips against the overflow scroller on any edge.
           padding: '0.5rem 0.9rem 1.25rem',
-          margin: '0 0 1rem',
+          // Bleed through main's 1.25rem side padding: the row isn't a card, so
+          // it may run wider than the cards — on phones that slack goes straight
+          // into bigger donuts (the fluid sizing absorbs it).
+          margin: '0 -1.25rem 1rem',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
         }}
