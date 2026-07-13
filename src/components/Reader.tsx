@@ -314,6 +314,16 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       setSelectedWord(null);
       return;
     }
+    // Enriched tokens can carry an empty meaning — an unlinkable proper noun
+    // (enrich.ts keeps its furigana but leaves meaning blank), or a JMDict entry
+    // that came through glossless during article enrichment. Trusting it here
+    // renders a permanent skeleton because this handler never fetches. Route to
+    // the real lookup path instead — it fetches (with timeout + error state) and
+    // honors the "tap falls back to dictionary-lookup" the enricher intended.
+    if (!details.meaning) {
+      handleDictionaryLookup(details.word, sentText, e, tokenId, details.jmdictEntryId);
+      return;
+    }
     determineAnchor(e);
     // Track under the canonical key (entry_id when linked, else the surface/lemma),
     // so a click and a passive read of the same word land on one record (#39).
@@ -404,7 +414,10 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
       const combinedInitial: WordDetails = {
         word,
         reading: quickDef.reading || '...',
-        meaning: quickDef.meaning || 'Looking up...',
+        // Leave empty when the lookup genuinely returned no gloss — the modal
+        // renders a terminal "no definition" state for that (a placeholder here
+        // would masquerade as still-loading and never resolve).
+        meaning: quickDef.meaning || '',
         furiganaMap: quickDef.furiganaMap,
         jlptLevel: quickDef.jlptLevel,
         pos: quickDef.pos,
