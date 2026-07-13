@@ -1070,8 +1070,9 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // Backfill cached words that have a JMDict entry id but are missing a JLPT
-      // level and/or a difficulty:
+      // Backfill degraded cached words:
+      //   - entry-less records: resolved by surface form and re-keyed onto their
+      //     canonical entry_id (see the first stage below).
       //   - jlptLevel: resolved official → kanji → frequency (matches enrichment).
       //   - difficulty: seeded from the (now-known) JLPT as a read-past 'skip',
       //     exactly like applyDifficultyEvent's first contact, so a word seen before
@@ -1079,6 +1080,85 @@ export const useAppStore = create<AppState>()(
       // Only seeds difficulty for words actually encountered (timesSeen >= 1) and
       // syncs the seeded grades to Supabase in one batched round-trip.
       backfillWordProgress: async () => {
+        // Heal entry-less records by resolving their surface form against JMDict.
+        // A partially-failed enrichment (one lookup leg timing out / truncating)
+        // used to leave tokens link-less, and grading off them stored degraded
+        // records: conjugated reading, blank meaning, no entry id, no JLPT — stuck
+        // permanently in Progress's "Other" and invisible to the entry-id stages
+        // below. The stored surface is the kuromoji lemma, so a JMDict surface
+        // lookup recovers the entry; the record is then re-keyed onto its canonical
+        // entry_id (merging into any healthy duplicate tracked there) and picks up
+        // the dictionary reading/meaning/JLPT. Katakana-only surfaces are skipped
+        // on purpose: article katakana is mostly proper nouns, and linking e.g.
+        // トランプ (the person) to JMDict's "playing cards" would be wrong — those
+        // records legitimately live in "Other".
+        const entrylessTargets = Object.entries(get().wordDatabase)
+          .map(([key, w]) => ({ key, surface: w.surface ?? key, w }))
+          .filter(({ surface, w }) => {
+            if (w.jmdictEntryId) return false;
+            // Resolvable = contains hiragana or kanji (excludes katakana-only,
+            // romaji, digits) and isn't a bare single-kana parse fragment.
+            if (!/[぀-ゟ一-鿿㐀-䶿々]/.test(surface)) return false;
+            if (surface.length === 1 && /[぀-ゟ]/.test(surface)) return false;
+            return true;
+          });
+        if (entrylessTargets.length > 0) {
+          try {
+            const { lookupLemmasBatch, jmdictToWordDetails } = await import('./jmdict');
+            const surfaces = [...new Set(entrylessTargets.map(t => t.surface))];
+            // Chunk the batch: each surface can match several entries, and one huge
+            // .in() risks the silent ~1000-row cap — the very truncation that
+            // created these records during enrichment.
+            const resolved = new Map<string, import('./jmdict').JMDictResult>();
+            const CHUNK = 50;
+            for (let i = 0; i < surfaces.length; i += CHUNK) {
+              const part = await lookupLemmasBatch(surfaces.slice(i, i + CHUNK));
+              part.forEach((v, k) => resolved.set(k, v));
+            }
+            if (resolved.size > 0) {
+              set((state) => {
+                const db = { ...state.wordDatabase };
+                let changed = false;
+                for (const { key, surface } of entrylessTargets) {
+                  // Re-read latest; a concurrent lookup may have linked it already.
+                  const current = db[key];
+                  if (!current || current.jmdictEntryId) continue;
+                  const entry = resolved.get(surface);
+                  if (!entry) continue;
+                  const d = jmdictToWordDetails(surface, entry);
+                  const healed: WordData = {
+                    ...current,
+                    // The stored reading/furigana came from a conjugated token;
+                    // the JMDict lemma reading matches the displayed surface.
+                    reading: d.reading || current.reading,
+                    meaning: current.meaning && current.meaning !== 'Implicitly parsed context'
+                      ? current.meaning
+                      : (d.meaning || current.meaning),
+                    furiganaMap: d.furiganaMap.length > 0 ? d.furiganaMap : current.furiganaMap,
+                    pos: current.pos ?? d.pos,
+                    jlptLevel: current.jlptLevel ?? d.jlptLevel,
+                    jlptDerived: current.jlptLevel != null ? current.jlptDerived : d.jlptDerived,
+                    freqRank: current.freqRank ?? d.freqRank,
+                    surface: current.surface ?? surface,
+                    jmdictEntryId: d.jmdictEntryId,
+                  };
+                  if (d.jmdictEntryId !== key) {
+                    const existing = db[d.jmdictEntryId];
+                    db[d.jmdictEntryId] = existing ? mergeWordData(existing, healed) : healed;
+                    delete db[key];
+                  } else {
+                    db[key] = healed;
+                  }
+                  changed = true;
+                }
+                return changed ? { wordDatabase: db } : {};
+              });
+            }
+          } catch (e) {
+            console.warn('[store] entry-less word resolve failed:', e);
+          }
+        }
+
         // Heal words that entered via read-past (recordWordSeen creates them with an
         // empty `reading`) or were promoted to the deck before ever being looked up:
         // with no reading and no furiganaMap the flashcard front can't show furigana.
