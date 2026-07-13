@@ -1,0 +1,36 @@
+{
+  "id": "EVAL-008",
+  "note": "N3 cluster path (docs/vocab-palette-redesign.md): the drone/fireworks story that motivated the redesign. Ships concept clusters (easiest-known first) + difficulty ceiling. A/B pair with EVAL-009 (same article, legacy thin palette) — expect higher jlptFit here.",
+  "source": {
+    "title": "Drones help fire department catch illegal fireworks",
+    "text": "The fire department in Sacramento, in northern California, used drones for the first time this year on July 4th. Thanks to the drone monitoring, one case resulted in a $100,000 fine. Firefighter Justin Silvia explained that the drones can film high-quality video and use Google Maps to pinpoint the location of fireworks. Every year, illegal fireworks cause serious fires, injuries, and several deaths. They also pollute the air around residential areas and create loud noise. Police and fire departments warned that they will publish the drone footage on social media and continue monitoring in the future.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 3,
+    "rtkLevel": 700,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 3
+  },
+  "palette": {
+    "known": ["使い始める", "入れる", "導入する", "見張る", "監視する", "見つける", "特定する", "撮る", "撮影する", "止める", "捕まえる", "取り締まる", "禁止", "違法", "けが", "被害"],
+    "review": ["罰金", "騒音"],
+    "new": [],
+    "targetReview": 2,
+    "targetNew": 0,
+    "clusters": [
+      { "concept": "introduce", "words": ["使い始める", "入れる", "導入する"] },
+      { "concept": "monitor", "words": ["見張る", "監視する"] },
+      { "concept": "identify", "words": ["見つける", "特定する"] },
+      { "concept": "film", "words": ["撮る", "撮影する"] },
+      { "concept": "crack down", "words": ["止める", "捕まえる", "取り締まる"] },
+      { "concept": "illegal", "words": ["禁止", "違法"] },
+      { "concept": "damage", "words": ["けが", "被害"] }
+    ]
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}

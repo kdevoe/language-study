@@ -1,0 +1,27 @@
+{
+  "id": "EVAL-009",
+  "note": "N3 legacy path A/B control: SAME drone/fireworks article as EVAL-008, but the thin topic-noun palette the OLD pipeline produced (no clusters, no difficulty ceiling). Baseline to measure the cluster path against.",
+  "source": {
+    "title": "Drones help fire department catch illegal fireworks",
+    "text": "The fire department in Sacramento, in northern California, used drones for the first time this year on July 4th. Thanks to the drone monitoring, one case resulted in a $100,000 fine. Firefighter Justin Silvia explained that the drones can film high-quality video and use Google Maps to pinpoint the location of fireworks. Every year, illegal fireworks cause serious fires, injuries, and several deaths. They also pollute the air around residential areas and create loud noise. Police and fire departments warned that they will publish the drone footage on social media and continue monitoring in the future.",
+    "sources": []
+  },
+  "profile": {
+    "jlptLevel": 3,
+    "rtkLevel": 700,
+    "studyMode": "balanced",
+    "vocabMode": "balanced",
+    "readingIntensity": "balanced",
+    "targetParagraphs": 3
+  },
+  "palette": {
+    "known": ["消防", "花火", "警察", "動画"],
+    "review": ["罰金"],
+    "new": ["騒音"],
+    "targetReview": 1,
+    "targetNew": 1
+  },
+  "assertions": {
+    "mustNotContain": []
+  }
+}

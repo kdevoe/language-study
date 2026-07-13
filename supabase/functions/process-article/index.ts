@@ -112,9 +112,6 @@ const DEFAULT_TARGET_PARAGRAPHS: Record<SourceKind, number> = {
 // longer full-text article gets proportionally more review/new words — keeping
 // the known/review/new density constant instead of diluting it across more text.
 const WORDS_PER_PARAGRAPH = 67;
-// Backbone (KNOWN) pool size per paragraph — a draw-from pool, not a quota — so a
-// longer article has a richer known palette to build its spine from.
-const KNOWN_WORDS_PER_PARAGRAPH = 10;
 
 // #51: how many review slots to reserve for a topic-INDEPENDENT floor of the user's
 // most-stuck words, blended in regardless of whether they match the article's topic.
@@ -129,13 +126,61 @@ const INTENSITY_RATIOS: Record<string, { known: number; review: number; new: num
   intensive: { known: 0.900, review: 0.080, new: 0.020 },
 };
 
-async function extractKeywordsWithGroq(title: string, snippet: string, apiKey: string): Promise<string[]> {
-  const prompt = `Extract 10-15 topic keywords from this English news article. Return ONLY a JSON array of lowercase single-word or two-word phrases — concrete nouns and topic terms preferred (skip filler like "the", "said", "people"). No explanation.
+// A story concept plus sense-appropriate English synonyms. Expanding on the English
+// side is a recall booster on the JMDict gloss match: 監視's gloss is "surveillance"
+// but 見張り's is "watch / lookout" — same idea, no string overlap — so pulling
+// {monitoring, watching, oversight} surfaces the whole synonym cluster at varying
+// difficulty, from which we later pick the easiest word the reader knows.
+// See docs/vocab-palette-redesign.md.
+interface Concept { concept: string; synonyms: string[] }
+
+// Max concepts per net and synonyms per concept (docs decision #1). Bounds both the
+// per-concept candidate fan-out and the eventual prompt length.
+const MAX_CONCEPTS_PER_NET = 8;
+const MAX_SYNONYMS_PER_CONCEPT = 3;
+// Words offered per concept cluster — enough to give the model an easiest-first choice
+// (and rotate for variety) without bloating the prompt.
+const CLUSTER_WORDS_MAX = 4;
+
+function normalizeConcepts(raw: unknown): Concept[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Concept[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    // Tolerate both {concept, synonyms:[...]} and a bare "word" string.
+    const concept = String((item && typeof item === 'object' ? (item as any).concept : item) ?? '')
+      .toLowerCase().trim();
+    if (concept.length < 2 || concept.length > 30 || seen.has(concept)) continue;
+    seen.add(concept);
+    const synRaw = (item && typeof item === 'object' ? (item as any).synonyms : []) ?? [];
+    const synonyms = (Array.isArray(synRaw) ? synRaw : [])
+      .map((s: unknown) => String(s).toLowerCase().trim())
+      .filter((s: string) => s.length >= 2 && s.length <= 30 && s !== concept)
+      .slice(0, MAX_SYNONYMS_PER_CONCEPT);
+    out.push({ concept, synonyms });
+    if (out.length >= MAX_CONCEPTS_PER_NET) break;
+  }
+  return out;
+}
+
+// Extract the article's concepts in two nets (docs/vocab-palette-redesign.md):
+//   topics  — concrete nouns/entities the story is ABOUT
+//   actions — verbs/adjectives/abstract ideas describing what HAPPENS (the news-register
+//             vocabulary that makes articles hard and that the old noun-only extractor
+//             threw away). Each concept carries sense-appropriate English synonyms.
+async function extractConceptsWithGroq(
+  title: string, snippet: string, apiKey: string,
+): Promise<{ topics: Concept[]; actions: Concept[] }> {
+  const prompt = `You are preparing vocabulary for a Japanese news rewrite. From this English news article, extract its key CONCEPTS in two groups. For each concept give up to ${MAX_SYNONYMS_PER_CONCEPT} common English synonyms, chosen for THIS article's sense (e.g. "fine" meaning a monetary penalty → "penalty, forfeit"; NOT "healthy, delicate").
+
+- "topics": concrete nouns / entities the story is about (people, things, places, organizations).
+- "actions": verbs, adjectives, and abstract ideas describing what HAPPENS (e.g. introduce, monitor, identify, warn, spread, illegal, damage). Prefer these over filler like "said" or "people".
+
+Give up to ${MAX_CONCEPTS_PER_NET} concepts per group. Return ONLY JSON of this exact shape:
+{"topics":[{"concept":"surveillance","synonyms":["monitoring","watching","oversight"]}],"actions":[{"concept":"identify","synonyms":["locate","pinpoint"]}]}
 
 Title: ${title}
-Snippet: ${snippet}
-
-Example output: ["economy", "trade", "tariff", "minister", "election"]`;
+Snippet: ${snippet}`;
 
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',
@@ -149,15 +194,14 @@ Example output: ["economy", "trade", "tariff", "minister", "election"]`;
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(`Groq keyword extraction failed: ${err.error?.message || response.statusText}`);
+    throw new Error(`Groq concept extraction failed: ${err.error?.message || response.statusText}`);
   }
   const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content ?? '[]';
-  // gpt-oss-20b in json_object mode may wrap in {"keywords": [...]} or return a bare array
-  const parsed = JSON.parse(raw);
-  const arr: unknown = Array.isArray(parsed) ? parsed : (parsed.keywords ?? parsed.topics ?? parsed.terms ?? []);
-  if (!Array.isArray(arr)) return [];
-  return arr.map(String).map((s) => s.toLowerCase().trim()).filter((s) => s.length >= 2 && s.length <= 30);
+  const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+  return {
+    topics: normalizeConcepts(parsed.topics),
+    actions: normalizeConcepts(parsed.actions),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -230,36 +274,50 @@ Deno.serve(async (req) => {
     const targetNew = Math.max(1, Math.round(ratios.new * wordsBudget));
     console.log(`[process-article] length: ${targetParagraphs} paragraphs (sourceKind=${sourceKind}), vocab budget ${wordsBudget} -> ${targetReview} review / ${targetNew} new`);
 
-    // 2. Vocabulary palette pipeline
-    //    a) Extract topic keywords from the English source (Groq)
-    //    b) Query JMDict for candidate entries whose glosses match
-    //    c) Bucket candidates into known / review / new vs. user_word_progress
-    let knownPalette: string[] = [];
+    // 2. Vocabulary palette pipeline (docs/vocab-palette-redesign.md)
+    //    a) Extract the story's concepts in two nets — topics + actions (Groq)
+    //    b) For each concept, gloss-match its English synonyms in JMDict, ONE RPC per
+    //       concept (parallel) so each synonym cluster stays grouped, not flattened
+    //    c) Within a cluster keep only words the reader can USE (known backbone or
+    //       at/below-level "new"), easiest first — so the model can say a hard idea with
+    //       a word the reader already knows.
+    // knownPalette/newPalette stay empty: the flat palette is superseded by clusters, but
+    // the fields remain for the shared prompt builder's legacy (eval-harness) back-compat.
+    const knownPalette: string[] = [];
     let reviewPalette: string[] = [];
-    let newPalette: string[] = [];
+    const newPalette: string[] = [];
     let vocabTargets: string[] = []; // legacy: kept for vocab_mode prompt back-compat
+    const clusters: { concept: string; words: string[] }[] = [];
     try {
-      const keywords = await extractKeywordsWithGroq(title, sourceText.slice(0, 2000), groqKey);
-      if (keywords.length > 0) {
-        const keywordPatterns = keywords.map((k) => `%${k}%`);
-        const { data: candidates, error: candErr } = await supabase.rpc('jmdict_vocab_candidates', {
-          keywords: keywordPatterns,
-          user_jlpt: jlptLevel,
-          max_results: 200,
-        });
-        if (candErr) throw candErr;
+      const { topics, actions } = await extractConceptsWithGroq(title, sourceText.slice(0, 2000), groqKey);
+      const concepts = [...topics, ...actions];
+      if (concepts.length > 0) {
+        // One RPC per concept (parallel) reusing the existing candidate function unchanged
+        // (no migration). Modest per-concept cap — we only surface a few words per cluster.
+        const perConcept = await Promise.all(concepts.map(async (c) => {
+          const patterns = [c.concept, ...c.synonyms].map((k) => `%${k}%`);
+          const { data, error } = await supabase.rpc('jmdict_vocab_candidates', {
+            keywords: patterns,
+            user_jlpt: jlptLevel,
+            max_results: 40,
+          });
+          if (error) {
+            console.warn(`[process-article] cluster query failed for «${c.concept}»:`, error.message);
+            return { concept: c.concept, candidates: [] as any[] };
+          }
+          return { concept: c.concept, candidates: (data ?? []) as any[] };
+        }));
 
-        const entryIds: string[] = (candidates ?? []).map((c: any) => c.entry_id);
-        // Fetch the richer per-user signals (numeric difficulty + times_seen), not just
-        // the coarse mastery_level bucket, so the metric can rank by real familiarity (#25).
+        // One progress lookup across ALL clusters' candidates (avoids N round-trips).
+        const allEntryIds = Array.from(new Set(perConcept.flatMap((p) => p.candidates.map((c) => c.entry_id))));
         type Progress = { mastery: WordSignal['mastery']; difficulty: number | null; timesSeen: number | null };
         let progressMap = new Map<string, Progress>();
-        if (entryIds.length > 0) {
+        if (allEntryIds.length > 0) {
           const { data: progress } = await supabase
             .from('user_word_progress')
             .select('word_id, mastery_level, difficulty, times_seen')
             .eq('user_id', userId)
-            .in('word_id', entryIds);
+            .in('word_id', allEntryIds);
           progressMap = new Map((progress ?? []).map((p: any) => [p.word_id, {
             mastery: p.mastery_level,
             difficulty: p.difficulty ?? null,
@@ -267,45 +325,50 @@ Deno.serve(async (req) => {
           }]));
         }
 
-        // Map DB rows onto the shared Word Priority Metric (../_shared/wordPriority.ts),
-        // the single source of "which word matters" across the palette, intake (#68),
-        // and the deck (#70). It owns the known/review/new bucketing and the per-bucket
-        // ordering: the KNOWN backbone by confirmed-familiarity then frequency (#25), and
-        // REVIEW/NEW by JLPT proximity to the reader then frequency (#22).
-        const display = new Map<string, string>();
-        const buckets: Record<'known' | 'review' | 'new', WordSignal[]> = { known: [], review: [], new: [] };
-        for (const c of (candidates ?? []) as any[]) {
-          const text = c.kanji || c.kana;
-          if (!text) continue;
-          display.set(c.entry_id, text);
-          const prog = progressMap.get(c.entry_id);
-          const signal: WordSignal = {
-            entryId: c.entry_id,
-            jlptLevel: c.jlpt_level ?? null,
-            freqRank: c.freq_rank ?? null,
-            isCommon: !!c.is_common,
-            mastery: prog?.mastery,
-            difficulty: prog?.difficulty ?? null,
-            timesSeen: prog?.timesSeen ?? null,
-          };
-          const bucket = classifyBucket(signal, jlptLevel);
-          if (bucket) buckets[bucket].push(signal);
-        }
+        // Build one cluster per concept via the shared Word Priority Metric
+        // (../_shared/wordPriority.ts). Keep only USABLE words: known backbone
+        // (compareKnown, confirmed/assumed-known easiest first) then at/below-level "new"
+        // (compareByProximity). Hard/medium (review) words are excluded — struggling words
+        // are reinforced through the SRS floor below, not offered as the "easy way to say it".
         const byProximity = compareByProximity(jlptLevel);
-        buckets.known.sort(compareKnown);
-        buckets.review.sort(byProximity);
-        buckets.new.sort(byProximity);
-        knownPalette = buckets.known.map((s) => display.get(s.entryId)!);
-        reviewPalette = buckets.review.map((s) => display.get(s.entryId)!);
-        newPalette = buckets.new.map((s) => display.get(s.entryId)!);
-        // De-dupe while preserving order
-        knownPalette = Array.from(new Set(knownPalette)).slice(0, KNOWN_WORDS_PER_PARAGRAPH * targetParagraphs);
-        reviewPalette = Array.from(new Set(reviewPalette)).slice(0, Math.max(5, targetReview + 2));
-        newPalette = Array.from(new Set(newPalette)).slice(0, Math.max(3, targetNew + 2));
+        const usedSurfaces = new Set<string>(); // a surface leads at most one cluster
+        for (const { concept, candidates } of perConcept) {
+          const known: { s: WordSignal; text: string }[] = [];
+          const fresh: { s: WordSignal; text: string }[] = [];
+          for (const c of candidates) {
+            const text = c.kanji || c.kana;
+            if (!text) continue;
+            const prog = progressMap.get(c.entry_id);
+            const signal: WordSignal = {
+              entryId: c.entry_id,
+              jlptLevel: c.jlpt_level ?? null,
+              freqRank: c.freq_rank ?? null,
+              isCommon: !!c.is_common,
+              mastery: prog?.mastery,
+              difficulty: prog?.difficulty ?? null,
+              timesSeen: prog?.timesSeen ?? null,
+            };
+            const bucket = classifyBucket(signal, jlptLevel);
+            if (bucket === 'known') known.push({ s: signal, text });
+            else if (bucket === 'new') fresh.push({ s: signal, text });
+          }
+          known.sort((a, b) => compareKnown(a.s, b.s));
+          fresh.sort((a, b) => byProximity(a.s, b.s));
+          const words: string[] = [];
+          for (const { text } of [...known, ...fresh]) {
+            if (usedSurfaces.has(text) || words.includes(text)) continue;
+            words.push(text);
+            if (words.length >= CLUSTER_WORDS_MAX) break;
+          }
+          if (words.length > 0) {
+            words.forEach((w) => usedSurfaces.add(w));
+            clusters.push({ concept, words });
+          }
+        }
       }
-      console.log(`[process-article] Palette: ${knownPalette.length} known, ${reviewPalette.length} review, ${newPalette.length} new (intensity=${readingIntensity})`);
+      console.log(`[process-article] Clusters: ${clusters.length} concept(s) [${clusters.map((c) => c.concept).join(', ')}]`);
     } catch (palErr) {
-      console.error('[process-article] Palette pipeline error (continuing without palette):', palErr);
+      console.error('[process-article] Palette pipeline error (continuing without clusters):', palErr);
     }
 
     // #51: topic-INDEPENDENT review floor. The palette above only re-injects a review
@@ -396,6 +459,7 @@ Deno.serve(async (req) => {
       reviewPalette,
       newPalette,
       vocabTargets,
+      clusters,
     });
 
     console.log(`[process-article] Pass 1 for user ${userId}`);

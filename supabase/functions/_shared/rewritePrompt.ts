@@ -35,6 +35,15 @@ export interface RewriteInput {
   newPalette: string[];
   /** vocab_mode "Study" targets, drawn from the review palette. */
   vocabTargets: string[];
+  /**
+   * Concept clusters for input-side difficulty control (docs/vocab-palette-redesign.md).
+   * Each concept lists reader-appropriate Japanese words, EASIEST-KNOWN FIRST, so the
+   * model can say a hard idea with a word the reader already has. When present this
+   * SUPERSEDES the flat known/new palette block and adds an explicit difficulty ceiling.
+   * Absent (e.g. legacy eval fixtures) → the old flat-palette block renders byte-for-byte
+   * unchanged, so the eval harness baseline is preserved.
+   */
+  clusters?: { concept: string; words: string[] }[];
 }
 
 // JLPT level controls COMPLEXITY only (grammar/vocab difficulty). Article
@@ -68,7 +77,7 @@ export function buildRewritePrompt(input: RewriteInput): string {
   const {
     title, sourceText, targetParagraphs, jlptLevel, rtkLevel,
     studyMode, vocabMode, ratios, targetReview, targetNew,
-    knownPalette, reviewPalette, newPalette, vocabTargets,
+    knownPalette, reviewPalette, newPalette, vocabTargets, clusters,
   } = input;
 
   const jlptStr = `N${jlptLevel}`;
@@ -93,9 +102,28 @@ export function buildRewritePrompt(input: RewriteInput): string {
     }
   }
 
-  // Build targeted vocab palette block (empty string if pipeline produced nothing)
+  // Build targeted vocab palette block (empty string if pipeline produced nothing).
+  // Two shapes: the concept-cluster block (new input-side difficulty control) when the
+  // caller supplies `clusters`, else the legacy flat known/review/new palette. The legacy
+  // branch is kept byte-for-byte so the eval harness's frozen fixtures stay a valid
+  // regression baseline (scripts/eval-article-rewrite.mjs).
   let palettePrompt = '';
-  if (knownPalette.length + reviewPalette.length + newPalette.length > 0) {
+  if (clusters && clusters.length > 0) {
+    const clusterLines = clusters
+      .map((c) => `- «${c.concept}»: ${c.words.join(' / ')}`)
+      .join('\n');
+    // The review floor (topic-independent SRS words the reader is due to reinforce) still
+    // rides along as a flat list — it's a scheduling concern, not a difficulty one.
+    const reviewLine = reviewPalette.length > 0
+      ? `\nREVIEW — the reader is due to practise these; work about ${targetReview} of them in where they fit the facts naturally: ${reviewPalette.join('、')}`
+      : '';
+    palettePrompt = `
+DIFFICULTY CEILING: Write at or below ${jlptStr}. When the precise term for something is above ${jlptStr}, express the idea with the simpler wording listed below, or gloss it once in a yugen-box. SIMPLER WORDING BEATS PRECISE WORDING — a reader who understands every word learns more than one reaching for the dictionary. (This never overrides the GOLDEN RULE: never distort the facts to hit or avoid a word.)
+
+VOCABULARY GUIDANCE — to express each concept, PREFER the reader-appropriate words below (calibrated to this reader's level and known vocabulary, easiest first):
+${clusterLines}
+Vary your choice across the article — do not reuse the same word every time a concept recurs.${reviewLine}`;
+  } else if (knownPalette.length + reviewPalette.length + newPalette.length > 0) {
     const pctKnown = Math.round(ratios.known * 100);
     const pctReview = Math.round(ratios.review * 100);
     const pctNew = Math.round(ratios.new * 100);
