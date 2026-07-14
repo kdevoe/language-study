@@ -319,7 +319,7 @@ export function Progress() {
                     bottom: 'calc(100% + 7px)',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    fontSize: isActive ? '1.05rem' : '0.95rem',
+                    fontSize: isActive ? '1.1rem' : '0.85rem',
                     fontWeight: isActive ? 700 : 600,
                     letterSpacing: '0.04em',
                     lineHeight: 1,
@@ -357,6 +357,22 @@ export function Progress() {
           marginBottom: '1.5rem',
         }}
       >
+        {/* Mirrors the active mini donut's label styling so the card visibly
+            belongs to the selected level. */}
+        <span
+          className="sans"
+          style={{
+            display: 'block',
+            fontSize: '1.1rem',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            color: 'var(--text-main)',
+            lineHeight: 1,
+            marginBottom: '1rem',
+          }}
+        >
+          {LEVELS.find((l) => l.value === activeLevel)?.label}
+        </span>
         {donutTotal === 0 ? (
           <p
             className="sans"
