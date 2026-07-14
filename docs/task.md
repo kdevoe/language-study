@@ -274,3 +274,13 @@
     +40d, med/hard queued no schedule → Progress buckets show them → deck stays
     empty → re-entry excludes graded → batch summary → Done). All 5 test
     runners green (122), tsc + vite build clean, 0 new lint in touched files.
+- [x] Discover polish + furigana repair (#115, Jul 14)
+  - [x] Discover pills label-only (dropped "study soon"/"known" captions).
+  - [x] Discover cards align furigana via alignReading (same as enrichment) and
+        persist the map on the materialised record.
+  - [x] Wired up loadReadingData() at app bootstrap — #36's per-kanji aligner was
+        never loaded at runtime, so alignReading silently degraded to
+        alignOkurigana app-wide (意味/病院 showed one grouped reading).
+  - [x] One-shot "Re-align Furigana" in Settings → Advanced (mirrors Rebalance):
+        recomputes the stored furiganaMap back-catalog locally (furiganaMap never
+        syncs to user_word_progress); self-hides via lastFuriganaRealignTs.
