@@ -248,3 +248,29 @@
         foundation-first cap seeds from the grade at promotion); EASY activates
         into far-out maintenance via decidePacing (promotedTs null → never a
         "new" card, doesn't spend a daily slot). Was how 出口 jumped the queue.
+- [x] Discover mode (#113) — Study-tab triage of unseen words (Jul 14)
+  - Entry: offered only once the due deck is done (empty-deck and deck-complete
+    states show "Discover new words"; needs a known JLPT level). Batches of 20
+    from get_intake_candidates (entry-id keyed, foundation-first: lowest JLPT
+    level with unseen words, most common first) — NOT get_unseen_common_words,
+    which returns no entry_id so grades couldn't sync.
+  - [x] store.gradeDiscoverWord — materialises an entry-id-keyed record (same
+        template as a promotion win; the flip counts as an exposure) then applies
+        the Policy F split: EASY → far-out maintenance (decidePacing keep-active,
+        promotedTs null — never a "new" card, no daily slot); MEDIUM/HARD →
+        intake queue with the grade recorded, exits via the daily cap exactly
+        like a med/hard grade from reading. Sync always writes intakeStatus
+        (row doesn't exist server-side yet); logs mastery_change source:discover.
+  - [x] Flashcards.tsx — shared FlipSurface extraction (due deck + Discover use
+        the same card); Discover header/progress bar; Hard/Medium/Easy pills
+        (captions "study soon"/"known" instead of interval previews); batch
+        summary with "Discover more" / Done; graded words excluded on refetch.
+  - [x] furiganaSegments fix — an EMPTY furiganaMap fell into the partial-map
+        healing path (per-char identity segments), so map-less words (all
+        Discover cards, promoted intake words) never showed their reading on
+        reveal. Empty map now falls through to the whole-word reading fallback.
+  - Verified: Playwright walkthrough (empty state → Discover → flip → grade
+    Easy/Hard/Medium → store records correct: easy active/promotedTs null/due
+    +40d, med/hard queued no schedule → Progress buckets show them → deck stays
+    empty → re-entry excludes graded → batch summary → Done). All 5 test
+    runners green (122), tsc + vite build clean, 0 new lint in touched files.

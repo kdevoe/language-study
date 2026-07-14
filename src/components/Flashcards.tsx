@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import { useAppStore, WordData } from '../services/store';
+import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { selectDeck, DeckEntry } from '../services/deck';
 import { schedule, seedSrsFromDifficulty, type Rating, type SrsState } from '../services/srs';
+import { fetchIntakeCandidates } from '../services/jmdict';
+import type { IntakeCandidate } from '../services/intake';
 import { seedDemoDeck } from '../services/devSeed';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -13,6 +15,8 @@ const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 // Again/Hard/Good/Easy grade calls store.reviewWord → advances the FSRS schedule
 // (#67) and writes a `flashcard` review-log row. The deck is SNAPSHOTTED at mount
 // (tab open) so grading a card doesn't reshuffle the pile underfoot.
+// Once the deck is done, Discover mode (#113) offers a triage pass over unseen
+// foundation words — same card surface, Hard/Medium/Easy pills.
 
 // Grade color is carried entirely by a soft tinted shadow under each white pill —
 // no dot, no fill, no colored border — so the buttons keep the card's hairline
@@ -30,6 +34,39 @@ interface Card {
   key: string;
   word: WordData;
   kind: 'review' | 'new';
+}
+
+// ── Discover mode (#113) ─────────────────────────────────────────────────────
+// Once the day's deck is done, the user can optionally flip through UNSEEN
+// foundation words (lowest JLPT level with unseen words, most common first —
+// the same get_intake_candidates feed the daily promotion pass draws from) and
+// triage each as Hard / Medium / Easy. Grades land via store.gradeDiscoverWord
+// under Policy F: easy → far-out maintenance (never a "new" card); medium/hard
+// → the intake queue, exactly as if graded from reading.
+const DISCOVER_BATCH = 20;
+
+const DISCOVER_GRADES: { level: Exclude<MasteryLevel, 'unseen'>; label: string; caption: string; shadow: string }[] = [
+  { level: 'hard',   label: 'Hard',   caption: 'study soon', shadow: '0 3px 10px rgba(207, 125, 107, 0.30)' },
+  { level: 'medium', label: 'Medium', caption: 'study soon', shadow: '0 3px 10px rgba(194, 160, 88, 0.30)' },
+  { level: 'easy',   label: 'Easy',   caption: 'known',      shadow: '0 3px 10px rgba(143, 170, 116, 0.32)' },
+];
+
+// Minimal display record for a Discover card — the word has no store entry yet,
+// so the card renders straight off the candidate row.
+function wordForCandidate(c: IntakeCandidate): WordData {
+  return {
+    reading: c.reading,
+    meaning: c.meaning,
+    surface: c.word,
+    jlptLevel: c.jlptLevel,
+    jmdictEntryId: c.entryId,
+    freqRank: c.freqRank,
+    mastery: 'unseen',
+    timesSeen: 0,
+    uniqueDaysSeen: [],
+    lastSeenTs: 0,
+    streak: 0,
+  };
 }
 
 // Prior FSRS state for a word, or a seed from `difficulty` if it isn't scheduled
@@ -81,6 +118,8 @@ function formatInterval(days: number): string {
 
 export function Flashcards() {
   const reviewWord = useAppStore((s) => s.reviewWord);
+  const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
+  const jlptLevel = useAppStore((s) => s.jlptLevel);
 
   // Snapshot the deck once, at mount. Flashcards mounts when the tab opens, so this
   // is "the deck as of opening STUDY" and stays stable while the user works through it.
@@ -89,6 +128,40 @@ export function Flashcards() {
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
 
+  // Discover mode (#113). Non-null = in Discover; [] while loading or exhausted.
+  const [discoverCards, setDiscoverCards] = useState<IntakeCandidate[] | null>(null);
+  const [discoverIndex, setDiscoverIndex] = useState(0);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoveredCount, setDiscoveredCount] = useState(0); // triaged this session
+
+  async function startDiscover() {
+    if (discoverLoading) return;
+    setDiscoverLoading(true);
+    setDiscoverCards([]);
+    setDiscoverIndex(0);
+    setRevealed(false);
+    const s = useAppStore.getState();
+    const seenIds = Object.values(s.wordDatabase)
+      .map((w) => w.jmdictEntryId)
+      .filter((id): id is string => !!id);
+    const cands = s.jlptLevel != null
+      ? await fetchIntakeCandidates(s.jlptLevel, seenIds, DISCOVER_BATCH)
+      : [];
+    // Belt-and-braces: drop anything that gained a local record while fetching.
+    const db = useAppStore.getState().wordDatabase;
+    setDiscoverCards(cands.filter((c) => !db[c.entryId]));
+    setDiscoverLoading(false);
+  }
+
+  function gradeDiscover(level: Exclude<MasteryLevel, 'unseen'>) {
+    const c = discoverCards?.[discoverIndex];
+    if (!c) return;
+    gradeDiscoverWord(c, level);
+    setDiscoveredCount((n) => n + 1);
+    setRevealed(false);
+    setDiscoverIndex((i) => i + 1);
+  }
+
   // The app-open promotion pass (sync → promoteIntakeQueue) is async and can land
   // AFTER this tab mounted with an empty deck. While the deck is empty, rebuild the
   // snapshot whenever words change so freshly promoted cards surface without a
@@ -96,13 +169,16 @@ export function Flashcards() {
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   useEffect(() => {
     if (cards.length > 0) return;
+    // In Discover mode every grade touches wordDatabase; skip the rebuild churn —
+    // Discover grades never mint due cards (far-out maintenance or queued).
+    if (discoverCards != null) return;
     const fresh = buildDeck();
     if (fresh.length > 0) {
       setCards(fresh);
       setIndex(0);
       setRevealed(false);
     }
-  }, [cards.length, wordDatabase]);
+  }, [cards.length, wordDatabase, discoverCards]);
 
   // Dev-only: seed a demo deck, then rebuild the snapshot in place (no reload).
   function seedAndReload() {
@@ -135,6 +211,147 @@ export function Flashcards() {
     setIndex((i) => i + 1);
   }
 
+  // Offered only once the due deck is done (the empty and complete states below) —
+  // Discover augments a finished session, it never competes with due reviews.
+  const discoverEntry = jlptLevel != null && (
+    <>
+      <button
+        onClick={startDiscover}
+        style={{
+          marginTop: '1.75rem',
+          padding: '0.6rem 1.5rem',
+          border: '1px solid var(--border-light)',
+          borderRadius: '999px',
+          backgroundColor: 'var(--bg-pure)',
+          boxShadow: '0 3px 10px rgba(0, 0, 0, 0.05)',
+          color: 'var(--text-main)',
+          fontSize: '0.85rem',
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+          cursor: 'pointer',
+        }}
+      >
+        Discover new words
+      </button>
+      <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+        Triage common words you haven't met yet
+      </p>
+    </>
+  );
+
+  // ── Discover mode (#113) ────────────────────────────────────────────────
+  if (discoverCards != null) {
+    if (discoverLoading) {
+      return (
+        <Centered>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gathering new words…</p>
+        </Centered>
+      );
+    }
+    const dTotal = discoverCards.length;
+    if (dTotal === 0) {
+      return (
+        <Centered>
+          <p className="serif" style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+            見つかりません
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Nothing left to discover at your level.
+          </p>
+          <ExitDiscoverButton onClick={() => setDiscoverCards(null)} />
+        </Centered>
+      );
+    }
+    if (discoverIndex >= dTotal) {
+      return (
+        <Centered>
+          <p className="serif" style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+            お疲れさま
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '32ch', lineHeight: 1.6 }}>
+            {discoveredCount} new {discoveredCount === 1 ? 'word' : 'words'} triaged — hard and medium ones will drip into your deck.
+          </p>
+          <button
+            onClick={startDiscover}
+            style={{
+              marginTop: '1.75rem',
+              padding: '0.6rem 1.5rem',
+              border: '1px solid var(--border-light)',
+              borderRadius: '999px',
+              backgroundColor: 'var(--bg-pure)',
+              boxShadow: '0 3px 10px rgba(0, 0, 0, 0.05)',
+              color: 'var(--text-main)',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+              cursor: 'pointer',
+            }}
+          >
+            Discover more
+          </button>
+          <ExitDiscoverButton onClick={() => setDiscoverCards(null)} />
+        </Centered>
+      );
+    }
+
+    const cand = discoverCards[discoverIndex];
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 5rem)', paddingTop: '0.5rem', paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom))', boxSizing: 'border-box' }}>
+        {/* Progress */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
+            <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Discover
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{discoverIndex + 1} / {dTotal}</span>
+          </div>
+          <div style={{ height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px', overflow: 'hidden' }}>
+            <motion.div
+              style={{ height: '100%', backgroundColor: 'var(--accent-progress)' }}
+              initial={false}
+              animate={{ width: `${(discoverIndex / dTotal) * 100}%` }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </div>
+        </div>
+
+        <FlipSurface
+          cardKey={cand.entryId}
+          word={wordForCandidate(cand)}
+          revealed={revealed}
+          onReveal={() => setRevealed(true)}
+          footer={
+            <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
+              {DISCOVER_GRADES.map(({ level, label, caption, shadow }) => (
+                <button
+                  key={level}
+                  onClick={() => gradeDiscover(level)}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2px',
+                    padding: '0.55rem 0 0.6rem',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: '999px',
+                    backgroundColor: 'var(--bg-pure)',
+                    boxShadow: shadow,
+                    color: 'var(--text-main)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{label}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{caption}</span>
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
+    );
+  }
+
   // ── Empty deck ──────────────────────────────────────────────────────────
   if (total === 0) {
     return (
@@ -145,6 +362,7 @@ export function Flashcards() {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           You're all caught up — nothing due today.
         </p>
+        {discoverEntry}
         {DEV_MODE && (
           <button
             onClick={seedAndReload}
@@ -177,6 +395,7 @@ export function Flashcards() {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           Deck complete — {total} {total === 1 ? 'card' : 'cards'} reviewed.
         </p>
+        {discoverEntry}
       </Centered>
     );
   }
@@ -201,107 +420,143 @@ export function Flashcards() {
         </div>
       </div>
 
-      {/* The card is a single FIXED-HEIGHT flip surface. The grade buttons live
-          INSIDE the back face, as a hairline-divided strip along its bottom edge —
-          so flipping never changes the card's height or shifts the layout, and the
-          buttons arrive with the flip itself (no second animation). */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
-        <AnimatePresence mode="wait">
-          {/* Outer wrapper handles the between-cards slide/fade. */}
-          <motion.div
-            key={card.key}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }}
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.11, ease: 'easeIn' } }}
-            style={{ width: '100%', maxWidth: '340px' }}
-          >
-            {/* Inner element rotates in 3D — front and back are its two faces.
-                Capped in px but scaled by vh so it never tucks under the nav. */}
-            <motion.div
-              onClick={() => !revealed && setRevealed(true)}
-              initial={false}
-              animate={{ rotateY: revealed ? 180 : 0 }}
-              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: 'min(540px, 62vh)',
-                transformStyle: 'preserve-3d',
-                cursor: revealed ? 'default' : 'pointer',
-              }}
-            >
-              {/* FRONT — the word to recall (furigana hidden), with a subtle flip hint. */}
-              <CardFace>
-                <FuriganaWord word={card.word} reveal={false} />
-                <div style={{ position: 'absolute', bottom: '1.5rem', left: 0, right: 0, display: 'flex', justifyContent: 'center', color: 'var(--text-muted)', opacity: 0.35 }}>
-                  <ChevronDown size={20} strokeWidth={1.5} />
-                </div>
-              </CardFace>
-
-              {/* BACK — reading (furigana) + meaning + grammar note + JLPT level,
-                  with the grade pills floating along the bottom edge. */}
-              <CardFace
-                back
-                footer={
-                  <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
-                    {RATINGS.map(({ rating, label, shadow }) => (
-                      <button
-                        key={rating}
-                        onClick={() => grade(rating)}
-                        style={{
-                          flex: 1,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '2px',
-                          padding: '0.55rem 0 0.6rem',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: '999px',
-                          backgroundColor: 'var(--bg-pure)',
-                          boxShadow: shadow,
-                          color: 'var(--text-main)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{label}</span>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{previews[rating]}</span>
-                      </button>
-                    ))}
-                  </div>
-                }
+      <FlipSurface
+        cardKey={card.key}
+        word={card.word}
+        revealed={revealed}
+        onReveal={() => setRevealed(true)}
+        footer={
+          <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
+            {RATINGS.map(({ rating, label, shadow }) => (
+              <button
+                key={rating}
+                onClick={() => grade(rating)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '2px',
+                  padding: '0.55rem 0 0.6rem',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '999px',
+                  backgroundColor: 'var(--bg-pure)',
+                  boxShadow: shadow,
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                }}
               >
-                <FuriganaWord word={card.word} reveal={true} />
-                <div style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginTop: '1.5rem', lineHeight: 1.6, maxWidth: '28ch' }}>
-                  {card.word.meaning}
+                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{label}</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{previews[rating]}</span>
+              </button>
+            ))}
+          </div>
+        }
+      />
+    </div>
+  );
+}
+
+// Quiet exit link for the Discover screens — returns to the deck's summary state.
+function ExitDiscoverButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        marginTop: '1rem',
+        padding: '0.45rem 1rem',
+        border: 'none',
+        background: 'none',
+        color: 'var(--text-muted)',
+        fontSize: '0.8rem',
+        letterSpacing: '0.02em',
+        cursor: 'pointer',
+      }}
+    >
+      Done
+    </button>
+  );
+}
+
+// The single FIXED-HEIGHT flip surface, shared by the due deck and Discover mode.
+// The grade buttons live INSIDE the back face (passed as `footer`), as a strip
+// along its bottom edge — so flipping never changes the card's height or shifts
+// the layout, and the buttons arrive with the flip itself (no second animation).
+function FlipSurface({ cardKey, word, revealed, onReveal, footer }: {
+  cardKey: string;
+  word: WordData;
+  revealed: boolean;
+  onReveal: () => void;
+  footer: React.ReactNode;
+}) {
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
+      <AnimatePresence mode="wait">
+        {/* Outer wrapper handles the between-cards slide/fade. */}
+        <motion.div
+          key={cardKey}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }}
+          exit={{ opacity: 0, y: -10, transition: { duration: 0.11, ease: 'easeIn' } }}
+          style={{ width: '100%', maxWidth: '340px' }}
+        >
+          {/* Inner element rotates in 3D — front and back are its two faces.
+              Capped in px but scaled by vh so it never tucks under the nav. */}
+          <motion.div
+            onClick={() => !revealed && onReveal()}
+            initial={false}
+            animate={{ rotateY: revealed ? 180 : 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: 'min(540px, 62vh)',
+              transformStyle: 'preserve-3d',
+              cursor: revealed ? 'default' : 'pointer',
+            }}
+          >
+            {/* FRONT — the word to recall (furigana hidden), with a subtle flip hint. */}
+            <CardFace>
+              <FuriganaWord word={word} reveal={false} />
+              <div style={{ position: 'absolute', bottom: '1.5rem', left: 0, right: 0, display: 'flex', justifyContent: 'center', color: 'var(--text-muted)', opacity: 0.35 }}>
+                <ChevronDown size={20} strokeWidth={1.5} />
+              </div>
+            </CardFace>
+
+            {/* BACK — reading (furigana) + meaning + grammar note + JLPT level,
+                with the grade pills floating along the bottom edge. */}
+            <CardFace back footer={footer}>
+              <FuriganaWord word={word} reveal={true} />
+              <div style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginTop: '1.5rem', lineHeight: 1.6, maxWidth: '28ch' }}>
+                {word.meaning}
+              </div>
+              {word.grammarNote && (
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '1rem', lineHeight: 1.6, maxWidth: '30ch' }}>
+                  {word.grammarNote}
                 </div>
-                {card.word.grammarNote && (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '1rem', lineHeight: 1.6, maxWidth: '30ch' }}>
-                    {card.word.grammarNote}
-                  </div>
-                )}
-                {/* Plain text (no pill chrome) — a pill here would read as a fifth
-                    button now that the grade pills share the card. */}
-                {card.word.jlptLevel != null && (
-                  <span
-                    className="sans"
-                    title={card.word.jlptDerived ? 'Approximate level (inferred from kanji / frequency)' : undefined}
-                    style={{
-                      marginTop: '1.5rem',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.04em',
-                      color: '#4a5d23',
-                      opacity: 0.85,
-                    }}
-                  >
-                    {card.word.jlptDerived ? '≈' : ''}N{card.word.jlptLevel}
-                  </span>
-                )}
-              </CardFace>
-            </motion.div>
+              )}
+              {/* Plain text (no pill chrome) — a pill here would read as an extra
+                  button now that the grade pills share the card. */}
+              {word.jlptLevel != null && (
+                <span
+                  className="sans"
+                  title={word.jlptDerived ? 'Approximate level (inferred from kanji / frequency)' : undefined}
+                  style={{
+                    marginTop: '1.5rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    color: '#4a5d23',
+                    opacity: 0.85,
+                  }}
+                >
+                  {word.jlptDerived ? '≈' : ''}N{word.jlptLevel}
+                </span>
+              )}
+            </CardFace>
           </motion.div>
-        </AnimatePresence>
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -313,12 +568,18 @@ export function Flashcards() {
 function furiganaSegments(w: WordData): { kanji: string; kana: string }[] {
   const surface = w.surface || w.reading || '';
   let segments = w.furiganaMap ?? [];
-  const mapped = segments.map((s) => s.kanji).join('');
-  if (mapped !== surface && surface.startsWith(mapped)) {
-    const tail = Array.from(surface.slice(mapped.length)).map((c) => ({ kanji: c, kana: c }));
-    segments = [...segments, ...tail];
+  // Heal only a PARTIAL map. An empty map must fall through to the whole-word
+  // fallback below — healing it would fabricate per-char identity segments
+  // (kana === kanji), which the renderer treats as "nothing to annotate", so a
+  // map-less word (e.g. a Discover candidate) would never show its reading.
+  if (segments.length > 0) {
+    const mapped = segments.map((s) => s.kanji).join('');
+    if (mapped !== surface && surface.startsWith(mapped)) {
+      const tail = Array.from(surface.slice(mapped.length)).map((c) => ({ kanji: c, kana: c }));
+      segments = [...segments, ...tail];
+    }
+    return segments;
   }
-  if (segments.length > 0) return segments;
   // No map: one reading over the whole surface (kana shown above the run).
   return [{ kanji: surface, kana: w.reading || surface }];
 }
