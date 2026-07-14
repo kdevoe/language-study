@@ -5,6 +5,7 @@ import { NewsArticle } from './api';
 import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
 import { decidePacing, isActiveForPacing } from './pacing';
+import { alignReading, hasKanji, loadReadingData } from './furigana';
 import { selectPromotions, type IntakeItem, type IntakeCandidate } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
@@ -218,6 +219,9 @@ interface AppState {
   lastResetTs: number | null;
   // Study-pacing flood fix: when the one-time forward-reseed / re-queue last ran.
   lastStudyPacingResetTs: number | null;
+  // One-shot furigana re-align: when the stored furiganaMap back-catalog was last
+  // recomputed with the per-kanji reading tables (see realignFurigana).
+  lastFuriganaRealignTs: number | null;
   currentArticle: NewsArticle | null;
   articlesCache: Record<string, NewsArticle>;
   processingArticles: string[];
@@ -251,6 +255,7 @@ interface AppState {
   applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) => void;
   reviewWord: (word: string, rating: Rating, now: number) => void;
   resetStudyPacing: () => Promise<{ keptActive: number; requeued: number }>;
+  realignFurigana: () => Promise<{ updated: number; scanned: number }>;
   setWordMastery: (word: string, level: MasteryLevel) => void;
   gradeDiscoverWord: (candidate: IntakeCandidate, level: Exclude<MasteryLevel, 'unseen'>) => void;
   mergeWordRecords: (fromKey: string, toKey: string) => void;
@@ -295,6 +300,7 @@ export const useAppStore = create<AppState>()(
       lastRtkUpdateTs: null,
       lastResetTs: null,
       lastStudyPacingResetTs: null,
+      lastFuriganaRealignTs: null,
       currentArticle: null,
       articlesCache: {},
       processingArticles: [],
@@ -740,12 +746,16 @@ export const useAppStore = create<AppState>()(
           if (existing && (existing.intakeStatus === 'active' || existing.stability != null)) return {};
 
           const difficulty = difficultyForBucket(level);
+          // Same aligner as enrichment (jmdictToWordDetails), so if this word is
+          // later promoted its flashcard shows furigana split like any other.
+          const furiganaMap = alignReading(candidate.word, candidate.reading);
           const base: WordData = existing
             ? {
                 ...existing,
                 reading: existing.reading || candidate.reading,
                 meaning: existing.meaning || candidate.meaning,
                 surface: existing.surface ?? candidate.word,
+                furiganaMap: existing.furiganaMap?.length ? existing.furiganaMap : furiganaMap,
                 jmdictEntryId: existing.jmdictEntryId ?? candidate.entryId,
                 jlptLevel: existing.jlptLevel ?? candidate.jlptLevel,
                 freqRank: existing.freqRank ?? candidate.freqRank,
@@ -755,6 +765,7 @@ export const useAppStore = create<AppState>()(
                 reading: candidate.reading,
                 meaning: candidate.meaning,
                 surface: candidate.word,
+                furiganaMap,
                 jmdictEntryId: candidate.entryId,
                 jlptLevel: candidate.jlptLevel,
                 freqRank: candidate.freqRank,
@@ -1040,6 +1051,39 @@ export const useAppStore = create<AppState>()(
 
         const keptActive = touched.filter((w) => w.intakeStatus === 'active').length;
         return { keptActive, requeued: touched.length - keptActive };
+      },
+
+      // One-shot furigana re-align (Settings → Advanced), sibling of resetStudyPacing.
+      // The per-kanji reading tables were never loaded at runtime before main.tsx
+      // primed them (#36 was inert), so every STORED furiganaMap was computed by the
+      // coarser okurigana fallback: no-okurigana compounds (意味, 病院) carry one
+      // grouped segment instead of per-kanji readings. furiganaMap is local-only
+      // (never synced to user_word_progress), so this is a pure client re-derive —
+      // no server writes. Self-hiding via lastFuriganaRealignTs.
+      realignFurigana: async () => {
+        await loadReadingData();
+        let updated = 0;
+        let scanned = 0;
+        set((state) => {
+          const db = { ...state.wordDatabase };
+          for (const [key, w] of Object.entries(db)) {
+            // Entry-id keys are numeric (#39); legacy keys ARE the surface form.
+            const surface = w.surface || (/^\d+$/.test(key) ? '' : key);
+            if (!surface || !w.reading || !hasKanji(surface)) continue;
+            scanned++;
+            const fresh = alignReading(surface, w.reading);
+            const prev = w.furiganaMap ?? [];
+            const same = prev.length === fresh.length &&
+              prev.every((s, i) => s.kanji === fresh[i].kanji && s.kana === fresh[i].kana);
+            if (same) continue;
+            db[key] = { ...w, furiganaMap: fresh };
+            updated++;
+          }
+          return updated > 0
+            ? { wordDatabase: db, lastFuriganaRealignTs: Date.now() }
+            : { lastFuriganaRealignTs: Date.now() };
+        });
+        return { updated, scanned };
       },
 
       syncSrsWithSupabase: async (userId) => {
@@ -1593,6 +1637,7 @@ export const useAppStore = create<AppState>()(
         lastRtkUpdateTs: state.lastRtkUpdateTs,
         lastResetTs: state.lastResetTs,
         lastStudyPacingResetTs: state.lastStudyPacingResetTs,
+        lastFuriganaRealignTs: state.lastFuriganaRealignTs,
         dismissedArticleIds: state.dismissedArticleIds,
         readArticleIds: state.readArticleIds,
         readerFontSize: state.readerFontSize,

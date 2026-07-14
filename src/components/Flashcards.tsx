@@ -5,6 +5,7 @@ import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { selectDeck, DeckEntry } from '../services/deck';
 import { schedule, seedSrsFromDifficulty, type Rating, type SrsState } from '../services/srs';
 import { fetchIntakeCandidates } from '../services/jmdict';
+import { alignReading } from '../services/furigana';
 import type { IntakeCandidate } from '../services/intake';
 import { seedDemoDeck } from '../services/devSeed';
 
@@ -45,19 +46,22 @@ interface Card {
 // → the intake queue, exactly as if graded from reading.
 const DISCOVER_BATCH = 20;
 
-const DISCOVER_GRADES: { level: Exclude<MasteryLevel, 'unseen'>; label: string; caption: string; shadow: string }[] = [
-  { level: 'hard',   label: 'Hard',   caption: 'study soon', shadow: '0 3px 10px rgba(207, 125, 107, 0.30)' },
-  { level: 'medium', label: 'Medium', caption: 'study soon', shadow: '0 3px 10px rgba(194, 160, 88, 0.30)' },
-  { level: 'easy',   label: 'Easy',   caption: 'known',      shadow: '0 3px 10px rgba(143, 170, 116, 0.32)' },
+const DISCOVER_GRADES: { level: Exclude<MasteryLevel, 'unseen'>; label: string; shadow: string }[] = [
+  { level: 'hard',   label: 'Hard',   shadow: '0 3px 10px rgba(207, 125, 107, 0.30)' },
+  { level: 'medium', label: 'Medium', shadow: '0 3px 10px rgba(194, 160, 88, 0.30)' },
+  { level: 'easy',   label: 'Easy',   shadow: '0 3px 10px rgba(143, 170, 116, 0.32)' },
 ];
 
 // Minimal display record for a Discover card — the word has no store entry yet,
-// so the card renders straight off the candidate row.
+// so the card renders straight off the candidate row. furiganaMap comes from the
+// same aligner the enrichment path uses (jmdictToWordDetails), so the reading
+// splits across kanji/okurigana exactly like a regular flashcard.
 function wordForCandidate(c: IntakeCandidate): WordData {
   return {
     reading: c.reading,
     meaning: c.meaning,
     surface: c.word,
+    furiganaMap: alignReading(c.word, c.reading),
     jlptLevel: c.jlptLevel,
     jmdictEntryId: c.entryId,
     freqRank: c.freqRank,
@@ -322,17 +326,16 @@ export function Flashcards() {
           onReveal={() => setRevealed(true)}
           footer={
             <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
-              {DISCOVER_GRADES.map(({ level, label, caption, shadow }) => (
+              {DISCOVER_GRADES.map(({ level, label, shadow }) => (
                 <button
                   key={level}
                   onClick={() => gradeDiscover(level)}
                   style={{
                     flex: 1,
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '2px',
-                    padding: '0.55rem 0 0.6rem',
+                    justifyContent: 'center',
+                    padding: '0.75rem 0',
                     border: '1px solid var(--border-light)',
                     borderRadius: '999px',
                     backgroundColor: 'var(--bg-pure)',
@@ -342,7 +345,6 @@ export function Flashcards() {
                   }}
                 >
                   <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{label}</span>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{caption}</span>
                 </button>
               ))}
             </div>
