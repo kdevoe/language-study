@@ -36,7 +36,8 @@ export function Settings() {
     newWordsPerDay, setNewWordsPerDay,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight,
-    lastStudyPacingResetTs
+    lastStudyPacingResetTs,
+    lastFuriganaRealignTs
   } = useAppStore();
 
   const intensityOptions = ['leisure', 'balanced', 'intensive'] as const;
@@ -464,6 +465,39 @@ export function Settings() {
                   }}
                 >
                   Rebalance Flashcard Deck
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Re-align Furigana — one-time cleanup of the stored furiganaMap
+              back-catalog: maps saved before the per-kanji reading tables were
+              wired up (see main.tsx) carry one grouped reading per kanji run
+              (意味 → いみ over the pair) instead of per-kanji splits (い/み).
+              Local-only re-derive, nothing scheduled or deleted. Self-hides. */}
+          {lastFuriganaRealignTs == null && (
+            <>
+              <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', margin: '2rem 0' }} />
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+                  Re-align Furigana
+                </label>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.2rem' }}>
+                  A one-time cleanup of saved furigana: readings now split per kanji (意味 → い・み), but words saved earlier still show one grouped reading. Recomputes them on this device — nothing else changes. You only need to run this once.
+                </p>
+                <button
+                  onClick={async () => {
+                    const { useAppStore } = await import('../services/store');
+                    const r = await useAppStore.getState().realignFurigana();
+                    window.alert(`Furigana re-aligned.\n\n${r.updated} of ${r.scanned} words updated.`);
+                  }}
+                  style={{
+                    width: '100%', padding: '0.9rem', borderRadius: '12px', backgroundColor: 'transparent',
+                    color: 'var(--text-main)', border: '2px solid var(--border-light)', fontWeight: 700,
+                    fontSize: '0.9rem', cursor: 'pointer', letterSpacing: '0.03em',
+                  }}
+                >
+                  Re-align Furigana
                 </button>
               </div>
             </>
