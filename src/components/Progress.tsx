@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
-import { deckCounts, type DeckEntry } from '../services/deck';
 
 // Mastery palette mirrors the generated vocab-summary report so the in-app
 // dashboard shares the same earthy, muted language as the rest of Yūgen.
@@ -270,10 +269,15 @@ export function Progress() {
                 flex: `${isActive ? 80 : 64} 1 0px`,
                 maxWidth: isActive ? '80px' : '64px',
                 minWidth: isActive ? '54px' : '43px',
-                height: '84px',
+                height: '108px',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
+                // A fixed-height slot at the bottom centers the donut vertically,
+                // so every donut's CENTER sits on the same line regardless of
+                // size; the label is anchored to the donut's top edge, so it
+                // rides up as the active donut grows into the headroom above.
+                justifyContent: 'flex-end',
                 padding: 0,
                 border: 'none',
                 cursor: 'pointer',
@@ -282,12 +286,23 @@ export function Progress() {
                 transition: 'color 0.2s, flex-grow 0.25s ease, max-width 0.25s ease, min-width 0.25s ease',
               }}
             >
+              {/* Fixed-height slot = max donut size; smaller donuts center in it. */}
+              <span
+                style={{
+                  height: '80px',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
               {/* Round wrapper carries a box-shadow (border-radius 50%) instead of
                   a CSS filter: drop-shadow rasterizes the layer, which both blurs
                   it and shifts its color against the page background. box-shadow
                   keeps the ring vector-crisp and the hole truly transparent. */}
               <span
                 style={{
+                  position: 'relative',
                   display: 'flex',
                   width: '100%',
                   borderRadius: '50%',
@@ -297,6 +312,23 @@ export function Progress() {
                   transition: 'box-shadow 0.25s ease',
                 }}
               >
+                <span
+                  className="sans"
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 7px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: isActive ? '1.05rem' : '0.95rem',
+                    fontWeight: isActive ? 700 : 600,
+                    letterSpacing: '0.04em',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    transition: 'font-size 0.25s ease',
+                  }}
+                >
+                  {l.label}
+                </span>
                 <Donut
                   counts={bucketCounts}
                   total={tracked + bucketCounts.notSeen}
@@ -305,10 +337,10 @@ export function Progress() {
                   strokeWidth={8}
                   fluid
                   showText={false}
-                  centerLabel={l.label}
                   centerText={total.toLocaleString()}
                   holeFill={isActive ? 'var(--bg-card)' : undefined}
                 />
+              </span>
               </span>
             </button>
           );
@@ -337,13 +369,35 @@ export function Progress() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '1.75rem',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
+              // Donut grows into whatever the legend doesn't need; the legend
+              // keeps its natural (content) width and hugs the right edge, so
+              // the leftover always lands as whitespace between the two.
+              justifyContent: 'space-between',
+              gap: '1.25rem',
             }}
           >
-            <Donut counts={counts} total={donutTotal} activeBucket={activeBucket} />
-            <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+            <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: '210px' }}>
+              {/* Same lifted look as the active mini donut: round box-shadow
+                  wrapper + card-colored hole so the shadow can't bleed through. */}
+              <span
+                style={{
+                  display: 'flex',
+                  borderRadius: '50%',
+                  boxShadow: '0 6px 14px rgba(0,0,0,0.24)',
+                }}
+              >
+                <Donut
+                  counts={counts}
+                  total={donutTotal}
+                  activeBucket={activeBucket}
+                  fluid
+                  holeFill="var(--bg-card)"
+                  headline={`${donutTotal > 0 ? Math.round((levelTotal / donutTotal) * 100) : 0}%`}
+                  subline="seen"
+                />
+              </span>
+            </div>
+            <div style={{ flex: '0 0 auto' }}>
               {BUCKETS.filter((m) => m.key !== 'notSeen' || counts.notSeen > 0).map((m) => {
                 const value = counts[m.key];
                 const pct = donutTotal > 0 ? Math.round((value / donutTotal) * 100) : 0;
@@ -357,9 +411,9 @@ export function Progress() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.6rem',
+                      gap: '0.45rem',
                       width: '100%',
-                      padding: '0.5rem 0.5rem',
+                      padding: '0.45rem 0.4rem',
                       background: isActive ? 'var(--bg-pure)' : 'none',
                       border: 'none',
                       borderRadius: '10px',
@@ -378,14 +432,19 @@ export function Progress() {
                         flex: '0 0 auto',
                       }}
                     />
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', flex: 1 }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-main)', flex: 1, whiteSpace: 'nowrap' }}>
                       {m.label}
                     </span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                    {/* Fixed-width number columns: the legend keeps the same width
+                        no matter the digit counts, so the donut never resizes when
+                        switching levels or buckets. */}
+                    <span
+                      style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', width: '2.5rem', textAlign: 'right', flex: '0 0 auto' }}
+                    >
                       {pct}%
                     </span>
                     <span
-                      style={{ fontSize: '0.8rem', color: 'var(--text-muted)', minWidth: '1.6rem', textAlign: 'right' }}
+                      style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '2.7rem', textAlign: 'right', flex: '0 0 auto' }}
                     >
                       {value.toLocaleString()}
                     </span>
@@ -618,7 +677,8 @@ function Donut({
   strokeWidth = 20,
   showText = true,
   centerText,
-  centerLabel,
+  headline,
+  subline,
   displaySize,
   holeFill,
   fluid = false,
@@ -630,7 +690,8 @@ function Donut({
   strokeWidth?: number;
   showText?: boolean;
   centerText?: string;  // compact center count (mini donuts)
-  centerLabel?: string; // compact center label above the count (e.g. "N4")
+  headline?: string;    // big center line (detail donut), e.g. "42%"
+  subline?: string;     // small line under the headline, e.g. "seen"
   displaySize?: number; // rendered size; defaults to `size` (the viewBox scale)
   holeFill?: string;    // center fill; omit for a transparent hole
   fluid?: boolean;      // fill the parent's width (square) instead of fixed px
@@ -650,14 +711,6 @@ function Donut({
       offset += len;
       return seg;
     });
-
-  // Headline = the active bucket's share, else "words" total.
-  const headlineNum = activeBucket
-    ? `${total > 0 ? Math.round((counts[activeBucket] / total) * 100) : 0}%`
-    : total.toLocaleString();
-  const headlineLbl = activeBucket
-    ? BUCKETS.find((m) => m.key === activeBucket)!.label
-    : total === 1 ? 'word' : 'words';
 
   const rendered = displaySize ?? size;
   return (
@@ -699,64 +752,50 @@ function Donut({
           );
         })}
       </g>
-      {!showText && (centerLabel != null || centerText != null) && (
-        <>
-          {centerLabel != null && (
-            <text
-              x={center}
-              y={centerText != null ? center - 4 : center}
-              dominantBaseline="central"
-              textAnchor="middle"
-              className="sans"
-              style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.02em', fill: 'currentColor' }}
-            >
-              {centerLabel}
-            </text>
-          )}
-          {centerText != null && (
-            <text
-              x={center}
-              y={centerLabel != null ? center + 8 : center}
-              dominantBaseline="central"
-              textAnchor="middle"
-              className="sans"
-              style={{
-                // Shrink to fit the hole: ~0.62em average glyph width for digits.
-                fontSize: `${Math.min(9.5, (size - strokeWidth * 2 - 4) / (Math.max(centerText.length, 1) * 0.62))}px`,
-                fontWeight: 600,
-                opacity: 0.75,
-                fill: 'currentColor',
-              }}
-            >
-              {centerText}
-            </text>
-          )}
-        </>
+      {!showText && centerText != null && (
+        <text
+          x={center}
+          y={center}
+          dominantBaseline="central"
+          textAnchor="middle"
+          className="sans"
+          style={{
+            // Shrink to fit the hole: ~0.62em average glyph width for digits.
+            fontSize: `${Math.min(11, (size - strokeWidth * 2 - 4) / (Math.max(centerText.length, 1) * 0.62))}px`,
+            fontWeight: 600,
+            fill: 'currentColor',
+          }}
+        >
+          {centerText}
+        </text>
       )}
-      {showText && (
+      {showText && headline != null && (
         <>
           <text
             x={center}
-            y={center - 4}
+            y={subline != null ? center - 4 : center}
+            dominantBaseline={subline != null ? undefined : 'central'}
             textAnchor="middle"
             className="serif"
             style={{
-              fontSize: headlineNum.length > 4 ? '1.35rem' : '1.7rem',
+              fontSize: headline.length > 4 ? '1rem' : '1.2rem',
               fontWeight: 700,
               fill: 'var(--text-main)',
             }}
           >
-            {headlineNum}
+            {headline}
           </text>
-          <text
-            x={center}
-            y={center + 16}
-            textAnchor="middle"
-            className="sans"
-            style={{ fontSize: '0.7rem', fill: 'var(--text-muted)', letterSpacing: '0.04em' }}
-          >
-            {headlineLbl}
-          </text>
+          {subline != null && (
+            <text
+              x={center}
+              y={center + 14}
+              textAnchor="middle"
+              className="sans"
+              style={{ fontSize: '0.65rem', fill: 'var(--text-muted)', letterSpacing: '0.04em' }}
+            >
+              {subline}
+            </text>
+          )}
         </>
       )}
     </svg>
@@ -795,9 +834,7 @@ function MasteryPill({ bucket, difficulty }: { bucket: MasteryLevel; difficulty?
 }
 
 // --- Study dashboard (#73) --------------------------------------------------
-// Deck health (due / new / learning) straight from the SAME predicates the
-// flashcard deck uses (deckCounts), plus a review-activity heatmap fed by the
-// store's reviewsByDay tally — so the numbers agree with STUDY and the grid
+// Review-activity heatmap fed by the store's reviewsByDay tally — the grid
 // reflects real reviews (read-past + flashcard grades both count).
 
 const DAY_MS = 86_400_000;
@@ -817,27 +854,9 @@ const HEAT_COLORS = [
 const utcDayKey = (ms: number): string => new Date(ms).toISOString().split('T')[0];
 
 function StudyDashboard() {
-  const wordDatabase = useAppStore((s) => s.wordDatabase);
   const reviewsByDay = useAppStore((s) => s.reviewsByDay);
-  const newWordsPerDay = useAppStore((s) => s.newWordsPerDay);
 
   const now = Date.now();
-
-  // Deck health — project each word into the deck's DeckEntry shape and reuse the
-  // exact due/new/learning predicates so this never drifts from the flashcard deck.
-  const counts = useMemo(() => {
-    const entries: DeckEntry[] = Object.entries(wordDatabase).map(([key, w]) => ({
-      key,
-      jlptLevel: w.jlptLevel ?? null,
-      freqRank: w.freqRank ?? null,
-      dueAt: w.dueAt ?? null,
-      reps: w.reps ?? null,
-      stability: w.stability ?? null,
-      intakeStatus: w.intakeStatus,
-      promotedTs: w.promotedTs ?? null,
-    }));
-    return deckCounts(entries, now);
-  }, [wordDatabase, now]);
 
   // Heatmap columns: weeks × 7 weekday rows, oldest→newest, ending today. The first
   // cell is aligned to a Sunday so columns are whole weeks (Sun..Sat).
@@ -863,12 +882,6 @@ function StudyDashboard() {
     return { columns: cols, todayCount: reviewsByDay[utcDayKey(now)] ?? 0, windowTotal: total };
   }, [reviewsByDay, now]);
 
-  const stats: { label: string; value: number; color: string }[] = [
-    { label: 'Due', value: counts.due, color: '#c77b4a' },
-    { label: 'New', value: counts.new, color: 'var(--accent-primary)' },
-    { label: 'Learning', value: counts.learning, color: 'var(--text-muted)' },
-  ];
-
   return (
     <div
       style={{
@@ -878,41 +891,6 @@ function StudyDashboard() {
         marginBottom: '1.5rem',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1.1rem' }}>
-        <span className="sans" style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-          Study deck
-        </span>
-        <span className="sans" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          {newWordsPerDay} new / day
-        </span>
-      </div>
-
-      {/* Deck-health counts */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.4rem' }}>
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.15rem',
-              padding: '0.75rem 0.25rem',
-              backgroundColor: 'var(--bg-pure)',
-              borderRadius: '12px',
-            }}
-          >
-            <span className="serif" style={{ fontSize: '1.9rem', fontWeight: 700, lineHeight: 1, color: s.color }}>
-              {s.value}
-            </span>
-            <span className="sans" style={{ fontSize: '0.68rem', letterSpacing: '0.04em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              {s.label}
-            </span>
-          </div>
-        ))}
-      </div>
-
       {/* Review-activity heatmap */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.55rem' }}>
         <span className="sans" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
