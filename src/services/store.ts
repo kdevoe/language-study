@@ -5,7 +5,7 @@ import { NewsArticle } from './api';
 import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
 import { decidePacing, isActiveForPacing } from './pacing';
-import { selectPromotions, type IntakeItem } from './intake';
+import { selectPromotions, type IntakeItem, type IntakeCandidate } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -252,6 +252,7 @@ interface AppState {
   reviewWord: (word: string, rating: Rating, now: number) => void;
   resetStudyPacing: () => Promise<{ keptActive: number; requeued: number }>;
   setWordMastery: (word: string, level: MasteryLevel) => void;
+  gradeDiscoverWord: (candidate: IntakeCandidate, level: Exclude<MasteryLevel, 'unseen'>) => void;
   mergeWordRecords: (fromKey: string, toKey: string) => void;
   checkDailyKanji: () => void;
   promoteIntakeQueue: (now: number) => Promise<void>;
@@ -714,6 +715,127 @@ export const useAppStore = create<AppState>()(
             wordDatabase: {
               ...state.wordDatabase,
               [word]: updatedWord
+            }
+          };
+        }),
+
+      // Discover-mode triage (#113): the user flipped through an UNSEEN foundation
+      // word on the Study tab and self-assessed it. Unlike the reader/modal paths
+      // the word usually has no record yet, so this materialises one (entry-id
+      // keyed, same template as a promotion win) and applies the Policy F split
+      // that setWordMastery uses:
+      //   • easy — already known: activate straight into far-out maintenance
+      //     (promotedTs null — never surfaces as a "new" card, spends no daily slot).
+      //   • medium/hard — worth studying: the word joins the intake queue with the
+      //     grade recorded, and enters the deck via the daily foundation-first cap
+      //     exactly as if it had been graded med/hard from reading.
+      gradeDiscoverWord: (candidate: IntakeCandidate, level: Exclude<MasteryLevel, 'unseen'>) =>
+        set((state) => {
+          const key = candidate.entryId;
+          const now = Date.now();
+          const today = new Date(now).toISOString().split('T')[0];
+          const existing = state.wordDatabase[key];
+          // Already actively scheduled (raced with a promotion or a sync from
+          // another device) — don't clobber a live schedule with a triage tap.
+          if (existing && (existing.intakeStatus === 'active' || existing.stability != null)) return {};
+
+          const difficulty = difficultyForBucket(level);
+          const base: WordData = existing
+            ? {
+                ...existing,
+                reading: existing.reading || candidate.reading,
+                meaning: existing.meaning || candidate.meaning,
+                surface: existing.surface ?? candidate.word,
+                jmdictEntryId: existing.jmdictEntryId ?? candidate.entryId,
+                jlptLevel: existing.jlptLevel ?? candidate.jlptLevel,
+                freqRank: existing.freqRank ?? candidate.freqRank,
+                intakeStatus: existing.intakeStatus ?? 'queued',
+              }
+            : {
+                reading: candidate.reading,
+                meaning: candidate.meaning,
+                surface: candidate.word,
+                jmdictEntryId: candidate.entryId,
+                jlptLevel: candidate.jlptLevel,
+                freqRank: candidate.freqRank,
+                mastery: 'unseen',
+                timesSeen: 0,
+                uniqueDaysSeen: [],
+                lastSeenTs: 0,
+                streak: 0,
+                intakeStatus: 'queued',
+              };
+
+          // The triage flip is a genuine exposure — record it like a sighting.
+          const seen: WordData = {
+            ...base,
+            timesSeen: (base.timesSeen ?? 0) + 1,
+            uniqueDaysSeen: base.uniqueDaysSeen?.includes(today)
+              ? base.uniqueDaysSeen
+              : [...(base.uniqueDaysSeen ?? []), today],
+            lastSeenTs: now,
+          };
+
+          const decision = decidePacing({
+            key,
+            difficulty,
+            distinctExposures: seen.uniqueDaysSeen.length,
+            intakeStatus: seen.intakeStatus,
+            stability: seen.stability,
+          }, now);
+
+          let updatedWord: WordData;
+          if (decision.action === 'keep-active') {
+            const srs = decision.srs;
+            updatedWord = {
+              ...seen,
+              intakeStatus: 'active',
+              promotedTs: null,
+              stability: srs.stability,
+              fsrsDifficulty: srs.fsrsDifficulty,
+              dueAt: srs.dueAt,
+              lastReviewedTs: srs.lastReviewedAt,
+              intervalDays: (srs.dueAt - srs.lastReviewedAt) / 86_400_000,
+              reps: srs.reps,
+              lapses: srs.lapses,
+              srsStatus: srs.status,
+            };
+          } else {
+            updatedWord = seen; // stays queued; the daily cap seeds its schedule later
+          }
+          updatedWord = { ...updatedWord, mastery: level, difficulty, lastAdjustedDay: today, lastAdjustReason: 'manual' };
+
+          // Sync — unlike setWordMastery this always writes intakeStatus: the row
+          // usually doesn't exist server-side yet, so 'queued' must land too.
+          currentUserId().then((uid) => {
+            if (!uid) return;
+            import('./api').then(m => {
+              m.upsertWordProgressToSupabase(uid, key, {
+                mastery: updatedWord.mastery,
+                difficulty,
+                timesSeen: updatedWord.timesSeen,
+                streak: updatedWord.streak,
+                lastSeenTs: updatedWord.lastSeenTs,
+                intakeStatus: updatedWord.intakeStatus,
+                ...(decision.action === 'keep-active' ? {
+                  stability: updatedWord.stability,
+                  fsrsDifficulty: updatedWord.fsrsDifficulty,
+                  dueAt: updatedWord.dueAt,
+                  lastReviewedTs: updatedWord.lastReviewedTs,
+                  intervalDays: updatedWord.intervalDays,
+                  reps: updatedWord.reps,
+                  lapses: updatedWord.lapses,
+                  srsStatus: updatedWord.srsStatus,
+                } : {}),
+              });
+              m.logStudyEventToSupabase(uid, key, 'mastery_change', { level, difficulty, source: 'discover' });
+            });
+          });
+
+          return {
+            wordDatabase: {
+              ...state.wordDatabase,
+              [key]: updatedWord
             }
           };
         }),
