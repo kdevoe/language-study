@@ -5,6 +5,7 @@ import { NewsArticle } from './api';
 import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
 import { decidePacing, isActiveForPacing } from './pacing';
+import { alignReading } from './furigana';
 import { selectPromotions, type IntakeItem, type IntakeCandidate } from './intake';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
@@ -740,12 +741,16 @@ export const useAppStore = create<AppState>()(
           if (existing && (existing.intakeStatus === 'active' || existing.stability != null)) return {};
 
           const difficulty = difficultyForBucket(level);
+          // Same aligner as enrichment (jmdictToWordDetails), so if this word is
+          // later promoted its flashcard shows furigana split like any other.
+          const furiganaMap = alignReading(candidate.word, candidate.reading);
           const base: WordData = existing
             ? {
                 ...existing,
                 reading: existing.reading || candidate.reading,
                 meaning: existing.meaning || candidate.meaning,
                 surface: existing.surface ?? candidate.word,
+                furiganaMap: existing.furiganaMap?.length ? existing.furiganaMap : furiganaMap,
                 jmdictEntryId: existing.jmdictEntryId ?? candidate.entryId,
                 jlptLevel: existing.jlptLevel ?? candidate.jlptLevel,
                 freqRank: existing.freqRank ?? candidate.freqRank,
@@ -755,6 +760,7 @@ export const useAppStore = create<AppState>()(
                 reading: candidate.reading,
                 meaning: candidate.meaning,
                 surface: candidate.word,
+                furiganaMap,
                 jmdictEntryId: candidate.entryId,
                 jlptLevel: candidate.jlptLevel,
                 freqRank: candidate.freqRank,
