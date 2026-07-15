@@ -43,7 +43,8 @@ const emptyBuckets = (): Record<BucketKey, number> => ({
 });
 
 // JLPT numbering: 5 = N5 (easiest) ... 1 = N1 (hardest). `'other'` collects
-// words JMDict has no JLPT tag for.
+// words JMDict has no JLPT tag for — grouped internally but not shown as a
+// selectable level (no corpus to measure against).
 type LevelKey = number | 'other';
 const LEVELS: { value: LevelKey; label: string; note?: string }[] = [
   { value: 5, label: 'N5', note: 'easiest' },
@@ -51,7 +52,6 @@ const LEVELS: { value: LevelKey; label: string; note?: string }[] = [
   { value: 3, label: 'N3' },
   { value: 2, label: 'N2' },
   { value: 1, label: 'N1', note: 'hardest' },
-  { value: 'other', label: 'Other' },
 ];
 
 const levelKeyFor = (w: WordData): LevelKey =>
@@ -228,17 +228,16 @@ export function Progress() {
           display: 'flex',
           alignItems: 'center',
           // Fluid row: on narrow screens the donuts SHRINK proportionally (via
-          // flex-grow ratios on the buttons) so all six always fit with at least
-          // the fixed gap between them; on wide screens they cap at full size
-          // and space-between spreads the leftover as extra spacing. When the
-          // active donut grows, flexbox re-spreads every frame — neighbors
-          // slide smoothly.
-          justifyContent: 'space-between',
-          gap: '8px',
+          // flex-grow ratios on the buttons) so all five always fit with at
+          // least the fixed gap between them; on wide screens they cap at full
+          // size and space-evenly spreads the leftover. With side padding equal
+          // to `gap`, edge gap (padding + evenly share) always matches inner
+          // gap (gap + evenly share). When the active donut grows, flexbox
+          // re-spreads every frame — neighbors slide smoothly.
+          justifyContent: 'space-evenly',
+          gap: '10px',
           overflowX: 'auto',
-          // Generous padding so the active donut's shadow (14px blur) never
-          // clips against the overflow scroller on any edge.
-          padding: '0.5rem 0.9rem 1.25rem',
+          padding: '0.5rem 10px 1.25rem',
           // Bleed through main's 1.25rem side padding: the row isn't a card, so
           // it may run wider than the cards — on phones that slack goes straight
           // into bigger donuts (the fluid sizing absorbs it).
@@ -251,9 +250,6 @@ export function Progress() {
           const isActive = l.value === activeLevel;
           const bucketCounts = levelBucketCounts.get(l.value) ?? emptyBuckets();
           const tracked = byLevel.get(l.value)?.length ?? 0;
-          // Full corpus size for JLPT levels; 'Other' has no corpus, so tracked.
-          const total =
-            typeof l.value === 'number' ? levelTotals[l.value] ?? tracked : tracked;
           return (
             <button
               key={String(l.value)}
@@ -266,17 +262,15 @@ export function Progress() {
                 // at full size on wide screens. min-width floors legibility —
                 // below it the row overflows into a scroll with gaps intact.
                 // Height is fixed so nothing below the row moves vertically.
-                flex: `${isActive ? 80 : 64} 1 0px`,
-                maxWidth: isActive ? '80px' : '64px',
-                minWidth: isActive ? '54px' : '43px',
-                height: '108px',
+                flex: `${isActive ? 92 : 70} 1 0px`,
+                maxWidth: isActive ? '92px' : '70px',
+                minWidth: isActive ? '58px' : '45px',
+                height: '92px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                // A fixed-height slot at the bottom centers the donut vertically,
-                // so every donut's CENTER sits on the same line regardless of
-                // size; the label is anchored to the donut's top edge, so it
-                // rides up as the active donut grows into the headroom above.
+                // A fixed-height slot centers the donut vertically, so every
+                // donut's CENTER sits on the same line regardless of size.
                 justifyContent: 'flex-end',
                 padding: 0,
                 border: 'none',
@@ -289,7 +283,7 @@ export function Progress() {
               {/* Fixed-height slot = max donut size; smaller donuts center in it. */}
               <span
                 style={{
-                  height: '80px',
+                  height: '92px',
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
@@ -312,23 +306,6 @@ export function Progress() {
                   transition: 'box-shadow 0.25s ease',
                 }}
               >
-                <span
-                  className="sans"
-                  style={{
-                    position: 'absolute',
-                    bottom: 'calc(100% + 7px)',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    fontSize: isActive ? '1.1rem' : '0.85rem',
-                    fontWeight: isActive ? 700 : 600,
-                    letterSpacing: '0.04em',
-                    lineHeight: 1,
-                    whiteSpace: 'nowrap',
-                    transition: 'font-size 0.25s ease',
-                  }}
-                >
-                  {l.label}
-                </span>
                 <Donut
                   counts={bucketCounts}
                   total={tracked + bucketCounts.notSeen}
@@ -337,7 +314,8 @@ export function Progress() {
                   strokeWidth={8}
                   fluid
                   showText={false}
-                  centerText={total.toLocaleString()}
+                  centerText={l.label}
+                  centerFontSize={13}
                   holeFill={isActive ? 'var(--bg-card)' : undefined}
                 />
               </span>
@@ -389,10 +367,10 @@ export function Progress() {
               // keeps its natural (content) width and hugs the right edge, so
               // the leftover always lands as whitespace between the two.
               justifyContent: 'space-between',
-              gap: '1.25rem',
+              gap: '1rem',
             }}
           >
-            <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: '210px' }}>
+            <div style={{ flex: '0 1 42%', minWidth: 0, maxWidth: '230px' }}>
               {/* Same lifted look as the active mini donut: round box-shadow
                   wrapper + card-colored hole so the shadow can't bleed through. */}
               <span
@@ -406,10 +384,11 @@ export function Progress() {
                   counts={counts}
                   total={donutTotal}
                   activeBucket={activeBucket}
+                  strokeWidth={26}
                   fluid
                   holeFill="var(--bg-card)"
-                  headline={`${donutTotal > 0 ? Math.round((levelTotal / donutTotal) * 100) : 0}%`}
-                  subline="seen"
+                  headline={donutTotal.toLocaleString()}
+                  subline="words"
                 />
               </span>
             </div>
@@ -427,9 +406,9 @@ export function Progress() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.45rem',
+                      gap: '0.4rem',
                       width: '100%',
-                      padding: '0.45rem 0.4rem',
+                      padding: '0.45rem 0.3rem',
                       background: isActive ? 'var(--bg-pure)' : 'none',
                       border: 'none',
                       borderRadius: '10px',
@@ -448,19 +427,19 @@ export function Progress() {
                         flex: '0 0 auto',
                       }}
                     />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-main)', flex: 1, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.88rem', color: 'var(--text-main)', flex: 1, whiteSpace: 'nowrap' }}>
                       {m.label}
                     </span>
                     {/* Fixed-width number columns: the legend keeps the same width
                         no matter the digit counts, so the donut never resizes when
                         switching levels or buckets. */}
                     <span
-                      style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', width: '2.5rem', textAlign: 'right', flex: '0 0 auto' }}
+                      style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', width: '2.3rem', textAlign: 'right', flex: '0 0 auto' }}
                     >
                       {pct}%
                     </span>
                     <span
-                      style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '2.7rem', textAlign: 'right', flex: '0 0 auto' }}
+                      style={{ fontSize: '0.78rem', color: 'var(--text-muted)', width: '2.6rem', textAlign: 'right', flex: '0 0 auto' }}
                     >
                       {value.toLocaleString()}
                     </span>
@@ -693,6 +672,7 @@ function Donut({
   strokeWidth = 20,
   showText = true,
   centerText,
+  centerFontSize = 11,
   headline,
   subline,
   displaySize,
@@ -705,7 +685,8 @@ function Donut({
   size?: number;
   strokeWidth?: number;
   showText?: boolean;
-  centerText?: string;  // compact center count (mini donuts)
+  centerText?: string;  // compact center label (mini donuts)
+  centerFontSize?: number; // viewBox-unit cap for the centerText size
   headline?: string;    // big center line (detail donut), e.g. "42%"
   subline?: string;     // small line under the headline, e.g. "seen"
   displaySize?: number; // rendered size; defaults to `size` (the viewBox scale)
@@ -776,9 +757,10 @@ function Donut({
           textAnchor="middle"
           className="sans"
           style={{
-            // Shrink to fit the hole: ~0.62em average glyph width for digits.
-            fontSize: `${Math.min(11, (size - strokeWidth * 2 - 4) / (Math.max(centerText.length, 1) * 0.62))}px`,
-            fontWeight: 600,
+            // Shrink to fit the hole: ~0.62em average glyph width.
+            fontSize: `${Math.min(centerFontSize, (size - strokeWidth * 2 - 4) / (Math.max(centerText.length, 1) * 0.62))}px`,
+            fontWeight: 700,
+            letterSpacing: '0.03em',
             fill: 'currentColor',
           }}
         >
@@ -794,7 +776,7 @@ function Donut({
             textAnchor="middle"
             className="serif"
             style={{
-              fontSize: headline.length > 4 ? '1rem' : '1.2rem',
+              fontSize: headline.length > 5 ? '1rem' : '1.15rem',
               fontWeight: 700,
               fill: 'var(--text-main)',
             }}
@@ -804,10 +786,10 @@ function Donut({
           {subline != null && (
             <text
               x={center}
-              y={center + 14}
+              y={center + 13}
               textAnchor="middle"
               className="sans"
-              style={{ fontSize: '0.65rem', fill: 'var(--text-muted)', letterSpacing: '0.04em' }}
+              style={{ fontSize: '0.62rem', fill: 'var(--text-muted)', letterSpacing: '0.04em' }}
             >
               {subline}
             </text>

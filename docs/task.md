@@ -284,3 +284,18 @@
   - [x] One-shot "Re-align Furigana" in Settings → Advanced (mirrors Rebalance):
         recomputes the stored furiganaMap back-catalog locally (furiganaMap never
         syncs to user_word_progress); self-hides via lastFuriganaRealignTs.
+- [x] Study focus mode + 完了 finish card + Progress donut polish (Jul 14)
+  - [x] Progress: JLPT labels inside the mini donuts (count removed), 'Other'
+        level dropped from the selector, level row space-evenly (edge gap ==
+        inter-donut gap), detail donut shows total word count (percent-seen
+        removed), thicker ring, larger legend text.
+  - [x] Flashcards focus mode: first tap into a card hides the bottom nav and
+        the card grows into the space (min(660px, 74vh)); tap outside the card
+        exits; in-card taps stopPropagation so grading never exits; focus
+        releases on session end / unmount.
+  - [x] 完了 finish card replaces the plain deck-complete text: same flip
+        surface, front 完了 / COMPLETE, back お疲れさま + session cards /
+        reviews today / day streak + compact "Discover new words" pill.
+  - Verified: Playwright walkthrough (seed deck → focus on tap → outside-tap
+    exit → re-focus → grade 8/8 → finish card flip → Discover launch with live
+    candidates → focus re-entry). tsc clean.
