@@ -20,6 +20,9 @@ function App() {
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
   const [activeTab, setActiveTab] = useState<'news' | 'flashcards' | 'progress' | 'settings'>('news');
   const [showNav, setShowNav] = useState(true);
+  // Flashcard focus mode: tapping into a card hides the bottom nav so the card
+  // can use that space; Flashcards reports the state up from its card flow.
+  const [studyFocus, setStudyFocus] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'waitlisted' | 'not_joined' | null>(null);
@@ -659,11 +662,15 @@ function App() {
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} />
           )
         )}
-        {activeTab === 'flashcards' && <Flashcards />}
+        {activeTab === 'flashcards' && <Flashcards onFocusChange={setStudyFocus} />}
         {activeTab === 'progress' && <Progress />}
         {activeTab === 'settings' && <Settings />}
       </main>
-      <BottomNav activeTab={activeTab} onChange={setActiveTab} isVisible={showNav && newsView !== 'reading'} />
+      <BottomNav
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        isVisible={showNav && newsView !== 'reading' && !(activeTab === 'flashcards' && studyFocus)}
+      />
     </div>
   )
 }

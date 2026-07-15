@@ -120,7 +120,7 @@ function formatInterval(days: number): string {
   return `${(days / 365).toFixed(1)}y`;
 }
 
-export function Flashcards() {
+export function Flashcards({ onFocusChange }: { onFocusChange?: (focused: boolean) => void }) {
   const reviewWord = useAppStore((s) => s.reviewWord);
   const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
   const jlptLevel = useAppStore((s) => s.jlptLevel);
@@ -131,6 +131,12 @@ export function Flashcards() {
 
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+
+  // Focus mode: the first tap into a card hides the bottom nav (reported up via
+  // onFocusChange) and the card grows into the reclaimed space. Sticky across
+  // cards for the rest of the run; it releases when the run ends (finish card,
+  // Discover summary, empty deck) so the nav is back for onward navigation.
+  const [focused, setFocused] = useState(false);
 
   // Discover mode (#113). Non-null = in Discover; [] while loading or exhausted.
   const [discoverCards, setDiscoverCards] = useState<IntakeCandidate[] | null>(null);
@@ -144,6 +150,7 @@ export function Flashcards() {
     setDiscoverCards([]);
     setDiscoverIndex(0);
     setRevealed(false);
+    setFocused(false); // each run re-enters focus on its first card tap
     const s = useAppStore.getState();
     const seenIds = Object.values(s.wordDatabase)
       .map((w) => w.jmdictEntryId)
@@ -193,6 +200,33 @@ export function Flashcards() {
   }
   const total = cards.length;
   const card = cards[index];
+
+  // Focus is only real while a card is actually on screen — the summary/empty
+  // states always get the nav back, whatever `focused` says.
+  const inCardFlow =
+    discoverCards != null
+      ? !discoverLoading && discoverIndex < discoverCards.length && discoverCards.length > 0
+      : total > 0 && index < total;
+  const focusActive = focused && inCardFlow;
+  useEffect(() => {
+    onFocusChange?.(focusActive);
+  }, [focusActive, onFocusChange]);
+  // Leaving the tab unmounts this component — always hand the nav back.
+  useEffect(() => () => onFocusChange?.(false), [onFocusChange]);
+
+  // Card-flow wrapper: in focus mode the nav-reserving bottom padding collapses
+  // and the card (FlipSurface `tall`) grows into the space.
+  const flowStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 'calc(100dvh - 5rem)',
+    paddingTop: '0.5rem',
+    paddingBottom: focusActive
+      ? 'calc(1.25rem + env(safe-area-inset-bottom))'
+      : 'calc(4.75rem + env(safe-area-inset-bottom))',
+    boxSizing: 'border-box',
+    transition: 'padding-bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+  };
 
   // Interval each rating would assign, previewed against the current card's schedule.
   const previews = useMemo(() => {
@@ -300,7 +334,7 @@ export function Flashcards() {
 
     const cand = discoverCards[discoverIndex];
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 5rem)', paddingTop: '0.5rem', paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom))', boxSizing: 'border-box' }}>
+      <div style={flowStyle} onClick={() => setFocused(false)}>
         {/* Progress */}
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
@@ -323,6 +357,8 @@ export function Flashcards() {
           cardKey={cand.entryId}
           word={wordForCandidate(cand)}
           revealed={revealed}
+          tall={focusActive}
+          onTap={() => setFocused(true)}
           onReveal={() => setRevealed(true)}
           footer={
             <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
@@ -387,23 +423,30 @@ export function Flashcards() {
     );
   }
 
-  // ── Deck complete ───────────────────────────────────────────────────────
+  // ── Deck complete — the 完了 finish card ─────────────────────────────────
+  // Sits in the same card flow as the deck (full progress bar above it); flips
+  // to the day's stats with Discover as the only onward action.
   if (index >= total) {
     return (
-      <Centered>
-        <p className="serif" style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-          お疲れさま
-        </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          Deck complete — {total} {total === 1 ? 'card' : 'cards'} reviewed.
-        </p>
-        {discoverEntry}
-      </Centered>
+      <div style={flowStyle} onClick={() => setFocused(false)}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
+            <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Review
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{total} / {total}</span>
+          </div>
+          <div style={{ height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: '100%', backgroundColor: 'var(--accent-progress)' }} />
+          </div>
+        </div>
+        <FinishCard sessionCount={total} onDiscover={jlptLevel != null ? startDiscover : undefined} />
+      </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 5rem)', paddingTop: '0.5rem', paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom))', boxSizing: 'border-box' }}>
+    <div style={flowStyle} onClick={() => setFocused(false)}>
       {/* Progress */}
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
@@ -426,6 +469,8 @@ export function Flashcards() {
         cardKey={card.key}
         word={card.word}
         revealed={revealed}
+        tall={focusActive}
+        onTap={() => setFocused(true)}
         onReveal={() => setRevealed(true)}
         footer={
           <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
@@ -484,12 +529,14 @@ function ExitDiscoverButton({ onClick }: { onClick: () => void }) {
 // The grade buttons live INSIDE the back face (passed as `footer`), as a strip
 // along its bottom edge — so flipping never changes the card's height or shifts
 // the layout, and the buttons arrive with the flip itself (no second animation).
-function FlipSurface({ cardKey, word, revealed, onReveal, footer }: {
+function FlipSurface({ cardKey, word, revealed, onReveal, onTap, footer, tall = false }: {
   cardKey: string;
   word: WordData;
   revealed: boolean;
   onReveal: () => void;
+  onTap?: () => void; // fires on ANY in-card tap (even revealed) — re-enters focus
   footer: React.ReactNode;
+  tall?: boolean; // focus mode: grow into the space the hidden nav frees up
 }) {
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
@@ -503,16 +550,25 @@ function FlipSurface({ cardKey, word, revealed, onReveal, footer }: {
           style={{ width: '100%', maxWidth: '340px' }}
         >
           {/* Inner element rotates in 3D — front and back are its two faces.
-              Capped in px but scaled by vh so it never tucks under the nav. */}
+              Capped in px but scaled by vh so it never tucks under the nav.
+              Clicks stop here: anything outside the card (the flow wrapper)
+              exits focus mode, so in-card taps must not bubble that far. */}
           <motion.div
-            onClick={() => !revealed && onReveal()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTap?.();
+              if (!revealed) onReveal();
+            }}
             initial={false}
             animate={{ rotateY: revealed ? 180 : 0 }}
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
             style={{
               position: 'relative',
               width: '100%',
-              height: 'min(540px, 62vh)',
+              // Framer only drives `transform` here, so a plain CSS transition
+              // can own the focus-mode height change without any conflict.
+              height: tall ? 'min(660px, 74vh)' : 'min(540px, 62vh)',
+              transition: 'height 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
               transformStyle: 'preserve-3d',
               cursor: revealed ? 'default' : 'pointer',
             }}
@@ -559,6 +615,126 @@ function FlipSurface({ cardKey, word, revealed, onReveal, footer }: {
           </motion.div>
         </motion.div>
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Finish card ──────────────────────────────────────────────────────────────
+// Shown when the day's deck is done: the same quiet card surface as the
+// flashcards, with 完了 on the front. Tapping flips it to a small stats panel
+// for the day, with Discover as the only onward action.
+function FinishCard({ sessionCount, onDiscover }: { sessionCount: number; onDiscover?: () => void }) {
+  const [revealed, setRevealed] = useState(false);
+  const reviewsByDay = useAppStore((s) => s.reviewsByDay);
+
+  // Same UTC day key the store stamps reviewsByDay with.
+  const dayKey = (ms: number) => new Date(ms).toISOString().split('T')[0];
+  const todayReviews = reviewsByDay[dayKey(Date.now())] ?? 0;
+  // Consecutive review days ending today.
+  let streak = 0;
+  for (let ms = Date.now(); (reviewsByDay[dayKey(ms)] ?? 0) > 0; ms -= 86_400_000) streak += 1;
+
+  const stats = [
+    { value: sessionCount, label: sessionCount === 1 ? 'card' : 'cards' },
+    { value: todayReviews, label: 'today' },
+    { value: streak, label: streak === 1 ? 'day' : 'days' },
+  ];
+
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }}
+        style={{ width: '100%', maxWidth: '340px' }}
+      >
+        <motion.div
+          onClick={() => !revealed && setRevealed(true)}
+          initial={false}
+          animate={{ rotateY: revealed ? 180 : 0 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: 'min(540px, 62vh)',
+            transformStyle: 'preserve-3d',
+            cursor: revealed ? 'default' : 'pointer',
+          }}
+        >
+          {/* FRONT — 完了, nothing else. */}
+          <CardFace>
+            <span
+              className="serif"
+              translate="no"
+              style={{ fontSize: '3.4rem', lineHeight: 1.15, color: 'var(--text-main)', letterSpacing: '0.08em' }}
+            >
+              完了
+            </span>
+            <span
+              className="sans"
+              style={{
+                marginTop: '1.2rem',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                letterSpacing: '0.28em',
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Complete
+            </span>
+            <div style={{ position: 'absolute', bottom: '1.5rem', left: 0, right: 0, display: 'flex', justifyContent: 'center', color: 'var(--text-muted)', opacity: 0.35 }}>
+              <ChevronDown size={20} strokeWidth={1.5} />
+            </div>
+          </CardFace>
+
+          {/* BACK — today's numbers, then Discover. */}
+          <CardFace
+            back
+            footer={
+              onDiscover && (
+                <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '0 1.1rem 1.35rem' }}>
+                  <button
+                    onClick={onDiscover}
+                    style={{
+                      padding: '0.7rem 1.6rem',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: '999px',
+                      backgroundColor: 'var(--bg-pure)',
+                      boxShadow: '0 3px 10px rgba(143, 170, 116, 0.32)',
+                      color: 'var(--text-main)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      letterSpacing: '0.02em',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Discover new words
+                  </button>
+                </div>
+              )
+            }
+          >
+            <span className="serif" translate="no" style={{ fontSize: '1.4rem', color: 'var(--text-main)' }}>
+              お疲れさま
+            </span>
+            <div style={{ display: 'flex', gap: '2.4rem', marginTop: '2.25rem' }}>
+              {stats.map((s) => (
+                <div key={s.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45rem' }}>
+                  <span className="serif" style={{ fontSize: '1.8rem', lineHeight: 1, color: 'var(--text-main)' }}>
+                    {s.value}
+                  </span>
+                  <span className="sans" style={{ fontSize: '0.65rem', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <span className="sans" style={{ marginTop: '1.4rem', fontSize: '0.72rem', color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
+              {streak > 1 ? `${streak} days in a row — keep it going.` : 'Every review counts.'}
+            </span>
+          </CardFace>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
