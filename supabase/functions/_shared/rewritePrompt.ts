@@ -186,8 +186,9 @@ Rules:
 2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
 3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
 4. KANJI PREFERENCE: ${biasInstruction}
-5. VOCABULARY PREFERENCE: ${vocabInstruction}
-6. NO MARKUP: DO NOT use brackets [], parentheses (), or special formatting around Japanese words.
+5. NATURAL ORTHOGRAPHY — OVERRIDES ALL KANJI PREFERENCE ABOVE: Spell every word the way a modern Japanese newspaper spells it. Words normally written in kana MUST stay in kana: その (never 其の), それ／それから (never 其れ／其れから), とても (never 迚も), いつも (never 何時も), また (never 亦／又), もの・こと・ため・とき when grammatical, できる, ある, いる, など, ください, よう. NEVER use rare, archaic, literary, or irregular kanji forms (the forms JMDict tags rK/oK/iK). NEVER use ateji for foreign words: write country names and loanwords in KATAKANA — カナダ (never 加奈陀), アメリカ (never 亜米利加), イギリス (never 英吉利). When unsure whether a kanji form is in common everyday use, choose kana. This rule is absolute even in study/balanced kanji-bias mode.
+6. VOCABULARY PREFERENCE: ${vocabInstruction}
+7. NO MARKUP: DO NOT use brackets [], parentheses (), or special formatting around Japanese words.
 
 Output EXACTLY a JSON array:
 [{"type":"paragraph"|"yugen-box","text":"...","keyword":"...","reading":"...","description":"..."}]
