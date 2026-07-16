@@ -219,11 +219,20 @@ async function fetchAllRows<T>(page: (from: number, to: number) => PromiseLike<{
 
 type EmbeddedEntry = { id: string; jmdict_kanji: { text: string; common: boolean }[]; jmdict_kana: { text: string; common: boolean }[] };
 
-// Preferred display surface for an entry: common kanji > common kana > any kanji > any kana.
+// Preferred display surface for an entry: common kanji > common kana > any kanji
+// > any kana. Preferring a common KANA reading over a non-common kanji form keeps
+// words whose only kanji spelling is rare (その's 其の, とても's 迚も) in kana,
+// instead of feeding an unnatural surface into the vocab palette.
 function pickSurface(e: EmbeddedEntry): string | null {
-  const first = (rows: { text: string; common: boolean }[]) =>
-    rows.find((r) => r.common)?.text ?? rows[0]?.text ?? null;
-  return first(e.jmdict_kanji ?? []) ?? first(e.jmdict_kana ?? []);
+  const commonOf = (rows: { text: string; common: boolean }[]) =>
+    rows.find((r) => r.common)?.text ?? null;
+  const anyOf = (rows: { text: string; common: boolean }[]) => rows[0]?.text ?? null;
+  return (
+    commonOf(e.jmdict_kanji ?? []) ??
+    commonOf(e.jmdict_kana ?? []) ??
+    anyOf(e.jmdict_kanji ?? []) ??
+    anyOf(e.jmdict_kana ?? [])
+  );
 }
 
 function normalizeConcepts(raw: unknown): Concept[] {
