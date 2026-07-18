@@ -20,10 +20,47 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const REWRITE_MAX_ATTEMPTS = 3;
 const REWRITE_BACKOFF_MS = [500, 1000, 2000];
 
+/** A generation that parsed as JSON but doesn't have the shape the client can
+ *  render. Retried like truncated JSON — a fresh generation usually fixes it. */
+class BlockValidationError extends Error {}
+
+// Structural validation of a parsed generation, mirroring the eval harness's
+// parseBlocks (scripts/eval-article-rewrite.mjs) — production used to persist
+// blocks unvalidated, so one malformed generation wrote a broken article to
+// processed_news that crashed the client tokenizer, and the JIT buffer served it.
+// Contract (what Reader.tsx renders): a non-empty array with at least one
+// paragraph; paragraphs carry non-empty string `text` (fed to kuromoji);
+// yugen-box blocks carry keyword/description. Unknown block types pass —
+// the client ignores them.
+function validateBlocks(raw: unknown): void {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new BlockValidationError('generation is not a non-empty array of blocks');
+  }
+  let paragraphs = 0;
+  for (const b of raw) {
+    if (!b || typeof b !== 'object' || typeof (b as any).type !== 'string') {
+      throw new BlockValidationError(`malformed block: ${JSON.stringify(b)?.slice(0, 120)}`);
+    }
+    const block = b as { type: string; text?: unknown; keyword?: unknown; description?: unknown };
+    if (block.type === 'paragraph') {
+      if (typeof block.text !== 'string' || block.text.trim().length === 0) {
+        throw new BlockValidationError('paragraph block without non-empty string text');
+      }
+      paragraphs++;
+    } else if (block.type === 'yugen-box') {
+      if (typeof block.keyword !== 'string' && typeof block.description !== 'string') {
+        throw new BlockValidationError('yugen-box block without keyword or description');
+      }
+    }
+  }
+  if (paragraphs === 0) throw new BlockValidationError('no paragraph blocks in generation');
+}
+
 /** True for the transient upstream failures worth retrying: LLM rate-limit /
  *  overload / 5xx, and malformed-JSON (empty or truncated) generations. */
 function isTransientLlmError(err: unknown): boolean {
   if (err instanceof SyntaxError) return true; // truncated/empty JSON → regenerate
+  if (err instanceof BlockValidationError) return true; // parsed but unrenderable → regenerate
   const status = (err as { status?: number; code?: number })?.status
     ?? (err as { code?: number })?.code;
   if (status === 429 || status === 500 || status === 503) return true;
@@ -31,8 +68,8 @@ function isTransientLlmError(err: unknown): boolean {
   return /\b(429|500|503)\b|overload|unavailable|rate.?limit|resource.?exhausted|deadline|timeout/.test(msg);
 }
 
-/** Run the Pass-1 rewrite (Gemini generate + JSON.parse) with backoff on
- *  transient failures. Non-transient errors throw immediately. */
+/** Run the Pass-1 rewrite (Gemini generate + JSON.parse + block validation)
+ *  with backoff on transient failures. Non-transient errors throw immediately. */
 async function runRewriteWithRetry(ai: GoogleGenAI, prompt: string): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < REWRITE_MAX_ATTEMPTS; attempt++) {
@@ -46,7 +83,9 @@ async function runRewriteWithRetry(ai: GoogleGenAI, prompt: string): Promise<any
         .replace(/^```(json)?[\s\n]*/i, '')
         .replace(/[\s\n]*```$/i, '')
         .trim();
-      return JSON.parse(rawText);
+      const parsed = JSON.parse(rawText);
+      validateBlocks(parsed);
+      return parsed;
     } catch (err) {
       lastErr = err;
       const transient = isTransientLlmError(err);
