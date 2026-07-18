@@ -11,6 +11,7 @@ import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
+import { UpdatePrompt } from './components/UpdatePrompt'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -573,6 +574,7 @@ function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <UpdatePrompt />
       {actionError && (
         <div
           role="alert"
