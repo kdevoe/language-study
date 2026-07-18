@@ -270,6 +270,21 @@ interface AppState {
 // blob over time (see #54 / the localStorage-quota failure mode).
 const REVIEW_HISTORY_DAYS = 180;
 
+// #54: the read/dismissed id lists exist only to avoid re-suggesting already-seen
+// articles; old ids age out of the feed anyway, so a bounded recent window is
+// sufficient — unbounded, they creep the persist blob back toward the ~5MB quota
+// that once wedged the iOS PWA. Server-side consumed state is the source of truth,
+// so trimming is loss-free.
+const MAX_TRACKED_ARTICLE_IDS = 1000;
+// Aggressive truncation used by the quota evict-and-retry path: when a persist
+// write overflows, shrink to a floor that still covers the feed's working set.
+const EVICTED_ARTICLE_IDS = 100;
+
+/** Keep only the most recent `max` ids (lists append newest-last). */
+function capIds(ids: string[], max = MAX_TRACKED_ARTICLE_IDS): string[] {
+  return ids.length > max ? ids.slice(-max) : ids;
+}
+
 /** Increment `dayKey`'s review-event tally and prune to the rolling window. Pure;
  * ISO date keys sort chronologically, so the oldest keys drop first. */
 function bumpReviewDay(byDay: Record<string, number>, dayKey: string): Record<string, number> {
@@ -374,7 +389,7 @@ export const useAppStore = create<AppState>()(
       setArticlesCache: (cache) => set({ articlesCache: cache }),
       dismissArticle: (id) => {
         set((state) => ({
-          dismissedArticleIds: Array.from(new Set([...state.dismissedArticleIds, id]))
+          dismissedArticleIds: capIds(Array.from(new Set([...state.dismissedArticleIds, id])))
         }));
         // Server-owned dismissed state + JIT refill. Local array stays as a fast
         // cache; the server is the source of truth (cross-device + buffer trigger).
@@ -386,7 +401,7 @@ export const useAppStore = create<AppState>()(
       // is not cleared by the daily feed reset.
       markArticleRead: (id) => {
         set((state) => ({
-          readArticleIds: Array.from(new Set([...state.readArticleIds, id]))
+          readArticleIds: capIds(Array.from(new Set([...state.readArticleIds, id])))
         }));
         // Mark read server-side (on open) and top up the buffer.
         syncConsumed(id, 'read');
@@ -1609,6 +1624,21 @@ export const useAppStore = create<AppState>()(
           try {
             localStorage.setItem(name, value);
           } catch (e) {
+            // #54 evict-and-retry: a quota overflow used to just stop persisting —
+            // a whole session's grades silently lost on next reload. Truncate the
+            // article-id lists (loss-free; server owns consumed state) and retry
+            // once so the write that matters (wordDatabase) still lands.
+            try {
+              const parsed = JSON.parse(value);
+              const s = parsed?.state;
+              if (s && (Array.isArray(s.readArticleIds) || Array.isArray(s.dismissedArticleIds))) {
+                if (Array.isArray(s.readArticleIds)) s.readArticleIds = capIds(s.readArticleIds, EVICTED_ARTICLE_IDS);
+                if (Array.isArray(s.dismissedArticleIds)) s.dismissedArticleIds = capIds(s.dismissedArticleIds, EVICTED_ARTICLE_IDS);
+                localStorage.setItem(name, JSON.stringify(parsed));
+                console.warn('[store] localStorage quota hit — evicted article-id lists and re-persisted:', e);
+                return;
+              }
+            } catch { /* fall through to the log below */ }
             console.error('[store] localStorage persist failed (quota?) — continuing without persisting:', e);
           }
         },
@@ -1638,8 +1668,8 @@ export const useAppStore = create<AppState>()(
         lastResetTs: state.lastResetTs,
         lastStudyPacingResetTs: state.lastStudyPacingResetTs,
         lastFuriganaRealignTs: state.lastFuriganaRealignTs,
-        dismissedArticleIds: state.dismissedArticleIds,
-        readArticleIds: state.readArticleIds,
+        dismissedArticleIds: capIds(state.dismissedArticleIds),
+        readArticleIds: capIds(state.readArticleIds),
         readerFontSize: state.readerFontSize,
         readerFontWeight: state.readerFontWeight,
       }),
@@ -1763,6 +1793,11 @@ export const useAppStore = create<AppState>()(
         if (state) state.processingArticles = [];
         if (state && !Array.isArray(state.dismissedArticleIds)) state.dismissedArticleIds = [];
         if (state && !Array.isArray(state.readArticleIds)) state.readArticleIds = [];
+        // #54: trim lists that grew unbounded before the cap existed.
+        if (state) {
+          state.dismissedArticleIds = capIds(state.dismissedArticleIds);
+          state.readArticleIds = capIds(state.readArticleIds);
+        }
       }
     }
   )
