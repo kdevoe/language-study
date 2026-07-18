@@ -428,6 +428,18 @@ Deno.serve(async (req) => {
     const targetNew = Math.max(1, Math.round(ratios.new * wordsBudget));
     console.log(`[process-article] length: ${targetParagraphs} paragraphs (sourceKind=${sourceKind}), vocab budget ${wordsBudget} -> ${targetReview} review / ${targetNew} new`);
 
+    // Kick off concept extraction (Groq) in parallel with the lexicon build —
+    // neither depends on the other, and #103's concept↔SRS matching needs the
+    // concepts on EVERY article (lexicon path included), not just the cluster
+    // fallback. Never rejects: failure degrades to concept-less behavior
+    // (topic-independent floor, no clusters).
+    const conceptsPromise: Promise<{ topics: Concept[]; actions: Concept[] } | null> =
+      extractConceptsWithGroq(title, sourceText.slice(0, 2000), groqKey)
+        .catch((e) => {
+          console.warn('[process-article] concept extraction failed (continuing without):', e instanceof Error ? e.message : e);
+          return null;
+        });
+
     // 2a. Controlled-vocabulary lexicon — PRIMARY difficulty mechanism (phase 2).
     // Diagnosis on a real N4 article: the model already wrote 92% inside the reader's
     // ENCOUNTERED vocabulary, but 39% of content words sat in the medium/hard/unknown
@@ -479,13 +491,135 @@ Deno.serve(async (req) => {
       console.error('[process-article] Lexicon build failed (falling back to clusters):', lexErr);
     }
 
-    // 2b. Concept-cluster pipeline — FALLBACK when the lexicon can't be built.
-    //    a) Extract the story's concepts in two nets — topics + actions (Groq)
-    //    b) For each concept, gloss-match its English synonyms in JMDict, ONE RPC per
+    // 2b. Story concepts — topics + actions with sense-appropriate synonyms.
+    const conceptsResult = await conceptsPromise;
+    const concepts: Concept[] = conceptsResult ? [...conceptsResult.topics, ...conceptsResult.actions] : [];
+
+    // #51: how many review slots the topic floor may spend (computed here because
+    // the #103 matching phase below sizes its candidate window from it).
+    const stuckFloor = Math.min(STUCK_REVIEW_FLOOR, Math.max(1, targetReview));
+
+    // 2c. Concept↔SRS strong matching (#103): before asking JMDict globally, ask
+    // "does the reader have a STUDIED word that means this concept?" — a reverse
+    // user_word_progress ⋈ jmdict_senses join, matching each concept's synonym-
+    // expanded set against the studied words' English glosses. This bypasses the
+    // JLPT-tag gate (the reader's SRS outranks JLPT tagging as the authority on
+    // "known"), lets actively-studied hard/medium words enter clusters where a
+    // concept actually calls for them, and upgrades the stuck floor from
+    // topic-independent to concept-aligned when possible. A due word met in a
+    // RELEVANT sentence is the best reinforcement the app can offer — and
+    // reading it advances FSRS (#72), so it may never need a flashcard.
+    //
+    // Pool A (floor + clusters): struggling hard/medium actives.
+    // Pool B (clusters only): any-mastery words due within a week — reinforced
+    //   in relevant context without spending a floor slot reserved for stuck
+    //   words. The gloss match runs client-side over the ≤~45 words currently
+    //   in their pre-due window — no RPC or migration needed.
+    let stuckSignals: WordSignal[] = [];
+    let inWindowStuck: WordSignal[] = [];
+    const surfaceById = new Map<string, string>();
+    const conceptMatchIds = new Map<string, string[]>(); // concept -> entry ids, urgency-ordered
+    const matchedIds = new Set<string>();
+    try {
+      const PROGRESS_COLS = 'word_id, mastery_level, difficulty, times_seen, last_seen_at, due_at, stability, interval_days';
+      // Intake gate (#68): never surface a still-queued word as a review target.
+      // `is null` keeps pre-migration rows eligible.
+      const intakeGate = 'intake_status.is.null,intake_status.eq.active';
+      type ProgressRow = {
+        word_id: string; mastery_level: string; difficulty: number | null; times_seen: number | null;
+        last_seen_at: string | null; due_at: string | null; stability: number | null; interval_days: number | null;
+      };
+      const weekOut = new Date(Date.now() + 7 * 86_400_000).toISOString();
+      const [{ data: stuckRows }, { data: dueRows }] = await Promise.all([
+        supabase.from('user_word_progress').select(PROGRESS_COLS)
+          .eq('user_id', userId).in('mastery_level', ['hard', 'medium']).or(intakeGate).limit(200),
+        supabase.from('user_word_progress').select(PROGRESS_COLS)
+          .eq('user_id', userId).not('due_at', 'is', null).lt('due_at', weekOut).or(intakeGate).limit(100),
+      ]);
+      const toSignal = (r: ProgressRow): WordSignal => ({
+        entryId: r.word_id,
+        jlptLevel: null,
+        freqRank: null,
+        isCommon: false,
+        mastery: r.mastery_level as WordSignal['mastery'],
+        difficulty: r.difficulty ?? null,
+        timesSeen: r.times_seen ?? null,
+        lastSeenAt: r.last_seen_at ?? null,
+        // #72: real FSRS schedule so the floor can rank by true due-date.
+        dueAt: r.due_at ?? null,
+        stability: r.stability ?? null,
+        intervalDays: r.interval_days ?? null,
+      });
+      stuckSignals = ((stuckRows ?? []) as ProgressRow[]).map(toSignal);
+      const stuckIdSet = new Set(stuckSignals.map((s) => s.entryId));
+      const dueSignals = ((dueRows ?? []) as ProgressRow[])
+        .filter((r) => !stuckIdSet.has(r.word_id)).map(toSignal);
+
+      // In-window (or overdue) words, most-urgent first. Over-pick the floor list
+      // (katakana drops + alignment need options); cap the cluster pool at 30.
+      inWindowStuck = selectPreDueFloor(stuckSignals, Date.now(), stuckFloor + 12);
+      const inWindowAll = selectPreDueFloor([...stuckSignals, ...dueSignals], Date.now(), 30);
+      const poolIds = Array.from(new Set([...inWindowAll, ...inWindowStuck].map((s) => s.entryId)));
+
+      if (poolIds.length > 0) {
+        const [{ data: senseRows }, { data: kanjiRows }, { data: kanaRows }] = await Promise.all([
+          supabase.from('jmdict_senses').select('entry_id, gloss').in('entry_id', poolIds),
+          supabase.from('jmdict_kanji').select('entry_id, text, common').in('entry_id', poolIds).order('common', { ascending: false }),
+          supabase.from('jmdict_kana').select('entry_id, text, common').in('entry_id', poolIds).order('common', { ascending: false }),
+        ]);
+        // Surface forms (kanji preferred, kana fallback) for every pool word —
+        // shared by the floor and the cluster injection below.
+        const firstByEntry = (rows: { entry_id: string; text: string }[] | null) => {
+          const m = new Map<string, string>();
+          for (const r of rows ?? []) if (!m.has(r.entry_id)) m.set(r.entry_id, r.text);
+          return m;
+        };
+        const kanjiMap = firstByEntry(kanjiRows as { entry_id: string; text: string }[]);
+        const kanaMap = firstByEntry(kanaRows as { entry_id: string; text: string }[]);
+        for (const id of poolIds) {
+          const s = kanjiMap.get(id) ?? kanaMap.get(id);
+          if (s) surfaceById.set(id, s);
+        }
+
+        if (concepts.length > 0) {
+          const glossById = new Map<string, string>();
+          for (const r of (senseRows ?? []) as { entry_id: string; gloss: string[] }[]) {
+            const prev = glossById.get(r.entry_id) ?? '';
+            glossById.set(r.entry_id, (prev + ' ; ' + (r.gloss ?? []).join(' ; ')).toLowerCase());
+          }
+          // Substring match, same heuristic the cluster RPC uses (%kw%). 見張り
+          // glosses "watch / lookout" and only reaches «surveillance» through its
+          // synonyms — the synonym net widens the bridge, this match crosses it.
+          const inWindowOrder = inWindowAll.map((s) => s.entryId);
+          for (const c of concepts) {
+            const keys = [c.concept, ...c.synonyms];
+            const hits = inWindowOrder.filter((id) => {
+              const g = glossById.get(id);
+              return !!g && keys.some((k) => g.includes(k));
+            });
+            if (hits.length > 0) {
+              conceptMatchIds.set(c.concept, hits);
+              hits.forEach((id) => matchedIds.add(id));
+            }
+          }
+          if (matchedIds.size > 0) {
+            const detail = [...conceptMatchIds.entries()]
+              .map(([c, ids]) => `${c}: ${ids.map((i) => surfaceById.get(i) ?? i).join('/')}`).join(', ');
+            console.log(`[process-article] #103 concept↔SRS: ${matchedIds.size} studied word(s) matched [${detail}]`);
+          }
+        }
+      }
+    } catch (matchErr) {
+      console.error('[process-article] concept↔SRS matching failed (continuing):', matchErr);
+    }
+
+    // 2d. Concept-cluster pipeline — FALLBACK when the lexicon can't be built.
+    //    a) For each concept, gloss-match its English synonyms in JMDict, ONE RPC per
     //       concept (parallel) so each synonym cluster stays grouped, not flattened
-    //    c) Within a cluster keep only words the reader can USE (known backbone or
-    //       at/below-level "new"), easiest first — so the model can say a hard idea with
-    //       a word the reader already knows.
+    //    b) Within a cluster keep only words the reader can USE (the reader's own
+    //       studied concept-matches first (#103), then known backbone, then
+    //       at/below-level "new"), easiest first — so the model can say a hard idea
+    //       with a word the reader already knows.
     // knownPalette/newPalette stay empty: the flat palette is superseded by clusters, but
     // the fields remain for the shared prompt builder's legacy (eval-harness) back-compat.
     const knownPalette: string[] = [];
@@ -494,8 +628,6 @@ Deno.serve(async (req) => {
     let vocabTargets: string[] = []; // legacy: kept for vocab_mode prompt back-compat
     const clusters: { concept: string; words: string[] }[] = [];
     if (!lexicon) try {
-      const { topics, actions } = await extractConceptsWithGroq(title, sourceText.slice(0, 2000), groqKey);
-      const concepts = [...topics, ...actions];
       if (concepts.length > 0) {
         // One RPC per concept (parallel) reusing the existing candidate function unchanged
         // (no migration). Modest per-concept cap — we only surface a few words per cluster.
@@ -533,8 +665,11 @@ Deno.serve(async (req) => {
         // Build one cluster per concept via the shared Word Priority Metric
         // (../_shared/wordPriority.ts). Keep only USABLE words: known backbone
         // (compareKnown, confirmed/assumed-known easiest first) then at/below-level "new"
-        // (compareByProximity). Hard/medium (review) words are excluded — struggling words
-        // are reinforced through the SRS floor below, not offered as the "easy way to say it".
+        // (compareByProximity). Hard/medium words from the GLOBAL candidate pool are
+        // excluded — a struggling word is not the "easy way to say it" — but the
+        // reader's own concept-matched studied words (#103, in their pre-due window)
+        // are injected ahead of both buckets below: meeting them where a concept
+        // calls for them is reinforcement, not difficulty.
         const byProximity = compareByProximity(jlptLevel);
         const usedSurfaces = new Set<string>(); // a surface leads at most one cluster
         for (const { concept, candidates } of perConcept) {
@@ -559,7 +694,20 @@ Deno.serve(async (req) => {
           }
           known.sort((a, b) => compareKnown(a.s, b.s));
           fresh.sort((a, b) => byProximity(a.s, b.s));
+          // #103: the reader's own studied words that mean this concept lead the
+          // cluster — regardless of JLPT tagging (SRS presence IS eligibility;
+          // the tag-gated RPC above can't see untagged words). They arrive
+          // urgency-ordered (due/pre-due first); cap so the cluster still offers
+          // known-backbone alternatives.
+          const studied = (conceptMatchIds.get(concept) ?? [])
+            .map((id) => surfaceById.get(id))
+            .filter((t): t is string => !!t && !KATAKANA_ONLY_RE.test(t))
+            .slice(0, 2);
           const words: string[] = [];
+          for (const text of studied) {
+            if (usedSurfaces.has(text) || words.includes(text)) continue;
+            words.push(text);
+          }
           for (const { text } of [...known, ...fresh]) {
             if (usedSurfaces.has(text) || words.includes(text)) continue;
             words.push(text);
@@ -576,73 +724,31 @@ Deno.serve(async (req) => {
       console.error('[process-article] Palette pipeline error (continuing without clusters):', palErr);
     }
 
-    // #51: topic-INDEPENDENT review floor. The palette above only re-injects a review
-    // word when the article's topic happens to match it, so words tied to a one-off
-    // story orphan (seen once, topic never recurs) and never drift easier. Reserve a
-    // couple of review slots for the user's most-stuck hard/medium words and blend them
-    // in regardless of topic. Post-#67 the FSRS engine gives every active word a real
-    // `due_at` + `interval_days`, so these slots route by the PRE-DUE window
-    // (selectPreDueFloor): words entering their proportional window before due surface
-    // first (most urgent first), giving reading a chance to reinforce them before they
-    // reach the flashcard deck. Words not yet in-window are skipped.
-    const stuckFloor = Math.min(STUCK_REVIEW_FLOOR, Math.max(1, targetReview));
-    try {
-      const { data: stuckRows } = await supabase
-        .from('user_word_progress')
-        .select('word_id, mastery_level, difficulty, times_seen, last_seen_at, due_at, stability, interval_days')
-        .eq('user_id', userId)
-        .in('mastery_level', ['hard', 'medium'])
-        // Intake gate (#68): never surface a word that's still queued (waiting for daily
-        // promotion) as a review target. `is null` keeps pre-migration rows eligible, so
-        // this is safe to deploy before database/24 is applied by hand.
-        .or('intake_status.is.null,intake_status.eq.active')
-        .limit(200);
-      const stuckSignals: WordSignal[] = (stuckRows as any[] ?? []).map((r) => ({
-        entryId: r.word_id,
-        jlptLevel: null,
-        freqRank: null,
-        isCommon: false,
-        mastery: r.mastery_level,
-        difficulty: r.difficulty ?? null,
-        timesSeen: r.times_seen ?? null,
-        lastSeenAt: r.last_seen_at ?? null,
-        // #72: real FSRS schedule so the review floor can rank by true due-date.
-        dueAt: r.due_at ?? null,
-        stability: r.stability ?? null,
-        intervalDays: r.interval_days ?? null,
-      }));
-      // Pre-due surfacing window: reinforce words approaching due (proportional to their
-      // interval) so reading can push them out before they hit the flashcard deck. Only
-      // in-window / overdue words qualify, most-urgent first — spending the reader's few
-      // review slots on cards actually at risk, not ones due months out.
-      // Over-pick so katakana loanwords can be dropped after surface resolution without
-      // costing floor slots — reading a loanword is free (it's English in katakana), so
-      // it shouldn't consume one of the few review slots (user feedback).
-      const stuckIds = selectPreDueFloor(stuckSignals, Date.now(), stuckFloor + 4).map((s) => s.entryId);
-      if (stuckIds.length > 0) {
-        // Resolve surface forms (kanji preferred, kana fallback), preserving stuck order.
-        const [{ data: kanjiRows }, { data: kanaRows }] = await Promise.all([
-          supabase.from('jmdict_kanji').select('entry_id, text, common').in('entry_id', stuckIds).order('common', { ascending: false }),
-          supabase.from('jmdict_kana').select('entry_id, text, common').in('entry_id', stuckIds).order('common', { ascending: false }),
-        ]);
-        const firstByEntry = (rows: any[] | null) => {
-          const m = new Map<string, string>();
-          for (const r of rows ?? []) if (!m.has(r.entry_id)) m.set(r.entry_id, r.text);
-          return m;
-        };
-        const kanjiMap = firstByEntry(kanjiRows);
-        const kanaMap = firstByEntry(kanaRows);
-        const stuckReview = stuckIds
-          .map((id) => kanjiMap.get(id) ?? kanaMap.get(id))
-          .filter((t): t is string => !!t)
-          .filter((t) => !KATAKANA_ONLY_RE.test(t))
-          .slice(0, stuckFloor);
+    // #51 review floor, upgraded by #103 from topic-INDEPENDENT to concept-ALIGNED
+    // when possible. The floor still reserves a couple of review slots for the
+    // user's most-stuck hard/medium words routed by the PRE-DUE window
+    // (selectPreDueFloor — proportional to interval, most-urgent first, not-yet-
+    // in-window words skipped), but concept-matching in-window words now take the
+    // slots first: a stuck word met where a concept actually calls for it beats
+    // the same word wedged into an off-topic article. Falls back to the plain
+    // topic-independent pick when nothing matches. Pool + surfaces + matches were
+    // computed in 2c; each group below stays urgency-ordered.
+    // Over-pick so katakana loanwords can be dropped after surface resolution
+    // without costing floor slots — reading a loanword is free (it's English in
+    // katakana), so it shouldn't consume one of the few review slots.
+    {
+      const aligned = inWindowStuck.filter((s) => matchedIds.has(s.entryId));
+      const rest = inWindowStuck.filter((s) => !matchedIds.has(s.entryId));
+      const stuckReview = [...aligned, ...rest]
+        .map((s) => surfaceById.get(s.entryId))
+        .filter((t): t is string => !!t)
+        .filter((t) => !KATAKANA_ONLY_RE.test(t))
+        .slice(0, stuckFloor);
+      if (stuckReview.length > 0) {
         // Floor first (guaranteed to survive the slice), then topic-relevant review; dedupe.
         reviewPalette = Array.from(new Set([...stuckReview, ...reviewPalette])).slice(0, Math.max(5, targetReview + 2));
-        console.log(`[process-article] Review floor: blended ${stuckReview.length} stuck word(s) [${stuckReview.join(', ')}]`);
+        console.log(`[process-article] Review floor: blended ${stuckReview.length} stuck word(s), ${aligned.length} concept-aligned [${stuckReview.join(', ')}]`);
       }
-    } catch (stuckErr) {
-      console.error('[process-article] Review-floor blend failed (continuing):', stuckErr);
     }
 
     // vocab_mode "Study" prompt targets: drawn from the (now floor-blended) review palette.
