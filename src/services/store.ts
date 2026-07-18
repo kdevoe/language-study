@@ -1214,6 +1214,49 @@ export const useAppStore = create<AppState>()(
                 return { wordDatabase: newDatabase };
               });
             }
+            // Surface-keyed rows — the local-only remainder synced under their
+            // surface key (no JMDict entry to resolve above) — reconstruct
+            // minimally so their grades survive a reinstall. Only keys that look
+            // like Japanese surfaces qualify: an entry id that failed to resolve
+            // (stale/deleted JMDict row) must not become a junk "word" record.
+            // They keep living in Progress "Other" (no JLPT ⇒ deck-ineligible)
+            // until the healing pass in backfillWordProgress links them.
+            const surfaceOnly = missingIds.filter((id) =>
+              !details.has(id) && /[぀-ゟ゠-ヿ一-鿿㐀-䶿々]/.test(id));
+            if (surfaceOnly.length > 0) {
+              set((state) => {
+                const newDatabase = { ...state.wordDatabase };
+                let added = 0;
+                for (const id of surfaceOnly) {
+                  const r = remoteProgress[id];
+                  if (!r || newDatabase[id]) continue;
+                  newDatabase[id] = {
+                    reading: '',
+                    meaning: '',
+                    surface: id,
+                    mastery: r.mastery ?? 'unseen',
+                    difficulty: r.difficulty ?? null,
+                    timesSeen: r.timesSeen ?? 0,
+                    streak: r.streak ?? 0,
+                    lastSeenTs: r.lastSeenTs ?? Date.now(),
+                    uniqueDaysSeen: [],
+                    stability: r.stability ?? null,
+                    fsrsDifficulty: r.fsrsDifficulty ?? null,
+                    dueAt: r.dueAt ?? null,
+                    lastReviewedTs: r.lastReviewedTs ?? null,
+                    intervalDays: r.intervalDays ?? null,
+                    reps: r.reps ?? 0,
+                    lapses: r.lapses ?? 0,
+                    srsStatus: r.srsStatus ?? null,
+                    intakeStatus: r.intakeStatus ?? undefined,
+                    promotedTs: r.promotedTs ?? null,
+                  };
+                  added++;
+                }
+                if (added > 0) console.log(`[store] rehydrated ${added} surface-keyed word(s)`);
+                return added > 0 ? { wordDatabase: newDatabase } : {};
+              });
+            }
           } catch (e) {
             console.warn('[store] word-cache rehydrate failed:', e);
           }
@@ -1230,14 +1273,24 @@ export const useAppStore = create<AppState>()(
         // syncs). Local is authoritative — it reflects real reading — so push those
         // grades up. We only FILL server nulls here; an existing server difficulty
         // is left untouched, so this can't clobber a newer cross-device grade.
-        const toPush = Object.values(get().wordDatabase)
-          .filter((w) => {
-            if (!w.jmdictEntryId || w.difficulty == null) return false;
-            const remote = remoteProgress[w.jmdictEntryId];
+        //
+        // Entry-less records sync too, under their SURFACE key (path-forward §1.2):
+        // word_id is "JMDict entry id or unique word string" by schema, so the
+        // ~hundreds of graded words the healing pass can't link stop being
+        // localStorage-only — a reinstall no longer erases their grades. Junk
+        // guard: the key must contain a Japanese character and not be a bare
+        // single-kana parse fragment (mirrors the healing pass's filter).
+        const surfaceSyncable = (key: string) =>
+          /[぀-ゟ゠-ヿ一-鿿㐀-䶿々]/.test(key) && !(key.length === 1 && /[぀-ゟ゠-ヿ]/.test(key));
+        const toPush = Object.entries(get().wordDatabase)
+          .filter(([key, w]) => {
+            if (w.difficulty == null) return false;
+            if (!w.jmdictEntryId && !surfaceSyncable(key)) return false;
+            const remote = remoteProgress[w.jmdictEntryId ?? key];
             return !remote || remote.difficulty == null;
           })
-          .map((w) => ({
-            wordId: w.jmdictEntryId!,
+          .map(([key, w]) => ({
+            wordId: w.jmdictEntryId ?? key,
             mastery: w.mastery,
             difficulty: w.difficulty!,
             timesSeen: w.timesSeen,
