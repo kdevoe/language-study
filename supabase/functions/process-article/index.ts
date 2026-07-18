@@ -68,9 +68,22 @@ function isTransientLlmError(err: unknown): boolean {
   return /\b(429|500|503)\b|overload|unavailable|rate.?limit|resource.?exhausted|deadline|timeout/.test(msg);
 }
 
+// Token usage of the rewrite call, straight from Gemini's usageMetadata. The
+// lexicon path injects up to 4000 words (~9k tokens) per article — logging the
+// real numbers makes lexicon creep and cost regressions visible in production
+// instead of theoretical. `attempts` counts generations actually paid for.
+interface RewriteUsage {
+  promptTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  attempts: number;
+}
+
 /** Run the Pass-1 rewrite (Gemini generate + JSON.parse + block validation)
  *  with backoff on transient failures. Non-transient errors throw immediately. */
-async function runRewriteWithRetry(ai: GoogleGenAI, prompt: string): Promise<any> {
+async function runRewriteWithRetry(
+  ai: GoogleGenAI, prompt: string,
+): Promise<{ blocks: any; usage: RewriteUsage }> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < REWRITE_MAX_ATTEMPTS; attempt++) {
     try {
@@ -85,7 +98,16 @@ async function runRewriteWithRetry(ai: GoogleGenAI, prompt: string): Promise<any
         .trim();
       const parsed = JSON.parse(rawText);
       validateBlocks(parsed);
-      return parsed;
+      const meta = result.usageMetadata;
+      return {
+        blocks: parsed,
+        usage: {
+          promptTokens: meta?.promptTokenCount ?? null,
+          outputTokens: meta?.candidatesTokenCount ?? null,
+          totalTokens: meta?.totalTokenCount ?? null,
+          attempts: attempt + 1,
+        },
+      };
     } catch (err) {
       lastErr = err;
       const transient = isTransientLlmError(err);
@@ -656,7 +678,15 @@ Deno.serve(async (req) => {
     // Retries transient Gemini overload/rate-limit and malformed-JSON blips with
     // backoff (see runRewriteWithRetry) so one upstream hiccup no longer surfaces
     // as "the server may be busy."
-    const rawBlocks = await runRewriteWithRetry(ai, prompt1);
+    const { blocks: rawBlocks, usage } = await runRewriteWithRetry(ai, prompt1);
+
+    // 1.3 (path-forward): real prompt size + token counts, per article. One
+    // greppable line for the function logs, and persisted into metadata below
+    // so cost can be aggregated with SQL instead of log spelunking.
+    console.log(
+      `[process-article] usage: prompt=${usage.promptTokens} output=${usage.outputTokens} total=${usage.totalTokens} tokens, ` +
+      `attempts=${usage.attempts}, promptChars=${prompt1.length}, lexiconWords=${lexicon?.words.length ?? 0}, sourceKind=${sourceKind}`,
+    );
 
     // Store paragraphs as raw text ({type, text}); the client tokenizes, adds
     // furigana, and links JMDict entries with a real morphological analyzer
@@ -696,7 +726,21 @@ Deno.serve(async (req) => {
           sourceKind,
           sourceChars,
         },
-        metadata: { date: new Date().toISOString(), category: 'Recent News' },
+        metadata: {
+          date: new Date().toISOString(),
+          category: 'Recent News',
+          // Queryable per-article cost telemetry (metadata is jsonb):
+          //   select metadata->'usage' from processed_news order by created_at desc;
+          usage: {
+            model: GEMINI_FLASH,
+            promptTokens: usage.promptTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
+            attempts: usage.attempts,
+            promptChars: prompt1.length,
+            lexiconWords: lexicon?.words.length ?? 0,
+          },
+        },
       }, { onConflict: 'user_id,id' });
 
     if (saveError) {
