@@ -11,6 +11,7 @@
     "test:srs": "node scripts/test-srs.mjs",
     "test:intake": "node scripts/test-intake.mjs",
     "test:deck": "node scripts/test-deck.mjs",
+    "test:furigana": "node scripts/test-furigana-map.mjs",
     "test:wordpriority": "node scripts/test-wordpriority.mjs"
   },
   "dependencies": {

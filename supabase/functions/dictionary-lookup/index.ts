@@ -1,6 +1,7 @@
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
+import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,66 +12,8 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // --- JMDict lookup helpers (server-side, mirrors client jmdict.ts) ---
 
-const isKana = (c: string) => /[\u3040-\u309f\u30a0-\u30ff]/.test(c);
-
-function buildFuriganaMap(word: string, reading: string): { kanji: string; kana: string }[] {
-  const chars = Array.from(word);
-
-  if (chars.every(isKana)) {
-    return chars.map(c => ({ kanji: c, kana: c }));
-  }
-
-  const segments: { kanji: string; kana: string }[] = [];
-  let readingIdx = 0;
-
-  for (let i = 0; i < chars.length; i++) {
-    const char = chars[i];
-    if (isKana(char)) {
-      segments.push({ kanji: char, kana: char });
-      const kanaPos = reading.indexOf(char, readingIdx);
-      if (kanaPos !== -1) {
-        readingIdx = kanaPos + 1;
-      } else {
-        readingIdx++;
-      }
-    } else {
-      let kanjiEnd = i + 1;
-      while (kanjiEnd < chars.length && !isKana(chars[kanjiEnd])) {
-        kanjiEnd++;
-      }
-
-      let readingEnd = readingIdx;
-      if (kanjiEnd < chars.length) {
-        const nextKana = chars[kanjiEnd];
-        const nextAnchorPos = reading.indexOf(nextKana, readingIdx);
-        readingEnd = nextAnchorPos !== -1 ? nextAnchorPos : readingIdx + (kanjiEnd - i);
-      } else {
-        readingEnd = reading.length;
-      }
-
-      const kanjiBlock = chars.slice(i, kanjiEnd);
-      const blockReading = reading.slice(readingIdx, readingEnd);
-
-      if (kanjiBlock.length === 1) {
-        segments.push({ kanji: kanjiBlock[0], kana: blockReading });
-      } else {
-        const readingPerKanji = Math.floor(blockReading.length / kanjiBlock.length);
-        const remainder = blockReading.length % kanjiBlock.length;
-        let rIdx = 0;
-        for (let k = 0; k < kanjiBlock.length; k++) {
-          const count = readingPerKanji + (k < remainder ? 1 : 0);
-          segments.push({ kanji: kanjiBlock[k], kana: blockReading.slice(rIdx, rIdx + count) });
-          rIdx += count;
-        }
-      }
-
-      readingIdx = readingEnd;
-      i = kanjiEnd - 1;
-    }
-  }
-
-  return segments.length > 0 ? segments : [{ kanji: word, kana: reading }];
-}
+// isKana / buildFuriganaMap moved to ../_shared/furiganaMap.ts so the alignment
+// is unit-testable offline (scripts/test-furigana-map.mjs).
 
 interface JMDictDefinition {
   word: string;

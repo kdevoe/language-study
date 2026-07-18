@@ -232,11 +232,15 @@ export function Flashcards({ onFocusChange }: { onFocusChange?: (focused: boolea
   const previews = useMemo(() => {
     if (!card) return {} as Record<Rating, string>;
     const now = Date.now();
-    // A never-studied "new" card previews from a fresh FSRS card (State.New) so the
+    // A never-studied card previews from a fresh FSRS card (State.New) so the
     // grades ladder (Again→Easy) instead of bunching around the synthetic
-    // difficulty-seed stability that promotion writes as status 'review'. Review
-    // cards preview from their real prior schedule. Mirrors store.reviewWord.
-    const prior = card.kind === 'new' ? null : priorSrsFor(card.word, now);
+    // difficulty-seed stability that promotion writes as status 'review'.
+    // Never-studied = the SAME predicate store.reviewWord uses (promoted, reps
+    // still 0) — NOT the deck's card.kind: a promoted-never-graded word that is
+    // already due gets kind 'review', and keying off kind made the pills show
+    // seed-bunched intervals while grading actually applied the fresh ladder.
+    const neverStudied = card.word.promotedTs != null && (card.word.reps ?? 0) === 0;
+    const prior = neverStudied ? null : priorSrsFor(card.word, now);
     const out = {} as Record<Rating, string>;
     for (const { rating } of RATINGS) out[rating] = formatInterval(schedule(prior, rating, now).intervalDays);
     return out;
