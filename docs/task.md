@@ -299,3 +299,33 @@
   - Verified: Playwright walkthrough (seed deck → focus on tap → outside-tap
     exit → re-focus → grade 8/8 → finish card flip → Discover launch with live
     candidates → focus re-entry). tsc clean.
+- [x] Path-forward Phases 0–1: hardening + learning-loop quality (Jul 18)
+  - [x] 0.2 Gemini output validated before persisting in process-article (#118):
+        parseBlocks-style structural check inside the retry loop; a bad
+        generation regenerates instead of writing a client-crashing article.
+  - [x] 1.3 Real token/cost telemetry (#127): usageMetadata logged per article
+        and persisted to processed_news.metadata->'usage' (SQL-aggregatable).
+  - [x] 1.1 Concept↔SRS strong matching (#123, closes #103): concepts extracted
+        on every article; reverse user_word_progress ⋈ jmdict_senses gloss match
+        (client-side over the pre-due pool, no migration); matched studied words
+        lead clusters past the JLPT-tag gate; review floor concept-aligned.
+  - [x] 0.4 localStorage bounded (#119, closes #54): id lists capped at 1000 +
+        quota evict-and-retry so a full quota can't silently drop grades.
+  - [x] 0.3 Error monitoring (#126): DSN-gated lazy Sentry + root ErrorBoundary
+        (no more white screens); invokeEdgeFn + quota failures report. LIVE in
+        prod — VITE_SENTRY_DSN set in Vercel + .env, verified in the bundle.
+  - [x] 1.4 Correctness batch (#121): buildFuriganaMap extracted to _shared +
+        46-assert fixture runner (test:furigana; round-trip invariant incl.
+        jukujikun); intake candidate fetch retries once; grade pills use
+        reviewWord's exact new-card predicate (due-but-ungraded showed wrong
+        intervals).
+  - [x] 1.2 Local-only word gap (#124): entry-less graded words sync under their
+        surface key and rehydrate after reinstall (word_id has no FK — no
+        migration); healing pass keeps retrying links each session.
+  - [x] 0.5 PWA service worker (#125): vite-plugin-pwa prompt mode, update
+        banner (hourly + foreground checks), offline kuromoji via CacheFirst,
+        /api/* excluded from SPA fallback. Verified serving at /sw.js in prod.
+  - [ ] Manual follow-ups: supabase functions deploy process-article +
+        dictionary-lookup; verify jit-overnight-refill cron then delete
+        daily-feed; close #71/#72 (shipped in #97); beta users hard-refresh
+        once for the first SW.

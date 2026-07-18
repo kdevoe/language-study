@@ -1,5 +1,14 @@
 # Path Forward — July 2026
 A prioritized roadmap based on a full review of the 16 open GitHub issues, the codebase, and the shipped state of the app as of 2026-07-13.
+
+> **Status update (2026-07-18): Phases 0–1 shipped.**
+> - 0.1 ✔ — the stray branch turned out to be already merged (#107); #73 closed (#71/#72 still to close as shipped in #97)
+> - 0.2 ✔ #118 · 0.3 ✔ #126 (Sentry live in prod, DSN in Vercel env) · 0.4 ✔ #119 (closes #54) · 0.5 ✔ #125 (SW + update banner + offline kuromoji)
+> - 0.6 ◐ — `daily-feed` confirmed still deployed; cron verification + deletion pending (manual)
+> - 1.1 ✔ #123 (closes #103) · 1.2 ✔ #124 · 1.3 ✔ #127 · 1.4 ✔ #121 (adds `npm run test:furigana`, 46 asserts)
+> - Pending manual steps: `supabase functions deploy process-article` and `deploy dictionary-lookup`; beta users hard-refresh once for the first SW.
+> - **Next: Phase 2** — #38 BYOC, then #10 topics.
+
 ## Where the app stands
 The **Word Mastery Loop is complete**. Phases A–E of `word-mastery-loop-plan.md` all shipped: canonical entry-id keying (#39), FSRS-6 engine (#67), intake queue with calendar-day pacing (#68, #106), flashcard UI (#70), reader⇄flashcard one-schedule convergence (#71 via PR #97), pre-due review floor in articles (#72/#51), and the study dashboard (#73). On the content side, source-fullness ranking (#49/#57), topic clustering (#18), server-side JIT buffer (#31), concept clusters (#101), and the controlled-vocabulary lexicon (#105) are live — a real N4 reader's struggling-word share dropped from 39% to ~10%.
 
