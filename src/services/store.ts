@@ -1524,22 +1524,34 @@ export const useAppStore = create<AppState>()(
         const uid = await currentUserId();
         const userJlpt = state.jlptLevel;
         if (uid && userJlpt != null) {
-          try {
-            const seenIds = Object.values(get().wordDatabase)
-              .map((w) => w.jmdictEntryId)
-              .filter((id): id is string => !!id);
-            const { fetchIntakeCandidates } = await import('./jmdict');
-            const cands = await fetchIntakeCandidates(userJlpt, seenIds, cap + 20);
-            candidateItems = cands.map((c) => ({
-              key: null,
-              entryId: c.entryId,
-              jlptLevel: c.jlptLevel,
-              freqRank: c.freqRank,
-              timesSeen: 0,
-              candidate: c,
-            }));
-          } catch (e) {
-            console.warn('[store] intake candidate fetch failed:', e);
+          // A failed fetch silently erases the day's unseen-foundation slots (this
+          // pass runs once per calendar day — there is no later attempt). Retry once
+          // after a short pause before giving up, and log the give-up as an error so
+          // it surfaces once error monitoring lands (path-forward §0.3).
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const seenIds = Object.values(get().wordDatabase)
+                .map((w) => w.jmdictEntryId)
+                .filter((id): id is string => !!id);
+              const { fetchIntakeCandidates } = await import('./jmdict');
+              const cands = await fetchIntakeCandidates(userJlpt, seenIds, cap + 20);
+              candidateItems = cands.map((c) => ({
+                key: null,
+                entryId: c.entryId,
+                jlptLevel: c.jlptLevel,
+                freqRank: c.freqRank,
+                timesSeen: 0,
+                candidate: c,
+              }));
+              break;
+            } catch (e) {
+              if (attempt === 0) {
+                console.warn('[store] intake candidate fetch failed, retrying once:', e);
+                await new Promise((r) => setTimeout(r, 1500));
+              } else {
+                console.error('[store] intake candidate fetch failed after retry — no unseen-foundation words today:', e);
+              }
+            }
           }
         }
 
