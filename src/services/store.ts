@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
+import { captureError } from './monitoring';
 import { NewsArticle } from './api';
 import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
@@ -1639,7 +1640,7 @@ export const useAppStore = create<AppState>()(
                 return;
               }
             } catch { /* fall through to the log below */ }
-            console.error('[store] localStorage persist failed (quota?) — continuing without persisting:', e);
+            captureError(e, { where: 'localStorage-persist', evicted: true });
           }
         },
         removeItem: (name) => localStorage.removeItem(name),

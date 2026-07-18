@@ -46,6 +46,7 @@ export interface NewsArticle {
 }
 
 import { supabase } from './supabase'
+import { captureError } from './monitoring'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -90,7 +91,15 @@ async function invokeEdgeFn<T = any>(name: string, body: object, timeoutMs?: num
     ({ data, error } = (await run()) as { data: any; error: any });
   }
 
-  if (error) throw error;
+  if (error) {
+    // §0.3: surface real edge-function failures to monitoring. Transient
+    // busy-upstream errors (LLM overload → 503/429) are expected and retried
+    // by callers — reporting them would just be noise.
+    if (!isServerBusyError(error)) {
+      captureError(error, { edgeFn: name, status: (error as { status?: number })?.status ?? null });
+    }
+    throw error;
+  }
   return data as T;
 }
 
