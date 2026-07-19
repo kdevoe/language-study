@@ -1,0 +1,15 @@
+{
+  "_doc": "Manual overrides for enrich_jlpt.cjs. deny: entry ids that must never receive a JLPT tag (id -> reason). pin: force the entry chosen for a CSV word ('level|raw expression' -> entry id). extra: entry ids to tag even if no CSV word selects them (id -> level).",
+  "deny": {},
+  "pin": {
+    "5|ラジオカセ": "1138960",
+    "2|行っていらっしゃい": "2088750",
+    "2|お世話になりました": "1002260"
+  },
+  "_pin_notes": {
+    "5|ラジオカセ": "deck truncation of ラジオカセット; pinned to the common ラジカセ entry",
+    "2|行っていらっしゃい": "JMDict headword is 行ってらっしゃい",
+    "2|お世話になりました": "JMDict headword is お世話になる"
+  },
+  "extra": {}
+}

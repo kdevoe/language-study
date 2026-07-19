@@ -8,6 +8,7 @@ import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDiffi
 import { decidePacing, isActiveForPacing } from './pacing';
 import { alignReading, hasKanji, loadReadingData } from './furigana';
 import { selectPromotions, type IntakeItem, type IntakeCandidate } from './intake';
+import { TOMBSTONED_WORD_IDS } from './vocabCleanup';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -1142,6 +1143,12 @@ export const useAppStore = create<AppState>()(
 
         // Pull remote SRS progress (Last Write Wins)
         const remoteProgress = await fetchUserWordProgress(userId);
+        // JLPT-cleanup tombstones: ignore rows the server-side fix removes or
+        // remaps, so an un-migrated server can't re-add them locally (the remap
+        // targets arrive through this same sync under their own ids).
+        for (const id of Object.keys(remoteProgress)) {
+          if (TOMBSTONED_WORD_IDS.has(id)) delete remoteProgress[id];
+        }
         set((state) => {
           const newDatabase = { ...state.wordDatabase };
           let changed = false;
@@ -1302,6 +1309,8 @@ export const useAppStore = create<AppState>()(
           .filter(([key, w]) => {
             if (w.difficulty == null) return false;
             if (!w.jmdictEntryId && !surfaceSyncable(key)) return false;
+            // Never resurrect a tombstoned row from a stale local cache.
+            if (TOMBSTONED_WORD_IDS.has(w.jmdictEntryId ?? key)) return false;
             const remote = remoteProgress[w.jmdictEntryId ?? key];
             return !remote || remote.difficulty == null;
           })
@@ -1693,7 +1702,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
-      version: 7,
+      version: 8,
       // A persist write throws QuotaExceededError once localStorage fills up. That
       // exception used to propagate out of store actions (markArticleRead,
       // recordWordSeen, ...) and abort the tap handler — silently breaking article
@@ -1861,6 +1870,20 @@ export const useAppStore = create<AppState>()(
             if (!w || w.intakeStatus) return;
             const active = w.stability != null || w.difficulty != null;
             wordDatabase[key] = { ...w, intakeStatus: active ? 'active' : 'queued' };
+          });
+          state = { ...state, wordDatabase };
+        }
+        // v8: JLPT tag cleanup (docs/jlpt_vocab_audit.md). Drop word records for
+        // tombstoned homograph/noise entries — the server keeps (or remaps) the
+        // real progress, and the rehydrate pass re-adds remap targets with fresh
+        // dictionary data. Covers entry-id keys and legacy surface-keyed records
+        // that still carry a tombstoned jmdictEntryId.
+        if (version < 8 && state?.wordDatabase) {
+          const wordDatabase = { ...state.wordDatabase };
+          Object.keys(wordDatabase).forEach((key) => {
+            const w = wordDatabase[key];
+            if (!w) return;
+            if (TOMBSTONED_WORD_IDS.has(w.jmdictEntryId ?? key)) delete wordDatabase[key];
           });
           state = { ...state, wordDatabase };
         }

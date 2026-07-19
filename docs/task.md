@@ -380,3 +380,20 @@
         management) — Google News RSS query feeds ship headline-only teasers
         behind redirect URLs that Jina can't extract, which would reintroduce
         the snippet tier the sourcing work just eliminated.
+  - [ ] Manual follow-ups: supabase functions deploy process-article +
+        dictionary-lookup; verify jit-overnight-refill cron then delete
+        daily-feed; close #71/#72 (shipped in #97); beta users hard-refresh
+        once for the first SW.
+- [x] JLPT vocab tag cleanup (2026-07-19): audit (docs/jlpt_vocab_audit.md) found
+      ~16% of jlpt_level tags were homograph/homophone junk (はい tagged via 肺,
+      顔=かんばせ as N5) and 45 real N5 words overwritten to N1-N3 (会う, 来る,
+      する, 頭). enrich_jlpt.cjs rewritten: single best entry per deck word,
+      reading-corroborated kanji matches, easiest-level-wins, kana-primary
+      scoring, overrides file, dry-run + diff. Applied: 8,596 → 7,767 tagged
+      (N5 827 → 705). user_word_progress repaired (fix_progress_rows.cjs:
+      10 junk rows deleted, 26 remapped/merged preserving streaks — 万 kept its
+      33 sightings) with client tombstones + persist v8 migration so stale
+      caches can't resurrect them.
+  - [ ] Manual follow-ups: re-run database/15_backfill_unseen_difficulty.sql
+        (re-seed unseen difficulty from corrected tags); hard-refresh PWA after
+        deploy; re-run fix_progress_rows.cjs if any tombstoned rows resurrect.

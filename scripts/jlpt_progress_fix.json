@@ -1,0 +1,56 @@
+{
+  "_doc": "One-time user_word_progress cleanup after the JLPT retag (docs/jlpt_vocab_audit.md). remap: progress rows keyed to a wrong-homograph entry move to the entry the user actually read (same written surface); if the target row already exists the source row is simply deleted (knowledge already tracked). delete: dictionary-noise entries that only entered the deck via bad JLPT tags. Keep this in sync with TOMBSTONED_WORD_IDS in src/services/vocabCleanup.ts.",
+  "remap": {
+    "1579580": "1316380",
+    "1580400": "1353320",
+    "1479900": "1479890",
+    "1580485": "1580480",
+    "1311010": "2101130",
+    "1185190": "1185200",
+    "1185195": "1185200",
+    "1537960": "1537970",
+    "1378440": "1378450",
+    "1375250": "1375260",
+    "1311125": "1311110",
+    "1414230": "1414220",
+    "1147330": "1560070",
+    "2147990": "1472650",
+    "1643470": "1414340",
+    "1465580": "1465590",
+    "1525750": "1584460",
+    "1249300": "1589880",
+    "1557940": "1313000",
+    "1347580": "1311110",
+    "1409150": "1409140",
+    "1409160": "1409140",
+    "1428285": "1428280",
+    "1447430": "1447440",
+    "1165980": "1165970",
+    "2246880": "1203100"
+  },
+  "_remap_notes": {
+    "1643470": "大切り(おおぎり) -> 大切(たいせつ): 18 sightings were almost certainly たいせつ",
+    "1525750": "万(ばん) -> 万(まん): 33 sightings",
+    "1465580": "入る(いる) -> 入る(はいる)",
+    "1311010": "氏(うじ) -> 氏(し): news articles use 氏 as Mr./Ms.",
+    "1557940": "齢(よわい) -> 歳(とし): shared variant kanji",
+    "1249300": "係る(かかる) -> 掛かる: shared variant kanji"
+  },
+  "delete": [
+    "1543920",
+    "1580130",
+    "1000050",
+    "1186150",
+    "1193110",
+    "1316750",
+    "1331540",
+    "1339500",
+    "1518450",
+    "2427850"
+  ],
+  "_delete_notes": "余意, 出端, 仝, 下番, 架かる, 次点者, 就ける, 出切る, 亡い, 大き — Discover-triage noise, each seen once",
+  "_keep": {
+    "1009280": "響めき(どよめき) — real word met while reading; leave row",
+    "1003560": "ギザギザ — real word met while reading; leave row"
+  }
+}
