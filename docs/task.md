@@ -369,9 +369,13 @@
         update + persist across reload, last-topic guard holds. Caught in
         verification: feedTopics missing from persist partialize (selection
         silently lost on reload) — fixed. tsc clean.
-  - [ ] APPLY (your steps): (1) run database/26_feed_topics.sql in the SQL
-        editor; (2) supabase functions deploy fetch-raw-news ensure-buffer
-        process-article (last one carries the sourcing fix + lead cap).
+  - [x] APPLY (done 2026-07-19): database/26_feed_topics.sql run; fetch-raw-
+        news + ensure-buffer + process-article deployed. Verified live:
+        feed_topics column present (existing row null → defaults),
+        topics=null → World/Technology defaults, topics=[japan,ai] →
+        Japan 15 + AI 25 cards. process-article sourcing fix will show in
+        source_kind of the next JIT-produced articles — re-run the
+        database/20 audit query after ~a week (expect partial ≪ 65%).
   - [ ] Note: custom free-text topics deliberately deferred to #11 (RSS
         management) — Google News RSS query feeds ship headline-only teasers
         behind redirect URLs that Jina can't extract, which would reintroduce
