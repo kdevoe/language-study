@@ -340,9 +340,15 @@
         fetch-raw-news TEASER_CAP=800 ships description-teasers up to 800 —
         so the 600-1500-char band (all Guardian-style feeds) never gets
         upgraded to a full body. Every partial row sits in that skip band.
-        Proposed fix (not yet applied): extract when body < FULL_SOURCE_CHARS
-        (1500) instead of < 600 — would convert most partials to full at the
-        cost of ≤4 Jina calls/article.
+  - [x] Sourcing fix applied (same session): process-article now extracts
+        whenever a source body < FULL_SOURCE_CHARS (1500), not < 600 —
+        converts the stranded partial band to full at ≤4 Jina calls/article;
+        fullBody now requires a ≥1500-char body (short Jina stubs no longer
+        count). Lead-source cap raised 2500→4500 (LEAD_SOURCE_CHAR_CAP;
+        corroborating sources stay 2500, total stays 7000) since truncating
+        the lead costs real facts; fetch-raw-news FULLTEXT_BODY_CAP matched
+        to 4500. Watch metadata->'usage' token telemetry (1.3) + re-run the
+        database/20 audit query after a week to confirm partial→full shift.
   - [x] Curated topic catalog, 15 topics: world, technology, science,
         business, sports, culture, health, japan, ai, space, gaming,
         climate, food, travel, politics. 26 new feeds added across
@@ -364,7 +370,8 @@
         verification: feedTopics missing from persist partialize (selection
         silently lost on reload) — fixed. tsc clean.
   - [ ] APPLY (your steps): (1) run database/26_feed_topics.sql in the SQL
-        editor; (2) supabase functions deploy fetch-raw-news ensure-buffer.
+        editor; (2) supabase functions deploy fetch-raw-news ensure-buffer
+        process-article (last one carries the sourcing fix + lead cap).
   - [ ] Note: custom free-text topics deliberately deferred to #11 (RSS
         management) — Google News RSS query feeds ship headline-only teasers
         behind redirect URLs that Jina can't extract, which would reintroduce

@@ -71,8 +71,9 @@ const MAX_CARDS = 40;
 // teaser — the old flat 800-char cap landed full-text feeds as `partial` and also
 // tripped process-article's Jina skip. A bare `description` is just a teaser, so
 // keep it short (Jina backfills the body from the URL). process-article re-caps
-// each source at PER_SOURCE_CHAR_CAP = 2500, so matching that here is the ceiling.
-const FULLTEXT_BODY_CAP = 2500;  // content:encoded / Atom content — a real body
+// the lead source at LEAD_SOURCE_CHAR_CAP = 4500 (extras at 2500), so matching
+// the lead cap here is the ceiling.
+const FULLTEXT_BODY_CAP = 4500;  // content:encoded / Atom content — a real body
 const TEASER_CAP = 800;          // description-only — Jina fills the rest
 // The card preview (shown in the Feed and used only as a fallback snippet) never
 // needs the whole body; the full text rides in each card's `sources[].teaser`.
