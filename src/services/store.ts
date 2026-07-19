@@ -205,6 +205,9 @@ interface AppState {
   // Target article length (paragraphs) by source fullness. Length follows how
   // much real source material the article was built from; JLPT drives complexity.
   targetParagraphs: { full: number; partial: number; snippet: number };
+  // Feed topics (#10): curated topic ids the news pipeline pulls from. null =
+  // never chosen → server defaults (world/technology/science). See src/data/feedTopics.ts.
+  feedTopics: string[] | null;
   // Intake queue (#68): the Anki-style daily cap on how many new words graduate from
   // the queue into active study, and when the last promotion pass ran (daily gate).
   newWordsPerDay: number;
@@ -239,6 +242,7 @@ interface AppState {
   setFuriganaMode: (mode: 'always' | 'never' | 'dynamic') => void;
   setReadingIntensity: (intensity: 'leisure' | 'balanced' | 'intensive') => void;
   setTargetParagraphs: (kind: 'full' | 'partial' | 'snippet', value: number) => void;
+  setFeedTopics: (topics: string[]) => void;
   setNewWordsPerDay: (n: number) => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
@@ -308,6 +312,7 @@ export const useAppStore = create<AppState>()(
       furiganaMode: 'dynamic',
       readingIntensity: 'balanced',
       targetParagraphs: { full: 5, partial: 4, snippet: 3 },
+      feedTopics: null,
       newWordsPerDay: 3,
       lastIntakePromotionTs: null,
       reviewsByDay: {},
@@ -367,6 +372,16 @@ export const useAppStore = create<AppState>()(
         } as const)[kind];
         currentUserId().then((uid) => {
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { [column]: v }));
+        });
+      },
+      setFeedTopics: (topics) => {
+        // Never persist an empty selection — the server would fall back to
+        // defaults anyway, which would silently contradict the UI.
+        if (!Array.isArray(topics) || topics.length === 0) return;
+        const clean = [...new Set(topics)];
+        set({ feedTopics: clean });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { feed_topics: clean }));
         });
       },
       setNewWordsPerDay: (n) => {
@@ -1121,6 +1136,7 @@ export const useAppStore = create<AppState>()(
               snippet: remotePrefs.target_paragraphs_snippet ?? state.targetParagraphs.snippet,
             },
             newWordsPerDay: remotePrefs.new_words_per_day ?? state.newWordsPerDay,
+            feedTopics: remotePrefs.feed_topics ?? state.feedTopics,
           }));
         }
 
@@ -1725,6 +1741,7 @@ export const useAppStore = create<AppState>()(
         furiganaMode: state.furiganaMode,
         readingIntensity: state.readingIntensity,
         targetParagraphs: state.targetParagraphs,
+        feedTopics: state.feedTopics,
         newWordsPerDay: state.newWordsPerDay,
         lastIntakePromotionTs: state.lastIntakePromotionTs,
         reviewsByDay: state.reviewsByDay,

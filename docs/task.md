@@ -136,7 +136,7 @@
         (2) api.markArticleConsumed writes a dismissed/read TOMBSTONE when no live
         buffer row matched, so ensure_buffer_claim's ON CONFLICT never re-produces
         a swiped raw headline. Self-heals existing stuck buffers on next open.
-  - [/] Step 5: overnight cron — pg_cron + pg_net → ensure-buffer for active users
+  - [x] Step 5: overnight cron — pg_cron + pg_net → ensure-buffer for active users
         (study_history in last 14 days), service-role key via Vault. Retire daily-feed.
         Cron adds overnight/daily-fresh seeding + bootstrap for non-opening users
         (event-driven app-open/read/dismiss refill already shipped in Steps 3/4).
@@ -149,9 +149,11 @@
               is just the gateway pass (body userId is authoritative).
         - [x] daily-feed/index.ts marked DEPRECATED (banner); pg_cron schedule removed
               by 19. Dashboard-scheduled daily-feed (if any) must be disabled by hand.
-        - [ ] APPLY (your steps): (1) select vault.create_secret('<ANON_KEY>','jit_anon_key');
+        - [x] APPLY (your steps): (1) select vault.create_secret('<ANON_KEY>','jit_anon_key');
               (2) run database/19 in SQL editor; (3) smoke-test select jit_refill_active_users().
-        - [ ] After cron verified live: delete the daily-feed Edge Function deployment.
+        - [x] After cron verified live: delete the daily-feed Edge Function deployment.
+              (2026-07-19: cron.job shows jit-overnight-refill @ 0 9 * * * active;
+              daily-feed deleted.)
 - [x] Progress bucketing + sync fixes (2026-06-27): words wrongly in "Other"/Ungraded
       and lost on reinstall. Investigation traced one symptom to four distinct issues:
   - Root symptom: common N5–N4 words sat in Progress "Other" because their cached
@@ -325,7 +327,45 @@
   - [x] 0.5 PWA service worker (#125): vite-plugin-pwa prompt mode, update
         banner (hourly + foreground checks), offline kuromoji via CacheFirst,
         /api/* excluded from SPA fallback. Verified serving at /sw.js in prod.
-  - [ ] Manual follow-ups: supabase functions deploy process-article +
-        dictionary-lookup; verify jit-overnight-refill cron then delete
-        daily-feed; close #71/#72 (shipped in #97); beta users hard-refresh
-        once for the first SW.
+  - [x] Manual follow-ups (done 2026-07-19): deployed process-article +
+        dictionary-lookup; verified jit-overnight-refill cron live and
+        deleted daily-feed; beta users notified to hard-refresh once for
+        the first SW; closed #71/#72 (shipped in #97). Phase 0 fully done.
+- [/] Phase 2.2 Customizable feed topics (#10) + source-fullness audit (Jul 19)
+  - [x] Read-only audit of processed_news source_kind (n=255 tracked rows,
+        2026-W25→W29): snippet tier fully eliminated (0%) since #49/#57, but
+        only ~35-45%/week land `full`; ~55-65% stall at `partial` (median
+        ~870 chars). Root cause identified: EXTRACT_TEASER_THRESHOLD=600 in
+        process-article skips Jina extraction for any teaser ≥600 chars, while
+        fetch-raw-news TEASER_CAP=800 ships description-teasers up to 800 —
+        so the 600-1500-char band (all Guardian-style feeds) never gets
+        upgraded to a full body. Every partial row sits in that skip band.
+        Proposed fix (not yet applied): extract when body < FULL_SOURCE_CHARS
+        (1500) instead of < 600 — would convert most partials to full at the
+        cost of ≤4 Jina calls/article.
+  - [x] Curated topic catalog, 15 topics: world, technology, science,
+        business, sports, culture, health, japan, ai, space, gaming,
+        climate, food, travel, politics. 26 new feeds added across
+        BBC/Guardian/NPR desks + Verge AI, TechCrunch AI, NASA, Polygon,
+        Japan Times. Pool auto-scales per-feed depth (POOL_TARGET=132) so
+        selecting every topic doesn't grow the clustering prompt. All feed
+        URLs verified 200 (redirect targets canonicalized).
+  - [x] fetch-raw-news accepts `topics` (sanitized against catalog; empty/
+        unknown → world+technology+science defaults = pre-#10 behavior).
+  - [x] ensure-buffer reads user_preferences.feed_topics and passes it, so
+        server-produced JIT buffer articles honor the selection (cron too).
+  - [x] Client: feedTopics in store (null = never chosen) synced via
+        upsertUserPreferences + rehydrated in syncSrsWithSupabase; App.tsx
+        passes topics on both fetchNewsFeed paths; Settings "Feed Topics"
+        toggle-chip card (at least one topic enforced). UI chosen over
+        checklist/feed-strip/bilingual variants.
+  - [x] Verified in-browser (Playwright, dev mode): chips render, toggles
+        update + persist across reload, last-topic guard holds. Caught in
+        verification: feedTopics missing from persist partialize (selection
+        silently lost on reload) — fixed. tsc clean.
+  - [ ] APPLY (your steps): (1) run database/26_feed_topics.sql in the SQL
+        editor; (2) supabase functions deploy fetch-raw-news ensure-buffer.
+  - [ ] Note: custom free-text topics deliberately deferred to #11 (RSS
+        management) — Google News RSS query feeds ship headline-only teasers
+        behind redirect URLs that Jina can't extract, which would reintroduce
+        the snippet tier the sourcing work just eliminated.

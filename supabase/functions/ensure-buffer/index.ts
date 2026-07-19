@@ -89,12 +89,16 @@ Deno.serve(async (req) => {
     }
 
     // ── Guardrail #5: fetch fresh candidates. No source ⇒ stop. ───────────────
+    // The user's topic selection (#10) rides along so server-produced buffer
+    // articles match their interests. NULL/absent → fetch-raw-news defaults.
+    const { data: prefs } = await admin.from('user_preferences')
+      .select('feed_topics').eq('user_id', userId).maybeSingle();
     let candidates: RawCard[] = [];
     try {
       const resp = await fetch(`${supabaseUrl}/functions/v1/fetch-raw-news`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-        body: JSON.stringify({ page: 1 }),
+        body: JSON.stringify({ page: 1, topics: prefs?.feed_topics ?? null }),
       });
       if (resp.ok) {
         const data = await resp.json();

@@ -101,7 +101,7 @@ function App() {
       
       // Try current and next page if first is full of dupes
       for (let p = currentPage; p < currentPage + 2; p++) {
-        const moreNews = await fetchNewsFeed(p);
+        const moreNews = await fetchNewsFeed(p, useAppStore.getState().feedTopics);
         if (moreNews.length === 0) {
           setIsEndOfFeed(true);
           break;
@@ -156,7 +156,7 @@ function App() {
       if (userId && !DEV_MODE) ensureBuffer(userId);
 
       const [feed, readyBuffer] = await Promise.all([
-        fetchNewsFeed(1),
+        fetchNewsFeed(1, useAppStore.getState().feedTopics),
         userId && !DEV_MODE ? fetchReadyBufferArticles(userId) : Promise.resolve([] as NewsArticle[]),
       ]);
 

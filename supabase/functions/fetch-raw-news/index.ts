@@ -10,20 +10,58 @@ const corsHeaders = {
 // the same story shows up across several feeds and clusters into much richer
 // source material than a single NewsAPI query can (see #18 follow-up). NewsAPI
 // remains a fallback for the rare case where every feed fails.
-const FEED_LIST: { name: string; url: string; category: string }[] = [
-  { name: 'BBC',        url: 'https://feeds.bbci.co.uk/news/rss.xml',            category: 'World' },
-  { name: 'BBC Tech',   url: 'https://feeds.bbci.co.uk/news/technology/rss.xml', category: 'Technology' },
-  { name: 'The Verge',  url: 'https://www.theverge.com/rss/index.xml',           category: 'Technology' },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'Technology' },
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/',                     category: 'Technology' },
-  { name: 'NPR',        url: 'https://feeds.npr.org/1001/rss.xml',               category: 'World' },
-  { name: 'Engadget',   url: 'https://www.engadget.com/rss.xml',                 category: 'Technology' },
-  { name: 'Wired',      url: 'https://www.wired.com/feed/rss',                   category: 'Technology' },
-  { name: 'Guardian',   url: 'https://www.theguardian.com/world/rss',            category: 'World' },
-  { name: 'Guardian Tech', url: 'https://www.theguardian.com/technology/rss',    category: 'Technology' },
-  { name: 'Guardian Sci',  url: 'https://www.theguardian.com/science/rss',       category: 'Science' },
+//
+// Every feed is tagged with a topic id from the curated catalog (#10). The
+// client mirrors the id/label catalog in src/data/feedTopics.ts — keep the two
+// in sync when adding a topic. `category` stays the human label shown on cards.
+const FEED_LIST: { name: string; url: string; category: string; topic: string }[] = [
+  { name: 'BBC',        url: 'https://feeds.bbci.co.uk/news/rss.xml',            category: 'World',      topic: 'world' },
+  { name: 'NPR',        url: 'https://feeds.npr.org/1001/rss.xml',               category: 'World',      topic: 'world' },
+  { name: 'Guardian',   url: 'https://www.theguardian.com/world/rss',            category: 'World',      topic: 'world' },
+  { name: 'BBC Tech',   url: 'https://feeds.bbci.co.uk/news/technology/rss.xml', category: 'Technology', topic: 'technology' },
+  { name: 'The Verge',  url: 'https://www.theverge.com/rss/index.xml',           category: 'Technology', topic: 'technology' },
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'Technology', topic: 'technology' },
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/',                     category: 'Technology', topic: 'technology' },
+  { name: 'Engadget',   url: 'https://www.engadget.com/rss.xml',                 category: 'Technology', topic: 'technology' },
+  { name: 'Wired',      url: 'https://www.wired.com/feed/rss',                   category: 'Technology', topic: 'technology' },
+  { name: 'Guardian Tech', url: 'https://www.theguardian.com/technology/rss',    category: 'Technology', topic: 'technology' },
+  { name: 'Guardian Sci',  url: 'https://www.theguardian.com/science/rss',       category: 'Science',    topic: 'science' },
+  { name: 'BBC Science',   url: 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml', category: 'Science', topic: 'science' },
+  { name: 'BBC Business',  url: 'https://feeds.bbci.co.uk/news/business/rss.xml', category: 'Business',  topic: 'business' },
+  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', category: 'Business', topic: 'business' },
+  { name: 'BBC Sport',     url: 'https://feeds.bbci.co.uk/sport/rss.xml',         category: 'Sports',    topic: 'sports' },
+  { name: 'Guardian Sport', url: 'https://www.theguardian.com/us/sport/rss',      category: 'Sports',    topic: 'sports' },
+  { name: 'Guardian Culture', url: 'https://www.theguardian.com/us/culture/rss',  category: 'Culture',   topic: 'culture' },
+  { name: 'BBC Arts',      url: 'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml', category: 'Culture', topic: 'culture' },
+  { name: 'BBC Health',    url: 'https://feeds.bbci.co.uk/news/health/rss.xml',   category: 'Health',    topic: 'health' },
+  { name: 'NPR Health',    url: 'https://feeds.npr.org/1128/rss.xml',             category: 'Health',    topic: 'health' },
+  { name: 'Japan Times',   url: 'https://www.japantimes.co.jp/feed/',             category: 'Japan',     topic: 'japan' },
+  { name: 'Guardian Japan', url: 'https://www.theguardian.com/world/japan/rss',   category: 'Japan',     topic: 'japan' },
+  { name: 'The Verge AI',  url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', category: 'AI', topic: 'ai' },
+  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', category: 'AI', topic: 'ai' },
+  { name: 'Guardian AI',   url: 'https://www.theguardian.com/technology/artificialintelligenceai/rss', category: 'AI', topic: 'ai' },
+  { name: 'Guardian Space', url: 'https://www.theguardian.com/science/space/rss', category: 'Space',     topic: 'space' },
+  { name: 'NASA',          url: 'https://www.nasa.gov/news-release/feed/',        category: 'Space',     topic: 'space' },
+  { name: 'Polygon',       url: 'https://www.polygon.com/rss/index.xml/',         category: 'Gaming',    topic: 'gaming' },
+  { name: 'Guardian Games', url: 'https://www.theguardian.com/games/rss',         category: 'Gaming',    topic: 'gaming' },
+  { name: 'Guardian Environment', url: 'https://www.theguardian.com/us/environment/rss', category: 'Climate', topic: 'climate' },
+  { name: 'NPR Climate',   url: 'https://feeds.npr.org/1167/rss.xml',             category: 'Climate',   topic: 'climate' },
+  { name: 'Guardian Food', url: 'https://www.theguardian.com/food/rss',           category: 'Food',      topic: 'food' },
+  { name: 'NPR Food',      url: 'https://feeds.npr.org/1053/rss.xml',             category: 'Food',      topic: 'food' },
+  { name: 'Guardian Travel', url: 'https://www.theguardian.com/us/travel/rss',    category: 'Travel',    topic: 'travel' },
+  { name: 'NPR Politics',  url: 'https://feeds.npr.org/1014/rss.xml',             category: 'Politics',  topic: 'politics' },
+  { name: 'Guardian US Politics', url: 'https://www.theguardian.com/us-news/us-politics/rss', category: 'Politics', topic: 'politics' },
 ];
-const ITEMS_PER_FEED = 12;
+// The catalog's valid topic ids, and the set used when a user has never chosen
+// (feed_topics NULL / absent) — exactly the pre-#10 hardcoded lineup.
+const ALL_TOPICS = [...new Set(FEED_LIST.map((f) => f.topic))];
+const DEFAULT_TOPICS = ['world', 'technology', 'science'];
+// Pool sizing: ~132 items (the historical 11 feeds × 12) regardless of how many
+// feeds the topic selection activates, so the clustering prompt and Groq cost
+// stay flat when a user turns on every topic.
+const POOL_TARGET = 132;
+const MIN_ITEMS_PER_FEED = 6;
+const MAX_ITEMS_PER_FEED = 12;
 const FEED_TIMEOUT_MS = 8000;
 const MAX_CARDS = 40;
 
@@ -169,8 +207,23 @@ function domainOf(url: string): string {
   try { return new URL(url).host.replace(/^www\./, ''); } catch { return url; }
 }
 
-async function fetchFeeds(): Promise<PoolItem[]> {
-  const results = await Promise.allSettled(FEED_LIST.map(async (f) => {
+// Sanitize a client/DB-supplied topic selection down to known catalog ids.
+// Anything unrecognized is dropped; an empty/absent result falls back to the
+// defaults so a stale or corrupt preference can never zero out the feed.
+function resolveTopics(raw: unknown): string[] {
+  const picked = Array.isArray(raw)
+    ? raw.filter((t): t is string => typeof t === 'string' && ALL_TOPICS.includes(t))
+    : [];
+  return picked.length > 0 ? [...new Set(picked)] : DEFAULT_TOPICS;
+}
+
+async function fetchFeeds(topics: string[]): Promise<PoolItem[]> {
+  const feeds = FEED_LIST.filter((f) => topics.includes(f.topic));
+  // Fewer active feeds → deeper per-feed reads; more feeds → shallower, so the
+  // pool (and the clustering prompt built from it) stays near POOL_TARGET.
+  const itemsPerFeed = Math.max(MIN_ITEMS_PER_FEED,
+    Math.min(MAX_ITEMS_PER_FEED, Math.round(POOL_TARGET / Math.max(1, feeds.length))));
+  const results = await Promise.allSettled(feeds.map(async (f) => {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), FEED_TIMEOUT_MS);
     try {
@@ -180,7 +233,7 @@ async function fetchFeeds(): Promise<PoolItem[]> {
         return [] as PoolItem[];
       }
       const xml = await res.text();
-      return parseFeed(xml, f.name, f.category).filter(isValidItem).slice(0, ITEMS_PER_FEED);
+      return parseFeed(xml, f.name, f.category).filter(isValidItem).slice(0, itemsPerFeed);
     } catch (e) {
       console.warn(`[fetch-raw-news] feed ${f.name} failed:`, e instanceof Error ? e.message : e);
       return [] as PoolItem[];
@@ -200,7 +253,7 @@ async function fetchFeeds(): Promise<PoolItem[]> {
       pool.push(it);
     }
   }
-  console.log(`[fetch-raw-news] RSS pool: ${pool.length} items from ${FEED_LIST.length} feeds`);
+  console.log(`[fetch-raw-news] RSS pool: ${pool.length} items from ${feeds.length}/${FEED_LIST.length} feeds (topics: ${topics.join(',')})`);
   return pool;
 }
 
@@ -372,7 +425,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { page = 1 } = await req.json().catch(() => ({ page: 1 }));
+    const { page = 1, topics: rawTopics } = await req.json().catch(() => ({ page: 1 }));
+    const topics = resolveTopics(rawTopics);
 
     // RSS is multi-outlet and fetched fresh each session; it doesn't paginate
     // like NewsAPI. Serve the full clustered batch on page 1 and signal
@@ -386,7 +440,7 @@ Deno.serve(async (req) => {
 
     const groqKey = Deno.env.get('GROQ_API_KEY');
 
-    let pool = await fetchFeeds();
+    let pool = await fetchFeeds(topics);
     if (pool.length === 0) {
       const newsApiKey = Deno.env.get('NEWS_API_KEY');
       if (newsApiKey) {
