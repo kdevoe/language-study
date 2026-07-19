@@ -8,7 +8,7 @@ import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDiffi
 import { decidePacing, isActiveForPacing } from './pacing';
 import { alignReading, hasKanji, loadReadingData } from './furigana';
 import { selectPromotions, type IntakeItem, type IntakeCandidate } from './intake';
-import { TOMBSTONED_WORD_IDS } from './vocabCleanup';
+import { TOMBSTONED_WORD_IDS, RECOVERABLE_WORD_IDS } from './vocabCleanup';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
 
@@ -227,6 +227,8 @@ interface AppState {
   // One-shot furigana re-align: when the stored furiganaMap back-catalog was last
   // recomputed with the per-kanji reading tables (see realignFurigana).
   lastFuriganaRealignTs: number | null;
+  // Daily throttle for the sync-time JLPT label refresh (server labels win).
+  lastJlptLabelRefreshTs: number | null;
   currentArticle: NewsArticle | null;
   articlesCache: Record<string, NewsArticle>;
   processingArticles: string[];
@@ -323,6 +325,7 @@ export const useAppStore = create<AppState>()(
       lastResetTs: null,
       lastStudyPacingResetTs: null,
       lastFuriganaRealignTs: null,
+      lastJlptLabelRefreshTs: null,
       currentArticle: null,
       articlesCache: {},
       processingArticles: [],
@@ -1291,6 +1294,40 @@ export const useAppStore = create<AppState>()(
         // first-contact difficulty can be seeded. Early-returns once backfilled.
         await get().backfillWordProgress();
 
+        // Refresh JLPT labels for entry-backed words (daily). The local cache
+        // keeps the label captured at lookup time, so server-side retagging
+        // (docs/jlpt_vocab_audit.md) left stale levels behind — 来る displayed
+        // in the N1 list while the server said N5. Server value wins here,
+        // including derived levels for now-untagged entries.
+        const lastLabelTs = get().lastJlptLabelRefreshTs ?? 0;
+        if (Date.now() - lastLabelTs > 24 * 60 * 60 * 1000) {
+          try {
+            const { fetchJlptByEntryIds } = await import('./jmdict');
+            const refreshIds = Object.values(get().wordDatabase)
+              .map((w) => w.jmdictEntryId)
+              .filter((id): id is string => !!id);
+            const levels = await fetchJlptByEntryIds(refreshIds);
+            set((state) => {
+              const db = { ...state.wordDatabase };
+              let changed = 0;
+              for (const [key, w] of Object.entries(db)) {
+                const info = w.jmdictEntryId ? levels.get(w.jmdictEntryId) : undefined;
+                if (!info) continue;
+                if ((w.jlptLevel ?? null) !== info.jlptLevel || (w.jlptDerived ?? false) !== info.jlptDerived) {
+                  db[key] = { ...w, jlptLevel: info.jlptLevel, jlptDerived: info.jlptDerived };
+                  changed++;
+                }
+              }
+              if (changed > 0) console.log(`[store] refreshed JLPT labels on ${changed} word(s)`);
+              return changed > 0
+                ? { wordDatabase: db, lastJlptLabelRefreshTs: Date.now() }
+                : { lastJlptLabelRefreshTs: Date.now() };
+            });
+          } catch (e) {
+            console.warn('[store] JLPT label refresh failed:', e);
+          }
+        }
+
         // Reconcile local → server: words graded locally but ungraded (or absent)
         // on the server never had their grade persisted (legacy rows / failed past
         // syncs). Local is authoritative — it reflects real reading — so push those
@@ -1702,7 +1739,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'yugen-storage',
-      version: 8,
+      version: 9,
       // A persist write throws QuotaExceededError once localStorage fills up. That
       // exception used to propagate out of store actions (markArticleRead,
       // recordWordSeen, ...) and abort the tap handler — silently breaking article
@@ -1760,6 +1797,7 @@ export const useAppStore = create<AppState>()(
         lastResetTs: state.lastResetTs,
         lastStudyPacingResetTs: state.lastStudyPacingResetTs,
         lastFuriganaRealignTs: state.lastFuriganaRealignTs,
+        lastJlptLabelRefreshTs: state.lastJlptLabelRefreshTs,
         dismissedArticleIds: capIds(state.dismissedArticleIds),
         readArticleIds: capIds(state.readArticleIds),
         readerFontSize: state.readerFontSize,
@@ -1884,6 +1922,19 @@ export const useAppStore = create<AppState>()(
             const w = wordDatabase[key];
             if (!w) return;
             if (TOMBSTONED_WORD_IDS.has(w.jmdictEntryId ?? key)) delete wordDatabase[key];
+          });
+          state = { ...state, wordDatabase };
+        }
+        // v9: drop local copies of the misattributed homophone rows (する
+        // credited to 擦る, いる to 射る, なる to 生る) ONCE — the server-side
+        // remap moves that progress to the correct entries and it rehydrates
+        // back with fresh dictionary data. No sync block: these are real words.
+        if (version < 9 && state?.wordDatabase) {
+          const wordDatabase = { ...state.wordDatabase };
+          Object.keys(wordDatabase).forEach((key) => {
+            const w = wordDatabase[key];
+            if (!w) return;
+            if (RECOVERABLE_WORD_IDS.has(w.jmdictEntryId ?? key)) delete wordDatabase[key];
           });
           state = { ...state, wordDatabase };
         }

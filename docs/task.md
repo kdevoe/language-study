@@ -397,3 +397,10 @@
   - [ ] Manual follow-ups: re-run database/15_backfill_unseen_difficulty.sql
         (re-seed unseen difficulty from corrected tags); hard-refresh PWA after
         deploy; re-run fix_progress_rows.cjs if any tombstoned rows resurrect.
+  - [x] Homophone attribution fix (follow-up, same day): pickBestEntry now
+        prefers kana-primary (uk/no-kanji) entries for kana lemmas — freq-rank
+        tiebreak had credited する to 擦る (×155), いる to 射る (×43), なる to
+        生る (×108); rows remapped server-side, persist v9 drops local copies
+        once (RECOVERABLE_WORD_IDS, not tombstoned — real words). Sync now
+        refreshes JLPT labels daily from the server (stale 来る/先 showed as
+        N1). なる pinned to 成る in the enricher (生る keeps its legit N3 tag).
