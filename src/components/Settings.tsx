@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useAppStore } from '../services/store';
 import { rtkKanjiList } from '../data/rtkKanji';
+import { FEED_TOPICS, DEFAULT_FEED_TOPICS } from '../data/feedTopics';
 
 const stepperBtnStyle = (disabled: boolean): React.CSSProperties => ({
   width: '34px',
@@ -33,6 +34,7 @@ export function Settings() {
     studyMode, setStudyMode,
     readingIntensity, setReadingIntensity,
     targetParagraphs, setTargetParagraphs,
+    feedTopics, setFeedTopics,
     newWordsPerDay, setNewWordsPerDay,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight,
@@ -49,6 +51,16 @@ export function Settings() {
     if (!isNaN(val)) {
       setRtkLevel(Math.min(Math.max(1, val), rtkKanjiList.length));
     }
+  };
+
+  // null = never chosen → the server-default lineup is what's effectively active.
+  const selectedTopics = feedTopics ?? DEFAULT_FEED_TOPICS;
+  const toggleTopic = (id: string) => {
+    const next = selectedTopics.includes(id)
+      ? selectedTopics.filter(t => t !== id)
+      : [...selectedTopics, id];
+    if (next.length === 0) return; // keep at least one topic on
+    setFeedTopics(next);
   };
 
   const modes = ['Natural', 'Balanced', 'Study'] as const;
@@ -166,6 +178,43 @@ export function Settings() {
           {readingIntensity === 'leisure' && 'Light reading — ~98% known vocabulary. Flow through articles with minimal dictionary lookups.'}
           {readingIntensity === 'balanced' && 'Comfortable learning — ~95% known, with a handful of review words and 1–2 new words per article.'}
           {readingIntensity === 'intensive' && 'Study-heavy — ~90% known, with more review and new vocabulary packed in. Slower but faster growth.'}
+        </p>
+      </div>
+
+      {/* 2.5 Feed Topics (#10) */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
+          Feed Topics
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1.2rem' }}>
+          {FEED_TOPICS.map(topic => {
+            const isOn = selectedTopics.includes(topic.id);
+            return (
+              <button
+                key={topic.id}
+                onClick={() => toggleTopic(topic.id)}
+                title={topic.hint}
+                style={{
+                  padding: '0.5rem 1.1rem',
+                  borderRadius: '100px',
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: isOn ? 'var(--bg-pure)' : 'var(--border-light)',
+                  color: isOn ? 'var(--text-main)' : 'var(--text-muted)',
+                  fontWeight: isOn ? 700 : 600,
+                  fontSize: '0.85rem',
+                  boxShadow: isOn ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                {topic.label}
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          Choose what your reading feed draws from. Changes apply to newly fetched articles — stories already prepared for you will still appear first.
         </p>
       </div>
 

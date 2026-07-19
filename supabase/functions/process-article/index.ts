@@ -124,13 +124,22 @@ async function runRewriteWithRetry(
 
 // ── Opportunistic full-text extraction ──────────────────────────────────────
 // A NewsAPI/RSS teaser is ~150-200 chars; the real article body is 10-100x
-// richer. We pull it from the source URL via Jina Reader, but only for sources
-// whose teaser is thin (full-text feeds like Ars already ship the body) and
-// only for articles the user actually opens. Always falls back to the teaser.
+// richer. We pull it from the source URL via Jina Reader for any source that
+// didn't already ship a real body (full-text feeds like Ars do), and always
+// fall back to the teaser when extraction fails. The extraction bar is
+// FULL_SOURCE_CHARS: the old 600-char threshold skipped extraction for
+// description-style teasers in the 600–1500 band (Guardian et al., capped at
+// 800 by fetch-raw-news), which stranded ~65% of production articles at
+// `partial` — the audit showed every partial row sat in exactly that band.
 const JINA_READER_URL = 'https://r.jina.ai/';
-const EXTRACT_TEASER_THRESHOLD = 600; // skip extraction when teaser already this long
 const EXTRACT_TIMEOUT_MS = 8000;
 const MAX_EXTRACT_SOURCES = 4;
+// The LEAD source (index 0 — the story the article is actually about) keeps
+// more of its body than corroborating sources: truncating the lead genuinely
+// costs facts, while extras past ~2500 chars are mostly redundant color. The
+// 7000 total ceiling is unchanged; chunking beyond it is the Magazines (#58)
+// design question, not this path's.
+const LEAD_SOURCE_CHAR_CAP = 4500;
 const PER_SOURCE_CHAR_CAP = 2500;
 const TOTAL_SOURCE_CHAR_CAP = 7000;
 
@@ -189,16 +198,18 @@ async function buildSourceBlock(sources: SourceRef[], jinaKey: string | undefine
   let fullBody = false;
   const parts = await Promise.all(picked.map(async (s, n) => {
     let body = (s.teaser || '').trim();
-    if (s.url && body.length < EXTRACT_TEASER_THRESHOLD) {
+    if (body.length >= FULL_SOURCE_CHARS) {
+      fullBody = true;                 // full-text feed shipped a real body — no Jina needed
+    } else if (s.url) {
       const full = await extractFullText(s.url, jinaKey);
       if (full && full.length > body.length) {
         body = full;
-        fullBody = true;               // Jina supplied the body
+        // Only a substantial extraction counts as a real body; a short Jina
+        // result (error page, stub) just improves the teaser a little.
+        if (full.length >= FULL_SOURCE_CHARS) fullBody = true;
       }
-    } else if (body.length >= FULL_SOURCE_CHARS) {
-      fullBody = true;                 // full-text feed shipped a real body — no Jina needed
     }
-    body = body.slice(0, PER_SOURCE_CHAR_CAP);
+    body = body.slice(0, n === 0 ? LEAD_SOURCE_CHAR_CAP : PER_SOURCE_CHAR_CAP);
     return `${n + 1}. ${s.title || ''} — ${body}`.trim();
   }));
 

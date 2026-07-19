@@ -260,7 +260,7 @@ export async function fetchReadyBufferArticles(userId: string, limit = 10): Prom
   return (data ?? []).map((r) => r.content as NewsArticle).filter(Boolean);
 }
 
-export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
+export async function fetchNewsFeed(page: number = 1, topics: string[] | null = null): Promise<NewsArticle[]> {
   const devMode = import.meta.env.VITE_DEV_MODE === 'true';
   if (!devMode) {
     // getSession reads the cached session (no /auth/v1/user round-trip), so a
@@ -270,7 +270,7 @@ export async function fetchNewsFeed(page: number = 1): Promise<NewsArticle[]> {
   }
 
   try {
-    const { articles } = await invokeEdgeFn<{ articles: NewsArticle[] }>('fetch-raw-news', { page });
+    const { articles } = await invokeEdgeFn<{ articles: NewsArticle[] }>('fetch-raw-news', { page, topics });
     if (!articles || articles.length === 0) {
       console.warn(`[api] News API returned zero results for page ${page}. Check Edge Function logs.`);
       return [];
@@ -751,6 +751,7 @@ export async function upsertUserPreferences(
     target_paragraphs_partial?: number;
     target_paragraphs_snippet?: number;
     new_words_per_day?: number;
+    feed_topics?: string[];
   }
 ) {
   const { error } = await supabase
