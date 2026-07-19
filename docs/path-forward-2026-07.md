@@ -2,11 +2,11 @@
 A prioritized roadmap based on a full review of the 16 open GitHub issues, the codebase, and the shipped state of the app as of 2026-07-13.
 
 > **Status update (2026-07-18): Phases 0–1 shipped.**
-> - 0.1 ✔ — the stray branch turned out to be already merged (#107); #73 closed (#71/#72 still to close as shipped in #97)
+> - 0.1 ✔ — the stray branch turned out to be already merged (#107); #71/#72/#73 all closed as shipped in #97
 > - 0.2 ✔ #118 · 0.3 ✔ #126 (Sentry live in prod, DSN in Vercel env) · 0.4 ✔ #119 (closes #54) · 0.5 ✔ #125 (SW + update banner + offline kuromoji)
-> - 0.6 ◐ — `daily-feed` confirmed still deployed; cron verification + deletion pending (manual)
+> - 0.6 ✔ (2026-07-19) — `jit-overnight-refill` cron verified live (`0 9 * * *`, active); `daily-feed` deleted
 > - 1.1 ✔ #123 (closes #103) · 1.2 ✔ #124 · 1.3 ✔ #127 · 1.4 ✔ #121 (adds `npm run test:furigana`, 46 asserts)
-> - Pending manual steps: `supabase functions deploy process-article` and `deploy dictionary-lookup`; beta users hard-refresh once for the first SW.
+> - Manual steps done 2026-07-19: `process-article` + `dictionary-lookup` deployed; beta users notified to hard-refresh once for the first SW.
 > - **Next: Phase 2** — #38 BYOC, then #10 topics.
 
 ## Where the app stands
