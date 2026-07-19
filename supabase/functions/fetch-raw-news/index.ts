@@ -192,20 +192,47 @@ function parseFeed(xml: string, source: string, category: string): PoolItem[] {
   return out;
 }
 
+// Otherwise-English feeds occasionally carry non-English items — NASA publishes
+// Spanish-language releases in its main feed — and the pipeline rewrites
+// ENGLISH sources, so one slips through as a raw foreign headline in the Feed.
+// Cheap stopword screen on the title: ≥3 distinct hits among high-frequency
+// Spanish function words (or 2 + accented chars) is far beyond what English
+// headlines with Spanish proper nouns produce ("Los Angeles" or "El Paso" hit 1).
+const SPANISH_STOPWORDS = new Set([
+  'de', 'del', 'la', 'el', 'los', 'las', 'al', 'un', 'una', 'en',
+  'por', 'para', 'con', 'como', 'su', 'más', 'año', 'nuevo', 'nueva', 'y',
+]);
+function looksNonEnglish(title: string): boolean {
+  const hits = new Set(
+    title.toLowerCase().split(/[^a-záéíóúüñ]+/).filter((t) => SPANISH_STOPWORDS.has(t)),
+  );
+  if (/[áéíóúñ¿¡]/.test(title)) hits.add(' accents');
+  return hits.size >= 3;
+}
+
 function isValidItem(it: PoolItem): boolean {
   if (!it.title || it.title.length < 12) return false;
   if (it.title.includes('[Removed]')) return false;
   if (PACKAGE_RELEASE_TITLE.test(it.title.trim())) return false;
+  if (looksNonEnglish(it.title)) return false;
   if (!it.url) return false;
   if ((it.teaser || '').trim().length < 40) return false;
   return true;
 }
 
-// Registrable host, used by the multi-outlet heuristic. Feed *names* aren't
-// enough — "BBC" and "BBC Tech" are different feeds from the same outlet
-// (bbc.com), so they must not count as two outlets.
+// Registrable domain, used by the multi-outlet heuristic and the outlet
+// round-robin. Feed *names* aren't enough — "BBC" and "BBC Tech" are different
+// feeds from the same outlet (bbc.com) — and neither is the bare host:
+// www.nasa.gov and science.nasa.gov are ONE outlet, so subdomains must
+// collapse. Keep 3 labels for two-part TLDs (co.uk, co.jp, com.au…), else 2.
 function domainOf(url: string): string {
-  try { return new URL(url).host.replace(/^www\./, ''); } catch { return url; }
+  try {
+    const parts = new URL(url).host.replace(/^www\./, '').split('.');
+    const n = parts.length >= 3
+      && parts[parts.length - 2].length <= 3
+      && parts[parts.length - 1].length === 2 ? 3 : 2;
+    return parts.slice(-n).join('.');
+  } catch { return url; }
 }
 
 // Sanitize a client/DB-supplied topic selection down to known catalog ids.
@@ -408,16 +435,40 @@ function roundRobinByOutlet<T extends { originalUrl: string }>(cards: T[]): T[] 
   return out;
 }
 
-// Prefer richer source material into the buffer (full text > partial > snippet),
-// keeping topic variety by interleaving outlets within each richness tier.
-function rerankByRichness<T extends { sources: { teaser?: string }[]; originalUrl: string }>(cards: T[]): T[] {
-  const tiers: Record<number, T[]> = { 2: [], 1: [], 0: [] };
-  for (const c of cards) tiers[richnessTier(c)].push(c);
-  return [
-    ...roundRobinByOutlet(tiers[2]),
-    ...roundRobinByOutlet(tiers[1]),
-    ...roundRobinByOutlet(tiers[0]),
-  ];
+// Round-robin across TOPICS first, so no topic can monopolize the top of the
+// buffer. The old global richness-first ordering did exactly that once #10
+// added topics whose feeds ship full bodies (NASA): every tier-2 card was one
+// topic, and ensure-buffer claims in list order — three Space articles in a
+// row. Richness still orders WITHIN each topic queue (full > partial >
+// snippet, outlet-interleaved per tier), but since process-article now
+// Jina-extracts any thin source, that's a cost optimization (buffer picks
+// need fewer extraction calls), not a quality gate — it no longer deserves
+// to outrank topic variety.
+function rerankCards<T extends { sources: { teaser?: string }[]; originalUrl: string; category: string }>(cards: T[]): T[] {
+  const byTopic = new Map<string, T[]>();
+  for (const c of cards) {
+    const q = byTopic.get(c.category);
+    if (q) q.push(c); else byTopic.set(c.category, [c]);
+  }
+  const queues = [...byTopic.values()].map((group) => {
+    const tiers: Record<number, T[]> = { 2: [], 1: [], 0: [] };
+    for (const c of group) tiers[richnessTier(c)].push(c);
+    return [
+      ...roundRobinByOutlet(tiers[2]),
+      ...roundRobinByOutlet(tiers[1]),
+      ...roundRobinByOutlet(tiers[0]),
+    ];
+  });
+  const out: T[] = [];
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const q of queues) {
+      const c = q.shift();
+      if (c) { out.push(c); progressed = true; }
+    }
+  }
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -491,11 +542,11 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Prefer richer sources into the buffer, then cap. ensure-buffer claims these
-    // in order, so full-text cards get produced before snippet-only ones.
-    const cards = rerankByRichness(allCards).slice(0, MAX_CARDS);
+    // Interleave topics (richest first within each), then cap. ensure-buffer
+    // claims these in order, so the buffer inherits the topic mix.
+    const cards = rerankCards(allCards).slice(0, MAX_CARDS);
     const tierCounts = allCards.reduce((acc, c) => { acc[richnessTier(c)]++; return acc; }, { 0: 0, 1: 0, 2: 0 } as Record<number, number>);
-    console.log(`[fetch-raw-news] ${allCards.length} cards (full=${tierCounts[2]} partial=${tierCounts[1]} snippet=${tierCounts[0]}) -> top ${cards.length} re-ranked by richness`);
+    console.log(`[fetch-raw-news] ${allCards.length} cards (full=${tierCounts[2]} partial=${tierCounts[1]} snippet=${tierCounts[0]}) -> top ${cards.length}, topic-interleaved`);
 
     return new Response(JSON.stringify({ articles: cards }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
