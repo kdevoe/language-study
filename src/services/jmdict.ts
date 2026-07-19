@@ -50,8 +50,17 @@ export async function lookupWord(text: string): Promise<JMDictResult[]> {
   const kanjiResults = await lookupByKanji(text);
   if (kanjiResults.length > 0) return kanjiResults;
 
-  // 2. Fall back to kana
-  return lookupByKana(text);
+  // 2. Fall back to kana. Order kana-primary entries first so downstream
+  // "first candidate" fallbacks (e.g. failed LLM disambiguation) land on the
+  // word actually written in kana, not a kanji-primary homophone.
+  const kanaResults = await lookupByKana(text);
+  return [...kanaResults].sort((a, b) => {
+    const ka = isKanaPrimary(a) ? 0 : 1;
+    const kb = isKanaPrimary(b) ? 0 : 1;
+    if (ka !== kb) return ka - kb;
+    if (a.isCommon !== b.isCommon) return a.isCommon ? -1 : 1;
+    return (a.freqRank ?? Infinity) - (b.freqRank ?? Infinity);
+  });
 }
 
 async function lookupByKanji(text: string): Promise<JMDictResult[]> {
@@ -128,15 +137,29 @@ function posMatches(result: JMDictResult, pos: CoarsePos | undefined): boolean {
   return false;
 }
 
+/** Entry is written in kana in practice: no kanji forms, or usually-kana senses. */
+function isKanaPrimary(e: JMDictResult): boolean {
+  return e.kanji.length === 0 || e.senses.some(s => s.misc.includes('uk'));
+}
+
 /**
- * Pick the best entry for a lemma: prefer a POS match, then common words, then
- * the most frequent (lowest freq_rank). Replaces the old "first entry wins".
+ * Pick the best entry for a lemma: prefer a POS match, then — for kana lemmas —
+ * kana-primary entries, then common words, then the most frequent (lowest
+ * freq_rank). The kana-primary step matters because homophone verbs are all
+ * common and freq_rank alone routes する to 擦る "to rub" (為る has no rank) and
+ * いる to 射る "to shoot" — a word WRITTEN in kana is almost never the
+ * kanji-primary homophone. Replaces the old "first entry wins".
  */
-export function pickBestEntry(candidates: JMDictResult[], pos?: CoarsePos): JMDictResult {
+export function pickBestEntry(candidates: JMDictResult[], pos?: CoarsePos, kanaLemma = false): JMDictResult {
   return [...candidates].sort((a, b) => {
     const pa = posMatches(a, pos) ? 0 : 1;
     const pb = posMatches(b, pos) ? 0 : 1;
     if (pa !== pb) return pa - pb;
+    if (kanaLemma) {
+      const ka = isKanaPrimary(a) ? 0 : 1;
+      const kb = isKanaPrimary(b) ? 0 : 1;
+      if (ka !== kb) return ka - kb;
+    }
     if (a.isCommon !== b.isCommon) return a.isCommon ? -1 : 1;
     return (a.freqRank ?? Infinity) - (b.freqRank ?? Infinity);
   })[0];
@@ -180,9 +203,10 @@ export async function lookupLemmasBatch(
 
   const result = new Map<string, JMDictResult>();
   for (const lemma of unique) {
-    const ids = (kanjiIds.get(lemma)?.size ? kanjiIds.get(lemma) : kanaIds.get(lemma)) ?? new Set();
+    const viaKanji = !!kanjiIds.get(lemma)?.size;
+    const ids = (viaKanji ? kanjiIds.get(lemma) : kanaIds.get(lemma)) ?? new Set();
     const cands = [...ids].map(id => byId.get(id)).filter((e): e is JMDictResult => !!e);
-    if (cands.length > 0) result.set(lemma, pickBestEntry(cands, posByLemma?.get(lemma)));
+    if (cands.length > 0) result.set(lemma, pickBestEntry(cands, posByLemma?.get(lemma), !viaKanji));
   }
 
   await applyJlptFallback(result);

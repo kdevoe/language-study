@@ -44,6 +44,8 @@ export const TOMBSTONED_WORD_IDS: ReadonlySet<string> = new Set([
   '1165980', // 一番(ひとつがい) -> 一番(いちばん)
   '2246880', // 貝(バイ) -> 貝(かい)
   // deleted (dictionary noise that only entered via bad JLPT tags)
+  // NOTE: do not add real words here — this set permanently blocks sync for
+  // these ids. One-time fixes for legitimate words go in RECOVERABLE_WORD_IDS.
   '1543920', // 余意
   '1580130', // 出端
   '1000050', // 仝
@@ -54,4 +56,19 @@ export const TOMBSTONED_WORD_IDS: ReadonlySet<string> = new Set([
   '1339500', // 出切る
   '1518450', // 亡い
   '2427850', // 大き(おおき)
+]);
+
+/**
+ * Real words whose progress rows were MISATTRIBUTED by the reader's homophone
+ * tiebreak (pickBestEntry chose the kanji-primary homophone for a kana lemma:
+ * する -> 擦る, いる -> 射る, なる -> 生る). The server-side fix remaps those
+ * rows to the entry actually read; the persist v9 migration drops the local
+ * copies once so the remapped progress rehydrates cleanly. Unlike
+ * TOMBSTONED_WORD_IDS these are NOT blocked from future sync — they are
+ * legitimate words that can be studied for real later.
+ */
+export const RECOVERABLE_WORD_IDS: ReadonlySet<string> = new Set([
+  '1595910', // 擦る(する) -> 為る 1157170
+  '1322180', // 射る(いる) -> 居る 1577980
+  '1611000', // 生る(なる) -> 成る 1375610
 ]);

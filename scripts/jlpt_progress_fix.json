@@ -26,9 +26,15 @@
     "1428285": "1428280",
     "1447430": "1447440",
     "1165980": "1165970",
-    "2246880": "1203100"
+    "2246880": "1203100",
+    "1595910": "1157170",
+    "1322180": "1577980",
+    "1611000": "1375610"
   },
   "_remap_notes": {
+    "1595910": "擦る(する to rub) -> 為る(to do): reader lookup freq-rank tiebreak credited 155 する sightings to the rub entry",
+    "1322180": "射る(いる to shoot) -> 居る(to be): same tiebreak bug, 43 sightings",
+    "1611000": "生る(なる to bear fruit) -> 成る(to become): same, 108 sightings; these three are in RECOVERABLE_WORD_IDS (v9 local migration), NOT the permanent tombstone set — they are real words the user may study later",
     "1643470": "大切り(おおぎり) -> 大切(たいせつ): 18 sightings were almost certainly たいせつ",
     "1525750": "万(ばん) -> 万(まん): 33 sightings",
     "1465580": "入る(いる) -> 入る(はいる)",

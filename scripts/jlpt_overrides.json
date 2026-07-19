@@ -3,11 +3,13 @@
   "deny": {},
   "pin": {
     "5|ラジオカセ": "1138960",
+    "5|なる": "1375610",
     "2|行っていらっしゃい": "2088750",
     "2|お世話になりました": "1002260"
   },
   "_pin_notes": {
     "5|ラジオカセ": "deck truncation of ラジオカセット; pinned to the common ラジカセ entry",
+    "5|なる": "成る (to become) — 生る (to bear fruit) is also uk+common and carries the better freq band, so scoring picks it without the pin",
     "2|行っていらっしゃい": "JMDict headword is 行ってらっしゃい",
     "2|お世話になりました": "JMDict headword is お世話になる"
   },
