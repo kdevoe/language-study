@@ -404,3 +404,17 @@
         once (RECOVERABLE_WORD_IDS, not tombstoned — real words). Sync now
         refreshes JLPT labels daily from the server (stale 来る/先 showed as
         N1). なる pinned to 成る in the enricher (生る keeps its legit N3 tag).
+- [x] Feed mixing + language fixes (2026-07-19, follow-up to #10/#129):
+  - User report: three Space articles in a row + a Spanish headline. Traced:
+    rerankByRichness was topic-blind and NASA is the only full-text feed in
+    most selections → every tier-2 card was Space and ensure-buffer claims in
+    list order; NASA's main feed also carries Spanish-language releases.
+  - fetch-raw-news now round-robins across TOPICS first (richness orders
+    within each topic queue — post-extraction-fix it's only a Jina-cost
+    optimization); domainOf collapses subdomains to the registrable domain
+    (science.nasa.gov = www.nasa.gov); isValidItem drops non-English titles
+    via a Spanish stopword screen (≥3 distinct hits; "Los Angeles"/"El Paso"
+    safe). 12 behavior asserts in scratch harness.
+  - Deployed + verified live: 12-topic selection serves a perfect 1-per-topic
+    cycle (Space once per cycle, richest card leading); space-only pool has
+    0 Spanish titles while the English twin of the filtered release remains.
