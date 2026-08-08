@@ -1,5 +1,6 @@
 import { Reader } from './components/Reader'
 import { Feed } from './components/Feed'
+import { Library } from './components/Library'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
 import { Settings } from './components/Settings'
@@ -9,7 +10,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { fetchNewsFeed, NewsArticle, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError } from './services/api'
+import { fetchNewsFeed, NewsArticle, LongFormWork, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
 import { MoreVertical, ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
 
@@ -19,7 +20,7 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  const [activeTab, setActiveTab] = useState<'news' | 'flashcards' | 'progress' | 'settings'>('news');
+  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'flashcards' | 'progress' | 'settings'>('news');
   const [showNav, setShowNav] = useState(true);
   // Flashcard focus mode: tapping into a card hides the bottom nav so the card
   // can use that space; Flashcards reports the state up from its card flow.
@@ -30,6 +31,12 @@ function App() {
 
   // News Hub State
   const [newsView, setNewsView] = useState<'hub' | 'reading'>('hub');
+  // Library (書庫) state — long-form works read in the same Reader (a part IS
+  // an article), but with their own list/reading view so the news feed and the
+  // Library never share navigation state.
+  const [libraryView, setLibraryView] = useState<'list' | 'reading'>('list');
+  const [activeWork, setActiveWork] = useState<LongFormWork | null>(null);
+  const [activeWorkArticle, setActiveWorkArticle] = useState<NewsArticle | null>(null);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
@@ -496,6 +503,37 @@ function App() {
     handleBackToHub();
   };
 
+  // ── Library (書庫): long-form works, read in the same Reader ────────────────
+  const handleOpenWork = useCallback((work: LongFormWork, article: NewsArticle) => {
+    // Cache first so the Reader's cache path opens it instantly (never re-processes).
+    saveProcessedArticle(article.id, article);
+    setActiveWork(work);
+    setActiveWorkArticle(article);
+    setLibraryView('reading');
+    setShowNav(true);
+    window.scrollTo(0, 0);
+  }, [saveProcessedArticle]);
+
+  const handleBackToLibrary = () => {
+    setLibraryView('list');
+    setShowNav(true);
+  };
+
+  // 完了 on a work: mark it finished — it stays in the Library, re-readable
+  // (works are a collection, not a feed; nothing is dismissed).
+  const handleFinishWork = () => {
+    if (activeWork && session?.user?.id) {
+      updateWorkStatus(activeWork.id, session.user.id, 'finished');
+    }
+    handleBackToLibrary();
+  };
+
+  // Reading happens inside a tab's own view state; the header back-arrow and
+  // chrome-hiding are shared across both reading surfaces.
+  const isReading =
+    (activeTab === 'news' && newsView === 'reading') ||
+    (activeTab === 'library' && libraryView === 'reading');
+
   useEffect(() => {
     let lastScrollY = window.scrollY;
     let ticking = false;
@@ -619,8 +657,8 @@ function App() {
           opacity: showNav ? 1 : 0
         }}
       >
-        {newsView === 'reading' ? (
-          <button onClick={handleBackToHub} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+        {isReading ? (
+          <button onClick={activeTab === 'library' ? handleBackToLibrary : handleBackToHub} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <ChevronLeft size={24} strokeWidth={1.5} />
           </button>
         ) : (
@@ -641,7 +679,7 @@ function App() {
         // under-reserves and the first card tucks ~4px under the header.
         paddingTop: 'calc(5rem + max(1.5rem, env(safe-area-inset-top)))',
         paddingRight: '1.25rem',
-        paddingBottom: newsView === 'reading' ? '1rem' : '0rem',
+        paddingBottom: isReading ? '1rem' : '0rem',
         paddingLeft: '1.25rem',
         maxWidth: '600px', 
         margin: '0 auto', 
@@ -664,6 +702,13 @@ function App() {
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} />
           )
         )}
+        {activeTab === 'library' && (
+          libraryView === 'list' ? (
+            <Library onOpenWork={handleOpenWork} />
+          ) : (
+            <Reader key={activeWorkArticle?.id} initialArticle={activeWorkArticle} onComplete={handleFinishWork} />
+          )
+        )}
         {activeTab === 'flashcards' && <Flashcards onFocusChange={setStudyFocus} />}
         {activeTab === 'progress' && <Progress />}
         {activeTab === 'settings' && <Settings />}
@@ -671,7 +716,7 @@ function App() {
       <BottomNav
         activeTab={activeTab}
         onChange={setActiveTab}
-        isVisible={showNav && newsView !== 'reading' && !(activeTab === 'flashcards' && studyFocus)}
+        isVisible={showNav && !isReading && !(activeTab === 'flashcards' && studyFocus)}
       />
     </div>
   )

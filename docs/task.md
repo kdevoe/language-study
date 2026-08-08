@@ -418,3 +418,35 @@
   - Deployed + verified live: 12-topic selection serves a perfect 1-per-topic
     cycle (Space once per cycle, richest card leading); space-only pool has
     0 Spanish titles while the English twin of the filtered release remains.
+- [x] Long-form Phase A: BYOC paste import + 書庫 Library tab (#38/#58, Aug 8)
+  - Design: docs/long-form-content-design.md (approved 2026-08-08). A work's
+    parts are regular processed_news rows; Phase A ships single-part works
+    only (300–10,000 chars, no chunking).
+  - [x] database/27_long_form_works.sql: long_form_works table + RLS,
+        processed_news source_type/work_id/part_index columns,
+        ensure_buffer_claim recounted on source_type='news' only.
+        ⚠ APPLY IN SUPABASE **BEFORE** deploying frontend + edge functions
+        (client feed queries filter on source_type).
+  - [x] process-article: importText input path — length guards, 3-imports/24h
+        server guard (429 errorKind import_limit), work row created after a
+        successful generation (no orphan works), part saved ready with
+        grouping columns; shared personalization engine untouched.
+  - [x] ensure-buffer: pre-check counts filter source_type='news' (works never
+        consume the news buffer or its daily cap).
+  - [x] api.ts: LongFormWork type, fetchWorks (part-ready annotation),
+        importPastedText, importErrorMessage, updateWorkStatus; feed cache /
+        ready-buffer queries exclude non-news rows.
+  - [x] Library.tsx (書庫): filter pills (すべて/インポート/雑誌), flat
+        news-card-style list (active first, finished after, 完了 badge),
+        importing placeholder card, + button bottom-sheet with live char
+        count → part estimate and CTA gating; auto-opens the Reader on
+        import success. BottomNav gains the 5th LIBRARY tab (flex widths).
+  - [x] App.tsx: library list/reading view state; works read in the SAME
+        Reader (a part is an article — cached via saveProcessedArticle before
+        open); 完了 marks the work finished (stays re-readable, no dismissal).
+  - Verified: tsc + vite build clean, lint at pre-existing baseline; Playwright
+    dev-mode walkthrough (5 tabs → Library empty state → sheet: short/valid/
+    over-cap estimates + CTA disabled states → news feed regression OK).
+    Full import flow needs database/27 applied + `supabase functions deploy
+    process-article ensure-buffer`. (Applied + deployed 2026-08-08; migration
+    renumbered 26→27 after rebasing over #129's database/26_feed_topics.sql.)

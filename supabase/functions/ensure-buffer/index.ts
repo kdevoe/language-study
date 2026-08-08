@@ -70,13 +70,15 @@ Deno.serve(async (req) => {
     // orphan can't mask a real deficit — the RPC reclaims them under the lock).
     const freshCutoff = new Date(Date.now() - RECLAIM_MIN * 60_000).toISOString();
     const dayCutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
+    // News rows only: long-form work parts (source_type import/magazine) never
+    // occupy a buffer slot or eat the news daily cap (design §1; database/26).
     const [readyRes, pendRes, prodRes] = await Promise.all([
       admin.from('processed_news').select('*', { count: 'exact', head: true })
-        .eq('user_id', userId).eq('status', 'ready'),
+        .eq('user_id', userId).eq('source_type', 'news').eq('status', 'ready'),
       admin.from('processed_news').select('*', { count: 'exact', head: true })
-        .eq('user_id', userId).eq('status', 'pending').gt('created_at', freshCutoff),
+        .eq('user_id', userId).eq('source_type', 'news').eq('status', 'pending').gt('created_at', freshCutoff),
       admin.from('processed_news').select('*', { count: 'exact', head: true })
-        .eq('user_id', userId).gt('created_at', dayCutoff),
+        .eq('user_id', userId).eq('source_type', 'news').gt('created_at', dayCutoff),
     ]);
     const buffer = (readyRes.count ?? 0) + (pendRes.count ?? 0);
     const produced24h = prodRes.count ?? 0;
