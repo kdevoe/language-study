@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Long-Form Reader</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-olive: #4a5d23;
+  --border-light: #e0e0d8;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: #e9e9e2;
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding: 2.5rem 1rem 4rem;
+}
+.mock-header { max-width: 900px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--accent-olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 560px; margin: 0 auto; }
+
+/* ---------- phone frame ---------- */
+.stage { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; align-items: flex-start; }
+.phone {
+  width: 402px; height: 800px;
+  background: var(--bg-color);
+  border-radius: 44px;
+  border: 10px solid #1c1c1c;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.screen { height: 100%; overflow-y: auto; padding: 2.2rem 1.5rem 3rem; }
+
+/* ---------- reading content (mirrors today's Reader) ---------- */
+.meta-row { display: flex; gap: 1rem; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; }
+.meta-row .chip { background: var(--bg-card); padding: 0.2rem 0.6rem; border-radius: 4px; }
+.article-title { font-family: var(--font-serif); font-size: 2.1rem; font-weight: 500; line-height: 1.3; margin-bottom: 2rem; }
+.title-rule { width: 40px; height: 1px; background: var(--text-muted); margin-bottom: 2rem; }
+
+.reading-content { font-family: var(--font-serif); font-size: 1.125rem; letter-spacing: 0.02em; }
+.reading-content p { line-height: 2.2; margin-bottom: 2em; }
+ruby { ruby-align: center; }
+rt { font-size: 0.5em; color: var(--text-muted); }
+
+/* yugen box — exact styling from YugenBox.tsx */
+.yugen-box {
+  border-left: 4px solid var(--text-main);
+  background: var(--bg-card);
+  padding: 2rem;
+  margin: 3rem 0;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+}
+.yugen-box .label { font-family: var(--font-sans); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; font-weight: 600; letter-spacing: 0.05em; }
+.yugen-box h3 { font-family: var(--font-serif); font-size: 1.6rem; margin-bottom: 1rem; font-weight: 500; }
+.yugen-box h3 .reading { font-family: var(--font-sans); font-size: 1.1rem; color: var(--text-muted); font-weight: 400; }
+.yugen-box p { font-family: var(--font-sans); font-size: 1rem; line-height: 1.8; margin: 0; }
+
+/* section break — quiet, in the text flow, styled like the 完了 capsule */
+.section-end { text-align: center; margin: 4rem 0 2.5rem; }
+.section-end .fin { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); letter-spacing: 0.35em; }
+.section-end .pct { font-family: var(--font-sans); font-size: 0.68rem; color: var(--text-muted); margin-top: 0.6rem; opacity: 0.8; }
+
+.recap { margin: 0 0 2.5rem; text-align: center; }
+.recap .label { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 1rem; }
+.recap-words { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+.word-chip {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-family: var(--font-serif); font-size: 0.95rem; font-weight: 500;
+  background: var(--bg-card); padding: 0.45rem 0.9rem; border-radius: 100px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dot.new { background: #8fb0c4; }
+.dot.learning { background: #d4a24e; }
+.dot.known { background: var(--accent-olive); opacity: 0.7; }
+
+.next-part { text-align: center; margin-bottom: 1.6rem; }
+.next-part .num { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 0.5rem; }
+.next-part .title { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 500; line-height: 1.5; margin-bottom: 1.4rem; }
+.continue-btn {
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  border: 1px solid var(--border-light); border-radius: 100px;
+  padding: 0.75rem 2.5rem; font-weight: 600;
+}
+.continue-btn .serif-label { font-family: var(--font-serif); font-size: 1.25rem; vertical-align: middle; color: var(--text-main); }
+.jit-note { display: flex; justify-content: center; align-items: center; gap: 0.55rem; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-top: 1.4rem; opacity: 0.85; }
+.spinner { width: 11px; height: 11px; border: 1.5px solid rgba(74,93,35,0.2); border-top-color: var(--accent-olive); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- annotations ---------- */
+.legend { max-width: 420px; }
+.legend h2 { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; }
+.legend ol { list-style: none; display: flex; flex-direction: column; gap: 0.9rem; }
+.legend li { display: flex; gap: 0.8rem; font-size: 0.85rem; background: var(--bg-pure); border-radius: 16px; padding: 0.9rem 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.legend .n {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent-olive); color: #fff; font-size: 0.7rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; margin-top: 0.1rem;
+}
+.legend .muted { color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.15rem; }
+@media (max-width: 900px) { .stage { flex-direction: column; align-items: center; } }
+</style>
+</head>
+<body>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · LONG-FORM DESIGN §5</div>
+  <h1>Long-Form Reader</h1>
+  <p>Identical to reading a news article today — no header, no toggles, nothing but the text. Reopening a work lands here automatically: the page opens pre-scrolled so the first unread paragraph sits mid-screen, with what you already read visible above it.</p>
+</div>
+
+<div class="stage">
+  <div class="phone">
+    <div class="screen">
+
+      <!-- meta row: exactly today's category + readTime treatment -->
+      <div class="meta-row">
+        <span class="chip">MIT TECH REVIEW</span>
+        <span>第2部 / 全4部</span>
+      </div>
+
+      <h1 class="article-title"><ruby>写真<rt>しゃしん</rt></ruby>から<ruby>病気<rt>びょうき</rt></ruby>を見つけるAI</h1>
+      <div class="title-rule"></div>
+
+      <div class="reading-content">
+        <p><ruby>人工知能<rt>じんこうちのう</rt></ruby>は、<ruby>医療<rt>いりょう</rt></ruby>の<ruby>世界<rt>せかい</rt></ruby>を大きく<ruby>変<rt>か</rt></ruby>えようとしている。アメリカの<ruby>病院<rt>びょういん</rt></ruby>では、AIが<ruby>医者<rt>いしゃ</rt></ruby>を<ruby>助<rt>たす</rt></ruby>ける<ruby>仕組<rt>しく</rt></ruby>みが少しずつ広がっている。</p>
+
+        <p>この<ruby>変化<rt>へんか</rt></ruby>は、<ruby>研究室<rt>けんきゅうしつ</rt></ruby>だけの<ruby>話<rt>はなし</rt></ruby>ではない。<ruby>毎日<rt>まいにち</rt></ruby>の<ruby>診察<rt>しんさつ</rt></ruby>でも、AIの<ruby>力<rt>ちから</rt></ruby>が<ruby>使<rt>つか</rt></ruby>われ<ruby>始<rt>はじ</rt></ruby>めている。</p>
+
+        <p id="resumePoint">たとえば、<ruby>写真<rt>しゃしん</rt></ruby>から<ruby>病気<rt>びょうき</rt></ruby>を見つける<ruby>技術<rt>ぎじゅつ</rt></ruby>がある。AIは<ruby>何百万枚<rt>なんびゃくまんまい</rt></ruby>もの写真を<ruby>学<rt>まな</rt></ruby>び、人間の目では見えない小さな<ruby>変化<rt>へんか</rt></ruby>を見つけることができる。</p>
+
+        <div class="yugen-box">
+          <div class="label">キーワード</div>
+          <h3>診断 <span class="reading">(しんだん)</span></h3>
+          <p>Diagnosis — identifying an illness from its signs. AIによる診断 = "diagnosis by AI."</p>
+        </div>
+
+        <p>しかし、AIの<ruby>診断<rt>しんだん</rt></ruby>がいつも<ruby>正<rt>ただ</rt></ruby>しいわけではない。だから、<ruby>最後<rt>さいご</rt></ruby>に<ruby>決<rt>き</rt></ruby>めるのは、やはり人間の医者だ。AIと医者が<ruby>協力<rt>きょうりょく</rt></ruby>することで、より早く、より<ruby>安全<rt>あんぜん</rt></ruby>な医療が<ruby>可能<rt>かのう</rt></ruby>になる。</p>
+      </div>
+
+      <!-- section break: end of part 2 -->
+      <div class="section-end">
+        <div class="fin">— 第2部・完 —</div>
+        <div class="pct">全体の 50%</div>
+      </div>
+
+      <div class="recap">
+        <div class="label">この部で出会った言葉</div>
+        <div class="recap-words">
+          <span class="word-chip"><span class="dot new"></span>人工知能</span>
+          <span class="word-chip"><span class="dot new"></span>診断</span>
+          <span class="word-chip"><span class="dot learning"></span>技術</span>
+          <span class="word-chip"><span class="dot known"></span>写真</span>
+        </div>
+      </div>
+
+      <div class="next-part">
+        <div class="num">第3部</div>
+        <div class="title">AIと医者の新しい関係</div>
+        <button class="continue-btn"><span class="serif-label">続きを読む</span></button>
+        <div class="jit-note"><div class="spinner"></div>第4部は読みながら自動で準備されます</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="legend">
+    <h2>What this demonstrates</h2>
+    <ol>
+      <li><span class="n">1</span><div><b>Identical chrome to today's Reader</b> — the meta chip row (source instead of category, plus a quiet part indicator), the large serif title, the 40px hairline. Nothing else. No header, no progress bar, no mode toggles.</div></li>
+      <li><span class="n">2</span><div><b>Resume is invisible</b> — no marker. Reopening a work opens pre-scrolled to the saved position (part + block), with the first unread paragraph mid-screen so a little of what you already read shows above for context. This mockup loads that way — scroll up to see the part opening.</div></li>
+      <li><span class="n">3</span><div>Word lookup, furigana, and the キーワード box are the <b>existing Reader, unchanged</b> — a part is a regular processed article.</div></li>
+      <li><span class="n">4</span><div><b>Section break</b> replaces the 完了 capsule at the end of a part: a quiet 完 line with overall progress, the words-met recap, and the next part styled like the existing finish button. Part 4 prepares JIT while you read part 3.<span class="muted">A real part runs about 10 paragraphs (abridged here) — breaks stay rare enough to feel like chapter breaks, not interruptions.</span></div></li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  // Resume behavior: open pre-scrolled so the first unread block sits mid-screen,
+  // with already-read text visible above. Instant, exactly as the app would do it.
+  const screenEl = document.querySelector('.screen');
+  const resume = document.getElementById('resumePoint');
+  function centerResume() {
+    screenEl.scrollTop = resume.offsetTop - screenEl.clientHeight / 2 + resume.offsetHeight / 2;
+    window.scrollTo(0, 0);
+  }
+  centerResume();
+  // re-center once the serif webfont loads (metrics shift offsets)
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(centerResume);
+</script>
+</body>
+</html>

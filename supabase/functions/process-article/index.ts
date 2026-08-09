@@ -145,6 +145,24 @@ const TOTAL_SOURCE_CHAR_CAP = 7000;
 
 interface SourceRef { title?: string; url?: string; teaser?: string }
 
+// ── Long-form import (docs/long-form-content-design.md, Phase A) ─────────────
+// A pasted text becomes a WORK (long_form_works row) whose parts are regular
+// processed_news rows. Phase A ships single-part works only: anything at or
+// under IMPORT_MAX_CHARS is one part, no chunking. The personalization engine
+// below is shared unchanged — an import is just a different input path.
+const IMPORT_MIN_CHARS = 300;    // under this it's a dictionary lookup, not an article
+const IMPORT_MAX_CHARS = 10_000; // Phase A single-part cap (chunking lands in Phase B)
+const IMPORT_DAILY_CAP = 3;      // imports per user per rolling 24h (design §7)
+
+/** Work title for a pasted import: caller-provided, else the first non-empty
+ *  line of the text (blog posts usually open with their title). */
+function deriveImportTitle(text: string, provided?: string): string {
+  const fromCaller = (provided ?? '').trim();
+  if (fromCaller) return fromCaller.slice(0, 120);
+  const firstLine = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? 'Imported text';
+  return firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine;
+}
+
 // ── Source fullness classification ──────────────────────────────────────────
 // We track how much real source material Gemini actually received, because
 // article quality tracks it directly: a bare ~200-char teaser forces Gemini to
@@ -375,8 +393,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { userId, articleId, title, snippet, sources } = await req.json();
-    if (!userId || !title || !(snippet || (Array.isArray(sources) && sources.length))) {
+    const body = await req.json();
+    const { userId, articleId, snippet, sources } = body;
+    let title: string = body.title;
+    // Import mode (Phase A BYOC): a pasted text arrives as `importText` and is
+    // processed through the same engine, then saved as a single-part work.
+    const importText: string = typeof body.importText === 'string'
+      ? body.importText.replace(/\r\n?/g, '\n').trim()
+      : '';
+    const isImport = importText.length > 0;
+    if (!userId || (!isImport && (!title || !(snippet || (Array.isArray(sources) && sources.length))))) {
       return new Response(JSON.stringify({ error: 'userId, title, and snippet or sources are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -390,12 +416,41 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    if (isImport) {
+      // Input guards (design §2): too short is a dictionary lookup, not an
+      // article; over the Phase A cap needs chunking, which doesn't exist yet.
+      if (importText.length < IMPORT_MIN_CHARS || importText.length > IMPORT_MAX_CHARS) {
+        return new Response(JSON.stringify({
+          error: importText.length < IMPORT_MIN_CHARS
+            ? `Import must be at least ${IMPORT_MIN_CHARS} characters`
+            : `Import is capped at ${IMPORT_MAX_CHARS.toLocaleString()} characters for now`,
+          errorKind: 'import_invalid',
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // Server-side daily guard (design §7): rolling 24h, counted on the works
+      // table so it's independent of the news buffer's cap.
+      const dayCutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { count: imports24h } = await supabase
+        .from('long_form_works')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gt('created_at', dayCutoff);
+      if ((imports24h ?? 0) >= IMPORT_DAILY_CAP) {
+        return new Response(JSON.stringify({
+          error: `Daily import limit reached (${IMPORT_DAILY_CAP}/day). Try again tomorrow.`,
+          errorKind: 'import_limit',
+        }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      title = deriveImportTitle(importText, title);
+    }
+
     // Opportunistically upgrade thin teasers to full article text. Falls back
     // to the merged teaser block (snippet) when no sources / extraction fails.
-    let sourceText = snippet ?? '';
+    // Import mode: the pasted text IS the source — a real full body, no extraction.
+    let sourceText = isImport ? importText : (snippet ?? '');
     let sourceChars = sourceText.length;
-    let fullBody = false;
-    if (Array.isArray(sources) && sources.length > 0) {
+    let fullBody = isImport;
+    if (!isImport && Array.isArray(sources) && sources.length > 0) {
       try {
         const built = await buildSourceBlock(sources as SourceRef[], jinaKey);
         if (built.text) {
@@ -813,8 +868,52 @@ Deno.serve(async (req) => {
     // blocks keep Gemini's keyword/reading/description (that path is reliable).
     const processedBlocks = rawBlocks;
 
-    // 4. Save to processed_news
-    const finalArticleId = articleId || `${Date.now()}-${userId.slice(0, 8)}`;
+    // 4. Save. Import mode first creates the work row (generation succeeded, so
+    // no orphan works from failed imports), then saves part 1 as a regular
+    // processed_news row grouped under it — a part IS an article (design §1).
+    let work: { id: string } | null = null;
+    let finalArticleId = articleId || `${Date.now()}-${userId.slice(0, 8)}`;
+    if (isImport) {
+      const { data: workRow, error: workErr } = await supabase
+        .from('long_form_works')
+        .insert({
+          user_id: userId,
+          title,
+          source_type: 'import',
+          raw_text: sourceText,
+          char_count: sourceChars,
+          part_count: 1, // Phase A: single-part works only
+        })
+        // No raw_text: the client just sent it; don't echo 10k chars back.
+        .select('id, user_id, title, source_type, origin_url, char_count, part_count, status, created_at')
+        .single();
+      if (workErr || !workRow) {
+        console.error('[process-article] Work insert error:', workErr);
+        return new Response(JSON.stringify({ error: workErr?.message ?? 'work insert failed' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      work = workRow;
+      finalArticleId = `lf-${workRow.id}-p1`;
+    }
+
+    const category = isImport ? 'インポート' : 'Recent News';
+    const content = {
+      id: finalArticleId,
+      title,
+      originalUrl: '',
+      blocks: processedBlocks,
+      date: new Date().toISOString(),
+      readTime: isImport ? `${Math.max(2, targetParagraphs)}分で読める` : '5分で読める',
+      category,
+      // Echoed into content so the Feed can badge full-text articles without
+      // a second query (cache hydration only selects id + content).
+      sourceKind,
+      sourceChars,
+      // Work grouping, echoed for the Reader/Library (part chrome, Phase B resume).
+      ...(work ? { workId: work.id, partIndex: 1, partCount: 1 } : {}),
+    };
+
     const { error: saveError } = await supabase
       .from('processed_news')
       .upsert({
@@ -830,22 +929,11 @@ Deno.serve(async (req) => {
         // full text vs a bare snippet" over time (see database/20_source_fullness.sql).
         source_kind: sourceKind,
         source_chars: sourceChars,
-        content: {
-          id: finalArticleId,
-          title,
-          originalUrl: '',
-          blocks: processedBlocks,
-          date: new Date().toISOString(),
-          readTime: '5分で読める',
-          category: 'Recent News',
-          // Echoed into content so the Feed can badge full-text articles without
-          // a second query (cache hydration only selects id + content).
-          sourceKind,
-          sourceChars,
-        },
+        ...(work ? { source_type: 'import', work_id: work.id, part_index: 1 } : {}),
+        content,
         metadata: {
           date: new Date().toISOString(),
-          category: 'Recent News',
+          category,
           // Queryable per-article cost telemetry (metadata is jsonb):
           //   select metadata->'usage' from processed_news order by created_at desc;
           usage: {
@@ -862,13 +950,21 @@ Deno.serve(async (req) => {
 
     if (saveError) {
       console.error('[process-article] Save error:', saveError);
+      // Don't strand a partless work: the Library would show it stuck "preparing"
+      // forever. Removing it lets the user simply re-import.
+      if (work) await supabase.from('long_form_works').delete().eq('id', work.id);
       return new Response(JSON.stringify({ error: saveError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`[process-article] ✅ Saved article ${finalArticleId}`);
-    return new Response(JSON.stringify({ success: true, articleId: finalArticleId, blocks: processedBlocks }), {
+    console.log(`[process-article] ✅ Saved ${isImport ? 'work part' : 'article'} ${finalArticleId}`);
+    return new Response(JSON.stringify({
+      success: true,
+      articleId: finalArticleId,
+      blocks: processedBlocks,
+      ...(work ? { work, article: content } : {}),
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
