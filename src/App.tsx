@@ -37,6 +37,9 @@ function App() {
   const [libraryView, setLibraryView] = useState<'list' | 'reading'>('list');
   const [activeWork, setActiveWork] = useState<LongFormWork | null>(null);
   const [activeWorkArticle, setActiveWorkArticle] = useState<NewsArticle | null>(null);
+  // Invisible resume (design §5): block index the Reader pre-scrolls to when
+  // reopening a work at its saved reading position.
+  const [workResumeBlock, setWorkResumeBlock] = useState(0);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
@@ -504,12 +507,23 @@ function App() {
   };
 
   // ── Library (書庫): long-form works, read in the same Reader ────────────────
-  const handleOpenWork = useCallback((work: LongFormWork, article: NewsArticle) => {
+  const handleOpenWork = useCallback((work: LongFormWork, article: NewsArticle, resumeBlockIndex = 0) => {
     // Cache first so the Reader's cache path opens it instantly (never re-processes).
     saveProcessedArticle(article.id, article);
     setActiveWork(work);
     setActiveWorkArticle(article);
+    setWorkResumeBlock(resumeBlockIndex);
     setLibraryView('reading');
+    setShowNav(true);
+    window.scrollTo(0, 0);
+  }, [saveProcessedArticle]);
+
+  // 続きを読む at a section break: swap the Reader (keyed by article id) to the
+  // next part, from the top — no resume offset on a fresh part.
+  const handleNextWorkPart = useCallback((article: NewsArticle) => {
+    saveProcessedArticle(article.id, article);
+    setActiveWorkArticle(article);
+    setWorkResumeBlock(0);
     setShowNav(true);
     window.scrollTo(0, 0);
   }, [saveProcessedArticle]);
@@ -706,7 +720,13 @@ function App() {
           libraryView === 'list' ? (
             <Library onOpenWork={handleOpenWork} />
           ) : (
-            <Reader key={activeWorkArticle?.id} initialArticle={activeWorkArticle} onComplete={handleFinishWork} />
+            <Reader
+              key={activeWorkArticle?.id}
+              initialArticle={activeWorkArticle}
+              onComplete={handleFinishWork}
+              onNextPart={handleNextWorkPart}
+              resumeBlockIndex={workResumeBlock}
+            />
           )
         )}
         {activeTab === 'flashcards' && <Flashcards onFocusChange={setStudyFocus} />}

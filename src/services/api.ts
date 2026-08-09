@@ -50,6 +50,22 @@ export interface NewsArticle {
   partCount?: number;
 }
 
+/** Where the reader left off in a work (design §5) — persisted to the work row
+ *  on scroll (debounced) so reopening pre-scrolls invisibly to the spot. */
+export interface WorkReadingPosition {
+  partIndex: number;
+  blockIndex: number;
+  /** Overall 0–1 progress through the whole work, for the Library's progress line. */
+  percent?: number;
+}
+
+/** One part's processing state, from its processed_news row. */
+export interface WorkPartState {
+  index: number;
+  articleId: string;
+  status: string; // ready | pending | failed | read | ...
+}
+
 /** A long-form work (imported text / magazine feature) — the Library's unit.
  *  Its parts are regular processed_news rows grouped by work_id. */
 export interface LongFormWork {
@@ -61,11 +77,17 @@ export interface LongFormWork {
   partCount: number;
   status: 'active' | 'finished' | 'archived';
   createdAt: string;
-  /** Part 1's processed_news row id, when it exists (Phase A: single-part works). */
+  readingPosition?: WorkReadingPosition | null;
+  /** Every existing part row for this work (parts not yet JIT-processed are absent). */
+  parts?: WorkPartState[];
+  /** Part 1's processed_news row id, when it exists. */
   partArticleId?: string;
   /** True when part 1 is processed and openable. */
   partReady?: boolean;
 }
+
+/** Deterministic part-row id — must mirror the edge function's partArticleId. */
+export const workPartArticleId = (workId: string, partIndex: number) => `lf-${workId}-p${partIndex}`;
 
 import { supabase } from './supabase'
 import { captureError } from './monitoring'
@@ -295,6 +317,7 @@ interface WorkRow {
   part_count?: number;
   status?: 'active' | 'finished' | 'archived';
   created_at: string;
+  reading_position?: WorkReadingPosition | null;
 }
 
 function rowToWork(row: WorkRow): LongFormWork {
@@ -307,6 +330,7 @@ function rowToWork(row: WorkRow): LongFormWork {
     partCount: row.part_count ?? 1,
     status: row.status ?? 'active',
     createdAt: row.created_at,
+    readingPosition: row.reading_position ?? null,
   };
 }
 
@@ -317,7 +341,7 @@ export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
   const [worksRes, partsRes] = await Promise.all([
     supabase
       .from('long_form_works')
-      .select('id, title, source_type, origin_url, char_count, part_count, status, created_at')
+      .select('id, title, source_type, origin_url, char_count, part_count, status, created_at, reading_position')
       .eq('user_id', userId)
       .neq('status', 'archived')
       .order('created_at', { ascending: false }),
@@ -333,31 +357,87 @@ export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
   }
   if (partsRes.error) console.warn('[api] fetchWorks part lookup failed:', partsRes.error);
 
-  const firstPartByWork = new Map<string, { id: string; status: string }>();
+  const partsByWork = new Map<string, WorkPartState[]>();
   (partsRes.data ?? []).forEach((p) => {
-    if (p.work_id && p.part_index === 1) firstPartByWork.set(p.work_id, { id: p.id, status: p.status });
+    if (!p.work_id || typeof p.part_index !== 'number') return;
+    const list = partsByWork.get(p.work_id) ?? [];
+    list.push({ index: p.part_index, articleId: p.id, status: p.status });
+    partsByWork.set(p.work_id, list);
   });
 
   return (worksRes.data ?? []).map((row) => {
-    const part = firstPartByWork.get(row.id);
+    const parts = (partsByWork.get(row.id) ?? []).sort((a, b) => a.index - b.index);
+    const first = parts.find((p) => p.index === 1);
     return {
       ...rowToWork(row),
-      partArticleId: part?.id,
+      parts,
+      partArticleId: first?.articleId,
       // A part row exists in any non-failed state ⇒ it has content and opens.
-      partReady: !!part && part.status !== 'failed' && part.status !== 'pending',
+      partReady: !!first && first.status !== 'failed' && first.status !== 'pending',
     };
   });
 }
 
-/** Import pasted text as a single-part work (Phase A BYOC). The server
- *  validates length (300–10,000 chars), enforces the daily import guard,
- *  processes part 1 through the standard personalization engine, and returns
- *  the created work plus the ready-to-read article. Slow (~10-25s): one full
- *  Gemini generation — same wait as tapping an unprepared feed card. */
+/** JIT-process (or fetch, if already generated) one later part of a work.
+ *  Slow on a cache miss (~10-30s, one Gemini generation); instant when the
+ *  part already exists server-side. Throws on failure — see partErrorKind. */
+export async function requestWorkPart(
+  userId: string,
+  workId: string,
+  partIndex: number,
+): Promise<NewsArticle> {
+  const res = await invokeEdgeFn<{ success: boolean; article: NewsArticle }>(
+    'process-article',
+    { userId, workId, partIndex },
+  );
+  if (!res?.article) throw new Error('Part processing returned no article');
+  return res.article;
+}
+
+/** True when a failed requestWorkPart just means another invocation is already
+ *  generating this part (HTTP 409) — the caller should poll, not error out. */
+export function isPartInProgressError(error: unknown): boolean {
+  const e = error as { status?: number; context?: { status?: number } } | null;
+  return (e?.status ?? e?.context?.status) === 409;
+}
+
+/** Persist where the reader is in a work (fire-and-forget, caller debounces). */
+export async function saveWorkReadingPosition(
+  workId: string,
+  userId: string,
+  position: WorkReadingPosition,
+): Promise<void> {
+  const { error } = await supabase
+    .from('long_form_works')
+    .update({ reading_position: position })
+    .eq('id', workId)
+    .eq('user_id', userId);
+  if (error) console.warn('[api] saveWorkReadingPosition failed:', error.message);
+}
+
+/** Import pasted text as a new work (BYOC). The server validates length
+ *  (300–40,000 chars), enforces the daily guards, chunks anything over ~10k
+ *  chars into parts, processes part 1 through the standard personalization
+ *  engine (later parts JIT while reading), and returns the created work plus
+ *  the ready-to-read part-1 article. Slow (~10-30s): one full Gemini
+ *  generation — same wait as tapping an unprepared feed card. */
 export async function importPastedText(userId: string, text: string): Promise<{ work: LongFormWork; article: NewsArticle }> {
+  return runImport(userId, { importText: text });
+}
+
+/** Import a URL as a new work: the server fetches the page's full text (Jina)
+ *  and then follows the exact paste path. */
+export async function importFromUrl(userId: string, url: string): Promise<{ work: LongFormWork; article: NewsArticle }> {
+  return runImport(userId, { importUrl: url });
+}
+
+async function runImport(
+  userId: string,
+  input: { importText?: string; importUrl?: string },
+): Promise<{ work: LongFormWork; article: NewsArticle }> {
   const res = await invokeEdgeFn<{ success: boolean; work: WorkRow; article: NewsArticle }>(
     'process-article',
-    { userId, importText: text },
+    { userId, ...input },
   );
   if (!res?.work || !res?.article) throw new Error('Import returned no work');
   return { work: rowToWork(res.work), article: res.article };
@@ -367,8 +447,9 @@ export async function importPastedText(userId: string, text: string): Promise<{ 
 export function importErrorMessage(error: unknown): string {
   const e = error as { status?: number; context?: { status?: number } } | null;
   const status = e?.status ?? e?.context?.status;
-  if (status === 429) return '本日のインポート上限（3件）に達しました。明日また試してください。';
-  if (status === 400) return 'テキストは300〜10,000字にしてください。';
+  if (status === 429) return '本日のインポート上限に達しました。明日また試してください。';
+  if (status === 422) return 'このURLからテキストを取得できませんでした。本文を貼り付けてみてください。';
+  if (status === 400) return 'テキストは300〜40,000字にしてください。';
   if (isServerBusyError(error)) return 'サーバーが混み合っています。少し待ってからもう一度試してください。';
   return 'インポートに失敗しました。もう一度試してください。';
 }

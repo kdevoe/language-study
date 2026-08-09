@@ -247,6 +247,11 @@ interface AppState {
   setTargetParagraphs: (kind: 'full' | 'partial' | 'snippet', value: number) => void;
   setFeedTopics: (topics: string[]) => void;
   setNewWordsPerDay: (n: number) => void;
+  /** #6 minimal slice (long-form design §7): when on, word-progress writes —
+   *  reader grades, lookups, flashcard reviews, manual sets — are skipped
+   *  entirely (local AND server), so testing doesn't pollute real SRS state. */
+  sandboxMode: boolean;
+  setSandboxMode: (on: boolean) => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
   setArticlesCache: (cache: Record<string, NewsArticle>) => void;
@@ -317,6 +322,7 @@ export const useAppStore = create<AppState>()(
       targetParagraphs: { full: 5, partial: 4, snippet: 3 },
       feedTopics: null,
       newWordsPerDay: 3,
+      sandboxMode: false,
       lastIntakePromotionTs: null,
       reviewsByDay: {},
       wordDatabase: {},
@@ -395,6 +401,8 @@ export const useAppStore = create<AppState>()(
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { new_words_per_day: v }));
         });
       },
+
+      setSandboxMode: (on) => set({ sandboxMode: on }),
 
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
@@ -494,8 +502,9 @@ export const useAppStore = create<AppState>()(
         }),
 
         
-      recordWordSeen: (word: string, withoutLookup = false) => 
+      recordWordSeen: (word: string, withoutLookup = false) =>
         set((state) => {
+          if (state.sandboxMode) return {}; // #6: sandbox skips word-progress writes
           const today = new Date().toISOString().split('T')[0];
           // A word first met while reading enters the intake queue (#68) as 'queued':
           // exposure is recorded here, but it waits for daily promotion before scheduling.
@@ -552,6 +561,7 @@ export const useAppStore = create<AppState>()(
       // signal). The user-facing bucket (mastery) is re-derived from difficulty.
       applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) =>
         set((state) => {
+          if (state.sandboxMode) return {}; // #6: sandbox skips word-progress writes
           const current = state.wordDatabase[word];
           if (!current) return {}; // word must be saved first
 
@@ -676,6 +686,7 @@ export const useAppStore = create<AppState>()(
       // prevents passive sees later that day from overriding the user's call.
       setWordMastery: (word: string, level: MasteryLevel) =>
         set((state) => {
+          if (state.sandboxMode) return {}; // #6: sandbox skips word-progress writes
           const current = state.wordDatabase[word] || { reading: '', meaning: '', mastery: 'unseen', timesSeen: 0, uniqueDaysSeen: [], lastSeenTs: 0, streak: 0, intakeStatus: 'queued' as const };
           const today = new Date().toISOString().split('T')[0];
           const now = Date.now();
@@ -772,6 +783,7 @@ export const useAppStore = create<AppState>()(
       //     exactly as if it had been graded med/hard from reading.
       gradeDiscoverWord: (candidate: IntakeCandidate, level: Exclude<MasteryLevel, 'unseen'>) =>
         set((state) => {
+          if (state.sandboxMode) return {}; // #6: sandbox skips word-progress writes
           const key = candidate.entryId;
           const now = Date.now();
           const today = new Date(now).toISOString().split('T')[0];
@@ -898,6 +910,7 @@ export const useAppStore = create<AppState>()(
       // 3=Good 4=Easy.
       reviewWord: (word: string, rating: Rating, now: number) =>
         set((state) => {
+          if (state.sandboxMode) return {}; // #6: sandbox skips word-progress writes
           const current = state.wordDatabase[word];
           if (!current) return {};
 
@@ -1789,6 +1802,9 @@ export const useAppStore = create<AppState>()(
         targetParagraphs: state.targetParagraphs,
         feedTopics: state.feedTopics,
         newWordsPerDay: state.newWordsPerDay,
+        // Persisted so a mid-test reload (PWA testing) doesn't silently drop the
+        // guard; the Settings toggle shows a clear warning while it's on.
+        sandboxMode: state.sandboxMode,
         lastIntakePromotionTs: state.lastIntakePromotionTs,
         reviewsByDay: state.reviewsByDay,
         wordDatabase: state.wordDatabase,

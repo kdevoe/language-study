@@ -38,6 +38,7 @@ export function Settings() {
     newWordsPerDay, setNewWordsPerDay,
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight,
+    sandboxMode, setSandboxMode,
     lastStudyPacingResetTs,
     lastFuriganaRealignTs
   } = useAppStore();
@@ -551,6 +552,58 @@ export function Settings() {
               </div>
             </>
           )}
+
+          {/* Sandbox Study Mode — the minimal slice of #6, required before
+              long-form Phase B testing (design §7): word-progress writes
+              (reader grades, lookups, flashcard reviews, manual sets) are
+              skipped local + server while it's on, so test reading never
+              pollutes real SRS state. Deliberately loud when enabled. */}
+          <div style={{ width: '40px', height: '2px', backgroundColor: 'var(--border-light)', margin: '2rem 0' }} />
+          <div style={{
+            marginBottom: '1.5rem',
+            padding: sandboxMode ? '1.2rem' : 0,
+            borderRadius: '12px',
+            border: sandboxMode ? '1px solid #b8860b55' : 'none',
+            backgroundColor: sandboxMode ? '#b8860b0d' : 'transparent',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: sandboxMode ? '#b8860b' : 'var(--text-main)' }}>
+                Sandbox Study Mode {sandboxMode && '— ON'}
+              </label>
+              <button
+                onClick={() => setSandboxMode(!sandboxMode)}
+                aria-label="Toggle sandbox study mode"
+                style={{
+                  width: '48px',
+                  height: '28px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: sandboxMode ? '#b8860b' : 'var(--border-light)',
+                  position: 'relative',
+                  transition: 'background-color 0.25s',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute',
+                  top: '3px',
+                  left: sandboxMode ? '23px' : '3px',
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--bg-pure)',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                  transition: 'left 0.25s',
+                }} />
+              </button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+              {sandboxMode
+                ? 'Nothing you read or grade is being recorded — word progress, lookups, and flashcard reviews are all skipped. Turn this off when you finish testing.'
+                : 'For testing: read and grade without recording anything to your word progress or SRS schedule.'}
+            </p>
+          </div>
 
           {/* 5. Danger Zone */}
           <div style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid #ff444433', backgroundColor: '#ff444408', marginTop: '4rem', marginBottom: '1.5rem' }}>
