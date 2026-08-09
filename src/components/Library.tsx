@@ -7,20 +7,27 @@ import {
   fetchProcessedArticleById,
   fetchWorks,
   importErrorMessage,
+  importFromUrl,
   importPastedText,
+  workPartArticleId,
 } from '../services/api';
 import { supabase } from '../services/supabase';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
-// Phase A input guards — mirrored server-side in process-article (the server is
+// Input guards — mirrored server-side in process-article (the server is
 // authoritative; these just keep the CTA honest before the round-trip).
 const IMPORT_MIN_CHARS = 300;
-const IMPORT_MAX_CHARS = 10_000;
+const IMPORT_MAX_CHARS = 40_000;
+const IMPORT_SOFT_WARN_CHARS = 20_000;
+// Mirrors the server's PART_TARGET_CHARS for the live part estimate.
+const PART_TARGET_CHARS = 10_000;
+const estimateParts = (chars: number) => Math.max(1, Math.ceil(chars / PART_TARGET_CHARS));
 
 interface Props {
-  /** Open a ready work in the Reader. The article is the processed part content. */
-  onOpenWork: (work: LongFormWork, article: NewsArticle) => void;
+  /** Open a ready work in the Reader. The article is the processed part content;
+   *  resumeBlockIndex pre-scrolls to the saved reading position (design §5). */
+  onOpenWork: (work: LongFormWork, article: NewsArticle, resumeBlockIndex?: number) => void;
 }
 
 async function resolveUserId(): Promise<string | null> {
@@ -48,7 +55,9 @@ export function Library({ onOpenWork }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [importTab, setImportTab] = useState<'paste' | 'url'>('paste');
   const [pasteText, setPasteText] = useState('');
+  const [urlText, setUrlText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +82,11 @@ export function Library({ onOpenWork }: Props) {
   useEffect(() => { loadWorks(); }, [loadWorks]);
 
   const chars = pasteText.trim().length;
-  const importable = chars >= IMPORT_MIN_CHARS && chars <= IMPORT_MAX_CHARS && !isImporting;
+  const trimmedUrl = urlText.trim();
+  const urlValid = /^https?:\/\/\S+$/i.test(trimmedUrl);
+  const importable = !isImporting && (importTab === 'paste'
+    ? chars >= IMPORT_MIN_CHARS && chars <= IMPORT_MAX_CHARS
+    : urlValid);
 
   const handleImport = async () => {
     if (!importable) return;
@@ -82,9 +95,12 @@ export function Library({ onOpenWork }: Props) {
     setIsImporting(true);
     setSheetOpen(false); // the placeholder card below shows progress
     try {
-      const { work, article } = await importPastedText(userId, pasteText.trim());
+      const { work, article } = importTab === 'paste'
+        ? await importPastedText(userId, pasteText.trim())
+        : await importFromUrl(userId, trimmedUrl);
       if (!mountedRef.current) return; // finished server-side; next visit shows it READY
       setPasteText('');
+      setUrlText('');
       setWorks(prev => [{ ...work, partArticleId: article.id, partReady: true }, ...prev]);
       // The CTA is インポートして読む — the user has been watching this prepare,
       // so take them straight into the Reader.
@@ -93,7 +109,7 @@ export function Library({ onOpenWork }: Props) {
       console.error('[library] import failed:', e);
       if (!mountedRef.current) return;
       setError(importErrorMessage(e));
-      setSheetOpen(true); // the paste text is preserved — let them retry
+      setSheetOpen(true); // the input is preserved — let them retry
     } finally {
       if (mountedRef.current) setIsImporting(false);
     }
@@ -105,9 +121,22 @@ export function Library({ onOpenWork }: Props) {
     if (!userId) { setError('サインインが必要です。'); return; }
     setOpeningId(work.id);
     try {
-      const article = await fetchProcessedArticleById(work.partArticleId, userId);
+      // Resume at the saved position's part when that part is processed
+      // (design §5: tapping a card resumes where the reader left off).
+      const pos = work.readingPosition;
+      const resumable = !!pos
+        && pos.partIndex > 1
+        && pos.partIndex <= work.partCount
+        && (work.parts ?? []).some(p => p.index === pos.partIndex && p.status !== 'failed' && p.status !== 'pending');
+      const targetIndex = resumable ? pos!.partIndex : 1;
+      const targetId = targetIndex === 1 ? work.partArticleId : workPartArticleId(work.id, targetIndex);
+      let article = await fetchProcessedArticleById(targetId, userId);
+      if (!article && targetIndex !== 1) {
+        article = await fetchProcessedArticleById(work.partArticleId, userId);
+      }
       if (!article) { setError('この作品を読み込めませんでした。'); return; }
-      onOpenWork(work, article);
+      const resumeBlock = pos && article.partIndex === pos.partIndex ? (pos.blockIndex ?? 0) : 0;
+      onOpenWork(work, article, resumeBlock);
     } finally {
       if (mountedRef.current) setOpeningId(null);
     }
@@ -266,7 +295,9 @@ export function Library({ onOpenWork }: Props) {
                   </span>
                 </div>
                 <h3 className="serif" style={{ fontSize: '1.35rem', lineHeight: 1.45, color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: '92%' }}>
-                  {pasteText.trim().split('\n').find(l => l.trim())?.slice(0, 60) || 'インポート'}
+                  {importTab === 'url'
+                    ? (trimmedUrl.replace(/^https?:\/\//i, '').split('/')[0] || 'インポート')
+                    : (pasteText.trim().split('\n').find(l => l.trim())?.slice(0, 60) || 'インポート')}
                 </h3>
                 <div style={{ fontSize: '0.75rem', color: '#4a5d23', fontWeight: 600 }}>
                   あなたのレベルに合わせて書き直しています…
@@ -318,6 +349,10 @@ export function Library({ onOpenWork }: Props) {
                         <CheckCircle2 size={16} strokeWidth={2.5} />
                         <span className="serif" style={{ fontSize: '0.8rem' }}>完了</span>
                       </span>
+                    ) : work.partReady && work.partCount > 1 && work.readingPosition ? (
+                      <span className="serif" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a5d23', letterSpacing: '0.05em' }}>
+                        第{Math.min(work.readingPosition.partIndex, work.partCount)}部・全{work.partCount}部
+                      </span>
                     ) : work.partReady ? (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: '#4a5d23', letterSpacing: '0.05em' }}>
                         <CheckCircle2 size={16} strokeWidth={2.5} />
@@ -341,6 +376,20 @@ export function Library({ onOpenWork }: Props) {
                     <span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>
                     {relativeDate(work.createdAt)}
                   </div>
+
+                  {/* In-progress works carry a thin progress line along the
+                      card's bottom edge (design §6). */}
+                  {!finished && (work.readingPosition?.percent ?? 0) > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      height: '3px',
+                      width: `${Math.min(100, Math.round((work.readingPosition!.percent ?? 0) * 100))}%`,
+                      backgroundColor: '#4a5d23',
+                      opacity: 0.45,
+                    }} />
+                  )}
                 </motion.div>
               );
             })}
@@ -381,39 +430,104 @@ export function Library({ onOpenWork }: Props) {
               }}
             >
               <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: 'var(--border-light)', margin: '0 auto 1.2rem' }} />
-              <h2 className="serif" style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-main)' }}>
+              <h2 className="serif" style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '0.9rem', color: 'var(--text-main)' }}>
                 コンテンツを追加
               </h2>
-              <textarea
-                value={pasteText}
-                onChange={e => setPasteText(e.target.value)}
-                placeholder="ブログ記事、メール、歌詞、本の一節… 英語のテキストを貼り付けてください。"
-                style={{
-                  width: '100%',
-                  height: '130px',
-                  resize: 'none',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '0.85rem',
-                  backgroundColor: 'var(--bg-pure)',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '16px',
-                  padding: '0.9rem 1rem',
-                  color: 'var(--text-main)',
-                  outline: 'none',
-                  lineHeight: 1.6,
-                }}
-              />
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.8rem 0.2rem 0.2rem', lineHeight: 1.6 }}>
-                {chars === 0 ? (
-                  <>最大{IMPORT_MAX_CHARS.toLocaleString()}字までインポートできます。</>
-                ) : chars < IMPORT_MIN_CHARS ? (
-                  <>{chars}字 — 短すぎます（{IMPORT_MIN_CHARS}字以上）。</>
-                ) : chars > IMPORT_MAX_CHARS ? (
-                  <>約{chars.toLocaleString()}字 — 現在は{IMPORT_MAX_CHARS.toLocaleString()}字までです。</>
-                ) : (
-                  <>約{chars.toLocaleString()}字 → <b style={{ color: '#4a5d23' }}>全1部</b>。あなたのレベルに合わせた日本語で、すぐに準備されます。</>
-                )}
+
+              {/* Paste / URL tabs (design §6: the import sheet's two paths). */}
+              <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '0.9rem' }}>
+                {([['paste', '貼り付け'], ['url', 'URL']] as const).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    onClick={() => setImportTab(tab)}
+                    style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      cursor: 'pointer',
+                      padding: '0.42rem 1rem',
+                      borderRadius: '100px',
+                      border: importTab === tab ? '1px solid var(--text-main)' : '1px solid var(--border-light)',
+                      backgroundColor: importTab === tab ? 'var(--text-main)' : 'transparent',
+                      color: importTab === tab ? 'var(--bg-pure)' : 'var(--text-muted)',
+                      fontFamily: 'var(--font-sans)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
+
+              {importTab === 'paste' ? (
+                <>
+                  <textarea
+                    value={pasteText}
+                    onChange={e => setPasteText(e.target.value)}
+                    placeholder="ブログ記事、メール、歌詞、本の一節… 英語のテキストを貼り付けてください。"
+                    style={{
+                      width: '100%',
+                      height: '130px',
+                      resize: 'none',
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '0.85rem',
+                      backgroundColor: 'var(--bg-pure)',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: '16px',
+                      padding: '0.9rem 1rem',
+                      color: 'var(--text-main)',
+                      outline: 'none',
+                      lineHeight: 1.6,
+                    }}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.8rem 0.2rem 0.2rem', lineHeight: 1.6 }}>
+                    {chars === 0 ? (
+                      <>最大{IMPORT_MAX_CHARS.toLocaleString()}字までインポートできます。長いテキストは約{PART_TARGET_CHARS.toLocaleString()}字ごとの部に分かれます。</>
+                    ) : chars < IMPORT_MIN_CHARS ? (
+                      <>{chars}字 — 短すぎます（{IMPORT_MIN_CHARS}字以上）。</>
+                    ) : chars > IMPORT_MAX_CHARS ? (
+                      <>約{chars.toLocaleString()}字 — {IMPORT_MAX_CHARS.toLocaleString()}字までです。</>
+                    ) : (
+                      <>
+                        約{chars.toLocaleString()}字 → <b style={{ color: '#4a5d23' }}>全{estimateParts(chars)}部</b>。
+                        {estimateParts(chars) > 1
+                          ? '第1部はすぐに準備され、続きは読みながら準備されます。'
+                          : 'あなたのレベルに合わせた日本語で、すぐに準備されます。'}
+                        {chars >= IMPORT_SOFT_WARN_CHARS && <>{' '}長めのテキストです — 数日に分けて読むのがおすすめです。</>}
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="url"
+                    value={urlText}
+                    onChange={e => setUrlText(e.target.value)}
+                    placeholder="https://example.com/article"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{
+                      width: '100%',
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '0.85rem',
+                      backgroundColor: 'var(--bg-pure)',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: '16px',
+                      padding: '0.9rem 1rem',
+                      color: 'var(--text-main)',
+                      outline: 'none',
+                      lineHeight: 1.6,
+                    }}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.8rem 0.2rem 0.2rem', lineHeight: 1.6 }}>
+                    {trimmedUrl.length > 0 && !urlValid
+                      ? <>URLの形式が正しくありません（https://…）。</>
+                      : <>記事やブログのURLから本文を取り込みます。取り込めないページもあります — その場合は本文を貼り付けてください。</>}
+                  </div>
+                </>
+              )}
               <button
                 onClick={handleImport}
                 disabled={!importable}

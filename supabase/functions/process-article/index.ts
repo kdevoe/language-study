@@ -145,14 +145,30 @@ const TOTAL_SOURCE_CHAR_CAP = 7000;
 
 interface SourceRef { title?: string; url?: string; teaser?: string }
 
-// ── Long-form import (docs/long-form-content-design.md, Phase A) ─────────────
-// A pasted text becomes a WORK (long_form_works row) whose parts are regular
-// processed_news rows. Phase A ships single-part works only: anything at or
-// under IMPORT_MAX_CHARS is one part, no chunking. The personalization engine
-// below is shared unchanged — an import is just a different input path.
-const IMPORT_MIN_CHARS = 300;    // under this it's a dictionary lookup, not an article
-const IMPORT_MAX_CHARS = 10_000; // Phase A single-part cap (chunking lands in Phase B)
-const IMPORT_DAILY_CAP = 3;      // imports per user per rolling 24h (design §7)
+// ── Long-form import (docs/long-form-content-design.md, Phases A+B) ──────────
+// A pasted text or URL becomes a WORK (long_form_works row) whose parts are
+// regular processed_news rows. Phase B: the source is chunked at paragraph
+// boundaries into parts of up to ~10k chars (§3); part 1 is processed eagerly
+// on import, later parts JIT via { workId, partIndex } while the user reads.
+// The personalization engine below is shared unchanged — long-form is a
+// different input path plus a fidelity-leaning prompt variant (rewritePrompt's
+// `longform`), not an engine change.
+const IMPORT_MIN_CHARS = 300;     // under this it's a dictionary lookup, not an article
+const IMPORT_MAX_CHARS = 40_000;  // hard cap per import (~4 parts, design §2)
+const IMPORT_DAILY_CAP = 3;       // imports per user per rolling 24h (design §7)
+const PARTS_DAILY_CAP = 15;       // part generations per user per rolling 24h (design §7)
+// Parts target 8–10k source chars (§3) — deliberately above the news path's
+// TOTAL_SOURCE_CHAR_CAP: long parts keep section breaks rare. Balanced split:
+// ceil(total/10k) parts of ~equal size, so a 12k import is 2×6k, not 10k+2k.
+const PART_TARGET_CHARS = 10_000;
+// Long-form output length: ~1 paragraph per ~900 source chars (a full 8–10k
+// part ≈ the design's "about 10 output paragraphs"), clamped so a short import
+// isn't padded and a max part doesn't run away.
+const LONGFORM_CHARS_PER_PARAGRAPH = 900;
+const LONGFORM_MIN_PARAGRAPHS = 3;
+const LONGFORM_MAX_PARAGRAPHS = 12;
+const IMPORT_URL_TIMEOUT_MS = 12_000; // user is actively waiting (vs 8s opportunistic news extraction)
+const PART_PENDING_FRESH_MS = 5 * 60_000; // younger pending part = a generation is in flight
 
 /** Work title for a pasted import: caller-provided, else the first non-empty
  *  line of the text (blog posts usually open with their title). */
@@ -161,6 +177,132 @@ function deriveImportTitle(text: string, provided?: string): string {
   if (fromCaller) return fromCaller.slice(0, 120);
   const firstLine = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? 'Imported text';
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine;
+}
+
+/** Deterministic part id: JIT re-derivation, the client, and the import path
+ *  must all agree on it (the client constructs it to resume mid-work). */
+const partArticleId = (workId: string, partIndex: number) => `lf-${workId}-p${partIndex}`;
+
+/** A short line without terminal punctuation reads as a heading — a natural
+ *  place to start a part when one falls near a target boundary. */
+function looksLikeHeading(p: string): boolean {
+  const line = p.trim();
+  if (line.length === 0 || line.length > 80) return false;
+  if (/^#{1,6}\s/.test(line)) return true;
+  return !/[.。!?！？:：,、;]$/.test(line) && !line.includes('\n');
+}
+
+/** Last resort for a single paragraph bigger than a whole part (pasted text
+ *  with its line breaks stripped): split at sentence boundaries. */
+function splitAtSentences(p: string): string[] {
+  const sentences = p.split(/(?<=[.!?。！？])\s+/);
+  const out: string[] = [];
+  let cur = '';
+  for (const s of sentences) {
+    if (cur && cur.length + s.length + 1 > PART_TARGET_CHARS) { out.push(cur); cur = ''; }
+    cur = cur ? `${cur} ${s}` : s;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/**
+ * Split a raw source into part chunks (design §3). Deterministic string work —
+ * the SAME function runs at import time (to fix part_count) and at JIT time
+ * (re-chunking raw_text), so boundaries always agree. Splits only at paragraph
+ * boundaries, preferring headings when one falls near a boundary; balanced so
+ * every part lands near total/ceil(total/10k) chars instead of leaving a stub
+ * tail part.
+ */
+function chunkSourceText(text: string): string[] {
+  if (text.length <= PART_TARGET_CHARS) return [text];
+  // Paragraph units: blank-line separated; fall back to single newlines when
+  // the paste carries none (e.g. copied from a reader view).
+  let paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (paras.length <= 1) paras = text.split(/\n/).map((p) => p.trim()).filter(Boolean);
+  paras = paras.flatMap((p) => (p.length > PART_TARGET_CHARS ? splitAtSentences(p) : [p]));
+
+  const numParts = Math.min(Math.ceil(text.length / PART_TARGET_CHARS), paras.length);
+  const target = text.length / numParts;
+  const parts: string[] = [];
+  let current: string[] = [];
+  let len = 0;
+  for (let i = 0; i < paras.length; i++) {
+    current.push(paras[i]);
+    len += paras[i].length;
+    if (parts.length >= numParts - 1) continue; // final part takes the remainder
+    const next = paras[i + 1];
+    if (len >= target || (next !== undefined && len >= target * 0.8 && looksLikeHeading(next))) {
+      parts.push(current.join('\n\n'));
+      current = [];
+      len = 0;
+    }
+  }
+  if (current.length > 0) parts.push(current.join('\n\n'));
+  return parts;
+}
+
+/** Fetch an import URL's full text via Jina Reader, keeping the page title the
+ *  header carries (separate from the news path's extractFullText: longer
+ *  timeout — the user is actively waiting — and the title matters here). */
+async function extractImportUrl(url: string, jinaKey: string | undefined): Promise<{ text: string; title: string }> {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), IMPORT_URL_TIMEOUT_MS);
+  try {
+    const headers: Record<string, string> = { 'User-Agent': 'YugenStudy/1.0', 'Accept': 'text/plain' };
+    if (jinaKey) headers['Authorization'] = `Bearer ${jinaKey}`;
+    const res = await fetch(JINA_READER_URL + url, { headers, signal: ctrl.signal });
+    if (!res.ok) return { text: '', title: '' };
+    const raw = await res.text();
+    const title = raw.match(/^Title:\s*(.+)$/m)?.[1]?.trim() ?? '';
+    const text = (raw.split(/Markdown Content:\s*/i).pop() || raw).trim();
+    return { text, title };
+  } catch {
+    return { text: '', title: '' };
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+// ── Continuity across parts (design §4) ──────────────────────────────────────
+// Independently-generated parts drift (a name rendered three ways, tone
+// shifting). Each work carries a rolling `continuity` object; at JIT time the
+// PREVIOUS part's generated Japanese is distilled into it, and the result is
+// injected into this part's prompt (rewritePrompt `longform.continuity`).
+interface Continuity {
+  summaryJa?: string;
+  properNouns?: Record<string, string>;
+  styleNote?: string;
+}
+
+async function extractContinuity(
+  ai: GoogleGenAI, prevPartText: string, existing: Continuity,
+): Promise<Continuity | null> {
+  const prompt = `You maintain continuity for a serialized Japanese adaptation of an English work. Below is the Japanese text of the part the reader just finished, plus the proper-noun map accumulated so far. Return ONLY JSON of this exact shape:
+{"summary_ja":"前の部の内容の2〜3文の日本語要約","proper_nouns":{"English name":"日本語表記"},"style_note":"one short line: register/tone (e.g. です/ます調、エッセイ調)"}
+
+Rules: summary_ja summarizes THIS part (it opens the next part's context). proper_nouns = the accumulated map below MERGED with any new people/organizations/places in this part, using exactly the renderings this part used. Keep it under 15 entries (drop the least important).
+
+ACCUMULATED PROPER NOUNS: ${JSON.stringify(existing.properNouns ?? {})}
+
+PREVIOUS PART (Japanese):
+${prevPartText.slice(0, 8000)}`;
+  try {
+    const result = await ai.models.generateContent({
+      model: GEMINI_FLASH,
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const parsed = JSON.parse((result.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim());
+    return {
+      summaryJa: typeof parsed.summary_ja === 'string' ? parsed.summary_ja : undefined,
+      properNouns: parsed.proper_nouns && typeof parsed.proper_nouns === 'object' ? parsed.proper_nouns : undefined,
+      styleNote: typeof parsed.style_note === 'string' ? parsed.style_note : undefined,
+    };
+  } catch (e) {
+    console.warn('[process-article] continuity extraction failed (continuing without):', e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 // ── Source fullness classification ──────────────────────────────────────────
@@ -392,17 +534,27 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Set by the JIT-part path so the outer catch can flip its claimed `pending`
+  // part row to `failed` (freeing the retry affordance) on any thrown error.
+  let failClaim: (() => Promise<unknown>) | null = null;
+
   try {
     const body = await req.json();
     const { userId, articleId, snippet, sources } = body;
     let title: string = body.title;
-    // Import mode (Phase A BYOC): a pasted text arrives as `importText` and is
-    // processed through the same engine, then saved as a single-part work.
-    const importText: string = typeof body.importText === 'string'
+    // Import mode (BYOC): a pasted text arrives as `importText` (a URL as
+    // `importUrl`) and becomes a new work; part 1 processes eagerly.
+    let importText: string = typeof body.importText === 'string'
       ? body.importText.replace(/\r\n?/g, '\n').trim()
       : '';
-    const isImport = importText.length > 0;
-    if (!userId || (!isImport && (!title || !(snippet || (Array.isArray(sources) && sources.length))))) {
+    const importUrl: string = typeof body.importUrl === 'string' ? body.importUrl.trim() : '';
+    // JIT part mode (Phase B §3): { workId, partIndex } processes one later
+    // part of an existing work while the user reads the previous one.
+    const jitWorkId: string = typeof body.workId === 'string' ? body.workId : '';
+    const jitPartIndex: number = Number.isInteger(body.partIndex) ? body.partIndex : 0;
+    const isPartJit = jitWorkId.length > 0 && jitPartIndex > 0;
+    const isImport = importText.length > 0 || importUrl.length > 0;
+    if (!userId || (!isImport && !isPartJit && (!title || !(snippet || (Array.isArray(sources) && sources.length))))) {
       return new Response(JSON.stringify({ error: 'userId, title, and snippet or sources are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -415,42 +567,167 @@ Deno.serve(async (req) => {
     const jinaKey = Deno.env.get('JINA_API_KEY'); // optional — lifts extraction hit rate
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    // Hoisted (was created at the prompt step): the JIT-part path also needs
+    // Gemini for continuity extraction before the main rewrite.
+    const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
 
-    if (isImport) {
-      // Input guards (design §2): too short is a dictionary lookup, not an
-      // article; over the Phase A cap needs chunking, which doesn't exist yet.
-      if (importText.length < IMPORT_MIN_CHARS || importText.length > IMPORT_MAX_CHARS) {
-        return new Response(JSON.stringify({
-          error: importText.length < IMPORT_MIN_CHARS
-            ? `Import must be at least ${IMPORT_MIN_CHARS} characters`
-            : `Import is capped at ${IMPORT_MAX_CHARS.toLocaleString()} characters for now`,
-          errorKind: 'import_invalid',
-        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      // Server-side daily guard (design §7): rolling 24h, counted on the works
-      // table so it's independent of the news buffer's cap.
-      const dayCutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const { count: imports24h } = await supabase
-        .from('long_form_works')
+    const jsonError = (status: number, error: string, errorKind: string) =>
+      new Response(JSON.stringify({ error, errorKind }), {
+        status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
+    // ── Long-form state, resolved by the import / JIT branches below ─────────
+    let partIndexNum = 1;
+    let partCountNum = 1;
+    let importChunks: string[] | null = null;
+    let continuity: Continuity | undefined;
+    // The work a JIT part belongs to (raw_text stripped — never echo 40k back).
+    let jitWork: { id: string; title: string; source_type: string } | null = null;
+
+    const dayCutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
+    // Parts guard (design §7): every part generation in the rolling 24h —
+    // import part 1s and JIT parts alike — regardless of final status.
+    const countParts24h = async (): Promise<number> => {
+      const { count } = await supabase
+        .from('processed_news')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .not('work_id', 'is', null)
         .gt('created_at', dayCutoff);
-      if ((imports24h ?? 0) >= IMPORT_DAILY_CAP) {
-        return new Response(JSON.stringify({
-          error: `Daily import limit reached (${IMPORT_DAILY_CAP}/day). Try again tomorrow.`,
-          errorKind: 'import_limit',
-        }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return count ?? 0;
+    };
+
+    if (isImport) {
+      // URL import (Phase B §2): the existing Jina path fetches the page text,
+      // then everything below treats it exactly like a paste.
+      if (!importText && importUrl) {
+        if (!/^https?:\/\/\S+$/i.test(importUrl)) {
+          return jsonError(400, 'importUrl must be an http(s) URL', 'import_invalid');
+        }
+        const fetched = await extractImportUrl(importUrl, jinaKey);
+        importText = fetched.text.replace(/\r\n?/g, '\n').trim();
+        if ((!title || !String(title).trim()) && fetched.title) title = fetched.title;
+        // A page's length isn't the user's choice — truncate an over-cap page
+        // at a paragraph boundary instead of rejecting it.
+        if (importText.length > IMPORT_MAX_CHARS) {
+          const cut = importText.lastIndexOf('\n', IMPORT_MAX_CHARS);
+          importText = importText.slice(0, cut > IMPORT_MAX_CHARS / 2 ? cut : IMPORT_MAX_CHARS).trim();
+        }
+        if (importText.length < IMPORT_MIN_CHARS) {
+          return jsonError(422, 'Could not extract a readable article from that URL', 'import_fetch_failed');
+        }
+      }
+      // Input guards (design §2): too short is a dictionary lookup, not an
+      // article; the hard cap bounds a max import at ~4 parts.
+      if (importText.length < IMPORT_MIN_CHARS || importText.length > IMPORT_MAX_CHARS) {
+        return jsonError(400,
+          importText.length < IMPORT_MIN_CHARS
+            ? `Import must be at least ${IMPORT_MIN_CHARS} characters`
+            : `Import is capped at ${IMPORT_MAX_CHARS.toLocaleString()} characters`,
+          'import_invalid');
+      }
+      // Server-side daily guards (design §7): imports counted on the works
+      // table, parts on processed_news — both independent of the news buffer.
+      const [{ count: imports24h }, parts24h] = await Promise.all([
+        supabase
+          .from('long_form_works')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gt('created_at', dayCutoff),
+        countParts24h(),
+      ]);
+      if ((imports24h ?? 0) >= IMPORT_DAILY_CAP || parts24h >= PARTS_DAILY_CAP) {
+        return jsonError(429, `Daily import limit reached (${IMPORT_DAILY_CAP}/day). Try again tomorrow.`, 'import_limit');
       }
       title = deriveImportTitle(importText, title);
+      importChunks = chunkSourceText(importText);
+      partCountNum = importChunks.length;
     }
+
+    if (isPartJit) {
+      const { data: workRow } = await supabase
+        .from('long_form_works')
+        .select('id, title, source_type, raw_text, part_count, continuity')
+        .eq('id', jitWorkId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!workRow) return jsonError(404, 'Work not found', 'work_not_found');
+      // Re-chunk raw_text — chunkSourceText is deterministic, so boundaries
+      // match the ones part_count was computed from at import time.
+      const chunks = chunkSourceText(workRow.raw_text ?? '');
+      if (jitPartIndex < 2 || jitPartIndex > chunks.length) {
+        return jsonError(400, `partIndex must be 2–${chunks.length} for this work`, 'part_out_of_range');
+      }
+      const partId = partArticleId(workRow.id, jitPartIndex);
+      const { data: existing } = await supabase
+        .from('processed_news')
+        .select('status, content, created_at')
+        .eq('user_id', userId)
+        .eq('id', partId)
+        .maybeSingle();
+      // Idempotent: an already-generated part returns instantly (the JIT
+      // trigger and an explicit 続きを読む tap can race harmlessly).
+      if (existing?.status === 'ready' && existing.content) {
+        const content = existing.content as { blocks: unknown };
+        return new Response(JSON.stringify({ success: true, articleId: partId, blocks: content.blocks, article: content, cached: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // A fresh pending row means another invocation is mid-generation; a stale
+      // one (producer died) falls through and regenerates.
+      if (existing?.status === 'pending'
+        && Date.now() - new Date(existing.created_at).getTime() < PART_PENDING_FRESH_MS) {
+        return jsonError(409, 'This part is already being prepared', 'part_in_progress');
+      }
+      if (await countParts24h() >= PARTS_DAILY_CAP) {
+        return jsonError(429, `Daily part limit reached (${PARTS_DAILY_CAP}/day). Try again tomorrow.`, 'import_limit');
+      }
+      // Claim the slot (mirrors the news buffer's pending model) so the Library
+      // shows 準備中 and duplicate triggers back off via the check above.
+      await supabase.from('processed_news').upsert({
+        id: partId,
+        user_id: userId,
+        title: workRow.title,
+        status: 'pending',
+        source_type: workRow.source_type,
+        work_id: workRow.id,
+        part_index: jitPartIndex,
+      }, { onConflict: 'user_id,id' });
+      failClaim = () => supabase.from('processed_news')
+        .update({ status: 'failed' }).eq('user_id', userId).eq('id', partId);
+
+      jitWork = { id: workRow.id, title: workRow.title, source_type: workRow.source_type };
+      title = workRow.title;
+      partIndexNum = jitPartIndex;
+      partCountNum = chunks.length;
+      importChunks = chunks;
+
+      // Continuity (§4): distill the PREVIOUS part's generated Japanese into
+      // the rolling continuity object (stored camelCase on the work row), and
+      // inject it into this part's prompt. Failure degrades to the stored one.
+      const stored: Continuity = (workRow.continuity ?? {}) as Continuity;
+      const { data: prevRow } = await supabase
+        .from('processed_news')
+        .select('content')
+        .eq('user_id', userId)
+        .eq('id', partArticleId(workRow.id, jitPartIndex - 1))
+        .maybeSingle();
+      const prevText = (((prevRow?.content as { blocks?: { type: string; text?: string }[] })?.blocks) ?? [])
+        .filter((b) => b.type === 'paragraph' && typeof b.text === 'string')
+        .map((b) => b.text)
+        .join('\n');
+      continuity = (prevText ? await extractContinuity(ai, prevText, stored) : null) ?? stored;
+    }
+
+    const isLongform = isImport || isPartJit;
 
     // Opportunistically upgrade thin teasers to full article text. Falls back
     // to the merged teaser block (snippet) when no sources / extraction fails.
-    // Import mode: the pasted text IS the source — a real full body, no extraction.
-    let sourceText = isImport ? importText : (snippet ?? '');
+    // Long-form mode: this part's source chunk IS the source — a real full body.
+    let sourceText = isLongform ? importChunks![partIndexNum - 1] : (snippet ?? '');
     let sourceChars = sourceText.length;
-    let fullBody = isImport;
-    if (!isImport && Array.isArray(sources) && sources.length > 0) {
+    let fullBody = isLongform;
+    if (!isLongform && Array.isArray(sources) && sources.length > 0) {
       try {
         const built = await buildSourceBlock(sources as SourceRef[], jinaKey);
         if (built.text) {
@@ -486,7 +763,12 @@ Deno.serve(async (req) => {
       partial: prefs?.target_paragraphs_partial ?? DEFAULT_TARGET_PARAGRAPHS.partial,
       snippet: prefs?.target_paragraphs_snippet ?? DEFAULT_TARGET_PARAGRAPHS.snippet,
     };
-    const targetParagraphs = Math.max(1, Math.round(paragraphPref[sourceKind]));
+    // Long-form parts scale output with the chunk (§3's "about 10 paragraphs"
+    // for a full 8–10k part) instead of the news-length preference — the whole
+    // point of the fidelity variant is that a part reads long.
+    const targetParagraphs = isLongform
+      ? Math.max(LONGFORM_MIN_PARAGRAPHS, Math.min(LONGFORM_MAX_PARAGRAPHS, Math.round(sourceChars / LONGFORM_CHARS_PER_PARAGRAPH)))
+      : Math.max(1, Math.round(paragraphPref[sourceKind]));
 
     // Scale the vocab budget with length so review/new density stays constant.
     const wordsBudget = WORDS_PER_PARAGRAPH * targetParagraphs;
@@ -823,7 +1105,7 @@ Deno.serve(async (req) => {
     // 3. Build the Pass-1 rewrite prompt via the shared builder
     //    (../_shared/rewritePrompt.ts) so the offline eval harness
     //    (scripts/eval-article-rewrite.mjs) tests the exact prompt we ship (#65).
-    const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
+    // (Gemini client `ai` was created above, before the JIT continuity step.)
 
     // Pass 1: Rewrite article
     const prompt1 = buildRewritePrompt({
@@ -844,6 +1126,11 @@ Deno.serve(async (req) => {
       clusters,
       // Review words ride the lexicon block: the (katakana-filtered) pre-due floor.
       lexicon: lexicon ? { words: lexicon.words, reviewWords: reviewPalette } : undefined,
+      // Long-form (§3–4): fidelity-leaning adapt-don't-summarize variant, with
+      // continuity injected for parts after the first.
+      longform: isLongform
+        ? { partIndex: partIndexNum, partCount: partCountNum, continuity }
+        : undefined,
     });
 
     console.log(`[process-article] Pass 1 for user ${userId}`);
@@ -871,6 +1158,7 @@ Deno.serve(async (req) => {
     // 4. Save. Import mode first creates the work row (generation succeeded, so
     // no orphan works from failed imports), then saves part 1 as a regular
     // processed_news row grouped under it — a part IS an article (design §1).
+    // JIT mode already claimed its part row; the upsert below flips it ready.
     let work: { id: string } | null = null;
     let finalArticleId = articleId || `${Date.now()}-${userId.slice(0, 8)}`;
     if (isImport) {
@@ -880,11 +1168,13 @@ Deno.serve(async (req) => {
           user_id: userId,
           title,
           source_type: 'import',
-          raw_text: sourceText,
-          char_count: sourceChars,
-          part_count: 1, // Phase A: single-part works only
+          origin_url: importUrl || null,
+          // The FULL unchunked original — JIT part processing re-chunks it.
+          raw_text: importText,
+          char_count: importText.length,
+          part_count: partCountNum,
         })
-        // No raw_text: the client just sent it; don't echo 10k chars back.
+        // No raw_text in the echo: don't send up to 40k chars back down.
         .select('id, user_id, title, source_type, origin_url, char_count, part_count, status, created_at')
         .single();
       if (workErr || !workRow) {
@@ -894,24 +1184,28 @@ Deno.serve(async (req) => {
         });
       }
       work = workRow;
-      finalArticleId = `lf-${workRow.id}-p1`;
+      finalArticleId = partArticleId(workRow.id, 1);
     }
+    if (isPartJit && jitWork) finalArticleId = partArticleId(jitWork.id, partIndexNum);
 
-    const category = isImport ? 'インポート' : 'Recent News';
+    const workRef = work ?? jitWork;
+    const category = isLongform
+      ? (jitWork?.source_type === 'magazine' ? '雑誌' : 'インポート')
+      : 'Recent News';
     const content = {
       id: finalArticleId,
       title,
       originalUrl: '',
       blocks: processedBlocks,
       date: new Date().toISOString(),
-      readTime: isImport ? `${Math.max(2, targetParagraphs)}分で読める` : '5分で読める',
+      readTime: isLongform ? `${Math.max(2, targetParagraphs)}分で読める` : '5分で読める',
       category,
       // Echoed into content so the Feed can badge full-text articles without
       // a second query (cache hydration only selects id + content).
       sourceKind,
       sourceChars,
-      // Work grouping, echoed for the Reader/Library (part chrome, Phase B resume).
-      ...(work ? { workId: work.id, partIndex: 1, partCount: 1 } : {}),
+      // Work grouping, echoed for the Reader/Library (part chrome, resume).
+      ...(workRef ? { workId: workRef.id, partIndex: partIndexNum, partCount: partCountNum } : {}),
     };
 
     const { error: saveError } = await supabase
@@ -929,7 +1223,7 @@ Deno.serve(async (req) => {
         // full text vs a bare snippet" over time (see database/20_source_fullness.sql).
         source_kind: sourceKind,
         source_chars: sourceChars,
-        ...(work ? { source_type: 'import', work_id: work.id, part_index: 1 } : {}),
+        ...(workRef ? { source_type: jitWork?.source_type ?? 'import', work_id: workRef.id, part_index: partIndexNum } : {}),
         content,
         metadata: {
           date: new Date().toISOString(),
@@ -953,17 +1247,29 @@ Deno.serve(async (req) => {
       // Don't strand a partless work: the Library would show it stuck "preparing"
       // forever. Removing it lets the user simply re-import.
       if (work) await supabase.from('long_form_works').delete().eq('id', work.id);
+      // A JIT part's pending claim flips to failed so the retry affordance works.
+      if (failClaim) await failClaim().catch(() => {});
       return new Response(JSON.stringify({ error: saveError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`[process-article] ✅ Saved ${isImport ? 'work part' : 'article'} ${finalArticleId}`);
+    // Persist the continuity this part was generated FROM (camelCase, matching
+    // the Continuity interface) so the next part's JIT merges onto it.
+    if (isPartJit && jitWork && continuity && Object.keys(continuity).length > 0) {
+      await supabase
+        .from('long_form_works')
+        .update({ continuity })
+        .eq('id', jitWork.id)
+        .eq('user_id', userId);
+    }
+
+    console.log(`[process-article] ✅ Saved ${isLongform ? `work part ${partIndexNum}/${partCountNum}` : 'article'} ${finalArticleId}`);
     return new Response(JSON.stringify({
       success: true,
       articleId: finalArticleId,
       blocks: processedBlocks,
-      ...(work ? { work, article: content } : {}),
+      ...(workRef ? { work: workRef, article: content } : {}),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -975,6 +1281,9 @@ Deno.serve(async (req) => {
     // HTTP 503 → "try again in a moment"; anything else → generic failure.
     const busy = isTransientLlmError(err);
     console.error(`[process-article] Error (busy=${busy}):`, err);
+    // A JIT part that died mid-generation must not strand its pending claim —
+    // failed frees the slot for the reader's retry affordance.
+    if (failClaim) await failClaim().catch(() => {});
     return new Response(
       JSON.stringify({
         error: err instanceof Error ? err.message : String(err),

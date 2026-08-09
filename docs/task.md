@@ -450,3 +450,50 @@
     Full import flow needs database/27 applied + `supabase functions deploy
     process-article ensure-buffer`. (Applied + deployed 2026-08-08; migration
     renumbered 26→27 after rebasing over #129's database/26_feed_topics.sql.)
+- [x] Long-form Phase B: chunking, multi-part reader, URL import (#38/#58, Aug 8)
+  - Design doc §3–§5 + §7 (docs/long-form-content-design.md). No new migration:
+    continuity/reading_position columns shipped with database/27.
+  - [x] rewritePrompt.ts: `longform` variant — adapt-don't-summarize framing,
+        ~1 output paragraph per ~900 source chars (clamped 3–12), continuity
+        injection (summary + pinned proper-noun renderings + style note),
+        mid-work parts end without a wrap-up. News prompt verified
+        byte-identical across all 10 news fixtures.
+  - [x] process-article: paste cap raised to 40,000 chars (soft-warn 20k in
+        the sheet); deterministic paragraph-boundary chunking into balanced
+        ~10k-char parts (headings preferred, sentence-split fallback for
+        wall-of-text pastes); `importUrl` path via Jina (12s timeout, 422
+        import_fetch_failed, over-cap pages truncated at a paragraph
+        boundary); `{workId, partIndex}` JIT part path — pending-claim row
+        (準備中 in the Library, 409 while fresh, failed on error → retry),
+        idempotent ready-part return, continuity extracted from the previous
+        part's generated Japanese and persisted per work; guards: 3 imports +
+        15 parts per rolling 24h.
+  - [x] Reader.tsx: 第N部/全M部 meta chip; section break replaces 完了
+        between parts (部・完 + overall % + words-met recap + 続きを読む /
+        preparing spinner / retry); JIT-prepares part N+1 past 60% scroll
+        (poll-through-409); invisible resume — reading position saved
+        debounced on scroll (part+block+percent onto the work row), reopening
+        pre-scrolls the first unread block to mid-screen.
+  - [x] Library.tsx: 貼り付け/URL sheet tabs, live part estimate
+        (約N字 → 全X部) + 20k soft warning, resume-aware card open (saved
+        part first, part 1 fallback), in-progress cards show 第N部・全M部 +
+        thin bottom-edge progress line.
+  - [x] App.tsx: onNextPart swaps the keyed Reader to the next part;
+        resumeBlockIndex plumbed from the Library.
+  - [x] #6 minimal slice (required by design §7 before Phase B testing):
+        sandboxMode store flag + Settings toggle (Advanced) — recordWordSeen /
+        applyDifficultyEvent / setWordMastery / reviewWord / gradeDiscoverWord
+        all no-op while on (local + server), persisted with a loud warning.
+  - [x] Eval harness: `longform` fixture passthrough, ±3 paragraph tolerance
+        for longform, output cap 16384→32768 (longform outputs truncated);
+        new fixtures EVAL-011 (part 1, lexicon reused from EVAL-010) and
+        EVAL-012 (part 2 + continuity). Live runs: both clean — fidelity 5/5,
+        jlpt 4/5, naturalness 3/5 (lexicon circumlocutions, same tradeoff as
+        the news lexicon path), review 2/2, continuity part opens mid-story
+        with no re-introduction. Rule 7 tightened after paren-aside flags.
+  - Verified: build + lint at baseline, news prompts byte-identical,
+    Playwright dev walkthrough (sheet tabs, estimates incl. 全3部 at 25k +
+    soft warn, over-cap CTA disable, URL validation, sandbox toggle + all
+    five write-gates). Ship: `supabase functions deploy process-article`
+    (ensure-buffer unchanged), then merge frontend. Multi-part end-to-end
+    needs a real account — test with Sandbox Study Mode ON.

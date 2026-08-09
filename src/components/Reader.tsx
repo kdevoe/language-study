@@ -7,8 +7,13 @@ import {
   rewriteArticleWithGemini,
   fetchWordDefinitionQuick,
   fetchWordGrammarInsight,
-  fetchSentenceTranslation
+  fetchSentenceTranslation,
+  requestWorkPart,
+  isPartInProgressError,
+  saveWorkReadingPosition,
+  NewsArticle
 } from '../services/api';
+import { supabase } from '../services/supabase';
 import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
@@ -20,6 +25,18 @@ import { } from 'lucide-react'; // Empty block to show we're using icons elsewhe
 interface ReaderProps {
   initialArticle?: any;
   onComplete?: () => void;
+  /** Long-form: swap the Reader to the next part (App re-keys by article id). */
+  onNextPart?: (article: NewsArticle) => void;
+  /** Long-form invisible resume: pre-scroll so this block sits mid-screen. */
+  resumeBlockIndex?: number;
+}
+
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+
+async function resolveUserId(): Promise<string | null> {
+  if (DEV_MODE) return 'dev-user';
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id ?? null;
 }
 
 // Minimal shape needed to grade a word: definition details (for a never-seen word)
@@ -36,7 +53,7 @@ function hitWeightFor(text: string, furigana?: string, mastery?: MasteryLevel): 
   return [...text].length <= 2 ? 'lo' : 'mid';
 }
 
-export function Reader({ initialArticle, onComplete }: ReaderProps) {
+export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockIndex }: ReaderProps) {
   const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
   const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string, id: string } | null>(null);
   const [drawerAnchor, setDrawerAnchor] = useState<'top' | 'bottom'>('bottom');
@@ -96,6 +113,111 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
 
   // Keep the observer's view of mutable state fresh without re-creating it.
   clickedWordsRef.current = clickedWords;
+
+  // ── Long-form parts (docs/long-form-content-design.md §3, §5) ─────────────
+  // A part is a regular article whose content carries workId/partIndex/partCount.
+  // Everything below is inert for news articles (workId absent).
+  const workId: string | undefined = currentArticle?.workId;
+  const partIndex: number = currentArticle?.partIndex ?? 1;
+  const partCount: number = currentArticle?.partCount ?? 1;
+  const hasNextPart = !!workId && partIndex < partCount;
+
+  const [nextPartState, setNextPartState] = useState<'idle' | 'preparing' | 'ready' | 'failed'>('idle');
+  const nextPartArticleRef = React.useRef<NewsArticle | null>(null);
+  const jitFiredRef = React.useRef<string | null>(null); // article id JIT already fired for
+  const posSaveTimerRef = React.useRef<number | null>(null);
+
+  // JIT-prepare part N+1 (design §3: fired at ~60% of this part). Idempotent
+  // per open part; polls through a server 409 (another invocation generating).
+  const prepareNextPart = React.useCallback(async () => {
+    if (!workId || !hasNextPart || !currentArticle?.id) return;
+    if (jitFiredRef.current === currentArticle.id) return;
+    jitFiredRef.current = currentArticle.id;
+    const nextId = `lf-${workId}-p${partIndex + 1}`;
+    const cached = useAppStore.getState().articlesCache[nextId];
+    if (cached) {
+      nextPartArticleRef.current = cached;
+      setNextPartState('ready');
+      return;
+    }
+    const userId = await resolveUserId();
+    if (!userId) return;
+    setNextPartState('preparing');
+    const attempt = async (triesLeft: number): Promise<void> => {
+      try {
+        const article = await requestWorkPart(userId, workId, partIndex + 1);
+        nextPartArticleRef.current = article;
+        useAppStore.getState().saveProcessedArticle(article.id, article);
+        setNextPartState('ready');
+      } catch (e) {
+        if (isPartInProgressError(e) && triesLeft > 0) {
+          setTimeout(() => attempt(triesLeft - 1), 6000);
+          return;
+        }
+        console.warn('[Reader] next-part preparation failed:', e);
+        setNextPartState('failed');
+      }
+    };
+    attempt(20);
+  }, [workId, hasNextPart, partIndex, currentArticle?.id]);
+
+  const retryNextPart = () => {
+    jitFiredRef.current = null;
+    setNextPartState('idle');
+    prepareNextPart();
+  };
+
+  // Scroll: fire the JIT trigger past ~60%, and persist the reading position
+  // (debounced) so reopening the work resumes invisibly (design §5).
+  useEffect(() => {
+    if (!workId || !currentArticle) return;
+    const totalBlocks: number = currentArticle.blocks?.length ?? 0;
+    const checkJit = () => {
+      const progress = (window.scrollY + window.innerHeight) / Math.max(1, document.documentElement.scrollHeight);
+      if (progress > 0.6 && hasNextPart) prepareNextPart();
+    };
+    const onScroll = () => {
+      checkJit();
+      if (posSaveTimerRef.current) clearTimeout(posSaveTimerRef.current);
+      posSaveTimerRef.current = window.setTimeout(async () => {
+        // First block still (partly) on screen = the reader's spot.
+        const els = Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[data-block-idx]') ?? []);
+        if (els.length === 0) return;
+        const at = els.find((el) => el.getBoundingClientRect().bottom > 120) ?? els[els.length - 1];
+        const blockIndex = Number(at.dataset.blockIdx) || 0;
+        const percent = Math.min(1, ((partIndex - 1) + (totalBlocks > 0 ? blockIndex / totalBlocks : 0)) / partCount);
+        const userId = await resolveUserId();
+        if (userId) saveWorkReadingPosition(workId, userId, { partIndex, blockIndex, percent });
+      }, 1500);
+    };
+    // A part shorter than ~1.7 viewports never scrolls — check once on mount so
+    // the next part still prepares. (Position saves stay scroll-driven so a
+    // quick open/close can't overwrite a saved spot with block 0.)
+    checkJit();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (posSaveTimerRef.current) clearTimeout(posSaveTimerRef.current);
+    };
+  }, [workId, currentArticle, hasNextPart, partIndex, partCount, prepareNextPart]);
+
+  // Invisible resume (design §5): once this part's content is up, pre-scroll so
+  // the first unread block sits mid-screen — a little read text above for
+  // context, no marker. Runs once per article id (enrichment swaps keep the spot).
+  const resumedForIdRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentArticle || currentArticle.id !== initialArticle?.id) return;
+    if (!resumeBlockIndex || resumeBlockIndex <= 0) return;
+    if (resumedForIdRef.current === currentArticle.id) return;
+    resumedForIdRef.current = currentArticle.id;
+    requestAnimationFrame(() => {
+      const els = Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[data-block-idx]') ?? []);
+      if (els.length === 0) return;
+      const el = els.find((e) => Number(e.dataset.blockIdx) >= resumeBlockIndex) ?? els[els.length - 1];
+      const y = el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.35;
+      window.scrollTo({ top: Math.max(0, y) });
+    });
+  }, [currentArticle, initialArticle?.id, resumeBlockIndex]);
 
   // Grade one word as a 'skip' (read past without a lookup). Idempotent per article
   // session, and a no-op for words the reader tapped (those go through the click path).
@@ -613,6 +735,7 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>
+            {partCount > 1 && <span>第{partIndex}部 / 全{partCount}部</span>}
             <span>{currentArticle.readTime}</span>
           </div>
           <h1 className="serif" style={{ fontSize: '2.5rem', lineHeight: 1.3, marginBottom: '2rem', color: 'var(--text-main)' }}>
@@ -622,28 +745,83 @@ export function Reader({ initialArticle, onComplete }: ReaderProps) {
         </div>
 
         {currentArticle.blocks.map((block, i) => {
-          if (block.type === 'paragraph') return <p key={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
+          // data-block-idx anchors long-form resume (invisible pre-scroll) and
+          // the debounced reading-position save.
+          if (block.type === 'paragraph') return <p key={i} data-block-idx={i} style={{ lineHeight: 2.2 }}>{renderParagraph(block, i)}</p>;
           if (block.type === 'yugen-box') return <YugenBox key={i} keyword={block.keyword!} reading={block.reading} description={block.description!} />;
           return null;
         })}
 
-        {/* Finish capsule: marks the article done and removes it from the feed. */}
-        <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
-           <button
-             onClick={() => onComplete?.()}
-             style={{
-               backgroundColor: 'transparent',
-               color: 'var(--text-muted)',
-               padding: '0.75rem 2.5rem',
-               borderRadius: '100px',
-               fontWeight: 600,
-               border: '1px solid var(--border-light)',
-               cursor: 'pointer'
-             }}
-           >
-             <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle' }}>完了</span>
-           </button>
-        </div>
+        {hasNextPart ? (
+          /* Section break (design §5): replaces the 完了 capsule between parts —
+             a quiet 部・完 line, overall percent, words-met recap, then the next
+             part in the finish-button style (spinner while it JIT-prepares). */
+          <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+            <div className="serif" style={{ fontSize: '1.25rem', color: 'var(--text-main)', marginBottom: '0.7rem' }}>第{partIndex}部・完</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
+              作品全体の約{Math.round((partIndex / partCount) * 100)}%を読みました
+              {(gradedRef.current.size + clickedWords.size) > 0 && (
+                <><br />この部で出会った言葉 {gradedRef.current.size + clickedWords.size}語</>
+              )}
+            </div>
+            <div style={{ width: '40px', height: '1px', backgroundColor: 'var(--text-muted)', margin: '1.8rem auto' }} />
+            {nextPartState === 'ready' && nextPartArticleRef.current ? (
+              <button
+                onClick={() => onNextPart?.(nextPartArticleRef.current!)}
+                style={{
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-main)',
+                  padding: '0.75rem 2.5rem',
+                  borderRadius: '100px',
+                  fontWeight: 600,
+                  border: '1px solid var(--border-light)',
+                  cursor: 'pointer'
+                }}
+              >
+                <span className="serif" style={{ fontSize: '1.1rem', verticalAlign: 'middle' }}>続きを読む</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.7rem', verticalAlign: 'middle' }}>第{partIndex + 1}部へ</span>
+              </button>
+            ) : nextPartState === 'failed' ? (
+              <button
+                onClick={retryNextPart}
+                style={{
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-muted)',
+                  padding: '0.75rem 2.5rem',
+                  borderRadius: '100px',
+                  fontWeight: 600,
+                  border: '1px solid var(--border-light)',
+                  cursor: 'pointer'
+                }}
+              >
+                <span className="serif" style={{ fontSize: '1.1rem', verticalAlign: 'middle' }}>もう一度準備する</span>
+              </button>
+            ) : (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.75rem 1.5rem' }}>
+                <span className="lucide-spin" style={{ width: '14px', height: '14px', border: '2px solid var(--border-light)', borderTopColor: 'var(--text-muted)', borderRadius: '50%', display: 'inline-block' }} />
+                第{partIndex + 1}部を準備中…
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Finish capsule: marks the article/work done. */
+          <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+             <button
+               onClick={() => onComplete?.()}
+               style={{
+                 backgroundColor: 'transparent',
+                 color: 'var(--text-muted)',
+                 padding: '0.75rem 2.5rem',
+                 borderRadius: '100px',
+                 fontWeight: 600,
+                 border: '1px solid var(--border-light)',
+                 cursor: 'pointer'
+               }}
+             >
+               <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle' }}>完了</span>
+             </button>
+          </div>
+        )}
       </div>
 
       <WordModal 

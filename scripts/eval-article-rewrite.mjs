@@ -68,8 +68,10 @@ const DEFAULT_JUDGE = 'gemini-3.1-pro-preview';
 // Generous cap so *thinking* models don't truncate the JSON answer before its
 // closing bracket. 3.1-pro-preview burns ~2.7k thought tokens on a judge call;
 // flash burned ~4.9k on a lexicon-fixture rewrite (thoughts count against this
-// cap), which truncated at 8192 — hence 16384. Production sets NO output cap.
-const MAX_OUTPUT_TOKENS = 16384;
+// cap), which truncated at 8192 — hence 16384; a long-form ~10-paragraph
+// rewrite (EVAL-011) truncated again at 16384 — hence 32768. Production sets
+// NO output cap.
+const MAX_OUTPUT_TOKENS = 32768;
 
 // reading_intensity → known/review/new token-share (mirrors process-article/index.ts).
 const INTENSITY_RATIOS = {
@@ -167,6 +169,10 @@ function toRewriteInput(fx) {
     // Controlled-vocabulary path (phase 2): a fixture that ships `palette.lexicon`
     // ({words, reviewWords}) exercises the allowed-list prompt, which supersedes both.
     lexicon: fx.palette.lexicon,
+    // Long-form variant (design §3–4): a fixture that ships a top-level `longform`
+    // ({partIndex, partCount, continuity?}) exercises the adapt-don't-summarize
+    // prompt. Absent (all news fixtures) → the news prompt, byte-for-byte.
+    longform: fx.longform,
   };
 }
 
@@ -249,7 +255,9 @@ function scoreDeterministic(raw, fx, tokenizer) {
 
   const paras = blocks.filter((b) => b.type === 'paragraph');
   out.paragraphs = paras.length;
-  out.paragraphOk = Math.abs(paras.length - fx.profile.targetParagraphs) <= 1;
+  // Long-form targets are soft ("about 10 paragraphs", write fewer if thin) —
+  // grade with a wider tolerance than the news path's ±1.
+  out.paragraphOk = Math.abs(paras.length - fx.profile.targetParagraphs) <= (fx.longform ? 3 : 1);
   out.yugenBoxes = blocks.filter((b) => b.type === 'yugen-box').length;
   out.yugenOk = out.yugenBoxes >= 1;
 

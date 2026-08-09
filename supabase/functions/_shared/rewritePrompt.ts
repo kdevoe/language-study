@@ -61,6 +61,26 @@ export interface RewriteInput {
     /** Max out-of-list topic words the story may use, each force-glossed. Default 3. */
     maxTopicWords?: number;
   };
+  /**
+   * Long-form part adaptation (docs/long-form-content-design.md §3–4, Phase B).
+   * When present, the prompt switches from the news-reporter framing to a
+   * fidelity-leaning "adapt, don't summarize" variant: the source segment is
+   * covered in order at full detail (the news prompt compresses ~10k chars to a
+   * few paragraphs — wrong for content the reader chose), and parts after the
+   * first open seamlessly from the `continuity` object (rolling summary +
+   * proper-noun map) so a serialized work reads as one piece, not N unrelated
+   * articles. Absent → the news prompt renders byte-for-byte unchanged, so the
+   * eval harness's frozen news fixtures stay a valid regression baseline.
+   */
+  longform?: {
+    partIndex: number;
+    partCount: number;
+    continuity?: {
+      summaryJa?: string;
+      properNouns?: Record<string, string>;
+      styleNote?: string;
+    };
+  };
 }
 
 // JLPT level controls COMPLEXITY only (grammar/vocab difficulty). Article
@@ -162,6 +182,68 @@ VOCABULARY PALETTE (aim for ~${pctKnown}% known / ~${pctReview}% review / ~${pct
 - REVIEW words — work about ${targetReview} of these in where they fit the facts naturally: ${reviewPalette.join('、') || '(none)'}
 - NEW words — introduce about ${targetNew} of these if the topic allows, and gloss any you use in a yugen-box: ${newPalette.join('、') || '(none)'}
 Treat this palette as a GUIDE, not a quota. Never distort the facts or insert unnatural phrasing just to hit a word.`;
+  }
+
+  // Shared tail rules (2–7 of the news prompt) — identical strings in both
+  // variants; only Rule 1 (tone) differs, so the news template below keeps its
+  // original inline text byte-for-byte.
+  if (input.longform) {
+    const { partIndex, partCount } = input.longform;
+    const cont = input.longform.continuity;
+    const isSerial = partCount > 1;
+    const isFinal = partIndex >= partCount;
+
+    // Continuity block (§4): parts after the first open from the rolling
+    // summary and pin proper-noun renderings so a name never drifts between
+    // independently-generated parts.
+    let continuityPrompt = '';
+    if (partIndex > 1 && cont) {
+      const nouns = Object.entries(cont.properNouns ?? {});
+      const nounLines = nouns.length > 0
+        ? `\n- PROPER NOUNS — render each EXACTLY as previous parts did: ${nouns.map(([en, ja]) => `${en} → ${ja}`).join('、 ')}`
+        : '';
+      continuityPrompt = `
+CONTINUITY — the reader has already read part${partIndex > 2 ? 's 1–' + (partIndex - 1) : ' 1'}; this part must continue seamlessly:
+- Previous part, in summary: ${cont.summaryJa || '(前の部の要約なし)'}${nounLines}
+- Style: ${cont.styleNote || 'keep the same register and tone as the previous parts'}
+Do NOT re-introduce people or re-explain context the previous parts already covered. Open as a continuation, not a fresh start.`;
+    }
+
+    const serialNote = isSerial
+      ? ` This is part ${partIndex} of ${partCount}; the source below is exactly this part's segment of the original.`
+      : '';
+    const endNote = isSerial && !isFinal
+      ? `\n- This part ends mid-work: stop where the source segment stops. Do NOT write a concluding wrap-up, summary, or preview of what comes next — the work continues in the next part.`
+      : '';
+
+    return `
+You are adapting an English text into natural Japanese for a JLPT ${jlptStr} learner. The work is titled "${title}".${serialNote}
+LEVEL GUIDANCE: ${levelConfig.description}${continuityPrompt}
+Source (the original English text${isSerial ? "'s segment for this part" : ''}):
+${sourceText}
+
+ADAPT, DO NOT SUMMARIZE — THE READER CHOSE THIS TEXT AND WANTS TO READ IT, NOT A DIGEST OF IT:
+- Cover the source's content IN ORDER, at full detail: keep its examples, anecdotes, reasoning steps, and specifics. Aim for about ${targetParagraphs} paragraphs.
+- Rephrase ideas to the reader's level; NEVER drop them to save space. Simpler, longer phrasing of everything beats polished coverage of half.
+- Do NOT compress several source paragraphs into one sentence. If the source is genuinely thin, fewer faithful paragraphs are fine — but never trade detail for brevity when the material is there.
+
+GOLDEN RULE — FIDELITY TO THE SOURCE OVERRIDES EVERYTHING ELSE (length, palette, style):
+- Convey ONLY the ideas, events, and details present in the Source above. DO NOT invent facts, examples, opinions, or conclusions that are not in the Source.
+- DO NOT add your own editorial or concluding sentence (what it means, what happens next) unless the Source says it.${endNote}
+${palettePrompt}
+
+Rules:
+1. Match the source's register and voice — an essay stays an essay, a story stays a story, a letter stays a letter — in natural written Japanese.
+2. Pick 1 or 2 important vocabulary words and explain them in English as a "yugen-box".
+3. Provide the full Japanese text strings. DO NOT tokenize the text yet.
+4. KANJI PREFERENCE: ${biasInstruction}
+5. NATURAL ORTHOGRAPHY — OVERRIDES ALL KANJI PREFERENCE ABOVE: Spell every word the way a modern Japanese newspaper spells it. Words normally written in kana MUST stay in kana: その (never 其の), それ／それから (never 其れ／其れから), とても (never 迚も), いつも (never 何時も), また (never 亦／又), もの・こと・ため・とき when grammatical, できる, ある, いる, など, ください, よう. NEVER use rare, archaic, literary, or irregular kanji forms (the forms JMDict tags rK/oK/iK). NEVER use ateji for foreign words: write country names and loanwords in KATAKANA — カナダ (never 加奈陀), アメリカ (never 亜米利加), イギリス (never 英吉利). When unsure whether a kanji form is in common everyday use, choose kana. This rule is absolute even in study/balanced kanji-bias mode.
+6. VOCABULARY PREFERENCE: ${vocabInstruction}
+7. NO MARKUP: DO NOT use brackets [], parentheses （）, or special formatting anywhere. When the source sets an aside off with dashes or parentheses, rewrite it as a plain sentence or a comma phrase — never with （） in the output.
+
+Output EXACTLY a JSON array:
+[{"type":"paragraph"|"yugen-box","text":"...","keyword":"...","reading":"...","description":"..."}]
+`;
   }
 
   // Pass 1: Rewrite article
