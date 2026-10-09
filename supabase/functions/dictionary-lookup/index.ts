@@ -1,7 +1,10 @@
-import { GoogleGenAI } from 'https://esm.sh/@google/genai';
+import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
+import { CLAUDE_HAIKU, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
+
+// Reads ANTHROPIC_API_KEY from the function's secrets.
+const anthropic = new Anthropic();
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,18 +150,25 @@ ${lines}`;
 
     // type = 'definition' | 'grammar' | 'translation'
     if (type === 'grammar') {
-      // Grammar insight using Gemini
-      const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
+      // Grammar insight using Claude Haiku: ~1s vs ~3-4s on Gemini flash at a
+      // fraction of the cost, and plain-text output (Gemini wrapped terms in
+      // *markdown* that WordModal renders literally). Haiku occasionally invented
+      // romanized readings, hence the no-romaji line.
       const prompt = `Analyze the word "${word}" in this sentence: "${contextSentence}".
 MANDATORY: Provide ONLY 1 SINGLE brief sentence in English explaining its specific usage or grammar in this context.
-Be extremely concise.`;
+Be extremely concise. Write plain text (no markdown) and do not include romanized readings.`;
 
-      const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });
-      const result = await ai.models.generateContent({
-        model: GEMINI_FLASH,
-        contents: prompt,
+      const message = await anthropic.messages.create({
+        model: CLAUDE_HAIKU,
+        max_tokens: 2048, // covers adaptive thinking + the one-sentence answer
+        messages: [{ role: 'user', content: prompt }],
       });
-      const insight = (result.text ?? '').trim();
+      if (message.stop_reason === 'refusal') throw new Error('grammar insight declined by model');
+      const insight = message.content
+        .filter((b) => b.type === 'text')
+        .map((b) => b.text)
+        .join('')
+        .trim();
 
       return new Response(JSON.stringify({ insight }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
