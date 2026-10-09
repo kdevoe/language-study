@@ -25,7 +25,7 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 
 ## Architecture
 
-**Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 3.5-flash (article rewriting), Groq (dictionary fallback). Model identifiers are centralized in `supabase/functions/_shared/models.ts` (single bump point per model).
+**Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 3.8-flash (article rewriting), Claude Haiku 5.5 (grammar insights), Groq (dictionary fallback). Model identifiers are centralized in `supabase/functions/_shared/models.ts` (single bump point per model).
 
 ### Frontend (`src/`)
 
@@ -43,7 +43,7 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 Four Supabase Edge Functions:
 - **fetch-raw-news**: Fetches English articles from NewsAPI with multi-query fallback
 - **process-article**: Rewrites articles to Japanese via Gemini, personalized to user's JLPT/RTK/vocab targets. Returns structured `ArticleBlock[]` with furigana, grammar boxes, and word tokens
-- **dictionary-lookup**: Word definitions (Groq), grammar analysis (Gemini), and sentence translation (Groq)
+- **dictionary-lookup**: Word definitions (Groq), grammar analysis (Claude Haiku), and sentence translation (Groq)
 - **daily-feed**: Scheduled pre-processing of articles
 
 ### Database

@@ -19,11 +19,17 @@
  *   node scripts/eval-article-rewrite.mjs --fixture EVAL-001   # a single case
  *   node scripts/eval-article-rewrite.mjs --judge off          # deterministic scores only
  *   node scripts/eval-article-rewrite.mjs --print-prompt EVAL-001   # offline: print the built prompt, no API
- *   node scripts/eval-article-rewrite.mjs --list-models        # print the ids your key can call
+ *   node scripts/eval-article-rewrite.mjs --list-models        # print the Gemini ids your key can call
+ *   node scripts/eval-article-rewrite.mjs --models flash,haiku,sonnet,opus   # Gemini vs Claude
+ *   node scripts/eval-article-rewrite.mjs --models sonnet --effort low       # Claude effort override
  *
- * Requires GEMINI_API_KEY in the environment (or a .env with it). Makes REAL,
- * paid Gemini calls: ~1 rewrite + ~1 judge call per (fixture × model). A full run
- * over N fixtures and M models is N×M rewrites + N×M judge calls.
+ * Providers are routed by model id: `claude-*` → Anthropic, everything else →
+ * Gemini. Keys come from the environment or .env (loaded automatically):
+ * GEMINI_API_KEY / VITE_GEMINI_API_KEY for Gemini rewrites or a Gemini judge,
+ * ANTHROPIC_API_KEY for Claude. Only the keys the run actually needs are required.
+ * Makes REAL, paid calls: ~1 rewrite + ~1 judge call per (fixture × model). A full
+ * run over N fixtures and M models is N×M rewrites + N×M judge calls. Keep the
+ * judge fixed across runs you intend to compare.
  *
  * Reports print to stdout; a full JSON report is written to
  * scripts/eval-reports/<runId>.json (git-ignored).
@@ -32,6 +38,7 @@
 import esbuild from 'esbuild';
 import kuromoji from '@sglkc/kuromoji';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -42,17 +49,23 @@ const require = createRequire(import.meta.url);
 // ── Model registry ───────────────────────────────────────────────────────────
 // Aliases → live API model ids (confirmed via --list-models, July 2026), plus
 // per-1M-token USD pricing. See docs/phase-c-eval-notes.md for the landscape.
-//   flash → gemini-3.5-flash        : GA, stable, the current pin ($1.50/$9).
+//   flash → gemini-3.8-flash        : GA, stable, the current pin (Oct 2026; price not yet in PRICES).
+//   flash-3.5 → gemini-3.5-flash    : the previous pin ($1.50/$9).
 //   pro   → gemini-3.1-pro-preview  : newest Pro tier this key exposes (flash-vs-pro target).
 //   (there is NO gemini-3.1-pro or gemini-3.5-pro id — the 3.1 pro ships as -preview.)
 // Run `--list-models` to refresh these against your key.
 const MODEL_ALIASES = {
-  flash: 'gemini-3.5-flash',
+  flash: 'gemini-3.8-flash', // the production pin (models.ts GEMINI_FLASH)
+  'flash-3.5': 'gemini-3.5-flash',
   pro: 'gemini-3.1-pro-preview',
   'pro-3': 'gemini-3-pro-preview',
   'pro-2.5': 'gemini-2.5-pro',
   'flash-lite': 'gemini-3.1-flash-lite',
   'flash-3': 'gemini-3-flash-preview',
+  // Claude (Anthropic API) — current generation, Oct 2026.
+  haiku: 'claude-haiku-5-5',
+  sonnet: 'claude-sonnet-5-5',
+  opus: 'claude-opus-5-5',
 };
 // USD per 1,000,000 tokens (in / out). Values marked "est." lack a confirmed
 // public price row — verify before quoting. Unknown models report cost as n/a.
@@ -63,7 +76,19 @@ const PRICES = {
   'gemini-2.5-pro': { in: 1.25, out: 10 },
   'gemini-3.1-flash-lite': { in: 0.3, out: 2.5 }, // est.
   'gemini-3-flash-preview': { in: 1, out: 6 }, // est.
+  'claude-haiku-5-5': { in: 0.1, out: 0.5 }, // ≤100K-token prompts ($0.50/$2.50 beyond)
+  'claude-sonnet-5-5': { in: 2, out: 10 },
+  'claude-opus-5-5': { in: 4, out: 20 },
 };
+
+const isClaude = (modelId) => modelId.startsWith('claude-');
+
+// Pick up keys from .env without needing `node --env-file=.env`.
+try {
+  process.loadEnvFile('.env');
+} catch {
+  // no .env — rely on the shell environment
+}
 const DEFAULT_JUDGE = 'gemini-3.1-pro-preview';
 // Generous cap so *thinking* models don't truncate the JSON answer before its
 // closing bracket. 3.1-pro-preview burns ~2.7k thought tokens on a judge call;
@@ -96,6 +121,7 @@ function parseArgs(argv) {
     fixtureId: get('--fixture'), // single fixture by id
     printPrompt: get('--print-prompt'), // fixture id → print prompt and exit (offline)
     listModels: argv.includes('--list-models'), // print the key's generateContent models and exit
+    effort: get('--effort'), // Claude only: low|medium|high|xhigh|max (omit → model default)
     out: get('--out'),
   };
 }
@@ -319,23 +345,64 @@ ${body}
 Respond with ONLY this JSON: {"factualFidelity":<1-5>,"jlptFit":<1-5>,"naturalness":<1-5>,"notes":{"factualFidelity":"...","jlptFit":"...","naturalness":"..."}}`;
 }
 
-async function runJudge(genAI, judgeModelId, fx, blocks) {
-  const model = genAI.getGenerativeModel({
-    model: judgeModelId,
+// ── Provider-agnostic generation ─────────────────────────────────────────────
+// One JSON-producing call against either provider. Returns the raw text, the
+// provider's own usage object (kept verbatim in the report), and normalized
+// billable token counts. Output tokens INCLUDE thinking on both providers — both
+// bill thoughts as output, so leaving them out would flatter thinking models.
+async function generate(clients, modelId, prompt, { effort } = {}) {
+  if (isClaude(modelId)) {
+    // Current Claude models: thinking is always on (effort is the only depth
+    // control) and sampling params are rejected, so no temperature here. JSON
+    // comes from the prompt's own output schema, same as production's Gemini path.
+    // Streamed so the large max_tokens can't trip the SDK's HTTP timeout.
+    const msg = await clients.anthropic.messages
+      .stream({
+        model: modelId,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        ...(effort ? { output_config: { effort } } : {}),
+        messages: [{ role: 'user', content: prompt }],
+      })
+      .finalMessage();
+    // A safety decline counts as an error for this model — no server-side
+    // fallback, since a fallback model's output would be scored as this model's.
+    if (msg.stop_reason === 'refusal') {
+      throw new Error(`refusal (${msg.stop_details?.category ?? 'uncategorized'})`);
+    }
+    const raw = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    return {
+      raw,
+      usage: msg.usage,
+      inTok: msg.usage.input_tokens ?? 0,
+      outTok: msg.usage.output_tokens ?? 0,
+      stopReason: msg.stop_reason,
+    };
+  }
+
+  const model = clients.genAI.getGenerativeModel({
+    model: modelId,
     generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: MAX_OUTPUT_TOKENS },
   });
-  const res = await model.generateContent(buildJudgePrompt(fx, blocks));
-  const parsed = JSON.parse(extractJsonValue(res.response.text()));
+  const res = await model.generateContent(prompt);
   const usage = res.response.usageMetadata ?? {};
-  return { scores: parsed, usage };
+  const inTok = usage.promptTokenCount ?? 0;
+  const outTok =
+    usage.candidatesTokenCount !== undefined
+      ? usage.candidatesTokenCount + (usage.thoughtsTokenCount ?? 0)
+      : (usage.totalTokenCount ?? 0) - inTok;
+  return { raw: res.response.text(), usage, inTok, outTok, stopReason: res.response.candidates?.[0]?.finishReason };
+}
+
+async function runJudge(clients, judgeModelId, fx, blocks) {
+  const res = await generate(clients, judgeModelId, buildJudgePrompt(fx, blocks));
+  const parsed = JSON.parse(extractJsonValue(res.raw));
+  return { scores: parsed, usage: res.usage };
 }
 
 // ── Cost helper ──────────────────────────────────────────────────────────────
-function costUSD(modelId, usage) {
+function costUSD(modelId, inTok, outTok) {
   const price = PRICES[modelId];
-  if (!price || !usage) return null;
-  const inTok = usage.promptTokenCount ?? 0;
-  const outTok = usage.candidatesTokenCount ?? ((usage.totalTokenCount ?? 0) - inTok);
+  if (!price) return null;
   return (inTok / 1e6) * price.in + (outTok / 1e6) * price.out;
 }
 
@@ -395,6 +462,7 @@ function printFixtureDetail(rows) {
     const d = r.deterministic;
     const flags = [];
     if (!d.jsonOk) flags.push(`json:${d.jsonError}`);
+    if (r.stopReason === 'max_tokens' || r.stopReason === 'MAX_TOKENS') flags.push('truncated');
     if (d.markupClean === false) flags.push('markup');
     if (d.paragraphOk === false) flags.push(`paras=${d.paragraphs}`);
     if (d.yugenOk === false) flags.push('no-yugen');
@@ -439,22 +507,34 @@ async function main() {
     return;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error('GEMINI_API_KEY (or VITE_GEMINI_API_KEY) is required. Set it in your env or .env.');
+  const modelIds = args.models.map((m) => MODEL_ALIASES[m] ?? m);
+  const judgeOn = args.judge !== 'off';
+  const judgeModelId = MODEL_ALIASES[args.judge] ?? args.judge;
+
+  // Build only the clients this run needs, and fail fast on a missing key.
+  const usedModels = judgeOn ? [...modelIds, judgeModelId] : modelIds;
+  const clients = {};
+  const missing = [];
+  if (usedModels.some((m) => !isClaude(m))) {
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (geminiKey) clients.genAI = new GoogleGenerativeAI(geminiKey);
+    else missing.push('GEMINI_API_KEY (or VITE_GEMINI_API_KEY)');
+  }
+  if (usedModels.some(isClaude)) {
+    if (process.env.ANTHROPIC_API_KEY) clients.anthropic = new Anthropic();
+    else missing.push('ANTHROPIC_API_KEY');
+  }
+  if (missing.length) {
+    console.error(`Missing ${missing.join(' and ')}. Set it in your env or .env.`);
     console.error('Tip: `node scripts/eval-article-rewrite.mjs --print-prompt EVAL-001` works offline (no key, no API calls).');
     rmSync(TMP_BUNDLE, { force: true });
     process.exit(1);
   }
 
-  const modelIds = args.models.map((m) => MODEL_ALIASES[m] ?? m);
-  const judgeOn = args.judge !== 'off';
-  const judgeModelId = MODEL_ALIASES[args.judge] ?? args.judge;
+  const providers = [clients.genAI && 'Gemini', clients.anthropic && 'Anthropic'].filter(Boolean).join(' + ');
+  console.log(`Fixtures: ${fixtures.length}  Models: ${modelIds.join(', ')}  Judge: ${judgeOn ? judgeModelId : 'off'}${args.effort ? `  Claude effort: ${args.effort}` : ''}`);
+  console.log(`⚠ This makes real, paid ${providers} calls: ~${fixtures.length * modelIds.length} rewrite + ~${judgeOn ? fixtures.length * modelIds.length : 0} judge calls.\n`);
 
-  console.log(`Fixtures: ${fixtures.length}  Models: ${modelIds.join(', ')}  Judge: ${judgeOn ? judgeModelId : 'off'}`);
-  console.log(`⚠ This makes real, paid Gemini calls: ~${fixtures.length * modelIds.length} rewrite + ~${judgeOn ? fixtures.length * modelIds.length : 0} judge calls.\n`);
-
-  const genAI = new GoogleGenerativeAI(apiKey);
   const tokenizer = await buildTokenizer();
 
   const byModel = {};
@@ -466,22 +546,18 @@ async function main() {
       const prompt = buildRewritePrompt(input);
       const row = { fixtureId: fx.id, model: modelId, error: null };
       try {
-        const model = genAI.getGenerativeModel({
-          model: modelId,
-          generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: MAX_OUTPUT_TOKENS },
-        });
         const t0 = performance.now();
-        const res = await model.generateContent(prompt);
+        const res = await generate(clients, modelId, prompt, { effort: args.effort });
         row.latencyMs = performance.now() - t0;
-        const raw = res.response.text();
-        const usage = res.response.usageMetadata ?? {};
-        row.usage = usage;
-        row.costUSD = costUSD(modelId, usage);
+        const raw = res.raw;
+        row.usage = res.usage;
+        row.stopReason = res.stopReason;
+        row.costUSD = costUSD(modelId, res.inTok, res.outTok);
         row.deterministic = scoreDeterministic(raw, fx, tokenizer);
         row.rawText = raw;
         if (judgeOn && row.deterministic.jsonOk) {
           try {
-            row.judge = await runJudge(genAI, judgeModelId, fx, row.deterministic ? parseBlocks(raw).blocks : []);
+            row.judge = await runJudge(clients, judgeModelId, fx, row.deterministic ? parseBlocks(raw).blocks : []);
           } catch (je) {
             row.judgeError = je.message;
           }
@@ -507,6 +583,7 @@ async function main() {
   const report = {
     runId,
     models: modelIds,
+    effort: args.effort ?? null,
     judge: judgeOn ? judgeModelId : null,
     fixtures: fixtures.map((f) => f.id),
     rows: allRows.map((r) => ({ ...r, rawText: (r.rawText ?? '').slice(0, 4000) })),

@@ -8,12 +8,16 @@
 //   strings below are as reproducible as the provider allows.
 // - GEMINI_FLASH was previously the floating `gemini-3-flash-preview` alias. The
 //   gemini-3-flash line never shipped a stable/dated build, so we moved to the
-//   stable `gemini-3.5-flash` — a reproducible, non-preview identifier. The
-//   flash-vs-pro / per-task comparison still belongs to the eval harness in
-//   issue #65; this is the single line to change when that lands.
+//   stable `gemini-3.5-flash` — a reproducible, non-preview identifier. Bumped to
+//   the stable `gemini-3.8-flash` in Oct 2026. The flash-vs-pro / per-task
+//   comparison still belongs to the eval harness in issue #65; this is the
+//   single line to change when that lands.
 
-/** Gemini — article rewriting (process-article) + grammar insight (dictionary-lookup). */
-export const GEMINI_FLASH = 'gemini-3.5-flash';
+/** Gemini — article rewriting (process-article). */
+export const GEMINI_FLASH = 'gemini-3.8-flash';
+
+/** Claude — grammar insight (dictionary-lookup). Anthropic IDs carry no date suffix. */
+export const CLAUDE_HAIKU = 'claude-haiku-5-5';
 
 /** Groq — keyword extraction, heteronym readings, translation, definition fallback. */
 export const GROQ_GENERAL = 'openai/gpt-oss-20b';
