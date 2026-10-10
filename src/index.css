@@ -54,6 +54,14 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-serif);
 }
 
+/* Underline-only inputs (docs/design-system.md §6.4): the hairline darkens on focus. */
+.hero-input {
+  transition: border-color 0.3s;
+}
+.hero-input:focus {
+  border-bottom-color: var(--text-muted) !important;
+}
+
 .sans {
   font-family: var(--font-sans);
 }

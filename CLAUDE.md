@@ -54,7 +54,7 @@ RPC `check_is_approved(email)` returns `'approved'|'waitlisted'|'not_joined'` fo
 
 ## Key Conventions
 
-- **Styling**: Typography-first design using Shippori Mincho (serif) + Inter (sans-serif). Zen minimalist aesthetic -- no heavy UI, shadows, or borders. Use existing CSS variables from `index.css` (`--bg-color`, `--bg-card`, `--text-main`, `--accent-primary`, etc.). Do not introduce utility CSS frameworks.
+- **Styling**: Follow `docs/design-system.md` (palette, type, spacing, motion, and shared components like the slider toggle, bottom sheet and create button). Read it before building or restyling UI, and update it when a pattern changes. In short: typography-first design using Shippori Mincho (serif) + Inter (sans-serif); zen minimalist aesthetic -- no heavy UI, shadows, or borders; colours only from the CSS variables in `index.css`; no new accent colours. Do not introduce utility CSS frameworks.
 - **News proxy**: Production NewsAPI requests go through the `/api/news` Vercel serverless function (CORS). Localhost uses the client-side `VITE_NEWS_API_KEY` directly.
 - **SRS Auto-Bump threshold**: defaults to 3 (in store).
 - **RTK progression**: 3 new kanji per day, auto-bumped via `checkDailyKanji()`.

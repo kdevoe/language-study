@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Podcast creation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-olive: #4a5d23;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: #e9e9e2;
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding: 2.5rem 1rem 4rem;
+}
+button, input, textarea { font-family: var(--font-sans); }
+.serif { font-family: var(--font-serif); }
+
+.mock-header { max-width: 900px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--accent-olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 640px; margin: 0 auto; }
+
+.stage { display: flex; justify-content: center; gap: 2.5rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 380px; text-align: center; }
+.phone {
+  width: 402px; height: 800px; max-width: 100%;
+  background: var(--bg-color);
+  border-radius: 44px;
+  border: 10px solid #1c1c1c;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.app-header { display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 1.25rem 1rem; }
+.app-header h1 { font-family: var(--font-serif); font-size: 1.4rem; letter-spacing: 0.1em; font-weight: 500; }
+.icon-btn { background: none; border: none; color: var(--text-main); cursor: pointer; display: flex; align-items: center; }
+.scroll-area { height: calc(100% - 70px); overflow-y: auto; padding: 0.4rem 1.25rem 7rem; }
+
+/* ---------- Slider toggle — copied 1:1 from Settings (JLPT / Intensity / Vocab / Kanji) ----------
+   Track: --border-light, 4px padding, 45px tall. A white thumb with a soft
+   shadow slides under the labels; labels only change colour + weight. */
+.seg { display: flex; position: relative; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; }
+.seg .thumb {
+  position: absolute; top: 4px; bottom: 4px; border-radius: 100px;
+  background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 0;
+}
+.seg button {
+  flex: 1; position: relative; z-index: 1; border: none; outline: none; border-radius: 100px;
+  background: transparent; cursor: pointer;
+  font-family: var(--font-sans); font-size: 0.85rem; font-weight: 600; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.seg button.active { color: var(--text-main); font-weight: 700; }
+
+/* ---------- LISTEN tab ---------- */
+.tab-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.2rem; }
+.tab-header .kicker { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.tab-header h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.add-btn {
+  width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--text-main); color: var(--bg-pure);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+.list { display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1.4rem; }
+.ep-card { background: var(--bg-card); border-radius: 24px; padding: 1.4rem 1.5rem; border: 1px solid var(--border-light); position: relative; overflow: hidden; }
+.ep-card.digest { background: var(--bg-pure); }
+.ep-card.hidden { display: none; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.9rem; gap: 0.6rem; }
+.cat-tag { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; background: var(--bg-pure); color: var(--text-muted); padding: 0.3rem 0.7rem; border-radius: 8px; white-space: nowrap; }
+.ep-card.digest .cat-tag { background: rgba(74,93,35,0.08); color: var(--accent-olive); }
+.status { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; display: flex; align-items: center; gap: 0.4rem; }
+.status.ready { color: var(--accent-olive); letter-spacing: 0.05em; }
+.ep-card h3 { font-family: var(--font-serif); font-size: 1.25rem; line-height: 1.5; margin-bottom: 0.8rem; font-weight: 500; }
+.meta { font-size: 0.74rem; color: var(--text-muted); }
+.meta b { color: var(--text-main); font-weight: 500; }
+.meta i { font-style: normal; margin: 0 0.35rem; opacity: 0.5; }
+.progress { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--accent-olive); opacity: 0.4; }
+.spinner { width: 12px; height: 12px; border: 1.5px solid rgba(74,93,35,0.2); border-top-color: var(--accent-olive); border-radius: 50%; animation: spin 0.9s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Reader ---------- */
+.reader-meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem; }
+.reader-meta .cat { background: var(--bg-card); padding: 0.2rem 0.6rem; border-radius: 4px; }
+.listen-btn {
+  margin-left: auto; background: none; border: none; cursor: pointer; color: var(--text-muted);
+  display: flex; align-items: center; padding: 0.25rem; border-radius: 50%;
+}
+.listen-btn.made { color: var(--text-main); }
+.reader h1 { font-family: var(--font-serif); font-size: 2.1rem; line-height: 1.3; margin-bottom: 1.6rem; font-weight: 500; }
+.rule { width: 40px; height: 1px; background: var(--text-muted); margin-bottom: 1.6rem; }
+.reader p { font-family: var(--font-serif); font-size: 18px; line-height: 2.2; margin-bottom: 1.2rem; }
+
+/* ---------- Sheet layout: three groups, spacing does the organising ----------
+   tight inside a group, generous between groups (ma). Only the source picker
+   is full width; everything else has its own width. */
+.what { margin-top: 1.5rem; }
+.what .pane { height: 92px; }
+.hero-input {
+  width: 100%; border: none; outline: none; background: transparent;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-serif); font-size: 1.35rem; color: var(--text-main);
+  padding: 0.3rem 0.1rem 0.55rem; transition: border-color 0.3s;
+}
+.hero-input.url { font-family: var(--font-sans); font-size: 1rem; padding-top: 0.6rem; }
+.hero-input:focus { border-bottom-color: var(--text-muted); }
+.hero-input::placeholder, .paste::placeholder, .request-field::placeholder { color: #aaa9a2; }
+.suggest { display: flex; gap: 1.1rem; margin-top: 0.75rem; }
+.suggest button { background: none; border: none; cursor: pointer; padding: 0; font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); transition: color 0.2s; }
+.suggest button:hover { color: var(--text-main); }
+.paste {
+  width: 100%; height: 100%; border: none; outline: none; resize: none;
+  background: var(--bg-card); border-radius: 16px; padding: 0.8rem 1rem;
+  font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; color: var(--text-main);
+}
+.request { height: 2.4rem; margin-top: 1rem; display: flex; align-items: center; }
+.request-link { background: none; border: none; cursor: pointer; padding: 0; font-size: 0.8rem; color: var(--text-muted); letter-spacing: 0.04em; }
+.request-link:hover { color: var(--text-main); }
+.request-field {
+  width: 100%; border: none; outline: none; background: transparent;
+  border-bottom: 1px solid var(--border-light); padding: 0.4rem 0.1rem;
+  font-size: 0.85rem; color: var(--text-main);
+}
+.request-link.hidden, .request-field.hidden { display: none; }
+.action-row { margin-top: 1.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.seg.compact { flex: 0 0 200px; }
+.action-row .go { width: auto; height: 45px; padding: 0 2rem; }
+
+/* ---------- Sheet ---------- */
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 40; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 50;
+  background: var(--bg-color); border-radius: 28px 28px 0 0;
+  padding: 1.5rem 1.5rem 2.2rem; box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+  transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.phone.sheet-open .backdrop { opacity: 1; pointer-events: auto; }
+.phone.sheet-open .sheet { transform: translateY(0); }
+.grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1.2rem; }
+.sheet h2 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin-bottom: 1rem; }
+.sheet .kicker { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin-bottom: 0.3rem; }
+.sheet .source-title { font-family: var(--font-serif); font-size: 1.25rem; line-height: 1.5; margin-bottom: 0.4rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.field {
+  width: 100%; font-size: 0.85rem; background: var(--bg-pure); border: 1px solid var(--border-light);
+  border-radius: 16px; padding: 0.9rem 1rem; color: var(--text-main); outline: none; line-height: 1.6; resize: none;
+}
+.field:focus { border-color: var(--text-muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+.chip { font-family: var(--font-serif); font-size: 0.85rem; padding: 0.35rem 0.85rem; border-radius: 100px; border: 1px solid var(--border-light); background: transparent; color: var(--text-muted); cursor: pointer; }
+.gap { height: 0.9rem; }
+/* Create button — borrows the Settings slider's vocabulary instead of a
+   new colour. Resting: flat on the slider TRACK colour, muted text.
+   Ready: becomes the slider THUMB (white, main text) and lifts on a slightly
+   deeper version of the thumb's shadow. Pressed: settles flat. */
+:root { --go-ready: var(--bg-pure); --go-ready-text: var(--text-main); }
+.go-row { margin-top: 1.3rem; display: flex; }
+.go {
+  width: 100%; cursor: default; border: none;
+  background: var(--border-light); color: var(--text-muted);
+  font-family: var(--font-serif); font-size: 1.05rem; font-weight: 500; letter-spacing: 0.08em;
+  padding: 0.8rem 1rem; border-radius: 100px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  opacity: 0.7; transform: translateY(0); box-shadow: 0 0 0 rgba(0,0,0,0);
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s,
+              transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.go .arrow { display: none; transition: transform 0.3s; }
+.go.ready {
+  cursor: pointer; opacity: 1; font-weight: 700;
+  background: var(--go-ready); color: var(--go-ready-text);
+  transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+}
+.go.ready:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+.go.ready:active { transform: translateY(0) scale(0.98); box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition-duration: 0.1s; }
+
+/* B · compact pill, right-aligned, with an arrow that nudges on ready */
+body[data-btn="b"] .go-row { justify-content: flex-end; }
+body[data-btn="b"] .go { width: auto; padding: 0.7rem 1.6rem; }
+body[data-btn="b"] .go .arrow { display: inline; }
+body[data-btn="b"] .go.ready:hover .arrow { transform: translateX(3px); }
+
+/* C · outline that fills in: hairline olive border at rest, fills + lifts when ready */
+body[data-btn="c"] .go { background: transparent; box-shadow: inset 0 0 0 1px var(--border-light); }
+body[data-btn="c"] .go.ready { background: var(--go-ready); box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+
+.variant-switch { margin: 1.1rem auto 0; max-width: 380px; }
+.swatches { display: flex; justify-content: center; gap: 0.9rem; margin-top: 0.9rem; }
+.swatch { display: flex; align-items: center; gap: 0.45rem; background: none; border: none; cursor: pointer; font-size: 0.75rem; color: var(--text-muted); }
+.swatch i { width: 22px; height: 22px; border-radius: 50%; display: block; box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 3px transparent; transition: box-shadow 0.2s; }
+.swatch.active { color: var(--text-main); font-weight: 600; }
+.swatch.active i { box-shadow: 0 0 0 2px #e9e9e2, 0 0 0 3px var(--text-main); }
+.variant-note { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.6rem; min-height: 1.2em; }
+.pane.hidden { display: none; }
+/* Every source pane is the same height, so switching トピック / テキスト / URL
+   never moves the input's top edge or the rows below it. */
+.pane { height: 104px; }
+.pane textarea.field { height: 100%; }
+
+.toast {
+  position: absolute; top: 1rem; left: 50%; transform: translate(-50%, -150%); z-index: 60;
+  padding: 0.7rem 1.1rem; border-radius: 14px; background: var(--bg-card); border: 1px solid var(--border-light);
+  box-shadow: 0 6px 30px rgba(0,0,0,0.12); font-size: 0.85rem; white-space: nowrap; transition: transform 0.35s;
+}
+.toast.show { transform: translate(-50%, 0); }
+
+.bottom-nav { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; background: var(--bg-color); border-top: 1px solid var(--border-light); display: flex; justify-content: space-around; align-items: center; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em; color: var(--text-muted); }
+.bottom-nav .on { color: var(--text-main); }
+</style>
+</head>
+<body>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · PODCAST CREATION</div>
+  <h1>聴く — 作り方を整える</h1>
+  <p>Toggles are the Settings page's sliding control (same track, thumb, shadow and easing). The create sheet is organised into three groups — <em>what</em> (source + input), an optional request, and <em>go</em> (length + 作る on one row) — with only the source picker running full width. In the Reader, a headphone icon opens the same sheet with the article already chosen. Everything is clickable.</p>
+</div>
+
+<div class="stage">
+
+  <!-- ═════════ 1 · LISTEN tab + create sheet ═════════ -->
+  <div class="phone-wrap">
+    <div class="phone-label">1 · LISTEN TAB → + SHEET</div>
+    <div class="phone" id="p1">
+      <div class="app-header">
+        <span style="width:24px"></span>
+        <h1>読書家</h1>
+        <span style="width:24px"></span>
+      </div>
+      <div class="scroll-area">
+        <div class="tab-header">
+          <div>
+            <div class="kicker">LISTEN</div>
+            <h1>聴く</h1>
+          </div>
+          <button class="add-btn" onclick="openSheet('p1')" aria-label="エピソードを作る">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+
+        <div class="seg" id="filters">
+          <button class="active" data-f="all">すべて</button>
+          <button data-f="new">未再生</button>
+          <button data-f="partial">途中</button>
+          <button data-f="done">完了</button>
+        </div>
+
+        <div class="list">
+          <div class="ep-card digest" data-state="new">
+            <div class="card-top">
+              <span class="cat-tag">DAILY DIGEST · 10月10日</span>
+              <span class="status ready">● READY</span>
+            </div>
+            <h3>秋の新米と、宇宙の新しいニュース</h3>
+            <div class="meta"><b>ハルカ × ケンジ</b><i>·</i>4分52秒<i>·</i>今日</div>
+          </div>
+          <div class="ep-card" data-state="partial">
+            <div class="card-top">
+              <span class="cat-tag">記事から</span>
+              <span class="status">途中 · 42%</span>
+            </div>
+            <h3>東京の電車、なぜ時間通り？</h3>
+            <div class="meta"><b>ミサキ × タクヤ</b><i>·</i>関西弁<i>·</i>9分40秒<i>·</i>昨日</div>
+            <div class="progress" style="width:42%"></div>
+          </div>
+          <div class="ep-card" data-state="done">
+            <div class="card-top">
+              <span class="cat-tag">トピック · 宇宙</span>
+              <span class="status">✓ <span class="serif" style="font-size:0.8rem">完了</span></span>
+            </div>
+            <h3>宇宙ステーションの一日</h3>
+            <div class="meta"><b>ケンジ × アヤ</b><i>·</i>5分04秒<i>·</i>3日前</div>
+            <div class="progress" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav"><span>NEWS</span><span>LIBRARY</span><span class="on">LISTEN</span><span>REVIEW</span></div>
+
+      <div class="backdrop" onclick="closeSheet('p1')"></div>
+      <div class="sheet">
+        <div class="grabber"></div>
+        <h2>新しいエピソード</h2>
+
+        <div class="seg" data-group="src">
+          <button class="active" data-pane="topic">トピック</button>
+          <button data-pane="text">テキスト</button>
+          <button data-pane="url">URL</button>
+        </div>
+
+        <div class="what">
+          <div class="pane" data-pane="topic">
+            <input class="hero-input" placeholder="何について？">
+            <div class="suggest"><button>宇宙</button><button>AI</button><button>料理</button><button>旅行</button></div>
+          </div>
+          <div class="pane hidden" data-pane="text">
+            <textarea class="paste" placeholder="テキストを貼り付け"></textarea>
+          </div>
+          <div class="pane hidden" data-pane="url">
+            <input class="hero-input url" placeholder="https://" autocapitalize="none" spellcheck="false">
+          </div>
+        </div>
+
+        <div class="request">
+          <button class="request-link">＋ リクエスト</button>
+          <input class="request-field hidden" placeholder="例：ゆっくり、例を多めに">
+        </div>
+
+        <div class="action-row">
+          <div class="seg compact" data-group="len">
+            <button class="active">5分</button><button>10分</button><button>15分</button>
+          </div>
+          <button class="go" id="go1" onclick="if (this.classList.contains('ready')) closeSheet('p1')">作る</button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-note">Tap +. The topic is the hero: big serif text on a hairline, no box. Suggestions are plain text. The request stays a quiet link until tapped (its space is reserved, so nothing jumps). Length and 作る share the bottom row.</div>
+  </div>
+
+  <!-- ═════════ 2 · Reader + headphone ═════════ -->
+  <div class="phone-wrap">
+    <div class="phone-label">2 · READER → 🎧 SHEET</div>
+    <div class="phone" id="p2">
+      <div class="toast" id="toast">聴くタブで作成中</div>
+      <div class="app-header">
+        <button class="icon-btn" aria-label="戻る">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h1>読書家</h1>
+        <span style="width:24px"></span>
+      </div>
+      <div class="scroll-area reader">
+        <div class="reader-meta">
+          <span class="cat">テクノロジー</span>
+          <span>第2部 / 全4部</span>
+          <span>約6分</span>
+          <button class="listen-btn" id="listenBtn" onclick="openSheet('p2')" aria-label="ポッドキャストにする">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>
+          </button>
+        </div>
+        <h1>東京の電車は、なぜ時間通りに走るのか</h1>
+        <div class="rule"></div>
+        <p>東京の電車は、とても正確です。一日に何百万人もの人が電車に乗りますが、遅れることはほとんどありません。</p>
+        <p>その理由の一つは、運転士の訓練です。運転士は、駅に止まる時間を秒単位で練習します。</p>
+        <p>また、駅員もホームで乗客を手伝います。ドアが早く閉まるように、声をかけることもあります。</p>
+      </div>
+
+      <div class="backdrop" onclick="closeSheet('p2')"></div>
+      <div class="sheet">
+        <div class="grabber"></div>
+        <div class="kicker">この記事から</div>
+        <div class="source-title">東京の電車は、なぜ時間通りに走るのか（第2部）</div>
+
+        <div class="request">
+          <button class="request-link">＋ リクエスト</button>
+          <input class="request-field hidden" placeholder="例：運転士の話を中心に">
+        </div>
+
+        <div class="action-row">
+          <div class="seg compact" data-group="len2">
+            <button class="active">5分</button><button>10分</button><button>15分</button>
+          </div>
+          <button class="go" id="go2" onclick="makeFromArticle()">作る</button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-note">Tap the headphones at the right of the meta row. The same sheet minus the source group: the article title takes its place. After 作る the sheet closes, a short toast appears, and the icon darkens. The icon is in the same place in news articles and long-form parts.</div>
+  </div>
+
+</div>
+
+<script>
+function openSheet(id) {
+  document.getElementById(id).classList.add('sheet-open');
+  // The article sheet already has its source, so its button is ready on open —
+  // let it ripen just after the sheet lands so the lift is visible.
+  if (id === 'p2') {
+    const b = document.getElementById('go2');
+    b.classList.remove('ready');
+    setTimeout(() => b.classList.add('ready'), 380);
+  } else {
+    validateListen();
+  }
+}
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('sheet-open');
+}
+
+// Listen sheet: the button ripens once the visible source has something in it.
+function validateListen() {
+  const pane = document.querySelector('#p1 .pane:not(.hidden)');
+  const v = pane.querySelector('.hero-input, .paste').value.trim();
+  const ok = pane.dataset.pane === 'topic' ? v.length >= 2
+    : pane.dataset.pane === 'text' ? v.length >= 200
+    : /^https?:\/\/\S+\.\S+/.test(v);
+  document.getElementById('go1').classList.toggle('ready', ok);
+}
+document.querySelectorAll('#p1 .pane .hero-input, #p1 .pane .paste').forEach((f) => f.addEventListener('input', validateListen));
+// Request: a quiet link that swaps for its field in the same reserved slot.
+document.querySelectorAll('.request-link').forEach((l) => l.addEventListener('click', () => {
+  const f = l.parentElement.querySelector('.request-field');
+  l.classList.add('hidden');
+  f.classList.remove('hidden');
+  f.focus();
+}));
+
+
+// Slider toggles: one sliding thumb per control, positioned exactly like
+// Settings — left: calc(4px + i * (100% - 8px) / n), width: (100% - 8px) / n.
+function placeThumb(seg) {
+  const btns = [...seg.querySelectorAll('button')];
+  const i = Math.max(0, btns.findIndex((x) => x.classList.contains('active')));
+  const t = seg.querySelector('.thumb');
+  t.style.left = `calc(4px + ${i} * (100% - 8px) / ${btns.length})`;
+  t.style.width = `calc((100% - 8px) / ${btns.length})`;
+}
+document.querySelectorAll('.seg').forEach((seg) => {
+  const t = document.createElement('div');
+  t.className = 'thumb';
+  seg.prepend(t);
+  placeThumb(seg);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+    placeThumb(seg);
+    if (seg.dataset.group === 'src') {
+      seg.closest('.sheet').querySelectorAll('.pane').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.pane));
+    }
+    if (seg.id === 'filters') {
+      document.querySelectorAll('#p1 .ep-card').forEach((c) => c.classList.toggle('hidden', b.dataset.f !== 'all' && c.dataset.state !== b.dataset.f));
+    }
+  });
+});
+document.querySelectorAll('.suggest button').forEach((c) => c.addEventListener('click', () => { c.closest('.pane').querySelector('input').value = c.textContent; validateListen(); }));
+
+function makeFromArticle() {
+  closeSheet('p2');
+  document.getElementById('listenBtn').classList.add('made');
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+</script>
+</body>
+</html>

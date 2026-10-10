@@ -37,6 +37,8 @@ export interface PodcastPromptInput {
   targetChars: number;
   /** Human date label for the digest intro, e.g. "10月9日". */
   dateLabel?: string;
+  /** Optional free-text request from the listener (focus, tone, pace…). */
+  instructions?: string;
 }
 
 export interface PodcastTurn {
@@ -115,7 +117,18 @@ Output JSON only:
 {"title": "<short Japanese episode title>", "turns": [{"speaker": "host" | "guest", "text": "<Japanese>"}], "vocab": [{"word": "<word>", "reading": "<kana>", "meaning": "<English>"}]}
 Turn text is plain spoken Japanese only — no furigana, romaji, stage directions, sound effects, speaker names, or markdown.
 
-${sourceBlock(input)}`;
+${sourceBlock(input)}${requestBlock(input)}`;
+}
+
+/** The listener's own request, appended only when present (so default prompts
+ *  stay byte-identical). It can steer focus and tone but not the rules above. */
+function requestBlock(input: PodcastPromptInput): string {
+  const req = input.instructions?.trim();
+  if (!req) return '';
+  return `
+
+LISTENER'S REQUEST (follow it where it doesn't conflict with the level, length and output rules above):
+${req.slice(0, 300)}`;
 }
 
 export class ScriptValidationError extends Error {}

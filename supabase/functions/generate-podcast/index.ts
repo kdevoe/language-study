@@ -16,7 +16,7 @@
 // Requests:
 //   { source: { kind: 'article', articleId } | { kind: 'digest', date? } |
 //             { kind: 'topic', topic } | { kind: 'text', text, title? } | { kind: 'url', url },
-//     minutes?: 5 | 10 | 15 }                       → 202 { episode } (200 for an existing digest)
+//     minutes?: 5 | 10 | 15, instructions?: string (≤300 chars) }                       → 202 { episode } (200 for an existing digest)
 //   { action: 'retry', episodeId }                  → 202 { episode }
 //   { action: 'voice', episodeId }  (service only)  → 202
 
@@ -55,6 +55,7 @@ const JINA_READER_URL = 'https://r.jina.ai/';
 const URL_TIMEOUT_MS = 12_000;
 const SCRIPT_MAX_ATTEMPTS = 3;
 const SCRIPT_BACKOFF_MS = [500, 1500, 3000];
+const MAX_INSTRUCTIONS_CHARS = 300;
 
 const EPISODE_LIST_FIELDS = 'id, title, source_kind, source_ref, minutes, status, status_detail, cast_ids, duration_ms, listen_position_ms, listened_at, created_at';
 
@@ -71,7 +72,7 @@ interface EpisodeRow {
   user_id: string;
   source_kind: PodcastSourceKind;
   source_ref: string | null;
-  source_payload: { text?: string; title?: string } | null;
+  source_payload: { text?: string; title?: string; instructions?: string } | null;
   minutes: number;
   status: string;
   cast_ids: { host: string; guest: string } | null;
@@ -203,6 +204,7 @@ async function runScriptStage(supabase: SupabaseClient, episodeId: string) {
       items,
       targetChars: ep.minutes * CHARS_PER_MINUTE,
       dateLabel: ep.source_kind === 'digest' ? dateLabel(ep.source_ref) : undefined,
+      instructions: ep.source_payload?.instructions,
     });
     await supabase.from('podcast_episodes').update({
       script,
@@ -395,6 +397,9 @@ Deno.serve(async (req) => {
     default:
       return json(400, { error: 'unknown source kind', errorKind: 'bad_request' });
   }
+
+  const instructions = typeof body.instructions === 'string' ? body.instructions.trim().slice(0, MAX_INSTRUCTIONS_CHARS) : '';
+  if (instructions) sourcePayload = { ...(sourcePayload ?? {}), instructions };
 
   const { data: recent } = await supabase
     .from('podcast_episodes')

@@ -519,3 +519,14 @@
   - [x] useWordLookup hook extracted from Reader (Reader migrated, re-verified)
   - [ ] Follow-ups: mini-player (store audio slice), pg_cron digest pre-generation, lexicon for topic/text
         episodes, listening mastery, podcast eval fixtures
+- [x] Podcast from an article / long-form part + create-sheet redesign (2026-10-10) — mockup docs/mockups/podcast-create.html
+  - [x] Reader headphone icon (news + long-form parts) → PodcastSheet with the article as source (`kind: 'article'`,
+        no backend change; parts are processed_news rows); toast 聴くタブで作成中
+  - [x] PodcastSheet shared by LISTEN + Reader: grouped layout (source slider + hero input / ＋ リクエスト / length + 作る),
+        fixed source-pane height, 作る lifts when ready; optional request → `instructions` (≤300 chars, prompt
+        unchanged when empty)
+  - [x] SliderToggle extracted from Settings (4 copies migrated; Vocab Use now reactive) and used for LISTEN filters
+  - [x] useScrollLock: sheets + WordModal no longer let the page behind scroll
+  - [x] docs/design-system.md (approved) + CLAUDE.md pointer
+  - [ ] Deploy generate-podcast (instructions field); until then requests are ignored
+  - [ ] Design drift follow-ups (design-system.md §8): black + buttons, Library filter pills, REVIEW toggle, olive token

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Plus } from 'lucide-react';
+import { useScrollLock } from '../hooks/useScrollLock';
 import {
   LongFormWork,
   NewsArticle,
@@ -55,6 +56,7 @@ export function Library({ onOpenWork }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
+  useScrollLock(sheetOpen);
   const [importTab, setImportTab] = useState<'paste' | 'url'>('paste');
   const [pasteText, setPasteText] = useState('');
   const [urlText, setUrlText] = useState('');

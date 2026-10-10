@@ -4,6 +4,7 @@ import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 export interface WordDetails {
   word: string;
@@ -45,18 +46,14 @@ export function WordModal({
   const SYNC_DURATION = 1.05;
   const SYNC_EASE = [0.16, 1, 0.3, 1]; 
 
+  useScrollLock(isOpen);
+
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      if (anchor === 'top' && !isLoading && scrollRef.current) {
-        setTimeout(() => {
-          if (scrollRef.current) scrollRef.current.scrollTop = 9999;
-        }, 50);
-      }
-    } else {
-      document.body.style.overflow = 'auto';
+    if (isOpen && anchor === 'top' && !isLoading && scrollRef.current) {
+      setTimeout(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = 9999;
+      }, 50);
     }
-    return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen, anchor, isLoading]);
 
   useEffect(() => {

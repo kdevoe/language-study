@@ -558,6 +558,10 @@ function App() {
     window.scrollTo(0, 0);
   }, []);
 
+  // Reader → PodcastSheet: the episode is made in the background and appears
+  // in the LISTEN tab; the shared top toast says so.
+  const handlePodcastQueued = useCallback(() => setActionError('聴くタブで作成中'), []);
+
   const handleBackToListen = () => {
     setListenView('list');
     setShowNav(true);
@@ -738,7 +742,7 @@ function App() {
               isManualFetching={isLoadingFeed}
             />
           ) : (
-            <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} />
+            <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} onPodcastQueued={handlePodcastQueued} />
           )
         )}
         {activeTab === 'library' && (
@@ -751,6 +755,7 @@ function App() {
               onComplete={handleFinishWork}
               onNextPart={handleNextWorkPart}
               resumeBlockIndex={workResumeBlock}
+              onPodcastQueued={handlePodcastQueued}
             />
           )
         )}
