@@ -5,6 +5,9 @@ import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
 import { Settings } from './components/Settings'
 import { Review, type ReviewSegment } from './components/Review'
+import { Listen } from './components/Listen'
+import { PodcastPlayer } from './components/PodcastPlayer'
+import type { PodcastEpisode } from './services/podcasts'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
@@ -19,7 +22,7 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'flashcards' | 'settings'>('news');
+  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'listen' | 'flashcards' | 'settings'>('news');
   const [showNav, setShowNav] = useState(true);
   // Flashcard focus mode: tapping into a card hides the bottom nav so the card
   // can use that space; Flashcards reports the state up from its card flow.
@@ -42,6 +45,9 @@ function App() {
   // Invisible resume (design §5): block index the Reader pre-scrolls to when
   // reopening a work at its saved reading position.
   const [workResumeBlock, setWorkResumeBlock] = useState(0);
+  // LISTEN (聴く) state: the episode list, or one episode open in the player.
+  const [listenView, setListenView] = useState<'list' | 'player'>('list');
+  const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
@@ -544,11 +550,28 @@ function App() {
     handleBackToLibrary();
   };
 
+  // ── LISTEN (聴く): generated podcasts ─────────────────────────────────────
+  const handleOpenEpisode = useCallback((episode: PodcastEpisode) => {
+    setActiveEpisode(episode);
+    setListenView('player');
+    setShowNav(true);
+    window.scrollTo(0, 0);
+  }, []);
+
+  const handleBackToListen = () => {
+    setListenView('list');
+    setShowNav(true);
+  };
+
   // Reading happens inside a tab's own view state; the header back-arrow and
-  // chrome-hiding are shared across both reading surfaces.
+  // chrome-hiding are shared across the reading surfaces (the podcast player
+  // included — its transport bar takes the bottom nav's place).
   const isReading =
     (activeTab === 'news' && newsView === 'reading') ||
-    (activeTab === 'library' && libraryView === 'reading');
+    (activeTab === 'library' && libraryView === 'reading') ||
+    (activeTab === 'listen' && listenView === 'player');
+  const handleBack =
+    activeTab === 'library' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -674,7 +697,7 @@ function App() {
         }}
       >
         {isReading ? (
-          <button onClick={activeTab === 'library' ? handleBackToLibrary : handleBackToHub} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <button onClick={handleBack} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <ChevronLeft size={24} strokeWidth={1.5} />
           </button>
         ) : (
@@ -729,6 +752,13 @@ function App() {
               onNextPart={handleNextWorkPart}
               resumeBlockIndex={workResumeBlock}
             />
+          )
+        )}
+        {activeTab === 'listen' && (
+          listenView === 'player' && activeEpisode ? (
+            <PodcastPlayer key={activeEpisode.id} episode={activeEpisode} />
+          ) : (
+            <Listen onOpenEpisode={handleOpenEpisode} />
           )
         )}
         {activeTab === 'flashcards' && (

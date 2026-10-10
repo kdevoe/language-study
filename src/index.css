@@ -205,6 +205,28 @@ ruby.peek-furigana rt {
   padding: 2px 0;
 }
 
+/* Podcast player (PodcastPlayer.tsx): the playing sentence gets a soft olive
+   tint, the current word turns olive; listen-first blurs unrevealed sentences. */
+.podcast-sentence {
+  border-radius: 6px;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease, filter 0.3s ease, opacity 0.3s ease;
+}
+.podcast-sentence.cur {
+  background-color: rgba(74, 93, 35, 0.10);
+  box-shadow: 0 0 0 0.18em rgba(74, 93, 35, 0.10);
+}
+.podcast-word.on {
+  color: #4a5d23;
+}
+.listen-first .podcast-sentence:not(.revealed) {
+  filter: blur(6px);
+  opacity: 0.55;
+  cursor: pointer;
+}
+.listen-first .podcast-sentence.cur:not(.revealed) {
+  opacity: 0.8;
+}
+
 @keyframes lucide-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

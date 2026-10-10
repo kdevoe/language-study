@@ -39,5 +39,7 @@ vocab-summary.html
 
 # Eval harness output (#65): reports are runtime artifacts; bundle is transient
 scripts/eval-reports/
+scripts/podcast-spike/
+public/podcast-dev/
 .tmp_rewrite_prompt.mjs
 scripts/out/

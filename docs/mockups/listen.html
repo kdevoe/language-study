@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Listen (聴く)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-olive: #4a5d23;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: #e9e9e2;
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding: 2.5rem 1rem 4rem;
+}
+button { font-family: var(--font-sans); }
+.mock-header { max-width: 900px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--accent-olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 620px; margin: 0 auto; }
+
+.stage { display: flex; justify-content: center; gap: 2.5rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone {
+  width: 402px; height: 800px;
+  background: var(--bg-color);
+  border-radius: 44px;
+  border: 10px solid #1c1c1c;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.screen { height: 100%; display: flex; flex-direction: column; position: relative; }
+.scroll-area { flex: 1; overflow-y: auto; padding: 1.4rem 1.4rem 9rem; }
+
+/* ---------- LISTEN tab ---------- */
+.tab-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.2rem; }
+.tab-header .kicker { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.tab-header h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.add-btn {
+  width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--text-main); color: var(--bg-pure); font-size: 1.5rem; font-weight: 300;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+.filters { display: flex; gap: 0.45rem; margin-bottom: 1.4rem; flex-wrap: wrap; }
+.filter-pill {
+  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; cursor: pointer;
+  padding: 0.42rem 1rem; border-radius: 100px; border: 1px solid var(--border-light);
+  background: transparent; color: var(--text-muted);
+}
+.filter-pill.active { background: var(--text-main); color: var(--bg-pure); border-color: var(--text-main); }
+.list { display: flex; flex-direction: column; gap: 1.25rem; }
+.ep-card {
+  background: var(--bg-card); border-radius: 24px; padding: 1.4rem 1.5rem;
+  border: 1px solid var(--border-light); cursor: pointer;
+  position: relative; overflow: hidden;
+}
+.ep-card.hidden { display: none; }
+.ep-card.digest { background: var(--bg-pure); }
+.ep-card.now { border-color: var(--accent-olive); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.9rem; gap: 0.6rem; }
+.cat-tag {
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em;
+  background: var(--bg-pure); color: var(--text-muted);
+  padding: 0.3rem 0.7rem; border-radius: 8px;
+}
+.ep-card.digest .cat-tag, .cat-tag.olive { background: rgba(74,93,35,0.08); color: var(--accent-olive); }
+.status { display: flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; white-space: nowrap; }
+.status.ready { color: var(--accent-olive); }
+.status.muted { color: var(--text-muted); }
+.status.fail { color: #a8553f; }
+.ep-title { font-family: var(--font-serif); font-size: 1.25rem; font-weight: 500; line-height: 1.5; margin-bottom: 0.8rem; max-width: 95%; }
+.card-sub { font-size: 0.74rem; color: var(--text-muted); font-weight: 500; }
+.card-sub .sep { margin: 0 0.35rem; opacity: 0.5; }
+.card-sub .cast { color: var(--text-main); }
+.progress-line { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--accent-olive); opacity: 0.4; }
+.spinner { width: 12px; height: 12px; border: 1.5px solid rgba(74,93,35,0.2); border-top-color: var(--accent-olive); border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* mini-player (above nav, persists across tabs) */
+.mini {
+  position: absolute; left: 0.8rem; right: 0.8rem; bottom: 5.2rem; z-index: 15;
+  background: var(--text-main); color: var(--bg-pure); border-radius: 18px;
+  padding: 0.7rem 0.9rem; display: flex; align-items: center; gap: 0.8rem;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18); overflow: hidden; cursor: pointer;
+  transform: translateY(140%); transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.mini.show { transform: translateY(0); }
+.mini .t { flex: 1; min-width: 0; }
+.mini .t b { display: block; font-family: var(--font-serif); font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini .t span { font-size: 0.64rem; opacity: 0.7; letter-spacing: 0.05em; }
+.mini button { background: none; border: none; color: var(--bg-pure); font-size: 1.1rem; cursor: pointer; width: 32px; }
+.mini .bar { position: absolute; left: 0; bottom: 0; height: 2px; background: #c9d3b4; }
+
+/* bottom nav */
+.bottom-nav {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+  background: rgba(245,245,240,0.97); backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border-light);
+  display: flex; justify-content: space-around; padding: 0.7rem 0.5rem 1.4rem;
+}
+.nav-item { flex: 1; max-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; font-size: 0.56rem; font-weight: 500; letter-spacing: 0.05em; color: var(--text-muted); }
+.nav-item .ico { padding: 0.35rem 0.9rem; border-radius: 100px; display: flex; }
+.nav-item.active { color: var(--text-main); font-weight: 600; }
+.nav-item.active .ico { background: var(--accent-primary); }
+.nav-item.active svg { stroke-width: 2; }
+.gear { position: absolute; top: 1.1rem; right: 1.3rem; font-size: 1rem; color: var(--text-muted); }
+
+/* create sheet */
+.sheet-backdrop {
+  position: absolute; inset: 0; background: rgba(45,45,45,0.35); z-index: 40;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+}
+.sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: -110%; z-index: 50;
+  background: var(--bg-color); border-radius: 28px 28px 0 0;
+  padding: 1.5rem 1.5rem 2.2rem; transition: bottom 0.35s cubic-bezier(0.16,1,0.3,1);
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+}
+.sheet.open { bottom: 0; }
+.sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1.2rem; }
+.sheet h2 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin-bottom: 1rem; }
+.chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.chip {
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; cursor: pointer;
+  padding: 0.4rem 0.95rem; border-radius: 100px; border: 1px solid var(--border-light);
+  background: transparent; color: var(--text-muted);
+}
+.chip.active { background: var(--text-main); color: var(--bg-pure); border-color: var(--text-main); }
+.chip.soft { font-family: var(--font-serif); font-weight: 500; font-size: 0.85rem; letter-spacing: 0; }
+.field {
+  width: 100%; font-family: var(--font-sans); font-size: 0.85rem;
+  background: var(--bg-pure); border: 1px solid var(--border-light); border-radius: 16px;
+  padding: 0.9rem 1rem; color: var(--text-main); outline: none; margin-bottom: 0.9rem;
+}
+textarea.field { height: 110px; resize: none; line-height: 1.6; }
+.sheet-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin: 0.3rem 0 0.5rem; }
+.sheet-note { font-size: 0.72rem; color: var(--text-muted); line-height: 1.6; margin: 0.2rem 0.2rem 0; }
+.cta {
+  width: 100%; margin-top: 1rem; border: none; cursor: pointer;
+  background: var(--text-main); color: var(--bg-pure);
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em;
+  padding: 1rem; border-radius: 100px;
+}
+
+/* ---------- PLAYER ---------- */
+.player .topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.1rem 1.3rem 0.4rem; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted);
+}
+.player .topbar .back { font-size: 1.4rem; font-weight: 300; letter-spacing: 0; cursor: pointer; }
+.transcript { flex: 1; overflow-y: auto; padding: 0.6rem 1.5rem 13rem; scroll-behavior: smooth; position: relative; }
+.ep-head { margin: 0.4rem 0 1.8rem; }
+.ep-head h1 { font-family: var(--font-serif); font-size: 1.6rem; font-weight: 500; line-height: 1.4; margin-bottom: 0.7rem; }
+.ep-head .castline { font-size: 0.74rem; color: var(--text-muted); }
+.ep-head .castline b { color: var(--text-main); font-weight: 600; }
+.title-rule { width: 40px; height: 1px; background: var(--text-muted); margin-top: 1.4rem; }
+.turn { margin-bottom: 1.5rem; }
+.who { display: block; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin-bottom: 0.15rem; }
+.turn.guest .who { color: var(--accent-olive); opacity: 0.8; }
+.turn-text { font-family: var(--font-serif); font-size: 1.1rem; line-height: 2.15; letter-spacing: 0.02em; }
+.sent { border-radius: 6px; padding: 0.1em 0; transition: background 0.25s ease, filter 0.3s ease, opacity 0.3s ease; cursor: pointer; }
+.sent.cur { background: rgba(74,93,35,0.10); box-shadow: 0 0 0 0.18em rgba(74,93,35,0.10); }
+.w { border-radius: 3px; }
+.w.on { color: var(--accent-olive); }
+.w.dict { text-decoration: underline; text-decoration-color: rgba(74,93,35,0.25); text-underline-offset: 0.35em; }
+rt { font-size: 0.5em; color: var(--text-muted); }
+.no-furi rt { display: none; }
+.listen-first .sent:not(.revealed) { filter: blur(6px); opacity: 0.55; }
+.listen-first .sent.cur:not(.revealed) { opacity: 0.8; }
+
+.resync {
+  position: absolute; left: 50%; bottom: 9.6rem; transform: translate(-50%, 20px); z-index: 12;
+  background: var(--bg-pure); color: var(--text-main); border: 1px solid var(--border-light);
+  border-radius: 100px; padding: 0.45rem 1rem; font-size: 0.68rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.10); opacity: 0; pointer-events: none; transition: all 0.25s ease;
+}
+.resync.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+
+.transport {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 10;
+  background: linear-gradient(to bottom, rgba(245,245,240,0), var(--bg-color) 22%);
+  padding: 2.2rem 1.4rem 1.8rem;
+}
+.scrub { position: relative; height: 18px; cursor: pointer; }
+.scrub .track { position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: var(--border-light); border-radius: 2px; }
+.scrub .fill { position: absolute; left: 0; top: 8px; height: 2px; background: var(--text-main); border-radius: 2px; }
+.scrub .knob { position: absolute; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--text-main); transform: translateX(-5px); }
+.times { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 0.1rem; }
+.controls { display: flex; align-items: center; justify-content: space-between; margin-top: 0.7rem; }
+.ctl { background: none; border: none; cursor: pointer; color: var(--text-main); }
+.ctl.step { font-size: 1.05rem; width: 44px; height: 44px; }
+.ctl.play {
+  width: 60px; height: 60px; border-radius: 50%; background: var(--text-main); color: var(--bg-pure);
+  font-size: 1.2rem; box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+.ctl.pill {
+  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; color: var(--text-muted);
+  border: 1px solid var(--border-light); border-radius: 100px; padding: 0.35rem 0.7rem; min-width: 52px;
+}
+.ctl.pill.on { color: var(--text-main); border-color: var(--text-main); }
+.ctl.pill.serif { font-family: var(--font-serif); font-size: 0.85rem; font-weight: 600; letter-spacing: 0; padding: 0.25rem 0.7rem; }
+
+/* word sheet — stands in for WordModal */
+.word-sheet {
+  position: absolute; left: 0; right: 0; bottom: -100%; z-index: 50;
+  background: var(--bg-pure); border-radius: 28px 28px 0 0; padding: 1.4rem 1.6rem 2.2rem;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.15); transition: bottom 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.word-sheet.open { bottom: 0; }
+.word-sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1.1rem; }
+.ws-head { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 0.3rem; }
+.ws-head .word { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; }
+.ws-head .reading { color: var(--text-muted); font-size: 1rem; }
+.ws-head .jlpt { margin-left: auto; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; color: var(--accent-olive); background: rgba(74,93,35,0.08); padding: 0.2rem 0.55rem; border-radius: 6px; }
+.ws-meaning { font-size: 0.95rem; margin-bottom: 1rem; }
+.ws-sent { font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted); background: var(--bg-card); border-radius: 12px; padding: 0.7rem 0.9rem; margin-bottom: 1rem; line-height: 1.8; }
+.ws-sent .tr { display: block; font-family: var(--font-sans); font-size: 0.78rem; margin-top: 0.4rem; color: var(--text-main); }
+.ws-mastery { display: flex; gap: 0.5rem; }
+.ws-mastery button { flex: 1; border: 1px solid var(--border-light); background: var(--bg-color); border-radius: 14px; padding: 0.7rem 0; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+.ws-note { font-size: 0.66rem; color: var(--text-muted); text-align: center; margin-top: 0.9rem; }
+
+/* legend */
+.legend { max-width: 420px; }
+.legend h2 { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; }
+.legend ol { list-style: none; display: flex; flex-direction: column; gap: 0.9rem; }
+.legend li { display: flex; gap: 0.8rem; font-size: 0.85rem; background: var(--bg-pure); border-radius: 16px; padding: 0.9rem 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.legend .n {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent-olive); color: #fff; font-size: 0.7rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; margin-top: 0.1rem;
+}
+.legend .muted { color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.15rem; }
+.audio-note { font-size: 0.72rem; color: var(--text-muted); text-align: center; max-width: 380px; }
+@media (max-width: 900px) { .stage { flex-direction: column; align-items: center; } }
+</style>
+</head>
+<body>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · PODCAST DESIGN §6</div>
+  <h1>Listen（聴く）</h1>
+  <p>Left: the LISTEN tab, which takes SETTINGS' place in the bottom nav. Right: the player. Tap a card to load it into the player. The two real episodes play actual ElevenLabs v4 audio with the designed cast; tap words, double-tap sentences, scroll away and come back.</p>
+</div>
+
+<div class="stage">
+
+  <!-- ===================== LISTEN TAB ===================== -->
+  <div class="phone-wrap">
+    <div class="phone-label">LISTEN TAB</div>
+    <div class="phone">
+      <div class="screen">
+        <span class="gear" title="Settings now live only in the header">⚙︎</span>
+        <div class="scroll-area">
+          <div class="tab-header">
+            <div>
+              <div class="kicker">LISTEN</div>
+              <h1>聴く</h1>
+            </div>
+            <button class="add-btn" id="openCreate">+</button>
+          </div>
+
+          <div class="filters">
+            <button class="filter-pill active" data-filter="all">すべて</button>
+            <button class="filter-pill" data-filter="new">未再生</button>
+            <button class="filter-pill" data-filter="partial">途中</button>
+            <button class="filter-pill" data-filter="done">完了</button>
+          </div>
+
+          <div class="list" id="epList">
+            <div class="ep-card digest" data-ep="0" data-state="new">
+              <div class="card-top">
+                <span class="cat-tag">DAILY DIGEST · 10月9日</span>
+                <span class="status ready">✓ READY</span>
+              </div>
+              <h3 class="ep-title" data-title="0"></h3>
+              <div class="card-sub"><span class="cast">ケンジ × ヨウコ</span><span class="sep">·</span>関西弁<span class="sep">·</span><span data-dur="0"></span></div>
+              <div class="progress-line" data-prog="0" style="width:0"></div>
+            </div>
+
+            <div class="ep-card" data-ep="1" data-state="partial">
+              <div class="card-top">
+                <span class="cat-tag">記事から</span>
+                <span class="status muted">途中 · 40%</span>
+              </div>
+              <h3 class="ep-title" data-title="1"></h3>
+              <div class="card-sub"><span class="cast">ハルカ × ソウタ</span><span class="sep">·</span><span data-dur="1"></span><span class="sep">·</span>昨日</div>
+              <div class="progress-line" data-prog="1" style="width:40%"></div>
+            </div>
+
+            <div class="ep-card" data-state="new">
+              <div class="card-top">
+                <span class="cat-tag">トピック · 宇宙</span>
+                <span class="status muted"><span class="spinner"></span>音声を収録中…</span>
+              </div>
+              <h3 class="ep-title">月の水の氷はどこから来たのか</h3>
+              <div class="card-sub"><span class="cast">タクミ × ハルカ</span><span class="sep">·</span>博多弁<span class="sep">·</span>約5分</div>
+            </div>
+
+            <div class="ep-card" data-state="new">
+              <div class="card-top">
+                <span class="cat-tag">テキスト</span>
+                <span class="status fail">↻ 再試行</span>
+              </div>
+              <h3 class="ep-title">会社のニュースレター 10月号</h3>
+              <div class="card-sub"><span class="cast">ユウキ × アヤ</span><span class="sep">·</span>関西弁<span class="sep">·</span>生成に失敗しました</div>
+            </div>
+
+            <div class="ep-card" data-state="done">
+              <div class="card-top">
+                <span class="cat-tag olive">DAILY DIGEST · 10月8日</span>
+                <span class="status ready">✓ 完了</span>
+              </div>
+              <h3 class="ep-title">小さい町の春の花の祭り</h3>
+              <div class="card-sub"><span class="cast">ソウタ × ヨウコ</span><span class="sep">·</span>4分12秒<span class="sep">·</span>おととい</div>
+              <div class="progress-line" style="width:100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini" id="mini">
+          <div class="t"><b id="miniTitle"></b><span id="miniCast"></span></div>
+          <button id="miniPlay">❚❚</button>
+          <div class="bar" id="miniBar"></div>
+        </div>
+
+        <div class="bottom-nav">
+          <div class="nav-item"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18h-5"></path><path d="M18 14h-8"></path><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"></path><rect width="8" height="4" x="10" y="6" rx="1"></rect></svg></span>NEWS</div>
+          <div class="nav-item"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg></span>LIBRARY</div>
+          <div class="nav-item active"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"></path></svg></span>LISTEN</div>
+          <div class="nav-item"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"></path><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path></svg></span>REVIEW</div>
+          <div class="nav-item"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"></path><path d="M12 21V3"></path><path d="M19 21V9"></path></svg></span>PROGRESS</div>
+        </div>
+
+        <!-- create sheet -->
+        <div class="sheet-backdrop" id="createBackdrop"></div>
+        <div class="sheet" id="createSheet">
+          <div class="grab"></div>
+          <h2>エピソードを作る</h2>
+          <div class="chips" id="srcTabs">
+            <button class="chip active" data-src="topic">トピック</button>
+            <button class="chip" data-src="text">テキスト</button>
+            <button class="chip" data-src="url">URL</button>
+          </div>
+          <div data-pane="topic">
+            <input class="field" id="topicInput" placeholder="例：日本の電車、AIと仕事、秋の料理…">
+            <div class="chips">
+              <button class="chip soft" data-topic="宇宙">宇宙</button>
+              <button class="chip soft" data-topic="AI">AI</button>
+              <button class="chip soft" data-topic="料理">料理</button>
+              <button class="chip soft" data-topic="旅行">旅行</button>
+              <button class="chip soft" data-topic="スポーツ">スポーツ</button>
+            </div>
+          </div>
+          <div data-pane="text" hidden><textarea class="field" placeholder="英語のテキストを貼り付けてください。会話形式のポッドキャストに書き直します。"></textarea></div>
+          <div data-pane="url" hidden><input class="field" type="url" placeholder="https://example.com/article"></div>
+          <div class="sheet-label">長さ</div>
+          <div class="chips" id="lenChips">
+            <button class="chip active">約5分</button>
+            <button class="chip">約10分</button>
+            <button class="chip">約15分</button>
+          </div>
+          <div class="sheet-note">出演者はおまかせ — 毎回ちがう組み合わせでお届けします。記事の最後の「🎧 ポッドキャストにする」からも作れます。</div>
+          <button class="cta" id="createCta">エピソードを作る</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PLAYER ===================== -->
+  <div class="phone-wrap">
+    <div class="phone-label">PLAYER</div>
+    <div class="phone">
+      <div class="screen player" id="playerScreen">
+        <div class="topbar"><span class="back">‹</span><span id="pKind"></span><span style="width:14px"></span></div>
+        <div class="transcript" id="transcript"></div>
+        <button class="resync" id="resync">↓ 再生位置へ</button>
+
+        <div class="transport">
+          <div class="scrub" id="scrub"><div class="track"></div><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>
+          <div class="times"><span id="tNow">0:00</span><span id="tLeft">-0:00</span></div>
+          <div class="controls">
+            <button class="ctl pill" id="speed" title="Playback speed">1.0×</button>
+            <button class="ctl step" id="prev" title="Previous sentence">⏮</button>
+            <button class="ctl play" id="play">▶</button>
+            <button class="ctl step" id="next" title="Next sentence">⏭</button>
+            <button class="ctl pill serif on" id="furi" title="Furigana">ふ</button>
+          </div>
+          <div class="controls" style="justify-content:center;margin-top:0.6rem">
+            <button class="ctl pill" id="lf" title="Listen-first: transcript hidden until you tap a sentence">耳で聴く</button>
+          </div>
+        </div>
+
+        <div class="sheet-backdrop" id="wordBackdrop"></div>
+        <div class="word-sheet" id="wordSheet">
+          <div class="grab"></div>
+          <div class="ws-head"><span class="word" id="wsWord"></span><span class="reading" id="wsReading"></span><span class="jlpt" id="wsJlpt"></span></div>
+          <div class="ws-meaning" id="wsMeaning"></div>
+          <div class="ws-sent" id="wsSent"></div>
+          <div class="ws-mastery">
+            <button data-close>わからない</button>
+            <button data-close>まあまあ</button>
+            <button data-close>わかる</button>
+          </div>
+          <div class="ws-note">Stands in for today's WordModal. Playback paused on tap and resumes when this closes.</div>
+        </div>
+      </div>
+    </div>
+    <div class="audio-note" id="audioNote">Audio is read from <code>scripts/podcast-spike/audio/</code> (git-ignored, so local only). Without it the player runs on a simulated clock.</div>
+  </div>
+
+  <!-- ===================== LEGEND ===================== -->
+  <div class="legend">
+    <h2>What this demonstrates</h2>
+    <ol>
+      <li><span class="n">1</span><div><b>LISTEN takes SETTINGS' slot</b>: NEWS · LIBRARY · LISTEN · REVIEW · PROGRESS. The rail keeps today's lucide icons (LISTEN = <code>Headphones</code>). Settings stays in the header gear, and STUDY is relabelled REVIEW.</div></li>
+      <li><span class="n">2</span><div><b>Same card language as the Library.</b> Today's DAILY DIGEST sits on top with a white card. The cast rotates per episode and shows on the card (ケンジ × ヨウコ), with the dialect noted when one is present.</div></li>
+      <li><span class="n">3</span><div><b>Status mirrors the job</b>: 台本を作成中… → 音声を収録中… → ✓ READY, or ↻ 再試行 on failure. Try the + sheet: the new card walks through each state.<span class="muted">Episodes take about a minute (about 50s script + about 30s audio), so the placeholder card matters.</span></div></li>
+      <li><span class="n">4</span><div><b>Transcript as the interface.</b> The active sentence gets a soft olive tint and the current word turns olive. Auto-scroll keeps the active line about 40% down. Scroll away and auto-scroll stops; <i>↓ 再生位置へ</i> brings you back.</div></li>
+      <li><span class="n">5</span><div><b>Tap a word</b> → pause + dictionary (the WordModal). Closing resumes playback. Lookups count toward SRS exactly as in the Reader; there is no passive "heard it" credit. <b>Double-tap a sentence</b> → jump there.</div></li>
+      <li><span class="n">6</span><div><b>Transport is for learners</b>: ⏮/⏭ step by <i>sentence</i>, not ±10s. Speed cycles 0.75 / 0.9 / 1.0 / 1.15× with pitch preserved. ふ toggles furigana. <b>耳で聴く</b> (listen-first) blurs the transcript; tap a sentence to reveal it.</div></li>
+      <li><span class="n">7</span><div><b>Mini-player</b>: leave the player while audio is playing and a slim bar stays above the nav on every tab. Lock-screen controls come via the Media Session API. Reopening resumes where you stopped.</div></li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const EPISODES = [{"id":"EVAL-004.kenji-yoko","title":"新しい関税と私たちの生活","kind":"DAILY DIGEST","date":"10月9日","duration":215.92,"names":{"host":"ケンジ","guest":"ヨウコ"},"dialects":{"host":"関西弁","guest":"標準語"},"audio":"../../scripts/podcast-spike/audio/EVAL-004.kenji-yoko.eleven_v4.mp3","turns":[{"sp":"host","text":"皆さんこんにちは！ケンジです。今日も楽しくニュースを聞いていきましょう。ヨウコさん、よろしくお願いします！","t":[0,0.37,0.47,0.56,0.7,0.85,0.99,1.14,1.28,1.32,1.36,1.44,1.52,1.68,1.84,2.4,2.6,2.72,2.8,3.04,3.12,3.2,3.3,3.4,3.5,3.6,3.72,3.76,3.8,3.84,3.92,4,4.1,4.2,4.3,4.4,4.96,5.04,5.12,5.2,5.4,5.6,5.64,5.68,5.84,5.88,5.92,6.03,6.13,6.24,6.35,6.45,6.56]},{"sp":"guest","text":"こんにちは、ヨウコです。よろしくお願いします。今日は、政府が発表した新しい関税のお話ですね。","t":[7.04,7.22,7.39,7.57,7.74,7.92,8,8.08,8.24,8.32,8.48,8.64,9.12,9.2,9.28,9.4,9.52,9.65,9.79,9.92,10.05,10.19,10.32,10.96,11.2,11.36,11.76,12,12.12,12.24,12.32,12.56,12.72,13,13.28,13.49,13.71,13.92,14.16,14.32,14.44,14.56,14.88,15.01,15.15,15.28]},{"sp":"host","text":"せやねん。政府が外国の商品に、新しい関税をかけると発表したらしいです。そもそも関税って何なんですか？","t":[15.36,15.52,15.68,15.76,15.92,16.56,16.72,16.88,17.12,17.32,17.52,17.6,17.8,18,18.32,18.4,18.59,18.77,18.96,19.2,19.28,19.44,19.55,19.65,19.76,19.92,20.08,20.24,20.32,20.4,20.48,20.56,20.64,20.8,20.96,21.6,21.76,21.92,22.08,22.24,22.48,22.64,22.76,22.88,23.04,23.12,23.2,23.31,23.41,23.52]},{"sp":"guest","text":"関税は、外国から入ってくる商品にかける税金のことです。この新しい関税は、来月から始まるんですよ。","t":[24.08,24.32,24.56,25.12,25.2,25.4,25.6,25.72,25.84,26,26.12,26.24,26.36,26.48,26.68,26.88,27.04,27.2,27.36,27.52,27.76,27.92,28.05,28.19,28.32,28.44,28.56,29.2,29.36,29.52,29.73,29.95,30.16,30.4,30.56,31.12,31.24,31.36,31.6,31.72,31.84,32,32.12,32.24,32.36,32.48,32.6,32.72]},{"sp":"host","text":"来月からですか！ほんまにすぐ始まりますね。でも政府は、どうして新しい関税をかけることにしたんですか？","t":[32.8,33.04,33.2,33.32,33.44,33.55,33.65,33.76,34.32,34.48,34.64,34.72,34.96,35.08,35.2,35.36,35.44,35.52,35.64,35.76,35.92,36.56,36.72,36.88,37.04,37.2,37.6,37.72,37.78,37.84,37.96,38.08,38.24,38.4,38.56,38.8,38.88,38.96,39.07,39.17,39.28,39.39,39.49,39.6,39.64,39.68,39.79,39.89,40,40.08]},{"sp":"guest","text":"政府の担当者は、国内の会社を守るためだと話しています。外国から安い商品がたくさん入ってきますからね。","t":[40.24,40.44,40.64,40.8,41,41.2,41.52,41.84,41.92,42.16,42.4,42.56,42.8,43.04,43.16,43.28,43.44,43.56,43.68,43.8,43.92,44.16,44.27,44.38,44.5,44.61,44.72,45.36,45.6,45.84,46.08,46.32,46.52,46.72,46.96,47.2,47.28,47.4,47.52,47.64,47.76,47.92,48,48.08,48.19,48.29,48.4,48.52,48.64,48.8]},{"sp":"host","text":"あー、なるほど。つまり、値段が安い外国の商品から、国内の会社を守るということですね！","t":[49.28,49.52,49.76,49.92,50.08,50.24,50.44,50.64,51.28,51.47,51.65,51.84,51.89,52,52.16,52.32,52.52,52.72,52.92,53.12,53.2,53.4,53.6,53.84,54.08,54.28,54.38,54.48,54.64,54.88,55.12,55.24,55.36,55.6,55.68,55.76,55.84,55.92,56,56.11,56.21,56.32]},{"sp":"guest","text":"その通りです。外国の商品が安すぎると、国内の会社の商品が売れなくなってしまいますからね。","t":[56.8,56.96,57.12,57.28,57.44,57.6,57.76,58.4,58.6,58.8,58.96,59.16,59.36,59.52,59.76,59.88,60,60.32,60.64,60.72,60.96,61.2,61.36,61.52,61.68,61.76,62.04,62.32,62.4,62.52,62.64,62.75,62.85,62.96,63.05,63.14,63.23,63.33,63.42,63.51,63.6,63.76,63.92,64]},{"sp":"host","text":"国内の会社を守るのは大切やと思います。でも、みんなが喜んでいるわけやないんですよね？","t":[64.48,64.68,64.88,65.04,65.2,65.36,65.44,65.68,65.81,65.95,66.08,66.28,66.48,66.56,66.67,66.78,66.9,67.01,67.12,67.76,68,68.24,68.48,68.56,68.64,68.72,68.84,68.96,69.04,69.12,69.2,69.28,69.4,69.52,69.6,69.68,69.76,69.87,69.98,70.1,70.21,70.32]},{"sp":"guest","text":"そうなんです。経済の専門家は、これから商品の値段が上がるかもしれないと警告しています。","t":[70.48,70.6,70.72,70.84,70.96,71.08,71.2,71.92,72.08,72.4,72.48,72.64,72.8,72.96,73.52,73.6,73.74,73.88,74.02,74.16,74.4,74.64,74.72,74.88,75.04,75.2,75.33,75.47,75.6,75.72,75.84,75.96,76.08,76.24,76.4,76.56,76.76,76.96,77.07,77.18,77.3,77.41,77.52]},{"sp":"host","text":"えっ、商品の値段が上がってしまうんですか？買い物をする私たちには、それは困りますやん！","t":[77.92,78.08,78.24,78.72,78.92,79.12,79.2,79.36,79.44,79.6,79.72,79.84,79.9,79.97,80.03,80.1,80.16,80.27,80.37,80.48,80.64,81.2,81.36,81.52,81.68,81.81,81.95,82.08,82.19,82.29,82.4,82.64,82.88,83.08,83.15,83.21,83.28,83.52,83.63,83.73,83.84,83.92,84.08]},{"sp":"guest","text":"はい。外国から入る商品に関税をかけると、その分だけお店での値段が高くなってしまいます。","t":[84.56,84.72,84.88,85.52,85.72,85.92,86.08,86.24,86.4,86.56,86.8,87.04,87.2,87.36,87.52,87.6,87.76,87.92,88.08,88.56,88.64,88.8,88.96,89.12,89.4,89.68,89.84,90,90.16,90.32,90.48,90.64,90.8,91.04,91.12,91.2,91.31,91.43,91.54,91.66,91.77,91.89,92]},{"sp":"host","text":"うわー、外国の商品の値段が上がるのは大変やなあ。経済の専門家は、他にも何か言っているんですか？","t":[92.48,92.64,92.88,93.12,93.52,93.72,93.92,94,94.2,94.4,94.48,94.64,94.72,94.8,94.92,95.04,95.17,95.31,95.44,95.68,95.84,96,96.16,96.4,97.12,97.2,97.52,97.57,97.68,97.84,98,98.32,98.4,98.56,98.68,98.8,98.96,99.04,99.12,99.18,99.24,99.3,99.36,99.44,99.52,99.6,99.76]},{"sp":"guest","text":"はい。経済の専門家は、相手の国との貿易が減るかもしれない、とも警告しています。","t":[100.16,100.32,100.96,101.12,101.28,101.6,101.68,101.84,102.08,102.24,102.72,102.8,102.96,103.12,103.28,103.52,103.64,103.76,104.08,104.4,104.44,104.48,104.64,104.76,104.88,105,105.12,105.24,105.36,105.68,105.84,106,106.2,106.4,106.51,106.62,106.74,106.85,106.96]},{"sp":"host","text":"貿易が減るんですか。つまり、相手の国と商品を売ったり買ったりすることが少なくなってしまうんですね。","t":[107.44,107.68,108.08,108.16,108.24,108.32,108.43,108.53,108.64,108.8,109.44,109.63,109.81,110,110.08,110.24,110.32,110.48,110.72,110.88,111.12,111.36,111.44,111.52,111.63,111.73,111.84,112,112.08,112.16,112.24,112.37,112.5,112.62,112.75,112.88,113.04,113.12,113.2,113.28,113.36,113.44,113.52,113.6,113.68,113.78,113.88,113.98,114.08]},{"sp":"guest","text":"その通りです。貿易が減ると、お互いの国の関係も難しくなってしまうかもしれません。","t":[114.56,114.72,114.88,115.04,115.2,115.36,115.52,116.16,116.32,116.72,116.8,116.88,117.2,117.52,117.8,117.89,117.99,118.08,118.16,118.36,118.56,118.8,119.04,119.12,119.44,119.56,119.68,119.76,119.87,119.98,120.1,120.21,120.32,120.43,120.55,120.66,120.78,120.89,121.01,121.12]},{"sp":"host","text":"貿易が減るのは困った問題やなあ。それから、輸出を行う会社も何か言っているんですか？","t":[121.2,121.44,121.76,121.8,121.84,121.97,122.11,122.24,122.48,122.6,122.72,122.88,123.04,123.2,123.36,123.52,124.24,124.32,124.4,124.64,124.88,125,125.12,125.28,125.44,125.6,125.76,125.92,126.08,126.24,126.4,126.48,126.56,126.62,126.68,126.74,126.8,126.91,127.01,127.12,127.2]},{"sp":"guest","text":"はい。輸出を行う会社の中にも、これからのことを心配している会社がたくさんありますよ。","t":[127.6,127.76,128.4,128.48,128.64,128.88,129.07,129.25,129.44,129.6,129.76,129.84,130.16,130.48,130.8,130.92,130.98,131.04,131.17,131.31,131.44,131.57,131.71,131.84,132.08,132.24,132.34,132.44,132.54,132.64,132.88,133.04,133.2,133.3,133.4,133.5,133.6,133.72,133.84,133.96,134.08,134.24]},{"sp":"host","text":"輸出を行う会社ですか！外国に向けて商品を売る会社ですね。具体的には何が心配なんですか？","t":[134.64,134.8,135.04,135.23,135.41,135.6,135.76,135.84,135.95,136.05,136.16,136.88,137.08,137.28,137.4,137.52,137.64,137.76,137.96,138.16,138.24,138.36,138.48,138.56,138.72,138.83,138.93,139.04,139.68,139.84,140,140.16,140.36,140.56,140.8,140.88,141.12,141.2,141.28,141.36,141.47,141.57,141.68]},{"sp":"guest","text":"相手の国との貿易が減ると、外国の市場で商品を売ることができなくなるのではないか、と心配しているんです。","t":[142.08,142.32,142.4,142.56,142.8,142.96,143.12,143.28,143.6,143.68,143.76,144.16,144.56,144.64,144.88,145.12,145.2,145.36,145.6,145.76,146,146.24,146.32,146.4,146.52,146.64,146.76,146.88,147,147.12,147.24,147.36,147.48,147.6,147.72,147.84,147.96,148.08,148.2,148.32,148.64,148.8,149.04,149.2,149.3,149.4,149.5,149.6,149.71,149.81,149.92]},{"sp":"host","text":"なるほど！相手の国も関税をかけたら、外国の市場で日本の商品が売れへんようになりますもんね。","t":[150.32,150.48,150.64,150.84,151.04,151.6,151.68,151.76,151.92,152.16,152.32,152.48,152.64,152.72,152.84,152.96,153.2,153.44,153.52,153.72,153.92,154,154.16,154.24,154.48,154.61,154.75,154.88,155.12,155.36,155.48,155.54,155.6,155.68,155.76,155.84,155.92,156,156.08,156.16,156.24,156.32,156.4,156.56,156.72]},{"sp":"guest","text":"そうなんです。だから輸出を行う会社は、外国の市場で売れなくなることをとても心配しているんです。","t":[156.88,157,157.12,157.24,157.36,157.48,157.6,158.24,158.45,158.67,158.88,159.04,159.28,159.44,159.6,159.76,160,160.16,160.64,160.8,161,161.2,161.28,161.52,161.76,161.88,161.94,162,162.12,162.24,162.36,162.48,162.64,162.8,162.96,163.09,163.23,163.36,163.6,163.76,163.84,163.92,164,164.08,164.21,164.35,164.48]},{"sp":"host","text":"国内の会社を守るための関税やのに、輸出を行う会社が困ってしまうのは、ほんまに難しい問題やなあ。","t":[164.88,165.08,165.28,165.44,165.6,165.76,165.84,166.08,166.16,166.32,166.48,166.64,166.72,166.88,166.96,167.28,167.6,167.72,167.84,167.92,168.08,168.24,168.4,168.56,168.8,168.88,169.04,169.12,169.2,169.28,169.36,169.44,169.68,169.92,170,170.08,170.24,170.32,170.48,170.64,170.8,170.96,171.12,171.28,171.44,171.6,171.76]},{"sp":"guest","text":"ええ。商品の値段が上がることや、相手の国との貿易が減ることなど、いろいろな問題がありますね。","t":[171.84,172,172.24,172.88,173.12,173.36,173.44,173.6,173.76,173.84,173.96,174.08,174.21,174.35,174.48,175.04,175.16,175.28,175.36,175.52,175.76,175.88,176,176.24,176.64,176.68,176.72,176.85,176.99,177.12,177.44,177.76,178,178.06,178.12,178.18,178.24,178.32,178.52,178.72,178.83,178.94,179.06,179.17,179.28,179.36]},{"sp":"host","text":"新しい関税は来月から始まるから、私たちの生活や買い物の値段がどうなるか、ほんまに気になりますね。","t":[179.84,180.03,180.21,180.4,180.56,180.72,180.96,181.12,181.28,181.4,181.52,181.68,181.76,181.84,182.12,182.4,182.56,182.67,182.77,182.88,183.04,183.28,183.52,183.68,183.84,184,184.16,184.21,184.32,184.48,184.64,184.72,184.8,184.92,185.04,185.44,185.52,185.6,185.68,185.76,185.92,186,186.1,186.19,186.29,186.38,186.48,186.64]},{"sp":"guest","text":"はい。来月から始まりますから、商品の値段や貿易のニュースを、これからもよく見ていきましょう。","t":[187.04,187.2,187.84,188,188.16,188.4,188.52,188.64,188.88,189,189.12,189.24,189.36,189.68,190,190.28,190.42,190.56,190.64,190.88,191.2,191.28,191.44,191.76,191.96,192.01,192.06,192.11,192.16,192.56,192.8,192.86,192.92,192.98,193.04,193.2,193.32,193.44,193.6,193.68,193.76,193.84,193.94,194.04,194.14,194.24]},{"sp":"host","text":"ほんまですね！今日は「政府が外国の商品に新しい関税をかける」というニュースについて話しました。","t":[194.56,194.72,194.8,194.88,195.01,195.15,195.28,196,196.18,196.24,196.64,196.72,196.88,197.04,197.28,197.44,197.6,197.68,197.88,198.08,198.4,198.59,198.77,198.96,199.2,199.36,199.44,199.55,199.65,199.76,199.92,200.08,200.16,200.24,200.32,200.4,200.48,200.56,200.66,200.76,200.86,200.96,201.12,201.22,201.32,201.42,201.52]},{"sp":"guest","text":"はい。商品の値段や貿易について、よくわかりましたね。皆さん、今日もありがとうございました。","t":[201.92,202.08,202.72,202.8,203.08,203.36,203.44,203.68,204,204.05,204.16,204.4,204.6,204.8,205,205.2,205.32,205.38,205.44,205.55,205.65,205.76,205.89,206.03,206.16,206.24,207.04,207.28,207.52,207.76,207.8,207.92,208,208.08,208.18,208.28,208.38,208.49,208.59,208.69,208.79,208.9,209.0,209.1,209.2]},{"sp":"host","text":"ヨウコさん、ありがとうございました！それでは皆さん、また次回お会いしましょう！ほな、さいなら！","t":[209.6,209.68,209.76,209.84,210.04,210.24,210.72,210.76,210.81,210.85,210.9,210.94,210.98,211.03,211.07,211.11,211.16,211.2,211.84,211.92,212,212.12,212.24,212.45,212.67,212.88,213.04,213.12,213.2,213.44,213.6,213.68,213.72,213.76,213.84,213.92,214,214.08,214.16,214.72,214.88,215.2,215.28,215.32,215.36,215.52,215.68]}]},{"id":"EVAL-010.haruka-sota","title":"アメリカのはしかのワクチンと小さい子供たちのニュース","kind":"記事から","date":"昨日","duration":221.04,"names":{"host":"ハルカ","guest":"ソウタ"},"dialects":{"host":"標準語","guest":"標準語"},"audio":"../../scripts/podcast-spike/audio/EVAL-010.haruka-sota.eleven_v4.mp3","turns":[{"sp":"host","text":"みなさん、こんにちは！ハルカです。今日もラジオを聞いてくれてありがとうございます。ソウタさん、よろしくお願いします！","t":[0,0.4,0.48,0.56,0.64,1.08,1.17,1.26,1.34,1.43,1.52,1.56,1.6,1.76,1.84,2,2.16,2.8,2.96,3.04,3.12,3.28,3.36,3.52,3.68,3.73,3.79,3.84,3.96,4.08,4.32,4.42,4.51,4.61,4.7,4.8,4.9,4.99,5.09,5.18,5.28,6,6.08,6.16,6.32,6.52,6.72,6.76,6.8,6.96,7.04,7.12,7.23,7.33,7.44,7.57,7.71,7.84]},{"sp":"guest","text":"ハルカさん、こんにちは。ソウタです。よろしくお願いします。今日も分かりやすくニュースを説明しますね。","t":[8.32,8.4,8.48,8.56,8.8,9.04,9.52,9.62,9.71,9.81,9.9,10,10.08,10.16,10.24,10.32,10.48,10.64,11.12,11.2,11.36,11.44,11.52,11.6,11.68,11.76,11.89,12.03,12.16,12.8,12.96,13.04,13.28,13.39,13.49,13.6,13.71,13.81,13.92,14.02,14.12,14.22,14.32,14.4,14.56,14.64,14.75,14.85,14.96,15.04]},{"sp":"host","text":"ありがとうございます！今日はアメリカの小さい子供たちのワクチンについてのニュースですね。新しい研究が出たと聞きました。","t":[15.52,15.62,15.71,15.81,15.9,16,16.1,16.19,16.29,16.38,16.48,17.12,17.36,17.52,17.76,17.88,18,18.12,18.24,18.48,18.64,18.8,18.96,19.12,19.28,19.4,19.52,19.68,19.76,19.92,20,20.08,20.2,20.32,20.44,20.56,20.72,20.78,20.84,20.9,20.96,21.09,21.23,21.36,22.16,22.35,22.53,22.72,22.92,23.12,23.24,23.36,23.52,23.6,23.68,23.82,23.96,24.1,24.24]},{"sp":"guest","text":"はい。新しい研究によると、アメリカで決まった内容が、小さい子供たちにとってとても危険だということが分かりました。","t":[24.64,24.72,24.88,25.44,25.6,25.76,25.92,26.12,26.32,26.4,26.48,26.84,27.2,27.44,27.5,27.56,27.62,27.68,27.76,27.92,28.03,28.13,28.24,28.4,28.56,29.12,29.36,29.44,29.52,29.6,29.76,29.92,30,30.08,30.24,30.4,30.56,30.72,30.88,31.04,31.2,31.28,31.44,31.52,31.6,31.68,31.76,31.87,31.97,32.08,32.19,32.29,32.4,32.51,32.61,32.72]},{"sp":"host","text":"とても危険なんですか？子供たちのことですから心配ですね。いったい誰が、どんなことを決めたのですか？","t":[33.04,33.2,33.36,33.52,33.68,33.84,33.92,34,34.16,34.32,34.48,35.2,35.36,35.52,35.64,35.76,35.87,35.97,36.08,36.22,36.36,36.5,36.64,36.88,37.04,37.17,37.31,37.44,38.32,38.43,38.53,38.64,38.88,39.12,39.44,39.6,39.65,39.71,39.76,39.89,40.03,40.16,40.24,40.32,40.4,40.53,40.67,40.8,40.96]},{"sp":"guest","text":"アメリカのRFKジュニアたちが決めました。彼らは、小さい子供たちにはしかのワクチンを受けるお勧めをやめたんです。","t":[41.12,41.24,41.36,41.48,41.6,41.84,42.08,42.32,42.48,42.56,42.64,42.72,42.8,42.92,43.04,43.12,43.24,43.36,43.47,43.57,43.68,44.64,44.8,44.96,45.44,45.52,45.65,45.79,45.92,46.08,46.24,46.32,46.4,46.68,46.96,47.04,47.12,47.28,47.36,47.52,47.6,47.68,47.76,47.92,48.04,48.16,48.32,48.48,48.64,48.72,48.8,48.92,49.04,49.15,49.25,49.36]},{"sp":"host","text":"ええっ！はしかのワクチンを受けるお勧めをやめたのですか？病気を防ぐために大切なのに、どうしてですか？","t":[49.76,50,50.08,50.16,50.8,50.96,51.08,51.2,51.28,51.44,51.52,51.64,51.76,51.84,51.92,52.04,52.16,52.35,52.53,52.72,52.8,52.88,53,53.12,53.25,53.39,53.52,53.68,54.56,54.8,54.96,55.08,55.2,55.36,55.49,55.63,55.76,55.96,56.16,56.4,56.64,56.88,57,57.06,57.12,57.2,57.28,57.41,57.55,57.68]},{"sp":"guest","text":"この問題を話し合ったグループは、ワクチンをやめることが子供たちにどんな影響があるか、考えませんでした。","t":[58.08,58.2,58.32,58.48,58.64,58.8,58.96,59.12,59.24,59.3,59.36,59.46,59.56,59.66,59.76,60.32,60.4,60.48,60.64,60.72,60.8,60.88,60.96,61.08,61.2,61.39,61.57,61.76,61.92,62.08,62.2,62.32,62.48,62.59,62.69,62.8,62.96,63.12,63.23,63.33,63.44,63.76,63.92,64,64.08,64.19,64.29,64.4,64.51,64.61,64.72]},{"sp":"host","text":"子供たちへの影響を考えなかったのですか？きちんとルールを守って決めたのではないのですか？","t":[65.04,65.28,65.44,65.56,65.68,65.8,65.92,66.08,66.24,66.43,66.61,66.8,66.9,67,67.1,67.2,67.33,67.47,67.6,67.76,68.48,68.62,68.76,68.9,69.04,69.12,69.24,69.36,69.44,69.6,69.72,69.84,69.96,70.08,70.24,70.34,70.43,70.53,70.62,70.72,70.85,70.99,71.12,71.28]},{"sp":"guest","text":"いいえ。正しい規則を使って決めることもしませんでした。だから、研究を行った人たちはとても心配しています。","t":[71.44,71.56,71.68,71.76,72.48,72.64,72.8,72.96,73.2,73.28,73.42,73.56,73.7,73.84,73.92,74,74.11,74.21,74.32,74.4,74.52,74.64,74.72,74.8,74.88,75,75.12,76.08,76.29,76.51,76.72,76.92,77.02,77.12,77.28,77.44,77.52,77.6,77.76,77.92,78.16,78.4,78.51,78.61,78.72,78.96,79.12,79.22,79.31,79.41,79.5,79.6]},{"sp":"host","text":"正しい規則も使わずに決めたのですね。はしかは、小さい子供がかかると危ない病気ですよね。","t":[80,80.19,80.37,80.56,80.64,80.88,81.04,81.2,81.36,81.48,81.6,81.72,81.84,81.92,82.05,82.19,82.32,82.48,83.36,83.44,83.6,83.76,84.16,84.24,84.37,84.51,84.64,84.8,85.12,85.32,85.39,85.45,85.52,85.84,86.08,86.16,86.24,86.4,86.48,86.62,86.76,86.9,87.04]},{"sp":"guest","text":"その通りです。はしかはとても強い病気です。研究を行った人たちも、この決定で子供たちに危険が迫っていると伝えています。","t":[87.52,87.68,87.84,87.96,88.08,88.24,88.4,89.04,89.12,89.28,89.44,89.6,89.73,89.87,90,90.16,90.32,90.48,90.56,90.72,90.88,91.84,92.04,92.24,92.4,92.56,92.64,92.72,92.88,93.04,93.2,93.6,93.76,93.84,93.92,94.08,94.24,94.72,94.96,95.04,95.16,95.28,95.44,95.6,95.92,96.04,96.16,96.28,96.4,96.52,96.64,96.76,96.82,96.88,97,97.12,97.24,97.36]},{"sp":"host","text":"つまり、お勧めをやめると、病気になる小さい子供が増えて本当に危ない、ということですね。","t":[97.76,98,98.24,98.48,98.56,98.72,98.88,99.04,99.12,99.28,99.36,99.68,100,100.08,100.32,100.44,100.56,100.68,100.8,100.96,101.12,101.28,101.44,101.76,101.8,101.84,102.12,102.4,102.59,102.77,102.96,103.2,103.4,103.6,103.84,103.89,103.94,103.98,104.03,104.08,104.21,104.35,104.48]},{"sp":"guest","text":"はい。それだけではありません。この決定のせいで、お金の問題も新しく出てきてしまいました。","t":[104.64,104.8,104.96,105.52,105.6,105.68,105.8,105.92,106.01,106.1,106.19,106.29,106.38,106.47,106.56,107.36,107.48,107.6,107.8,108,108.08,108.16,108.44,108.72,108.84,108.9,109.04,109.2,109.36,109.52,109.76,110,110.12,110.24,110.36,110.48,110.56,110.65,110.74,110.83,110.93,111.02,111.11,111.2]},{"sp":"host","text":"お金の問題ですか？お勧めをやめると、お金の何が変わるのですか？","t":[111.52,111.68,111.92,112.08,112.24,112.4,112.53,112.67,112.8,113.6,113.76,113.92,114.08,114.16,114.32,114.4,114.68,114.96,115.08,115.14,115.36,115.52,115.76,115.92,116,116.08,116.16,116.29,116.43,116.56,116.72]},{"sp":"guest","text":"普通の保険会社が、ワクチンのお金を払う必要がなくなりました。だから、保険が使えなくなります。","t":[117.12,117.28,117.44,117.52,117.68,117.84,118,118.16,118.56,118.64,118.72,118.88,118.96,119.04,119.16,119.28,119.6,119.68,119.76,119.92,120.08,120.24,120.32,120.44,120.56,120.68,120.8,120.88,120.96,121.04,121.92,122.11,122.29,122.48,122.56,122.64,122.8,122.96,123.08,123.2,123.32,123.44,123.52,123.6,123.72,123.84]},{"sp":"host","text":"保険会社がお金を払わないと、家族がワクチンのお金を全部自分で払うことになりますね。","t":[124.24,124.4,124.56,124.8,124.96,125.04,125.16,125.52,125.6,125.68,125.84,126.08,126.32,126.56,126.8,126.92,127.04,127.12,127.28,127.44,127.52,127.6,127.72,127.84,128.08,128.4,128.56,128.72,128.88,129.04,129.2,129.36,129.47,129.57,129.68,129.79,129.9,130.02,130.13,130.24,130.4]},{"sp":"guest","text":"そうです。ワクチンのお金は高いですから、自分のお金で払うのはとても大変です。","t":[130.8,130.92,131.04,131.16,131.28,131.92,132,132.16,132.24,132.32,132.44,132.56,132.72,132.96,133.08,133.2,133.3,133.4,133.5,133.6,134.08,134.21,134.35,134.48,134.56,134.88,134.96,135.04,135.12,135.32,135.52,135.65,135.79,135.92,136.08,136.24,136.36,136.48]},{"sp":"host","text":"お金がない家族はどうするのですか？アメリカには、国が子供を助けてくれる計画はないのですか？","t":[136.88,137,137.28,137.39,137.49,137.6,137.8,138,138.13,138.27,138.4,138.48,138.56,138.69,138.83,138.96,139.12,140,140.1,140.2,140.3,140.4,140.68,140.96,141.04,141.36,141.48,141.6,141.84,141.96,142.08,142.2,142.32,142.4,142.48,142.64,142.8,143.04,143.15,143.25,143.36,143.49,143.63,143.76,143.92]},{"sp":"guest","text":"アメリカには、お金がない家族の子供たちにワクチンを届ける国の計画があります。子供の半分が使う大きな計画です。","t":[144.24,144.36,144.48,144.6,144.72,145,145.28,145.36,145.44,145.68,145.79,145.89,146,146.16,146.32,146.48,146.64,146.8,146.92,147.04,147.36,147.44,147.6,147.68,147.76,147.92,148.16,148.28,148.4,148.56,148.72,148.88,149.12,149.22,149.31,149.41,149.5,149.6,150.56,150.72,150.96,151.04,151.2,151.44,151.6,151.84,152.08,152.21,152.35,152.48,152.64,152.8,152.92,153.04]},{"sp":"host","text":"子供の半分も使っているのですね！その計画があれば、お金がない家族もワクチンをもらえますか？","t":[153.44,153.68,153.84,154,154.24,154.4,154.56,154.72,154.8,154.88,154.96,155.04,155.17,155.31,155.44,155.6,156.4,156.52,156.64,156.88,157.04,157.22,157.4,157.58,157.76,157.84,157.96,158.16,158.29,158.43,158.56,158.76,158.96,159.12,159.2,159.36,159.44,159.52,159.68,159.79,159.89,160,160.12,160.24,160.32]},{"sp":"guest","text":"それが、今回の決定のせいで、その国の計画でもはしかのワクチンを使うことができなくなってしまいました。","t":[160.48,160.69,160.91,161.12,161.36,161.44,161.52,161.6,161.8,162,162.08,162.16,162.48,162.8,162.88,163,163.12,163.28,163.44,163.68,163.84,164.08,164.32,164.48,164.56,164.64,164.72,164.88,164.96,165.04,165.12,165.28,165.44,165.6,165.71,165.82,165.94,166.05,166.16,166.24,166.32,166.4,166.49,166.58,166.67,166.76,166.85,166.94,167.03,167.12]},{"sp":"host","text":"ええっ！国の計画でも使えないのですか？それなら、たくさんの子供たちにワクチンが届きませんね。","t":[167.52,167.68,167.76,167.92,168.56,168.76,168.96,169.12,169.28,169.4,169.52,169.68,169.79,169.89,170,170.11,170.21,170.32,170.48,171.36,171.48,171.6,171.84,172.08,172.24,172.32,172.4,172.51,172.61,172.72,172.88,173.04,173.16,173.28,173.36,173.52,173.6,173.76,173.92,174.04,174.16,174.24,174.37,174.51,174.64,174.8]},{"sp":"guest","text":"はい。お金がない家族の子供たちにワクチンが届かなくなります。研究では、これが本当に危ないと示しています。","t":[175.2,175.36,175.52,176.08,176.16,176.4,176.51,176.61,176.72,176.88,177.04,177.12,177.36,177.44,177.56,177.68,178.08,178.16,178.32,178.44,178.56,178.64,178.88,179,179.06,179.12,179.2,179.28,179.4,179.52,180.48,180.68,180.88,181.12,181.36,181.6,181.68,181.76,181.84,182,182.16,182.32,182.56,182.64,182.72,182.8,182.96,183.07,183.18,183.3,183.41,183.52]},{"sp":"host","text":"つまり、お金がない子供たちにワクチンが届かなくなるのですね。病気の危険が高くなります。子供たちの健康のために、早く正しい決定をしてほしいです。","t":[183.92,184.16,184.4,184.64,184.72,184.84,185.04,185.17,185.31,185.44,185.6,185.76,185.92,186.08,186.32,186.48,186.56,186.72,186.88,187,187.12,187.2,187.32,187.44,187.56,187.68,187.79,187.89,188,188.16,189.12,189.28,189.52,189.6,189.68,189.84,190,190.24,190.35,190.46,190.58,190.69,190.8,191.68,191.84,192,192.12,192.24,192.48,192.6,192.72,192.92,193.12,193.32,193.52,193.68,193.92,194.16,194.32,194.48,194.64,194.8,194.96,195.07,195.17,195.28,195.39,195.49,195.6,195.76,195.92]},{"sp":"guest","text":"本当にそうですね。みんなで小さい子供たちを守ることが大切です。子供の健康を守るために、安全な決定が必要ですね。","t":[196.08,196.24,196.4,196.56,196.64,196.72,196.85,196.99,197.12,198,198.11,198.21,198.32,198.64,198.77,198.91,199.04,199.2,199.36,199.48,199.6,199.76,199.92,200.04,200.16,200.28,200.4,200.6,200.8,200.92,201.04,202,202.16,202.32,202.56,202.68,202.8,202.88,203.12,203.3,203.48,203.66,203.84,203.92,204.12,204.32,204.52,204.62,204.72,204.85,204.99,205.12,205.23,205.33,205.44]},{"sp":"host","text":"今日は、アメリカのはしかのワクチンについての新しい研究をお話ししました。ソウタさん、ありがとうございました！","t":[205.84,206.04,206.16,206.56,206.84,206.91,206.98,207.05,207.12,207.28,207.44,207.52,207.6,207.76,207.84,208,208.08,208.16,208.3,208.44,208.58,208.72,208.96,209.15,209.33,209.52,209.72,209.92,210.04,210.16,210.32,210.48,210.8,211.12,211.44,211.76,211.8,211.84,212,212.16,212.36,212.56,213.04,213.08,213.13,213.17,213.22,213.26,213.3,213.34,213.39,213.43,213.48,213.52]},{"sp":"guest","text":"ありがとうございました。リスナーのみなさんも、健康に気をつけて過ごしてくださいね。また次回お会いしましょう！","t":[213.76,213.84,213.92,214,214.08,214.16,214.24,214.32,214.4,214.48,214.56,214.64,215.52,215.68,215.76,215.84,215.92,216,216.08,216.24,216.32,216.4,216.8,216.88,217.04,217.2,217.36,217.44,217.52,217.6,217.72,217.84,217.96,218.08,218.16,218.24,218.32,218.4,218.48,218.56,218.64,219.52,219.64,219.76,220,220.24,220.32,220.4,220.6,220.64,220.68,220.72,220.76,220.8]}]}];
+
+// Mock dictionary — in the app this is the real tokenizer + JMDict lookup.
+const DICT = {
+  '関税': ['かんぜい', 'tariff; customs duty', 'N1'], '政府': ['せいふ', 'government', 'N3'], '商品': ['しょうひん', 'goods; merchandise', 'N3'],
+  '外国': ['がいこく', 'foreign country', 'N5'], '値段': ['ねだん', 'price', 'N4'], '経済': ['けいざい', 'economy', 'N3'],
+  '専門家': ['せんもんか', 'expert; specialist', 'N2'], '警告': ['けいこく', 'warning', 'N1'], '貿易': ['ぼうえき', 'trade', 'N2'],
+  '国内': ['こくない', 'domestic', 'N2'], '発表': ['はっぴょう', 'announcement', 'N3'], '生活': ['せいかつ', 'daily life', 'N4'],
+  '税金': ['ぜいきん', 'tax', 'N3'], '会社': ['かいしゃ', 'company', 'N5'], '守る': ['まもる', 'to protect', 'N4'],
+  '研究': ['けんきゅう', 'research', 'N4'], '子供': ['こども', 'child', 'N5'], '危険': ['きけん', 'danger', 'N4'],
+  '病気': ['びょうき', 'illness', 'N5'], '予防': ['よぼう', 'prevention', 'N2'], '今日': ['きょう', 'today', 'N5'],
+  '皆さん': ['みなさん', 'everyone', 'N5'], '影響': ['えいきょう', 'influence; effect', 'N3'], '健康': ['けんこう', 'health', 'N4'],
+  '理由': ['りゆう', 'reason', 'N4'], '問題': ['もんだい', 'problem', 'N5'], '安い': ['やすい', 'cheap', 'N5'],
+};
+const DICT_KEYS = Object.keys(DICT).sort((a, b) => b.length - a.length);
+const seg = new Intl.Segmenter('ja', { granularity: 'word' });
+
+function tokenize(text) {
+  const out = []; let buf = '', bufStart = 0;
+  const flush = () => { for (const s of seg.segment(buf)) out.push({ w: s.segment, i: bufStart + s.index }); buf = ''; };
+  for (let i = 0; i < text.length;) {
+    const k = DICT_KEYS.find((k) => text.startsWith(k, i));
+    if (k) { flush(); out.push({ w: k, i, dict: true }); i += k.length; bufStart = i; }
+    else { if (!buf) bufStart = i; buf += text[i++]; }
+  }
+  flush();
+  return out;
+}
+const fmt = (s) => { s = Math.max(0, s); return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`; };
+const durLabel = (s) => `${Math.floor(s / 60)}分${String(Math.round(s % 60)).padStart(2, '0')}秒`;
+
+// ---------- Listen tab ----------
+EPISODES.forEach((ep, i) => {
+  document.querySelector(`[data-title="${i}"]`).textContent = ep.title;
+  document.querySelector(`[data-dur="${i}"]`).textContent = durLabel(ep.duration);
+});
+document.querySelectorAll('.filter-pill').forEach((p) => p.addEventListener('click', () => {
+  document.querySelectorAll('.filter-pill').forEach((q) => q.classList.toggle('active', q === p));
+  document.querySelectorAll('.ep-card').forEach((c) => c.classList.toggle('hidden', p.dataset.filter !== 'all' && c.dataset.state !== p.dataset.filter));
+}));
+document.getElementById('epList').addEventListener('click', (e) => {
+  const card = e.target.closest('.ep-card[data-ep]');
+  if (card) { load(+card.dataset.ep, true); }
+});
+
+const createSheet = document.getElementById('createSheet'), createBackdrop = document.getElementById('createBackdrop');
+const toggleCreate = (open) => { createSheet.classList.toggle('open', open); createBackdrop.classList.toggle('open', open); };
+document.getElementById('openCreate').onclick = () => toggleCreate(true);
+createBackdrop.onclick = () => toggleCreate(false);
+document.querySelectorAll('#srcTabs .chip').forEach((t) => t.onclick = () => {
+  document.querySelectorAll('#srcTabs .chip').forEach((q) => q.classList.toggle('active', q === t));
+  document.querySelectorAll('[data-pane]').forEach((p) => p.hidden = p.dataset.pane !== t.dataset.src);
+});
+document.querySelectorAll('[data-topic]').forEach((c) => c.onclick = () => { document.getElementById('topicInput').value = c.dataset.topic; });
+document.querySelectorAll('#lenChips .chip').forEach((c) => c.onclick = () => document.querySelectorAll('#lenChips .chip').forEach((q) => q.classList.toggle('active', q === c)));
+document.getElementById('createCta').onclick = () => {
+  const topic = document.getElementById('topicInput').value.trim() || 'AIと仕事';
+  toggleCreate(false);
+  const card = document.createElement('div');
+  card.className = 'ep-card'; card.dataset.state = 'new';
+  card.innerHTML = `<div class="card-top"><span class="cat-tag">トピック · ${topic}</span><span class="status muted"><span class="spinner"></span><span class="st">台本を作成中…</span></span></div>
+    <h3 class="ep-title">${topic}についての新しいエピソード</h3><div class="card-sub"><span class="cast">ヨウコ × ユウキ</span><span class="sep">·</span>約5分</div>`;
+  document.getElementById('epList').prepend(card);
+  setTimeout(() => { card.querySelector('.st').textContent = '音声を収録中…'; }, 2500);
+  setTimeout(() => { card.querySelector('.status').className = 'status ready'; card.querySelector('.status').innerHTML = '✓ READY'; }, 5500);
+};
+
+// ---------- Player: clock (real audio, or simulated if the file is missing) ----------
+const audio = new Audio();
+let simulated = false, simT = 0, simStart = null, rate = 1;
+const clock = {
+  get t() { return simulated ? (simStart == null ? simT : simT + (performance.now() - simStart) / 1000 * rate) : audio.currentTime; },
+  get playing() { return simulated ? simStart != null : !audio.paused; },
+  play() { if (simulated) { if (simStart == null) simStart = performance.now(); } else audio.play().catch(() => { simulated = true; clock.play(); }); loop(); renderPlay(); },
+  pause() { if (simulated) { simT = clock.t; simStart = null; } else audio.pause(); renderPlay(); },
+  seek(t) { if (simulated) { const p = clock.playing; simT = t; simStart = p ? performance.now() : null; } else audio.currentTime = t; tick(); },
+  setRate(r) { if (simulated && simStart != null) { simT = clock.t; simStart = performance.now(); } rate = r; audio.playbackRate = r; audio.preservesPitch = true; },
+};
+audio.addEventListener('error', () => { simulated = true; document.getElementById('audioNote').textContent = 'Audio file not found, so playback runs on a simulated clock (timings are still the real alignment).'; });
+audio.addEventListener('pause', renderPlay); audio.addEventListener('play', renderPlay);
+
+// ---------- Player: transcript ----------
+let ep = null, sents = [], words = [], curSent = null, curWord = null, epIdx = -1;
+const tr = document.getElementById('transcript');
+
+function load(i, autoplay) {
+  if (epIdx === i) { if (autoplay && !clock.playing) clock.play(); return; }
+  clock.pause(); epIdx = i; ep = EPISODES[i]; simulated = false; simT = 0; simStart = null;
+  audio.src = ep.audio; audio.playbackRate = rate;
+  document.getElementById('pKind').textContent = `${ep.kind} · ${ep.date}`;
+  const dial = (r) => ep.dialects[r] !== '標準語' ? `（${ep.dialects[r]}）` : '';
+  tr.innerHTML = `<div class="ep-head"><h1>${ep.title}</h1><div class="castline"><b>${ep.names.host}</b>${dial('host')} × <b>${ep.names.guest}</b>${dial('guest')} · ${durLabel(ep.duration)}</div><div class="title-rule"></div></div>`;
+  sents = []; words = []; curSent = curWord = null;
+  for (const turn of ep.turns) {
+    const div = document.createElement('div'); div.className = `turn ${turn.sp}`;
+    div.innerHTML = `<span class="who">${ep.names[turn.sp]}</span>`;
+    const body = document.createElement('div'); body.className = 'turn-text'; div.appendChild(body);
+    let sent = null;
+    for (const tok of tokenize(turn.text)) {
+      if (!sent) { sent = document.createElement('span'); sent.className = 'sent'; sent.dataset.t = turn.t[tok.i]; body.appendChild(sent); sents.push(sent); }
+      const w = document.createElement('span'); w.className = 'w' + (tok.dict ? ' dict' : '');
+      w.innerHTML = tok.dict ? `<ruby>${tok.w}<rt>${DICT[tok.w][0]}</rt></ruby>` : tok.w;
+      w.dataset.word = tok.w; w.dataset.t = turn.t[tok.i]; w._sent = sent;
+      sent.appendChild(w); words.push(w);
+      if (/[。！？!?]$/.test(tok.w)) sent = null;
+    }
+    tr.appendChild(div);
+  }
+  tr.scrollTop = 0; tick();
+  document.getElementById('miniTitle').textContent = ep.title;
+  document.getElementById('miniCast').textContent = `${ep.names.host} × ${ep.names.guest}`;
+  if (autoplay) clock.play();
+}
+
+// ---------- Player: sync loop ----------
+let userScrollUntil = 0, autoScrollPaused = false, raf = null;
+function tick() {
+  if (!ep) return;
+  const t = clock.t;
+  let lo = 0, hi = words.length - 1, idx = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (+words[m].dataset.t <= t) { idx = m; lo = m + 1; } else hi = m - 1; }
+  const w = words[idx];
+  if (w && w !== curWord) { curWord?.classList.remove('on'); curWord = w; w.classList.add('on'); }
+  if (w && w._sent !== curSent) {
+    curSent?.classList.remove('cur'); curSent = w._sent; curSent.classList.add('cur');
+    if (!autoScrollPaused) scrollToCur();
+  }
+  document.getElementById('fill').style.width = `${(t / ep.duration) * 100}%`;
+  document.getElementById('knob').style.left = `${(t / ep.duration) * 100}%`;
+  document.getElementById('tNow').textContent = fmt(t);
+  document.getElementById('tLeft').textContent = '-' + fmt(ep.duration - t);
+  document.getElementById('miniBar').style.width = `${(t / ep.duration) * 100}%`;
+  const prog = document.querySelector(`[data-prog="${epIdx}"]`); if (prog) prog.style.width = `${(t / ep.duration) * 100}%`;
+  if (t >= ep.duration) { clock.pause(); }
+}
+function loop() { cancelAnimationFrame(raf); const f = () => { tick(); if (clock.playing) raf = requestAnimationFrame(f); }; raf = requestAnimationFrame(f); }
+function scrollToCur() {
+  if (!curSent) return;
+  const top = curSent.getBoundingClientRect().top - tr.getBoundingClientRect().top + tr.scrollTop;
+  programmatic = true; tr.scrollTo({ top: top - tr.clientHeight * 0.4 });
+  setTimeout(() => { programmatic = false; }, 600);
+}
+let programmatic = false;
+const userScrolled = () => { if (programmatic || !clock.playing) return; autoScrollPaused = true; document.getElementById('resync').classList.add('show'); };
+tr.addEventListener('wheel', userScrolled, { passive: true });
+tr.addEventListener('touchmove', userScrolled, { passive: true });
+document.getElementById('resync').onclick = () => { autoScrollPaused = false; document.getElementById('resync').classList.remove('show'); scrollToCur(); };
+
+// ---------- Player: controls ----------
+function renderPlay() {
+  const p = clock.playing;
+  document.getElementById('play').textContent = p ? '❚❚' : '▶';
+  document.getElementById('miniPlay').textContent = p ? '❚❚' : '▶';
+  document.getElementById('mini').classList.toggle('show', !!ep && (p || clock.t > 0));
+  document.querySelectorAll('.ep-card').forEach((c) => c.classList.toggle('now', +c.dataset.ep === epIdx && p));
+}
+document.getElementById('play').onclick = () => { if (!ep) load(0, false); clock.playing ? clock.pause() : clock.play(); };
+document.getElementById('miniPlay').onclick = (e) => { e.stopPropagation(); clock.playing ? clock.pause() : clock.play(); };
+const sentIndex = () => Math.max(0, sents.indexOf(curSent));
+document.getElementById('prev').onclick = () => { const i = sentIndex(); const s = sents[clock.t - +sents[i].dataset.t > 1.2 ? i : Math.max(0, i - 1)]; clock.seek(+s.dataset.t); };
+document.getElementById('next').onclick = () => { const s = sents[Math.min(sents.length - 1, sentIndex() + 1)]; clock.seek(+s.dataset.t); };
+const SPEEDS = [0.75, 0.9, 1, 1.15];
+document.getElementById('speed').onclick = (e) => {
+  const r = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length]; clock.setRate(r);
+  e.currentTarget.textContent = `${r.toFixed(r === 1 ? 1 : 2).replace(/0$/, '')}×`; e.currentTarget.classList.toggle('on', r !== 1);
+};
+document.getElementById('furi').onclick = (e) => { tr.classList.toggle('no-furi'); e.currentTarget.classList.toggle('on'); };
+document.getElementById('lf').onclick = (e) => { tr.classList.toggle('listen-first'); e.currentTarget.classList.toggle('on'); };
+document.getElementById('scrub').onclick = (e) => {
+  if (!ep) return; const r = e.currentTarget.getBoundingClientRect();
+  clock.seek(((e.clientX - r.left) / r.width) * ep.duration);
+};
+
+// tap word → pause + dictionary; double-tap sentence → seek; listen-first tap → reveal
+let tapTimer = null, resumeAfter = false;
+tr.addEventListener('click', (e) => {
+  const w = e.target.closest('.w'); if (!w) return;
+  const s = w._sent;
+  if (tr.classList.contains('listen-first') && !s.classList.contains('revealed')) { s.classList.add('revealed'); return; }
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => openWord(w), 260);
+});
+tr.addEventListener('dblclick', (e) => {
+  const s = e.target.closest('.sent'); if (!s) return;
+  clearTimeout(tapTimer); window.getSelection()?.removeAllRanges();
+  clock.seek(+s.dataset.t); if (!clock.playing) clock.play();
+});
+const wordSheet = document.getElementById('wordSheet'), wordBackdrop = document.getElementById('wordBackdrop');
+function openWord(w) {
+  if (/^[\s、。！？!?「」]+$/.test(w.dataset.word)) return;
+  resumeAfter = clock.playing; clock.pause();
+  const d = DICT[w.dataset.word];
+  document.getElementById('wsWord').textContent = w.dataset.word;
+  document.getElementById('wsReading').textContent = d ? d[0] : '';
+  document.getElementById('wsJlpt').textContent = d ? d[2] : '';
+  document.getElementById('wsJlpt').hidden = !d;
+  document.getElementById('wsMeaning').textContent = d ? d[1] : '(mockup: JMDict lookup result appears here)';
+  const sentText = [...w._sent.querySelectorAll('.w')].map((x) => x.dataset.word).join('');
+  document.getElementById('wsSent').innerHTML = `${sentText}<span class="tr">訳 → (sentence translation, fetched on demand)</span>`;
+  wordSheet.classList.add('open'); wordBackdrop.classList.add('open');
+}
+function closeWord() { wordSheet.classList.remove('open'); wordBackdrop.classList.remove('open'); if (resumeAfter) clock.play(); }
+wordBackdrop.onclick = closeWord;
+wordSheet.querySelectorAll('[data-close]').forEach((b) => b.onclick = closeWord);
+
+load(0, false);
+</script>
+</body>
+</html>

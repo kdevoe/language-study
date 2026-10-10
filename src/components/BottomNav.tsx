@@ -1,6 +1,6 @@
-import { Newspaper, BookOpen, Layers, Settings } from 'lucide-react';
+import { Newspaper, BookOpen, Headphones, Layers } from 'lucide-react';
 
-type Tab = 'news' | 'library' | 'flashcards' | 'settings';
+type Tab = 'news' | 'library' | 'listen' | 'flashcards' | 'settings';
 
 interface Props {
   activeTab: Tab;
@@ -12,8 +12,8 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
     { id: 'news', label: 'NEWS', icon: Newspaper },
     { id: 'library', label: 'LIBRARY', icon: BookOpen },
+    { id: 'listen', label: 'LISTEN', icon: Headphones },
     { id: 'flashcards', label: 'REVIEW', icon: Layers },
-    { id: 'settings', label: 'SETTINGS', icon: Settings }
   ] as const;
 
   return (

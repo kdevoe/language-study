@@ -24,3 +24,8 @@ export const GROQ_GENERAL = 'openai/gpt-oss-20b';
 
 /** Groq — same-story news clustering/dedupe (fetch-raw-news). */
 export const GROQ_CLUSTER = 'llama-3.3-70b-versatile';
+
+/** ElevenLabs — podcast dialogue TTS (generate-podcast). v4 won the P0 spike over
+ *  v3: ~35% faster generation and a 7–20 dB lower noise floor on every voice
+ *  (docs/podcast-design.md "Spike results"). */
+export const ELEVEN_DIALOGUE_MODEL = 'eleven_v4';
