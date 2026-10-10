@@ -1,6 +1,6 @@
-import { Newspaper, BookOpen, Layers, BarChart2, Settings } from 'lucide-react';
+import { Newspaper, BookOpen, Layers, Settings } from 'lucide-react';
 
-type Tab = 'news' | 'library' | 'flashcards' | 'progress' | 'settings';
+type Tab = 'news' | 'library' | 'flashcards' | 'settings';
 
 interface Props {
   activeTab: Tab;
@@ -12,8 +12,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
     { id: 'news', label: 'NEWS', icon: Newspaper },
     { id: 'library', label: 'LIBRARY', icon: BookOpen },
-    { id: 'flashcards', label: 'STUDY', icon: Layers },
-    { id: 'progress', label: 'PROGRESS', icon: BarChart2 },
+    { id: 'flashcards', label: 'REVIEW', icon: Layers },
     { id: 'settings', label: 'SETTINGS', icon: Settings }
   ] as const;
 
@@ -50,8 +49,8 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
               cursor: 'pointer',
               color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
               transition: 'color 0.2s',
-              // Five tabs now: flex within the bar (fixed 80px × 5 overflows a
-              // 375px viewport), capped so they don't sprawl on wide screens.
+              // Flex within the bar (a fixed 80px × 5 overflowed a 375px viewport),
+              // capped so they don't sprawl on wide screens.
               flex: 1,
               maxWidth: '80px'
             }}

@@ -64,7 +64,7 @@ interface WordRow extends WordData {
   dbKey: string;  // the wordDatabase key — stable, unique React key
 }
 
-export function Progress() {
+export function Progress({ embedded = false }: { embedded?: boolean } = {}) {
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const userJlpt = useAppStore((s) => s.jlptLevel);
 
@@ -202,12 +202,15 @@ export function Progress() {
 
   return (
     <div className="fade-in" style={{ paddingBottom: '6rem' }}>
-      <h1
-        className="serif"
-        style={{ fontSize: '2rem', marginBottom: '0.35rem', color: 'var(--text-main)' }}
-      >
-        Progress
-      </h1>
+      {/* Inside REVIEW the 進捗 segment label is the title. */}
+      {!embedded && (
+        <h1
+          className="serif"
+          style={{ fontSize: '2rem', marginBottom: '0.35rem', color: 'var(--text-main)' }}
+        >
+          Progress
+        </h1>
+      )}
       <p
         className="sans"
         style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}

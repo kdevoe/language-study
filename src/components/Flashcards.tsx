@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
-import { selectDeck, DeckEntry } from '../services/deck';
+import { buildDeck, type Card } from '../services/dueDeck';
 import { schedule, seedSrsFromDifficulty, type Rating, type SrsState } from '../services/srs';
 import { fetchIntakeCandidates } from '../services/jmdict';
 import { alignReading } from '../services/furigana';
@@ -30,12 +30,6 @@ const RATINGS: { rating: Rating; label: string; shadow: string }[] = [
   { rating: 4, label: 'Easy', shadow: '0 3px 10px rgba(143, 170, 116, 0.32)' },
 ];
 
-// A card carries the full word plus which source (due review / new) put it here.
-interface Card {
-  key: string;
-  word: WordData;
-  kind: 'review' | 'new';
-}
 
 // ── Discover mode (#113) ─────────────────────────────────────────────────────
 // Once the day's deck is done, the user can optionally flip through UNSEEN
@@ -91,23 +85,6 @@ function priorSrsFor(w: WordData, now: number): SrsState {
     : seedSrsFromDifficulty(baseDifficulty, w.lastSeenTs ?? now);
 }
 
-// Snapshot the current due deck from the store: map every word to a DeckEntry,
-// run selectDeck, and rehydrate each surviving key back to its full WordData.
-function buildDeck(): Card[] {
-  const db = useAppStore.getState().wordDatabase;
-  const now = Date.now();
-  const entries: DeckEntry[] = Object.entries(db).map(([key, w]) => ({
-    key,
-    jlptLevel: w.jlptLevel ?? null,
-    freqRank: w.freqRank ?? null,
-    dueAt: w.dueAt ?? null,
-    reps: w.reps ?? null,
-    stability: w.stability ?? null,
-    intakeStatus: w.intakeStatus,
-    promotedTs: w.promotedTs ?? null,
-  }));
-  return selectDeck(entries, now).map((c) => ({ key: c.key, word: db[c.key], kind: c.kind }));
-}
 
 // Human-friendly interval label, Anki-style ("10m" / "3d" / "2mo" / "1.4y").
 function formatInterval(days: number): string {
@@ -120,13 +97,24 @@ function formatInterval(days: number): string {
   return `${(days / 365).toFixed(1)}y`;
 }
 
-export function Flashcards({ onFocusChange }: { onFocusChange?: (focused: boolean) => void }) {
+export function Flashcards({
+  onFocusChange,
+  onRemainingChange,
+  topOffset = '0rem',
+}: {
+  onFocusChange?: (focused: boolean) => void;
+  // Due cards left in this run — drives the 復習 badge in REVIEW.
+  onRemainingChange?: (remaining: number) => void;
+  // Height of chrome REVIEW renders above the card flow (its segmented control),
+  // subtracted from the flow's min-height so the page doesn't scroll.
+  topOffset?: string;
+}) {
   const reviewWord = useAppStore((s) => s.reviewWord);
   const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
   const jlptLevel = useAppStore((s) => s.jlptLevel);
 
   // Snapshot the deck once, at mount. Flashcards mounts when the tab opens, so this
-  // is "the deck as of opening STUDY" and stays stable while the user works through it.
+  // is "the deck as of opening REVIEW" and stays stable while the user works through it.
   const [cards, setCards] = useState<Card[]>(buildDeck);
 
   const [index, setIndex] = useState(0);
@@ -209,6 +197,9 @@ export function Flashcards({ onFocusChange }: { onFocusChange?: (focused: boolea
       : total > 0 && index < total;
   const focusActive = focused && inCardFlow;
   useEffect(() => {
+    onRemainingChange?.(Math.max(0, total - index));
+  }, [total, index, onRemainingChange]);
+  useEffect(() => {
     onFocusChange?.(focusActive);
   }, [focusActive, onFocusChange]);
   // Leaving the tab unmounts this component — always hand the nav back.
@@ -219,7 +210,7 @@ export function Flashcards({ onFocusChange }: { onFocusChange?: (focused: boolea
   const flowStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 'calc(100dvh - 5rem)',
+    minHeight: `calc(100dvh - 5rem - ${topOffset})`,
     paddingTop: '0.5rem',
     paddingBottom: focusActive
       ? 'calc(1.25rem + env(safe-area-inset-bottom))'

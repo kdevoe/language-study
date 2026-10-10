@@ -4,8 +4,7 @@ import { Library } from './components/Library'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav } from './components/BottomNav'
 import { Settings } from './components/Settings'
-import { Progress } from './components/Progress'
-import { Flashcards } from './components/Flashcards'
+import { Review, type ReviewSegment } from './components/Review'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
@@ -20,11 +19,14 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'flashcards' | 'progress' | 'settings'>('news');
+  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'flashcards' | 'settings'>('news');
   const [showNav, setShowNav] = useState(true);
   // Flashcard focus mode: tapping into a card hides the bottom nav so the card
   // can use that space; Flashcards reports the state up from its card flow.
   const [studyFocus, setStudyFocus] = useState(false);
+  // REVIEW's 復習/進捗 segment: null until the user picks one (Review then opens
+  // on 復習 when cards are due, else 進捗); remembered for the session after that.
+  const [reviewSegment, setReviewSegment] = useState<ReviewSegment | null>(null);
   const [session, setSession] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'waitlisted' | 'not_joined' | null>(null);
@@ -729,8 +731,9 @@ function App() {
             />
           )
         )}
-        {activeTab === 'flashcards' && <Flashcards onFocusChange={setStudyFocus} />}
-        {activeTab === 'progress' && <Progress />}
+        {activeTab === 'flashcards' && (
+          <Review segment={reviewSegment} onSegmentChange={setReviewSegment} onFocusChange={setStudyFocus} />
+        )}
         {activeTab === 'settings' && <Settings />}
       </main>
       <BottomNav
