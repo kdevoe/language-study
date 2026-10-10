@@ -25,8 +25,9 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
       backgroundColor: 'var(--bg-pure)',
       display: 'flex',
       justifyContent: 'center',
-      padding: '0.75rem 1rem',
-      paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+      padding: '0.95rem 1rem',
+      // Sit a touch lower: borrow a little of the home-indicator inset.
+      paddingBottom: 'max(0.6rem, calc(env(safe-area-inset-bottom) - 0.4rem))',
       borderTop: '1px solid var(--border-light)',
       zIndex: 20,
       transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
@@ -37,7 +38,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
           screen edges: with 4 tabs, full-width distribution left NEWS/REVIEW
           hugging the bezels. Even gaps inside a capped width keep the edge
           inset about equal to the spacing between tabs on a phone. */}
-      <div style={{ display: 'flex', justifyContent: 'space-evenly', width: '100%', maxWidth: '360px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-evenly', width: '100%', maxWidth: '392px' }}>
       {tabs.map(({ id, label, icon: Icon }) => {
         const isActive = activeTab === id;
         return (
