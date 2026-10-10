@@ -107,8 +107,9 @@ export async function fetchEpisode(id: string): Promise<PodcastEpisodeFull> {
   return data as PodcastEpisodeFull;
 }
 
-export async function createEpisode(source: EpisodeSource, minutes = 5): Promise<PodcastEpisode> {
-  const data = await invokeEdgeFn<{ episode: PodcastEpisode }>('generate-podcast', { source, minutes }, 30_000);
+/** `instructions`: optional listener request (≤300 chars) steering focus/tone. */
+export async function createEpisode(source: EpisodeSource, minutes = 5, instructions?: string): Promise<PodcastEpisode> {
+  const data = await invokeEdgeFn<{ episode: PodcastEpisode }>('generate-podcast', { source, minutes, instructions }, 30_000);
   return data.episode;
 }
 
@@ -152,6 +153,7 @@ export async function episodeErrorMessage(error: unknown): Promise<string> {
     case 'text_too_long': return 'テキストは20,000字以内にしてください。';
     case 'bad_request': return '入力を確認してください。';
     case 'unauthorized': return 'ログインしてください。';
+    case 'not_found': return 'この記事はまだ保存されていません。少し待ってからもう一度試してください。';
   }
   if (isServerBusyError(error)) return 'サーバーが混み合っています。少し待ってからもう一度試してください。';
   return 'エピソードを作れませんでした。もう一度試してください。';

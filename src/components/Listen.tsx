@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Plus, RotateCw } from 'lucide-react';
+import { SliderToggle } from './SliderToggle';
+import { PodcastSheet } from './PodcastSheet';
 import {
   PodcastEpisode,
-  EpisodeSource,
   createEpisode,
   episodeErrorMessage,
   fetchEpisodes,
@@ -16,20 +17,23 @@ import { castMember } from '../data/podcastCast';
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 // LISTEN tab (docs/podcast-design.md §6.1, mockup docs/mockups/listen.html): one
-// flat card list under filter pills — the Library's card language — plus a +
-// sheet that makes an episode from a topic, pasted text or a URL. Today's daily
+// flat card list under the filter slider — the Library's card language — plus
+// a + button opening PodcastSheet (topic, pasted text or a URL). Today's daily
 // digest is requested automatically the first time the tab opens each day.
 
 const POLL_MS = 5000;
-const TEXT_MIN_CHARS = 200;
-const TEXT_MAX_CHARS = 20_000;
-const TOPIC_SUGGESTIONS = ['宇宙', 'AI', '料理', '旅行', 'スポーツ', '日本の電車'];
-const LENGTHS = [5, 10, 15];
 // Remembers the day an automatic digest was last requested, so a feed with no
 // stories (or a failure) doesn't re-request on every visit.
 const DIGEST_ATTEMPT_KEY = 'yugen-digest-attempt';
 
 type Filter = 'all' | 'new' | 'partial' | 'done';
+
+const FILTER_OPTIONS = [
+  { value: 'all', label: 'すべて' },
+  { value: 'new', label: '未再生' },
+  { value: 'partial', label: '途中' },
+  { value: 'done', label: '完了' },
+] as const;
 
 interface Props {
   onOpenEpisode: (episode: PodcastEpisode) => void;
@@ -79,12 +83,6 @@ export function Listen({ onOpenEpisode }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [sourceTab, setSourceTab] = useState<'topic' | 'text' | 'url'>('topic');
-  const [topic, setTopic] = useState('');
-  const [text, setText] = useState('');
-  const [url, setUrl] = useState('');
-  const [minutes, setMinutes] = useState(5);
-  const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const digestRequestedRef = useRef(false);
@@ -132,39 +130,6 @@ export function Listen({ onOpenEpisode }: Props) {
       .catch((e) => console.info('[listen] daily digest not created:', e?.message ?? e));
   }, [isLoading, episodes]);
 
-  const trimmedTopic = topic.trim();
-  const textChars = text.trim().length;
-  const trimmedUrl = url.trim();
-  const creatable = !isCreating && (
-    sourceTab === 'topic' ? trimmedTopic.length >= 2 && trimmedTopic.length <= 80
-      : sourceTab === 'text' ? textChars >= TEXT_MIN_CHARS && textChars <= TEXT_MAX_CHARS
-        : /^https?:\/\/\S+$/i.test(trimmedUrl)
-  );
-
-  const handleCreate = async () => {
-    if (!creatable) return;
-    const source: EpisodeSource = sourceTab === 'topic'
-      ? { kind: 'topic', topic: trimmedTopic }
-      : sourceTab === 'text'
-        ? { kind: 'text', text: text.trim() }
-        : { kind: 'url', url: trimmedUrl };
-    setIsCreating(true);
-    try {
-      const ep = await createEpisode(source, minutes);
-      if (!mountedRef.current) return;
-      setEpisodes((prev) => [ep, ...prev]);
-      setSheetOpen(false);
-      setTopic('');
-      setText('');
-      setUrl('');
-    } catch (e) {
-      console.error('[listen] create failed:', e);
-      if (mountedRef.current) setError(await episodeErrorMessage(e));
-    } finally {
-      if (mountedRef.current) setIsCreating(false);
-    }
-  };
-
   const handleRetry = async (ep: PodcastEpisode) => {
     try {
       const updated = await retryEpisode(ep.id);
@@ -175,28 +140,6 @@ export function Listen({ onOpenEpisode }: Props) {
   };
 
   const visible = episodes.filter((e) => filter === 'all' || stateOf(e) === filter);
-
-  const pill = (active: boolean, label: string, onClick: () => void, key?: string) => (
-    <button
-      key={key ?? label}
-      onClick={onClick}
-      style={{
-        fontSize: '0.66rem',
-        fontWeight: 800,
-        letterSpacing: '0.08em',
-        cursor: 'pointer',
-        padding: '0.42rem 1rem',
-        borderRadius: '100px',
-        border: active ? '1px solid var(--text-main)' : '1px solid var(--border-light)',
-        backgroundColor: active ? 'var(--text-main)' : 'transparent',
-        color: active ? 'var(--bg-pure)' : 'var(--text-muted)',
-        fontFamily: 'var(--font-sans)',
-        transition: 'all 0.2s',
-      }}
-    >
-      {label}
-    </button>
-  );
 
   const spinner = (size = 12) => (
     <div
@@ -268,12 +211,7 @@ export function Listen({ onOpenEpisode }: Props) {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '1.4rem', flexWrap: 'wrap' }}>
-        {pill(filter === 'all', 'すべて', () => setFilter('all'))}
-        {pill(filter === 'new', '未再生', () => setFilter('new'))}
-        {pill(filter === 'partial', '途中', () => setFilter('partial'))}
-        {pill(filter === 'done', '完了', () => setFilter('done'))}
-      </div>
+      <SliderToggle options={FILTER_OPTIONS} value={filter} onChange={setFilter} ariaLabel="絞り込み" style={{ marginBottom: '1.4rem' }} />
 
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -286,9 +224,9 @@ export function Listen({ onOpenEpisode }: Props) {
           <h2 className="serif" style={{ fontSize: '1.4rem', marginBottom: '0.8rem', color: 'var(--text-main)' }}>
             {filter === 'all' ? 'まだエピソードがありません' : 'ここにはまだありません'}
           </h2>
-          <p style={{ fontSize: '0.9rem', lineHeight: 1.7, maxWidth: '300px', margin: '0 auto' }}>
-            毎朝、ニュースから「今日のダイジェスト」が届きます。+ ボタンで好きなトピックやテキストからも作れます。
-          </p>
+          {filter === 'all' && (
+            <p style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>毎朝ダイジェストが届きます</p>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -362,124 +300,11 @@ export function Listen({ onOpenEpisode }: Props) {
         </div>
       )}
 
-      {/* ── Create sheet ── */}
-      <AnimatePresence>
-        {sheetOpen && (
-          <>
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSheetOpen(false)}
-              style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(45,45,45,0.35)', zIndex: 40 }}
-            />
-            <motion.div
-              key="sheet"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-              style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50, backgroundColor: 'var(--bg-color)', borderRadius: '28px 28px 0 0', padding: '1.5rem 1.5rem calc(2.2rem + env(safe-area-inset-bottom))', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', maxWidth: '600px', margin: '0 auto' }}
-            >
-              <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: 'var(--border-light)', margin: '0 auto 1.2rem' }} />
-              <h2 className="serif" style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '0.9rem', color: 'var(--text-main)' }}>
-                エピソードを作る
-              </h2>
-
-              <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '0.9rem' }}>
-                {pill(sourceTab === 'topic', 'トピック', () => setSourceTab('topic'))}
-                {pill(sourceTab === 'text', 'テキスト', () => setSourceTab('text'))}
-                {pill(sourceTab === 'url', 'URL', () => setSourceTab('url'))}
-              </div>
-
-              {sourceTab === 'topic' && (
-                <>
-                  <input
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="例：日本の電車、AIと仕事、秋の料理…"
-                    maxLength={80}
-                    style={fieldStyle}
-                  />
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.7rem' }}>
-                    {TOPIC_SUGGESTIONS.map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => setTopic(t)}
-                        className="serif"
-                        style={{ fontSize: '0.85rem', padding: '0.35rem 0.85rem', borderRadius: '100px', border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {sourceTab === 'text' && (
-                <>
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="英語のテキストを貼り付けてください。会話形式のポッドキャストに書き直します。"
-                    style={{ ...fieldStyle, height: '120px', resize: 'none' }}
-                  />
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.6rem 0.2rem 0' }}>
-                    {textChars === 0
-                      ? `${TEXT_MIN_CHARS}〜${TEXT_MAX_CHARS.toLocaleString()}字`
-                      : textChars < TEXT_MIN_CHARS
-                        ? `${textChars}字 — 短すぎます（${TEXT_MIN_CHARS}字以上）。`
-                        : textChars > TEXT_MAX_CHARS
-                          ? `約${textChars.toLocaleString()}字 — ${TEXT_MAX_CHARS.toLocaleString()}字までです。`
-                          : `約${textChars.toLocaleString()}字`}
-                  </div>
-                </>
-              )}
-              {sourceTab === 'url' && (
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/article"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  style={fieldStyle}
-                />
-              )}
-
-              <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.16em', color: 'var(--text-muted)', margin: '1.1rem 0 0.5rem' }}>長さ</div>
-              <div style={{ display: 'flex', gap: '0.45rem' }}>
-                {LENGTHS.map((m) => pill(minutes === m, `約${m}分`, () => setMinutes(m), `len-${m}`))}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.9rem 0.2rem 0', lineHeight: 1.6 }}>
-                出演者はおまかせ — 毎回ちがう組み合わせでお届けします。作成には1〜2分かかります。
-              </div>
-
-              <button
-                onClick={handleCreate}
-                disabled={!creatable}
-                style={{ width: '100%', marginTop: '1rem', border: 'none', cursor: creatable ? 'pointer' : 'default', backgroundColor: creatable ? 'var(--text-main)' : 'var(--border-light)', color: creatable ? 'var(--bg-pure)' : 'var(--text-muted)', fontFamily: 'var(--font-sans)', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.12em', padding: '1rem', borderRadius: '100px', transition: 'all 0.2s' }}
-              >
-                {isCreating ? '送信中…' : 'エピソードを作る'}
-              </button>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <PodcastSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onCreated={(ep) => setEpisodes((prev) => [ep, ...prev])}
+      />
     </div>
   );
 }
-
-const fieldStyle: React.CSSProperties = {
-  width: '100%',
-  fontFamily: 'var(--font-sans)',
-  fontSize: '0.85rem',
-  backgroundColor: 'var(--bg-pure)',
-  border: '1px solid var(--border-light)',
-  borderRadius: '16px',
-  padding: '0.9rem 1rem',
-  color: 'var(--text-main)',
-  outline: 'none',
-  lineHeight: 1.6,
-};

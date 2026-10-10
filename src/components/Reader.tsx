@@ -15,8 +15,8 @@ import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
 import { useWordLookup } from '../hooks/useWordLookup';
-import { } from 'lucide-react'; // Empty block to show we're using icons elsewhere if needed, or just clear it.
-// Actually, let's just remove the line if no icons are used.
+import { Headphones } from 'lucide-react';
+import { PodcastSheet } from './PodcastSheet';
 
 
 interface ReaderProps {
@@ -26,6 +26,8 @@ interface ReaderProps {
   onNextPart?: (article: NewsArticle) => void;
   /** Long-form invisible resume: pre-scroll so this block sits mid-screen. */
   resumeBlockIndex?: number;
+  /** A podcast episode was requested from this article (App shows a toast). */
+  onPodcastQueued?: () => void;
 }
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -50,13 +52,17 @@ function hitWeightFor(text: string, furigana?: string, mastery?: MasteryLevel): 
   return [...text].length <= 2 ? 'lo' : 'mid';
 }
 
-export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockIndex }: ReaderProps) {
+export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockIndex, onPodcastQueued }: ReaderProps) {
   
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
   const [loadingArticleTitle, setLoadingArticleTitle] = useState<string>("");
   
   const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
+  // Companion podcast (design-system §6.2): the headphone icon opens the
+  // create sheet with this article as the source; it darkens once requested.
+  const [podcastSheetOpen, setPodcastSheetOpen] = useState(false);
+  const [podcastQueued, setPodcastQueued] = useState(false);
   // Word / sentence lookup (WordModal) — shared with the podcast player. A
   // looked-up word counts as clicked so grade-on-visible skips it.
   const lookup = useWordLookup({
@@ -544,10 +550,17 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
           animation plays only on a genuine open (the loading → loaded branch flip). */}
       <div key={currentArticle.id} ref={contentRef} className="reading-content fade-in" style={{ paddingBottom: 0, fontSize: `${readerFontSize || 18}px`, fontWeight: readerFontWeight || 500 }}>
         <div style={{ marginBottom: '3rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>
             {partCount > 1 && <span>第{partIndex}部 / 全{partCount}部</span>}
             <span>{currentArticle.readTime}</span>
+            <button
+              onClick={() => setPodcastSheetOpen(true)}
+              aria-label="ポッドキャストにする"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', padding: '0.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', color: podcastQueued ? 'var(--text-main)' : 'var(--text-muted)', transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}
+            >
+              <Headphones size={20} strokeWidth={1.5} />
+            </button>
           </div>
           <h1 className="serif" style={{ fontSize: '2.5rem', lineHeight: 1.3, marginBottom: '2rem', color: 'var(--text-main)' }}>
             {currentArticle.title}
@@ -636,6 +649,12 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
       </div>
 
       <WordModal {...lookup.modalProps} />
+      <PodcastSheet
+        open={podcastSheetOpen}
+        onClose={() => setPodcastSheetOpen(false)}
+        onCreated={() => { setPodcastQueued(true); onPodcastQueued?.(); }}
+        article={{ id: currentArticle.id, title: partCount > 1 ? `${currentArticle.title}（第${partIndex}部）` : currentArticle.title }}
+      />
     </>
   );
 }
