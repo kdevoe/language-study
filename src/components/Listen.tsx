@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Plus, RotateCw } from 'lucide-react';
-import { SliderToggle } from './SliderToggle';
+import { CheckCircle2, RotateCw } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
+import { AddButton, ArchiveList } from './ArchiveList';
+import type { ArchiveCard } from './ArchiveList';
 import {
   PodcastEpisode,
   createEpisode,
+  deleteEpisodes,
   episodeErrorMessage,
+  fetchEpisodeSearchText,
   fetchEpisodes,
   isInFlight,
   localDateKey,
@@ -16,24 +18,17 @@ import { castMember } from '../data/podcastCast';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
-// LISTEN tab (docs/podcast-design.md §6.1, mockup docs/mockups/listen.html): one
-// flat card list under the filter slider — the Library's card language — plus
-// a + button opening PodcastSheet (topic, pasted text or a URL). Today's daily
-// digest is requested automatically the first time the tab opens each day.
+// LISTEN tab (docs/podcast-design.md §6.1): episodes in ArchiveList — grouped
+// by month, searchable, swipe to delete, long-press to select (mockup
+// docs/mockups/archive-organize.html) — plus a + button opening PodcastSheet.
+// Today's daily digest is requested automatically on the first visit each day.
 
 const POLL_MS = 5000;
 // Remembers the day an automatic digest was last requested, so a feed with no
 // stories (or a failure) doesn't re-request on every visit.
 const DIGEST_ATTEMPT_KEY = 'yugen-digest-attempt';
 
-type Filter = 'all' | 'new' | 'partial' | 'done';
-
-const FILTER_OPTIONS = [
-  { value: 'all', label: 'すべて' },
-  { value: 'new', label: '未再生' },
-  { value: 'partial', label: '途中' },
-  { value: 'done', label: '完了' },
-] as const;
+type ListenState = 'new' | 'partial' | 'done';
 
 interface Props {
   onOpenEpisode: (episode: PodcastEpisode) => void;
@@ -59,7 +54,7 @@ const durationLabel = (ep: PodcastEpisode) => {
 const progressOf = (ep: PodcastEpisode) =>
   ep.listened_at ? 1 : ep.duration_ms ? Math.min(1, ep.listen_position_ms / ep.duration_ms) : 0;
 
-function stateOf(ep: PodcastEpisode): Exclude<Filter, 'all'> {
+function stateOf(ep: PodcastEpisode): ListenState {
   if (ep.listened_at) return 'done';
   if (ep.status === 'ready' && ep.listen_position_ms > 0) return 'partial';
   return 'new';
@@ -81,7 +76,6 @@ function sourceTag(ep: PodcastEpisode): string {
 export function Listen({ onOpenEpisode }: Props) {
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<Filter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -130,63 +124,47 @@ export function Listen({ onOpenEpisode }: Props) {
       .catch((e) => console.info('[listen] daily digest not created:', e?.message ?? e));
   }, [isLoading, episodes]);
 
-  const handleRetry = async (ep: PodcastEpisode) => {
+  const handleRetry = useCallback(async (ep: PodcastEpisode) => {
     try {
       const updated = await retryEpisode(ep.id);
       if (mountedRef.current) setEpisodes((prev) => prev.map((p) => (p.id === ep.id ? { ...p, ...updated } : p)));
     } catch (e) {
       if (mountedRef.current) setError(await episodeErrorMessage(e));
     }
-  };
+  }, []);
 
-  const visible = episodes.filter((e) => filter === 'all' || stateOf(e) === filter);
+  const handleDelete = useCallback(async (ids: string[]) => {
+    await deleteEpisodes(ids);
+    if (mountedRef.current) setEpisodes((prev) => prev.filter((p) => !ids.includes(p.id)));
+  }, []);
 
-  const spinner = (size = 12) => (
-    <div
-      className="lucide-spin"
-      style={{ width: size, height: size, border: '1.5px solid rgba(74, 93, 35, 0.2)', borderTopColor: '#4a5d23', borderRadius: '50%' }}
-    />
-  );
-
-  const statusCorner = (ep: PodcastEpisode) => {
-    if (isInFlight(ep)) {
-      return (
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-          {spinner()} {ep.status === 'scripting' ? '台本を作成中…' : '音声を収録中…'}
-        </span>
-      );
-    }
-    if (ep.status === 'failed') {
-      return (
-        <button
-          onClick={(e) => { e.stopPropagation(); handleRetry(ep); }}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', fontWeight: 800, color: '#a8553f', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          <RotateCw size={14} strokeWidth={2.5} /> 再試行
-        </button>
-      );
-    }
-    const state = stateOf(ep);
-    if (state === 'done') {
-      return (
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-          <CheckCircle2 size={16} strokeWidth={2.5} />
-          <span className="serif" style={{ fontSize: '0.8rem' }}>完了</span>
-        </span>
-      );
-    }
-    if (state === 'partial') {
-      return <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>途中 · {Math.round(progressOf(ep) * 100)}%</span>;
-    }
-    return (
-      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: '#4a5d23', letterSpacing: '0.05em' }}>
-        <CheckCircle2 size={16} strokeWidth={2.5} /> READY
-      </span>
-    );
-  };
+  const card = useCallback((ep: PodcastEpisode): ArchiveCard => {
+    const host = castMember(ep.cast_ids?.host);
+    const guest = castMember(ep.cast_ids?.guest);
+    const dialect = host.dialect ?? guest.dialect;
+    const isDigest = ep.source_kind === 'digest';
+    const dot = <span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>;
+    return {
+      tag: sourceTag(ep),
+      status: statusCorner(ep, handleRetry),
+      title: ep.title || (isDigest ? '今日のニュースから' : 'エピソードを準備中'),
+      titleMuted: !ep.title,
+      meta: (
+        <>
+          <span style={{ color: 'var(--text-main)' }}>{host.name} × {guest.name}</span>
+          {dialect && <>{dot}{dialect}</>}
+          {dot}{durationLabel(ep)}
+          {dot}{relativeDate(ep.created_at)}
+        </>
+      ),
+      progress: progressOf(ep),
+      featured: isDigest,
+      openable: ep.status === 'ready',
+    };
+  }, [handleRetry]);
 
   return (
-    <div style={{ paddingBottom: '6rem' }}>
+    <>
       {error && (
         <div
           role="alert"
@@ -197,114 +175,81 @@ export function Listen({ onOpenEpisode }: Props) {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '1.2rem' }}>
-        <div>
-          <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.2em', color: 'var(--text-muted)' }}>LISTEN</div>
-          <h1 className="serif" translate="no" style={{ fontSize: '2rem', fontWeight: 500, lineHeight: 1.2, color: 'var(--text-main)' }}>聴く</h1>
-        </div>
-        <button
-          onClick={() => setSheetOpen(true)}
-          aria-label="エピソードを作る"
-          style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer', backgroundColor: 'var(--text-main)', color: 'var(--bg-pure)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 18px rgba(0,0,0,0.15)' }}
-        >
-          <Plus size={22} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      <SliderToggle options={FILTER_OPTIONS} value={filter} onChange={setFilter} ariaLabel="絞り込み" style={{ marginBottom: '1.4rem' }} />
-
-      {isLoading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {[1, 2].map((i) => (
-            <div key={i} className="skeleton-shimmer" style={{ width: '100%', height: '140px', borderRadius: '24px' }} />
-          ))}
-        </div>
-      ) : visible.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
-          <h2 className="serif" style={{ fontSize: '1.4rem', marginBottom: '0.8rem', color: 'var(--text-main)' }}>
-            {filter === 'all' ? 'まだエピソードがありません' : 'ここにはまだありません'}
-          </h2>
-          {filter === 'all' && (
+      <ArchiveList
+        kicker="LISTEN"
+        title="聴く"
+        headerAction={<AddButton onClick={() => setSheetOpen(true)} label="エピソードを作る" />}
+        items={episodes}
+        isLoading={isLoading}
+        createdAt={createdAtOf}
+        card={card}
+        loadSearchText={fetchEpisodeSearchText}
+        isUnfinished={isUnplayed}
+        unfinishedLabel="未再生"
+        unit="本"
+        onOpen={onOpenEpisode}
+        onDelete={handleDelete}
+        memoryKey="listen"
+        empty={
+          <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+            <h2 className="serif" style={{ fontSize: '1.4rem', marginBottom: '0.8rem', color: 'var(--text-main)' }}>まだエピソードがありません</h2>
             <p style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>毎朝ダイジェストが届きます</p>
-          )}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <AnimatePresence mode="popLayout">
-            {visible.map((ep) => {
-              const host = castMember(ep.cast_ids?.host);
-              const guest = castMember(ep.cast_ids?.guest);
-              const dialect = host.dialect ?? guest.dialect;
-              const playable = ep.status === 'ready';
-              const progress = progressOf(ep);
-              const isDigest = ep.source_kind === 'digest';
-              return (
-                <motion.div
-                  key={ep.id}
-                  layout="position"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                  onClick={() => playable && onOpenEpisode(ep)}
-                  whileTap={playable ? { scale: 0.98 } : undefined}
-                  style={{
-                    backgroundColor: isDigest ? 'var(--bg-pure)' : 'var(--bg-card)',
-                    borderRadius: '24px',
-                    padding: '1.4rem 1.5rem',
-                    border: playable && stateOf(ep) !== 'done' ? '1px solid rgba(74, 93, 35, 0.15)' : '1px solid var(--border-light)',
-                    boxShadow: '0 4px 25px rgba(0,0,0,0.03)',
-                    cursor: playable ? 'pointer' : 'default',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.9rem', gap: '0.6rem' }}>
-                    <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.15em',
-                      backgroundColor: isDigest ? 'rgba(74, 93, 35, 0.08)' : 'var(--bg-pure)',
-                      color: isDigest ? '#4a5d23' : 'var(--text-muted)',
-                      padding: '0.3rem 0.7rem',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: '60%',
-                    }}>
-                      {sourceTag(ep)}
-                    </span>
-                    {statusCorner(ep)}
-                  </div>
-
-                  <h3 className="serif" style={{ fontSize: '1.25rem', lineHeight: 1.5, color: ep.title ? 'var(--text-main)' : 'var(--text-muted)', marginBottom: '0.8rem', maxWidth: '95%' }}>
-                    {ep.title || (isDigest ? '今日のニュースから' : 'エピソードを準備中')}
-                  </h3>
-
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                    <span style={{ color: 'var(--text-main)' }}>{host.name} × {guest.name}</span>
-                    {dialect && <><span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>{dialect}</>}
-                    <span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>
-                    {durationLabel(ep)}
-                    <span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>
-                    {relativeDate(ep.created_at)}
-                  </div>
-
-                  {progress > 0 && (
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${Math.round(progress * 100)}%`, backgroundColor: '#4a5d23', opacity: 0.4 }} />
-                  )}
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      )}
+          </div>
+        }
+      />
 
       <PodcastSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onCreated={(ep) => setEpisodes((prev) => [ep, ...prev])}
       />
-    </div>
+    </>
+  );
+}
+
+const createdAtOf = (ep: PodcastEpisode) => ep.created_at;
+const isUnplayed = (ep: PodcastEpisode) => ep.status === 'ready' && stateOf(ep) === 'new';
+
+const spinner = (size = 12) => (
+  <div
+    className="lucide-spin"
+    style={{ width: size, height: size, border: '1.5px solid rgba(74, 93, 35, 0.2)', borderTopColor: '#4a5d23', borderRadius: '50%' }}
+  />
+);
+
+function statusCorner(ep: PodcastEpisode, onRetry: (ep: PodcastEpisode) => void) {
+  if (isInFlight(ep)) {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        {spinner()} {ep.status === 'scripting' ? '台本を作成中…' : '音声を収録中…'}
+      </span>
+    );
+  }
+  if (ep.status === 'failed') {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onRetry(ep); }}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', fontWeight: 800, color: '#a8553f', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+      >
+        <RotateCw size={14} strokeWidth={2.5} /> 再試行
+      </button>
+    );
+  }
+  const state = stateOf(ep);
+  if (state === 'done') {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+        <CheckCircle2 size={16} strokeWidth={2.5} />
+        <span className="serif" style={{ fontSize: '0.8rem' }}>完了</span>
+      </span>
+    );
+  }
+  if (state === 'partial') {
+    return <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>途中 · {Math.round(progressOf(ep) * 100)}%</span>;
+  }
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: '#4a5d23', letterSpacing: '0.05em' }}>
+      <CheckCircle2 size={16} strokeWidth={2.5} /> READY
+    </span>
   );
 }

@@ -4,6 +4,7 @@
 // `podcasts` bucket via a signed URL, and writes back the listening position.
 import { supabase } from './supabase';
 import { invokeEdgeFn, isServerBusyError } from './api';
+import type { SearchCorpus } from './archiveSearch';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -88,9 +89,49 @@ export async function fetchEpisodes(): Promise<PodcastEpisode[]> {
     .from('podcast_episodes')
     .select(LIST_FIELDS)
     .order('created_at', { ascending: false })
-    .limit(50);
+    // The list groups by month now, so it holds the whole archive (a daily
+    // digest is about 365 rows a year). Stays under PostgREST's 1000-row cap.
+    .limit(900);
   if (error) throw error;
   return (data ?? []) as PodcastEpisode[];
+}
+
+/** Japanese script + English source per episode, for search (loaded on first search). */
+export async function fetchEpisodeSearchText(): Promise<SearchCorpus> {
+  const corpus: SearchCorpus = new Map();
+  if (DEV_MODE) return corpus;
+  const { data, error } = await supabase
+    .from('podcast_episodes')
+    .select('id, source_ref, source_payload, turns:script->turns')
+    .order('created_at', { ascending: false })
+    .limit(900);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const turns = (row.turns ?? []) as unknown as PodcastTurn[];
+    const payload = (row.source_payload ?? {}) as Record<string, unknown>;
+    const en = [row.source_ref, payload.title, payload.text, payload.url]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .join('\n');
+    corpus.set(row.id, { ja: turns.map((t) => t.text).join(' '), en });
+  }
+  return corpus;
+}
+
+/**
+ * Delete episodes and their MP3s. Audio goes first (best effort): once the row
+ * is gone nothing points at the object any more. Needs the storage delete
+ * policy from database/29_archive_delete.sql.
+ */
+export async function deleteEpisodes(ids: string[]): Promise<void> {
+  if (DEV_MODE || ids.length === 0) return;
+  const { data: rows } = await supabase.from('podcast_episodes').select('audio_path').in('id', ids);
+  const paths = (rows ?? []).map((r) => r.audio_path).filter((p): p is string => !!p);
+  if (paths.length) {
+    const { error } = await supabase.storage.from('podcasts').remove(paths);
+    if (error) console.warn('[podcasts] audio delete failed (row still deleted):', error);
+  }
+  const { error } = await supabase.from('podcast_episodes').delete().in('id', ids);
+  if (error) throw error;
 }
 
 export async function fetchEpisode(id: string): Promise<PodcastEpisodeFull> {

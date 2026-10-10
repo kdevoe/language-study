@@ -91,6 +91,7 @@ export const workPartArticleId = (workId: string, partIndex: number) => `lf-${wo
 
 import { supabase } from './supabase'
 import { captureError } from './monitoring'
+import type { SearchCorpus } from './archiveSearch'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -376,6 +377,48 @@ export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
       partReady: !!first && first.status !== 'failed' && first.status !== 'pending',
     };
   });
+}
+
+/** Japanese part text + English original per work, for Library search
+ *  (loaded on first search, not with the list). */
+export async function fetchWorkSearchText(userId: string): Promise<SearchCorpus> {
+  const [worksRes, partsRes] = await Promise.all([
+    supabase.from('long_form_works').select('id, origin_url, raw_text').eq('user_id', userId).neq('status', 'archived'),
+    supabase
+      .from('processed_news')
+      .select('work_id, part_index, blocks:content->blocks')
+      .eq('user_id', userId)
+      .not('work_id', 'is', null),
+  ]);
+  if (worksRes.error) throw worksRes.error;
+  if (partsRes.error) console.warn('[api] work search text: part lookup failed:', partsRes.error);
+
+  const jaByWork = new Map<string, { index: number; text: string }[]>();
+  for (const p of partsRes.data ?? []) {
+    if (!p.work_id) continue;
+    const blocks = (Array.isArray(p.blocks) ? p.blocks : []) as unknown as ArticleBlock[];
+    const text = blocks
+      .map((b) => b.text ?? b.content?.map((t) => t.text).join('') ?? b.description ?? '')
+      .join(' ');
+    const list = jaByWork.get(p.work_id) ?? [];
+    list.push({ index: p.part_index ?? 0, text });
+    jaByWork.set(p.work_id, list);
+  }
+
+  const corpus: SearchCorpus = new Map();
+  for (const w of worksRes.data ?? []) {
+    const ja = (jaByWork.get(w.id) ?? []).sort((a, b) => a.index - b.index).map((p) => p.text).join(' ');
+    corpus.set(w.id, { ja, en: [w.raw_text, w.origin_url].filter(Boolean).join('\n') });
+  }
+  return corpus;
+}
+
+/** Delete works. Their part rows go with them (processed_news.work_id cascades);
+ *  word progress and study history are keyed separately and stay. */
+export async function deleteWorks(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('long_form_works').delete().in('id', ids);
+  if (error) throw error;
 }
 
 /** JIT-process (or fetch, if already generated) one later part of a work.

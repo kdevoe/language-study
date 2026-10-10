@@ -145,6 +145,20 @@ Source of truth: Settings (JLPT, Article Intensity, Vocab Use, Kanji Use).
 Fixed at the top centre, `--bg-card`, radius 14px, 1px `--border-light`, shadow `0 6px 30px rgba(0,0,0,0.12)`, 0.85rem, tap to dismiss, auto-hides after about 5s. Keep messages to a few words (聴くタブで作成中).
 ### 6.7 Icon buttons
 Lucide icons, stroke width 1.5, 20–24px, `--text-muted` at rest, no background. An icon can show a "done" state by darkening to `--text-main`.
+### 6.8 Archive list (LISTEN, LIBRARY)
+Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-organize.html`.
+
+- **Months, not filters.** Items group by month under a serif month heading (year in small muted sans for any month but the current one) with the count and a chevron at the right. The newest month starts open and older ones collapsed; a collapsed month shows one muted summary line (`4本 · 未再生 2`).
+  
+- **Search** is a hero input on a hairline under the header, matching Japanese and English. Results stay grouped by month with every month open, under a muted `n件`. A hit in body text adds a short excerpt marked `EN` / `JA`, the match tinted `--accent-primary`.
+  
+- **Swipe left to delete** (the Feed's gesture): a `--accent-danger` panel with a serif 削除 is revealed behind the card; a long swipe deletes outright. One row open at a time.
+  
+- **Long-press (0.5s) to select.** The header becomes `n件を選択` + 完了, each card's status corner becomes a check circle, selected cards turn white with the thumb shadow, and an action bar (count + coral 削除) covers the bottom nav. Months offer すべて選択.
+  
+- **Undo, not confirm.** Deletes hide at once and reach the server after a 5s toast with 元に戻す (§6.6).
+  
+- The header's `+` is a white lifted circle (`AddButton`), not a black fill.
 
 * * *
 ## 7. Copy
@@ -159,10 +173,10 @@ Lucide icons, stroke width 1.5, 20–24px, `--text-muted` at rest, no background
 ## 8. Known drift (fix when touching these areas)
 - **Olive** `#4a5d23` is hard-coded about 33 times (READY labels, progress bars, spinners) and isn't a token. Decide whether it becomes a token (`--accent-olive`) or moves to the neutral and soft-blue system.
   
-- **Black primary actions:** the Listen and Library `+` buttons and the Library import button use `--text-main` fills with heavy shadows (`0 6px 18px rgba(0,0,0,0.15)`).
+- **Black primary actions:** the Library import button uses a `--text-main` fill (the Listen and Library `+` buttons are fixed, §6.8).
   
 - **Two toggle styles:** REVIEW's 復習 | 進捗 control (serif, `--bg-card` track, no sliding thumb) differs from the Settings slider.
   
-- **Outlined black-fill filter pills** in Library (and Listen before the podcast-create redesign) should become the slider toggle.
+- **Outlined black-fill pills** remain in the Library import sheet (貼り付け | URL) and should become the slider toggle. (The Library and Listen filter rows are gone, replaced by §6.8.)
   
 - **Slider duplication** in `Settings.tsx` (§6.1).
