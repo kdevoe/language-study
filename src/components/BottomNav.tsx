@@ -24,8 +24,8 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
       bottom: 0,
       backgroundColor: 'var(--bg-pure)',
       display: 'flex',
-      justifyContent: 'space-around',
-      padding: '0.75rem 0',
+      justifyContent: 'center',
+      padding: '0.75rem 1rem',
       paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
       borderTop: '1px solid var(--border-light)',
       zIndex: 20,
@@ -33,6 +33,11 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
       transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
       opacity: isVisible ? 1 : 0
     }}>
+      {/* Tabs sit in a centered group so the outer tabs aren't pushed to the
+          screen edges: with 4 tabs, full-width distribution left NEWS/REVIEW
+          hugging the bezels. Even gaps inside a capped width keep the edge
+          inset about equal to the spacing between tabs on a phone. */}
+      <div style={{ display: 'flex', justifyContent: 'space-evenly', width: '100%', maxWidth: '360px' }}>
       {tabs.map(({ id, label, icon: Icon }) => {
         const isActive = activeTab === id;
         return (
@@ -49,10 +54,8 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
               cursor: 'pointer',
               color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
               transition: 'color 0.2s',
-              // Flex within the bar (a fixed 80px × 5 overflowed a 375px viewport),
-              // capped so they don't sprawl on wide screens.
-              flex: 1,
-              maxWidth: '80px'
+              // Fixed-width slots; the group above handles distribution.
+              width: '76px',
             }}
           >
             <div style={{
@@ -61,7 +64,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
               backgroundColor: isActive ? 'var(--accent-primary)' : 'transparent',
               transition: 'background-color 0.2s'
             }}>
-              <Icon size={24} strokeWidth={isActive ? 2 : 1.5} />
+              <Icon size={28} strokeWidth={isActive ? 1.9 : 1.5} />
             </div>
             <span style={{ fontSize: '0.6rem', letterSpacing: '0.05em', fontWeight: isActive ? 600 : 500, marginTop: '2px' }}>
               {label}
@@ -69,6 +72,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
           </button>
         );
       })}
+      </div>
     </nav>
   );
 }
