@@ -530,3 +530,11 @@
   - [x] docs/design-system.md (approved) + CLAUDE.md pointer
   - [ ] Deploy generate-podcast (instructions field); until then requests are ignored
   - [ ] Design drift follow-ups (design-system.md §8): black + buttons, Library filter pills, REVIEW toggle, olive token
+- [x] Archive organize: LISTEN + LIBRARY (2026-10-10) — mockup docs/mockups/archive-organize.html, design-system.md §6.8
+  - [x] Shared ArchiveList: month groups (newest open, older collapsed with a summary line), replaces the filter rows
+  - [x] Search (services/archiveSearch.ts): Japanese + English, case/width/kana-folded; body text loaded on first
+        search (episode scripts + source; work parts + raw import); body hits show an EN/JA excerpt
+  - [x] Swipe left to delete (long swipe deletes outright), long-press → select mode + bulk delete, 5s undo toast
+  - [x] deleteEpisodes (row + MP3) / deleteWorks (parts cascade); LISTEN list limit 50 → 900
+  - [x] database/29_archive_delete.sql applied to prod 2026-10-10 (storage delete policy for own podcast audio)
+  - [ ] Long-form part navigation in the Reader (back / jump between parts) — currently forward-only

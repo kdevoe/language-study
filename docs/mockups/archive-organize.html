@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archive Organize</title>
+<!-- Mockup: month grouping + search + select/delete for LISTEN (聴く) and
+     LIBRARY (書庫). Replaces the filter pills. iPhotos-inspired: months group
+     and collapse, a 選択 mode for bulk delete, long-press for one, undo toast. -->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --accent-danger: #fde2da;
+  --border-light: #e0e0d8;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e8e8e2; font-family: var(--font-sans); color: var(--text-main); min-height: 100vh; }
+button { font-family: inherit; color: inherit; }
+
+/* ── Review chrome (outside the phone) ── */
+.chrome { max-width: 900px; margin: 0 auto; padding: 1.5rem 16px 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.chrome h2 { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.chrome .switch { display: flex; gap: 0.4rem; }
+.chrome .switch button { border: 1px solid #ccc; background: transparent; border-radius: 100px; padding: 0.35rem 0.9rem; font-size: 0.75rem; cursor: pointer; }
+.chrome .switch button.on { background: #fff; border-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 700; }
+.notes { max-width: 900px; margin: 0.8rem auto 0; padding: 0 16px; font-size: 0.78rem; color: #555; line-height: 1.6; }
+.notes b { color: var(--text-main); }
+
+/* ── Phone ── */
+.phone {
+  width: 390px; max-width: calc(100vw - 32px); height: 800px; margin: 1.2rem auto 3rem;
+  background: var(--bg-color); border-radius: 44px; position: relative; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.18), 0 0 0 10px #1c1c1c;
+}
+.scroll { position: absolute; inset: 0; overflow-y: auto; padding: 3.2rem 1.25rem 7rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* Header */
+.tab-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.1rem; min-height: 64px; }
+.kicker { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.tab-header h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.head-actions { display: flex; align-items: center; gap: 0.9rem; }
+.text-btn { background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); padding: 0.4rem 0.1rem; transition: color 0.4s var(--ease); }
+.text-btn:hover { color: var(--text-main); }
+.text-btn.strong { color: var(--text-main); font-weight: 600; }
+.add-btn {
+  width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--bg-pure); color: var(--text-main);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1); transition: box-shadow 0.4s var(--ease), transform 0.1s;
+}
+.add-btn:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+.add-btn:active { transform: scale(0.96); }
+.select-title { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 500; }
+
+/* Search: hero input on a hairline (design-system §6.4) */
+.search { position: relative; display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border-light); padding: 0.35rem 0 0.55rem; margin-bottom: 1.6rem; transition: border-color 0.4s var(--ease); }
+.search:focus-within { border-color: var(--text-muted); }
+.search svg { flex: none; color: var(--text-muted); }
+.search input { flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-serif); font-size: 1.15rem; color: var(--text-main); min-width: 0; }
+.search input::placeholder { color: #a5a59d; }
+.search .clear { border: none; background: none; cursor: pointer; color: var(--text-muted); display: none; padding: 0.2rem; }
+.search.has-q .clear { display: block; }
+.result-count { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; margin: -0.9rem 0 1.4rem; }
+
+/* Month sections */
+.month { margin-bottom: 2.2rem; }
+.month-head { display: flex; align-items: baseline; justify-content: space-between; cursor: pointer; user-select: none; padding: 0.2rem 0; }
+.month-head .m { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 500; }
+.month-head .y { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; margin-left: 0.45rem; letter-spacing: 0.06em; }
+.month-head .right { display: flex; align-items: center; gap: 0.55rem; font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+.month-head .count-wrap { display: flex; align-items: center; gap: 0.5rem; }
+.month-head .chev { transition: transform 0.4s var(--ease); }
+.month.collapsed .chev { transform: rotate(-90deg); }
+.month-head .sel-all { display: none; }
+.selecting .month-head .sel-all { display: inline; font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-main); background: none; border: none; cursor: pointer; }
+.selecting .month-head .count-wrap { display: none; }
+.month-sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem; display: none; }
+.month.collapsed .month-sub { display: block; }
+.month-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.45s var(--ease), opacity 0.35s var(--ease); margin-top: 0.9rem; }
+.month.collapsed .month-body { grid-template-rows: 0fr; opacity: 0; margin-top: 0; }
+.month-body > .inner { overflow: hidden; display: flex; flex-direction: column; gap: 1rem; }
+
+/* Cards (design-system §6.5) */
+.card {
+  background: var(--bg-card); border-radius: 24px; padding: 1.3rem 1.4rem; border: 1px solid var(--border-light);
+  box-shadow: 0 4px 25px rgba(0,0,0,0.03); position: relative; overflow: hidden; cursor: pointer;
+  transition: background-color 0.4s var(--ease), box-shadow 0.4s var(--ease), transform 0.1s, opacity 0.3s, max-height 0.35s var(--ease), padding 0.35s var(--ease), margin 0.35s var(--ease);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.card:active { transform: scale(0.98); }
+.card.featured { background: var(--bg-pure); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.75rem; }
+.tag { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.15em; background: var(--bg-pure); color: var(--text-muted); padding: 0.3rem 0.7rem; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62%; }
+.card.featured .tag { background: var(--accent-primary); color: var(--text-main); }
+.status { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; display: flex; align-items: center; gap: 0.35rem; }
+.status .serif { font-family: var(--font-serif); font-size: 0.8rem; }
+.card h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; line-height: 1.5; margin-bottom: 0.6rem; }
+.meta { font-size: 0.74rem; color: var(--text-muted); font-weight: 500; }
+.meta .dot { margin: 0 0.35rem; opacity: 0.5; }
+.progress { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent-progress); }
+.snippet { margin-top: 0.7rem; font-size: 0.78rem; line-height: 1.6; color: var(--text-muted); }
+.snippet.ja { font-family: var(--font-serif); font-size: 0.85rem; }
+.snippet .src { font-size: 0.56rem; font-weight: 800; letter-spacing: 0.15em; margin-right: 0.45rem; vertical-align: 1px; }
+mark { background: var(--accent-primary); color: var(--text-main); border-radius: 3px; padding: 0 2px; }
+
+/* Select mode: the check sits where the status was; selected = white + thumb shadow */
+.check { display: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #b9b9b0; flex: none; align-items: center; justify-content: center; transition: all 0.3s var(--ease); }
+.selecting .card .status { display: none; }
+.selecting .card .check { display: flex; }
+.selecting .card:active { transform: none; }
+.card.selected { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.card.selected .check { background: var(--text-main); border-color: var(--text-main); color: #fff; }
+
+/* Swipe-to-delete (same gesture as the Feed): drag left reveals 削除 behind
+   the card; release past the reveal snaps open, a long swipe deletes outright. */
+.swipe { position: relative; border-radius: 24px; transition: max-height 0.35s var(--ease), opacity 0.3s, margin 0.35s var(--ease); }
+.swipe .action {
+  position: absolute; top: 0; bottom: 0; right: 0; width: 100%; border-radius: 24px;
+  background: var(--accent-danger); display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 1.6rem; opacity: 0; transition: opacity 0.2s;
+}
+.swipe.dragging .action, .swipe.open .action { opacity: 1; }
+.swipe .action button { border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-main); }
+.swipe .card { touch-action: pan-y; }
+.swipe:not(.dragging) .card { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.4s var(--ease), box-shadow 0.4s var(--ease); }
+.swipe.removing { opacity: 0; max-height: 0 !important; margin-top: -1rem; }
+.swipe.removing .card { transform: translateX(-110%) !important; }
+.selecting .swipe .action { display: none; }
+
+/* Bottom nav, swapped for the action bar in select mode */
+.bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; background: rgba(245,245,240,0.94); backdrop-filter: blur(12px); border-top: 1px solid var(--border-light); }
+.nav, .actionbar { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: space-around; padding-top: 0.75rem; transition: opacity 0.3s var(--ease), transform 0.4s var(--ease); }
+.nav .t { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; font-size: 0.55rem; font-weight: 800; letter-spacing: 0.15em; color: #9a9a92; }
+.nav .t.on { color: var(--text-main); }
+.actionbar { justify-content: space-between; padding: 0.9rem 1.6rem 0; opacity: 0; transform: translateY(10px); pointer-events: none; }
+.selecting-root .nav { opacity: 0; transform: translateY(10px); pointer-events: none; }
+.selecting-root .actionbar { opacity: 1; transform: none; pointer-events: auto; }
+.actionbar .count { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; padding-top: 0.45rem; }
+.del-btn { display: flex; align-items: center; gap: 0.45rem; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 1rem; padding: 0.55rem 1.1rem; border-radius: 100px; background: var(--border-light); color: var(--text-muted); opacity: 0.7; transition: all 0.4s var(--ease); }
+.del-btn.ready { background: var(--accent-danger); color: var(--text-main); opacity: 1; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+
+/* Toast (design-system §6.6) + undo */
+.toast { position: absolute; top: 3.2rem; left: 50%; transform: translate(-50%, calc(-100% - 4rem)); z-index: 60; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 14px; box-shadow: 0 6px 30px rgba(0,0,0,0.12); padding: 0.65rem 0.75rem 0.65rem 1.1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 1rem; white-space: nowrap; transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.toast.show { transform: translate(-50%, 0); }
+.toast button { border: none; background: var(--bg-pure); border-radius: 100px; padding: 0.35rem 0.85rem; font-family: var(--font-serif); font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+.empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+.empty h2 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 500; color: var(--text-main); margin-bottom: 0.5rem; }
+.empty p { font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <h2>MOCKUP · ARCHIVE ORGANIZE</h2>
+  <div class="switch">
+    <button data-tab="listen" class="on">聴く (LISTEN)</button>
+    <button data-tab="library">書庫 (LIBRARY)</button>
+  </div>
+  <div class="switch">
+    <button id="resetBtn">Reset</button>
+  </div>
+</div>
+<p class="notes">
+  Try: <b>tap a month</b> to collapse/expand · <b>search</b> “train”, “電車”, “Kyoto”, “AI” or “松尾” ·
+  <b>swipe a card left</b> to reveal 削除 (a long swipe deletes straight away) → <b>元に戻す</b> ·
+  <b>long-press</b> a card (or right-click) to enter select mode, then tap more cards or 「すべて選択」 on a month → 削除 · 完了 exits.
+  Current month starts open; older months start collapsed.
+</p>
+
+<div class="phone" id="phone">
+  <div class="scroll" id="scroll">
+    <div class="tab-header" id="header"></div>
+    <div class="search" id="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" placeholder="検索" autocomplete="off" spellcheck="false">
+      <button class="clear" id="clear" aria-label="クリア">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div class="bottom">
+    <div class="nav" id="nav"></div>
+    <div class="actionbar">
+      <span class="count" id="selCount">項目を選択</span>
+      <button class="del-btn" id="bulkDel">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+        削除
+      </button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><span id="toastMsg"></span><button id="undo">元に戻す</button></div>
+</div>
+
+<script>
+// ── Sample data. `ja` = Japanese text searched (title + script/article body),
+//    `en` = English source searched (topic / pasted text / URL / raw import). ──
+const DATA = {
+  listen: [
+    { id: 'l1', date: '2026-10-10', tag: 'DAILY DIGEST · 10月10日', featured: true, title: '台風と新幹線の運休、そしてAIの著作権問題', meta: 'あおい × けんた · 6分12秒', state: 'new',
+      ja: '今日は台風19号の影響で東海道新幹線が運休になったニュースから。AIが作った絵の著作権について…', en: 'Typhoon halts Tokaido Shinkansen service; court weighs AI art copyright' },
+    { id: 'l2', date: '2026-10-10', tag: 'トピック · 日本の電車', title: '満員電車はなくなるのか', meta: 'みさき × 大輔 · 関西弁 · 5分40秒', state: 'partial', progress: 0.42,
+      ja: '東京の満員電車は世界でも有名ですが、リモートワークで少しずつ変わってきました。', en: 'Japanese trains' },
+    { id: 'l3', date: '2026-10-09', tag: '記事から', title: '京都の観光客、過去最多に', meta: 'ゆい × 拓海 · 4分58秒', state: 'done',
+      ja: '京都を訪れる観光客が過去最多になり、地元の人の生活にも影響が出ています。', en: 'Kyoto tourist numbers hit record as residents push back on overtourism' },
+    { id: 'l4', date: '2026-10-08', tag: 'URL', title: '睡眠不足と記憶の関係', meta: 'あおい × 博多弁の翔 · 9分50秒', state: 'new',
+      ja: '寝ている間に脳は記憶を整理しています。睡眠が足りないと…', en: 'https://example.com/science/sleep-and-memory — How sleep deprivation erodes memory consolidation' },
+    { id: 'l5', date: '2026-09-28', tag: 'DAILY DIGEST · 9月28日', featured: true, title: '円安と海外旅行、宇宙ステーションの新実験', meta: 'けんた × みさき · 5分20秒', state: 'done',
+      ja: '円安が続いて、海外旅行に行く人が減っています。国際宇宙ステーションでは…', en: 'Weak yen dents outbound travel; ISS begins new plant-growth experiment' },
+    { id: 'l6', date: '2026-09-21', tag: 'テキスト', title: '松尾芭蕉と旅のこころ', meta: 'ゆい × 大輔 · 関西弁 · 10分02秒', state: 'partial', progress: 0.7,
+      ja: '松尾芭蕉は「奥の細道」で東北を旅しました。旅とは何かを考えます。', en: 'Matsuo Basho walked north in 1689, writing The Narrow Road to the Deep North…' },
+    { id: 'l7', date: '2026-09-14', tag: 'トピック · AI', title: 'AIと仕事のこれから', meta: 'みさき × 拓海 · 5分10秒', state: 'done',
+      ja: 'AIが仕事を奪うと言われていますが、新しい仕事も生まれています。', en: 'AI and work' },
+    { id: 'l8', date: '2026-09-02', tag: 'DAILY DIGEST · 9月2日', featured: true, title: '防災の日と新しい地震予測', meta: 'あおい × けんた · 6分01秒', state: 'done',
+      ja: '9月1日は防災の日。新しい地震予測のしくみについて話します。', en: 'Japan marks Disaster Prevention Day; researchers unveil earthquake forecasting model' },
+    { id: 'l9', date: '2026-08-19', tag: 'トピック · 料理', title: '夏のそうめんを楽しむ', meta: 'ゆい × 翔 · 博多弁 · 5分00秒', state: 'done',
+      ja: '暑い夏にはそうめんが一番。いろいろな食べ方を紹介します。', en: 'Cooking' },
+  ],
+  library: [
+    { id: 'b1', date: '2026-10-07', tag: 'IMPORT · URL', title: '鉄道が変えた日本の都市', meta: '約12,400字 · 全2部', state: 'partial', progress: 0.35, statusText: '第1部・全2部',
+      ja: '明治時代に鉄道ができてから、日本の都市の形は大きく変わりました。', en: 'How railways reshaped Japanese cities — from Meiji-era lines to the commuter belt' },
+    { id: 'b2', date: '2026-08-17', tag: 'IMPORT', title: 'ミニマリズムとスカンジナビアのデザイン', meta: '約6,200字 · 全1部', state: 'done',
+      ja: '北欧のデザインと日本の美意識には共通点があります。', en: 'Lagom and ma: what Scandinavian and Japanese minimalism share' },
+    { id: 'b3', date: '2026-08-15', tag: 'IMPORT · URL', title: '京都の町家を守る人たち', meta: '約8,900字 · 全1部', state: 'new',
+      ja: '京都の古い町家を残すために活動している人たちを訪ねました。', en: 'The people saving Kyoto’s machiya townhouses, one beam at a time' },
+    { id: 'b4', date: '2026-08-12', tag: 'IMPORT', title: '睡眠の科学', meta: '約18,000字 · 全2部', state: 'partial', progress: 0.6, statusText: '第2部・全2部',
+      ja: '私たちはなぜ眠るのでしょうか。睡眠の科学を最新の研究から見ていきます。', en: 'Why we sleep: notes on memory, dreams and the circadian clock' },
+    { id: 'b5', date: '2026-08-09', tag: 'IMPORT', title: 'AIは翻訳者の仕事を奪うか', meta: '約4,100字 · 全1部', state: 'done',
+      ja: '機械翻訳はとても上手になりましたが、翻訳者はまだ必要です。', en: 'Will AI replace translators? A working translator’s view' },
+    { id: 'b6', date: '2026-07-22', tag: 'IMPORT · URL', title: '芭蕉の足あとをたどる', meta: '約9,600字 · 全1部', state: 'done',
+      ja: '松尾芭蕉が歩いた奥の細道を、現代の旅人がたどります。', en: 'Retracing Basho’s Narrow Road, 335 years later' },
+  ],
+};
+const TITLES = { listen: ['LISTEN', '聴く'], library: ['LIBRARY', '書庫'] };
+const NOW = new Date('2026-10-10T12:00:00');
+
+let tab = 'listen';
+let items = structuredClone(DATA);
+let query = '';
+let selecting = false;
+const selected = new Set();
+const collapsed = { listen: new Set(), library: new Set() };
+let lastDeleted = null, toastTimer = null;
+
+const $ = (id) => document.getElementById(id);
+const monthKey = (d) => d.slice(0, 7);
+const curMonth = monthKey(NOW.toISOString());
+
+function initCollapsed() {
+  for (const t of ['listen', 'library']) {
+    collapsed[t] = new Set([...new Set(items[t].map(i => monthKey(i.date)))].filter(k => k !== curMonth));
+    // Library: if nothing this month, open the newest month instead.
+    const keys = [...new Set(items[t].map(i => monthKey(i.date)))].sort().reverse();
+    if (keys.length && keys[0] !== curMonth) collapsed[t].delete(keys[0]);
+  }
+}
+
+function relDate(d) {
+  const days = Math.round((new Date(NOW.toDateString()) - new Date(new Date(d + 'T12:00').toDateString())) / 864e5);
+  if (days <= 0) return '今日';
+  if (days === 1) return '昨日';
+  if (days < 7) return `${days}日前`;
+  const dt = new Date(d + 'T12:00'); return `${dt.getMonth() + 1}月${dt.getDate()}日`;
+}
+
+function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+// Case-insensitive; kana/kanji compared as-is (the build will also fold
+// hiragana↔katakana and full/half-width).
+function hl(text, q) {
+  if (!q) return esc(text);
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return esc(text);
+  return esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+}
+function snippet(text, q, radius = 34) {
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  const s = Math.max(0, i - radius), e = Math.min(text.length, i + q.length + radius);
+  return (s > 0 ? '…' : '') + hl(text.slice(s, e), q) + (e < text.length ? '…' : '');
+}
+function matchOf(it, q) {
+  if (!q) return { hit: true };
+  const L = q.toLowerCase();
+  if (it.title.toLowerCase().includes(L) || it.tag.toLowerCase().includes(L)) return { hit: true };
+  if (it.ja.toLowerCase().includes(L)) return { hit: true, where: 'ja' };
+  if (it.en.toLowerCase().includes(L)) return { hit: true, where: 'en' };
+  return { hit: false };
+}
+
+function statusHtml(it) {
+  if (it.state === 'done') return `<span class="status"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span class="serif">完了</span></span>`;
+  if (it.state === 'partial') return `<span class="status">${it.statusText ?? '途中 · ' + Math.round(it.progress * 100) + '%'}</span>`;
+  return `<span class="status" style="color:var(--text-main)">${tab === 'listen' ? '未再生' : '未読'}</span>`;
+}
+
+function render() {
+  const [kick, title] = TITLES[tab];
+  $('phone').classList.toggle('selecting-root', selecting);
+  $('header').innerHTML = selecting
+    ? `<div><div class="kicker">${kick}</div><div class="select-title">${selected.size ? selected.size + '件を選択' : '項目を選択'}</div></div>
+       <div class="head-actions"><button class="text-btn strong" id="doneSel">完了</button></div>`
+    : `<div><div class="kicker">${kick}</div><h1>${title}</h1></div>
+       <div class="head-actions"><button class="add-btn" aria-label="追加"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>`;
+  $('search').classList.toggle('has-q', !!query);
+  $('nav').innerHTML = [['NEWS', 0], ['LIBRARY', tab === 'library'], ['LISTEN', tab === 'listen'], ['REVIEW', 0]]
+    .map(([l, on]) => `<div class="t ${on ? 'on' : ''}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${on ? 1.9 : 1.5}"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>${l}</div>`).join('');
+
+  const q = query.trim();
+  const list = items[tab].map(it => ({ it, m: matchOf(it, q) })).filter(x => x.m.hit);
+  const groups = new Map();
+  for (const x of list.sort((a, b) => b.it.date.localeCompare(a.it.date))) {
+    const k = monthKey(x.it.date);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(x);
+  }
+
+  let html = '';
+  if (q) html += `<div class="result-count">${list.length}件</div>`;
+  if (!list.length) {
+    html += q
+      ? `<div class="empty"><h2>見つかりません</h2><p>「${esc(q)}」に一致する${tab === 'listen' ? 'エピソード' : '作品'}はありません</p></div>`
+      : `<div class="empty"><h2>まだ何もありません</h2></div>`;
+  }
+  for (const [k, xs] of groups) {
+    const [y, mo] = k.split('-').map(Number);
+    // While searching, every month with hits is open.
+    const isCollapsed = !q && collapsed[tab].has(k);
+    const unplayed = xs.filter(x => x.it.state === 'new').length;
+    const allSel = xs.every(x => selected.has(x.it.id));
+    html += `<section class="month ${isCollapsed ? 'collapsed' : ''}" data-month="${k}">
+      <div class="month-head">
+        <div><span class="m">${mo}月</span>${y !== NOW.getFullYear() || k !== curMonth ? `<span class="y">${y}</span>` : ''}</div>
+        <div class="right">
+          <span class="count-wrap">${xs.length}
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></span>
+          <button class="sel-all" data-month="${k}">${allSel ? '選択解除' : 'すべて選択'}</button>
+        </div>
+      </div>
+      <div class="month-sub">${xs.length}${tab === 'listen' ? '本' : '作品'}${unplayed ? ` · ${tab === 'listen' ? '未再生' : '未読'} ${unplayed}` : ''}</div>
+      <div class="month-body"><div class="inner">`;
+    for (const { it, m } of xs) {
+      const snip = q && m.where
+        ? `<div class="snippet ${m.where}"><span class="src">${m.where === 'en' ? 'EN' : 'JA'}</span>${snippet(it[m.where], q)}</div>` : '';
+      html += `<div class="swipe" data-id="${it.id}">
+        <div class="action"><button class="swipe-del" aria-label="削除">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>削除</button></div>
+        <div class="card ${it.featured ? 'featured' : ''} ${selected.has(it.id) ? 'selected' : ''}" data-id="${it.id}">
+        <div class="card-top"><span class="tag">${hl(it.tag, q)}</span>${statusHtml(it)}
+          <span class="check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5 9-10"/></svg></span></div>
+        <h3>${hl(it.title, q)}</h3>
+        <div class="meta">${it.meta}<span class="dot">·</span>${relDate(it.date)}</div>
+        ${snip}
+        ${it.progress && it.state !== 'done' ? `<div class="progress" style="width:${it.progress * 100}%"></div>` : ''}
+      </div></div>`;
+    }
+    html += `</div></div></section>`;
+  }
+  const listEl = $('list');
+  listEl.className = selecting ? 'selecting' : '';
+  listEl.innerHTML = html;
+
+  const n = selected.size;
+  $('selCount').textContent = n ? `${n}件` : '項目を選択';
+  $('bulkDel').classList.toggle('ready', n > 0);
+}
+
+// ── Interaction ──
+document.querySelectorAll('.chrome [data-tab]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.chrome [data-tab]').forEach(x => x.classList.toggle('on', x === b));
+  tab = b.dataset.tab; selecting = false; selected.clear(); query = ''; $('q').value = ''; render(); $('scroll').scrollTop = 0;
+});
+$('resetBtn').onclick = () => { items = structuredClone(DATA); initCollapsed(); selecting = false; selected.clear(); query = ''; $('q').value = ''; render(); };
+$('q').oninput = (e) => { query = e.target.value; render(); };
+$('clear').onclick = () => { query = ''; $('q').value = ''; render(); $('q').focus(); };
+
+$('header').addEventListener('click', (e) => {
+  if (e.target.closest('#doneSel')) { selecting = false; selected.clear(); render(); }
+});
+
+// ── Gestures: swipe left = delete, long-press = enter select mode ──
+const REVEAL = 96;          // px the 削除 action shows when snapped open
+const FULL_SWIPE = 0.55;    // fraction of card width that deletes on release
+let g = null;               // current gesture
+let openSwipe = null;       // the one card snapped open (only one at a time)
+let suppressClick = false;
+
+function setX(sw, x) { sw.querySelector('.card').style.transform = x ? `translateX(${x}px)` : ''; }
+function closeOpen() { if (openSwipe) { openSwipe.classList.remove('open'); setX(openSwipe, 0); openSwipe = null; } }
+
+$('list').addEventListener('pointerdown', (e) => {
+  // A long-press re-renders under the finger, so its release fires no click;
+  // clear any stale suppression at the start of every new touch.
+  suppressClick = false;
+  const sw = e.target.closest('.swipe');
+  if (!sw || e.target.closest('.swipe-del')) return;
+  if (openSwipe && openSwipe !== sw) { closeOpen(); suppressClick = true; return; }
+  g = { sw, x0: e.clientX, y0: e.clientY, mode: null, base: sw === openSwipe ? -REVEAL : 0, tx: 0, pid: e.pointerId };
+  if (!selecting) {
+    g.timer = setTimeout(() => {
+      if (!g || g.mode) return;
+      g.mode = 'press';
+      selecting = true; selected.add(sw.dataset.id); closeOpen();
+      suppressClick = true; render();
+    }, 500);
+  }
+});
+$('list').addEventListener('pointermove', (e) => {
+  if (!g || g.mode === 'press' || g.mode === 'scroll') return;
+  const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+  if (!g.mode) {
+    if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { g.mode = 'scroll'; clearTimeout(g.timer); return; }
+    if (Math.abs(dx) > 8 && !selecting) {
+      g.mode = 'drag'; clearTimeout(g.timer);
+      g.sw.classList.add('dragging'); g.sw.setPointerCapture(g.pid);
+    } else return;
+  }
+  g.tx = Math.min(0, g.base + dx);
+  setX(g.sw, g.tx);
+});
+function endGesture() {
+  if (!g) return;
+  clearTimeout(g.timer);
+  if (g.mode === 'drag') {
+    const sw = g.sw, w = sw.offsetWidth;
+    sw.classList.remove('dragging');
+    suppressClick = true;
+    if (g.tx < -w * FULL_SWIPE) { openSwipe = null; deleteIds([sw.dataset.id]); }
+    else if (g.tx < -REVEAL / 2) { openSwipe = sw; sw.classList.add('open'); setX(sw, -REVEAL); }
+    else { if (openSwipe === sw) openSwipe = null; sw.classList.remove('open'); setX(sw, 0); }
+  }
+  g = null;
+}
+$('list').addEventListener('pointerup', endGesture);
+$('list').addEventListener('pointercancel', endGesture);
+// Desktop stand-in for long-press.
+$('list').addEventListener('contextmenu', (e) => {
+  const sw = e.target.closest('.swipe'); if (!sw) return;
+  e.preventDefault();
+  if (g) clearTimeout(g.timer);
+  selecting = true; selected.add(sw.dataset.id); closeOpen(); render();
+});
+
+$('list').addEventListener('click', (e) => {
+  const del = e.target.closest('.swipe-del');
+  if (del) { openSwipe = null; deleteIds([del.closest('.swipe').dataset.id]); return; }
+  if (suppressClick) { suppressClick = false; return; }
+  const selAll = e.target.closest('.sel-all');
+  if (selAll) {
+    e.stopPropagation();
+    const k = selAll.dataset.month;
+    const ids = items[tab].filter(i => monthKey(i.date) === k && matchOf(i, query.trim()).hit).map(i => i.id);
+    const all = ids.every(id => selected.has(id));
+    ids.forEach(id => all ? selected.delete(id) : selected.add(id));
+    render(); return;
+  }
+  const head = e.target.closest('.month-head');
+  if (head && !query.trim()) {
+    closeOpen();
+    const k = head.parentElement.dataset.month;
+    collapsed[tab].has(k) ? collapsed[tab].delete(k) : collapsed[tab].add(k);
+    head.parentElement.classList.toggle('collapsed');
+    return;
+  }
+  const card = e.target.closest('.card');
+  if (!card) return;
+  if (openSwipe) { closeOpen(); return; }
+  if (selecting) {
+    const id = card.dataset.id;
+    selected.has(id) ? selected.delete(id) : selected.add(id);
+    render();
+  }
+  // (normal tap → opens the player / reader in the real app)
+});
+
+$('bulkDel').onclick = () => {
+  if (!selected.size) return;
+  const ids = [...selected]; selected.clear(); selecting = false;
+  deleteIds(ids);
+};
+
+function deleteIds(ids) {
+  // Animate the cards out, then drop them from the model.
+  ids.forEach(id => {
+    const el = document.querySelector(`.swipe[data-id="${id}"]`);
+    if (el) { el.style.maxHeight = el.offsetHeight + 'px'; requestAnimationFrame(() => el.classList.add('removing')); }
+  });
+  const removed = items[tab].filter(i => ids.includes(i.id));
+  lastDeleted = { tab, removed };
+  setTimeout(() => { items[tab] = items[tab].filter(i => !ids.includes(i.id)); render(); }, 330);
+  $('toastMsg').textContent = `${ids.length}件を削除しました`;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); lastDeleted = null; }, 5000);
+  $('phone').classList.toggle('selecting-root', selecting);
+}
+$('undo').onclick = () => {
+  if (!lastDeleted) return;
+  items[lastDeleted.tab] = [...items[lastDeleted.tab], ...lastDeleted.removed];
+  lastDeleted = null; $('toast').classList.remove('show'); render();
+};
+
+initCollapsed();
+render();
+</script>
+</body>
+</html>
