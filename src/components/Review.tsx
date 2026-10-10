@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Flashcards } from './Flashcards';
 import { dueDeckSize } from '../services/dueDeck';
 import { Progress } from './Progress';
+import { useAppStore } from '../services/store';
 
 export type ReviewSegment = 'review' | 'progress';
 
@@ -16,8 +17,12 @@ const SEGMENTS: { id: ReviewSegment; label: string }[] = [
   { id: 'progress', label: '進捗' },
 ];
 
-// Height the segmented control occupies above the card flow (pill + margin).
-const SEGMENT_BAR_HEIGHT = '3.5rem';
+// Height the segmented control row occupies above the content (pill + breathing
+// room below it, as in docs/mockups/review-progress.html).
+const SEGMENT_BAR_HEIGHT = '4.4rem';
+
+// Matches how the store stamps reviewsByDay (UTC day key).
+const utcDayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 export function Review({
   segment,
@@ -33,6 +38,10 @@ export function Review({
   const [visitedProgress, setVisitedProgress] = useState(active === 'progress');
   const [remaining, setRemaining] = useState(0);
   const [focused, setFocused] = useState(false);
+  // Quiet right-hand hint balancing the toggle row: today's reviews on 復習,
+  // tracked words on 進捗.
+  const reviewsToday = useAppStore((s) => s.reviewsByDay[utcDayKey(Date.now())] ?? 0);
+  const trackedWords = useAppStore((s) => Object.keys(s.wordDatabase).length);
 
   const handleFocus = useCallback(
     (f: boolean) => {
@@ -51,7 +60,7 @@ export function Review({
     <div>
       {/* Focus mode hides the control along with the nav so the card keeps the screen. */}
       {!focused && (
-        <div style={{ height: SEGMENT_BAR_HEIGHT, display: 'flex', alignItems: 'flex-start' }}>
+        <div style={{ height: SEGMENT_BAR_HEIGHT, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div
             role="tablist"
             style={{
@@ -106,6 +115,12 @@ export function Review({
               );
             })}
           </div>
+          <span
+            className="sans"
+            style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, marginTop: '0.95rem' }}
+          >
+            {active === 'review' ? `今日 ${reviewsToday} 回` : `${trackedWords.toLocaleString()} 語`}
+          </span>
         </div>
       )}
 
