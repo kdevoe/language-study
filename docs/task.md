@@ -509,3 +509,13 @@
   - Verified: build + lint clean on touched files; Playwright dev walkthrough (empty deck →
     進捗 default, seeded deck badge 8 → 7 after a grade, focus hides control + nav,
     segment switch keeps card position, choice remembered across tab switches).
+- [x] Generated podcasts v1 (#12) — docs/podcast-design.md (§10 = what shipped), mockup docs/mockups/listen.html
+  - [x] P0 spike (scripts/spike-podcast.mjs): ElevenLabs v3 vs v4 on our Japanese content → v4 (faster, 7–20 dB cleaner);
+        designed voices (Voice Design) over library voices; 7-persona rotating cast incl. 関西弁/博多弁
+  - [x] Backend (DEPLOYED 2026-10-09): migration 28 (podcast_episodes + private `podcasts` bucket), ELEVENLABS_API_KEY
+        secret, generate-podcast (script → voice in two invocations; article/digest/topic/text/url sources)
+  - [x] Frontend: LISTEN tab replaces SETTINGS; Listen.tsx list + create sheet + daily digest on first visit;
+        PodcastPlayer.tsx synced transcript, tap-to-lookup, seek, speed, listen-first, Media Session, resume
+  - [x] useWordLookup hook extracted from Reader (Reader migrated, re-verified)
+  - [ ] Follow-ups: mini-player (store audio slice), pg_cron digest pre-generation, lexicon for topic/text
+        episodes, listening mastery, podcast eval fixtures

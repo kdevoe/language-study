@@ -5,9 +5,6 @@ import { YugenBox } from './YugenBox';
 import { WordModal, WordDetails } from './WordModal';
 import {
   rewriteArticleWithGemini,
-  fetchWordDefinitionQuick,
-  fetchWordGrammarInsight,
-  fetchSentenceTranslation,
   requestWorkPart,
   isPartInProgressError,
   saveWorkReadingPosition,
@@ -17,7 +14,7 @@ import { supabase } from '../services/supabase';
 import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
-import { touchLock } from '../services/touchLock';
+import { useWordLookup } from '../hooks/useWordLookup';
 import { } from 'lucide-react'; // Empty block to show we're using icons elsewhere if needed, or just clear it.
 // Actually, let's just remove the line if no icons are used.
 
@@ -54,18 +51,17 @@ function hitWeightFor(text: string, furigana?: string, mastery?: MasteryLevel): 
 }
 
 export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockIndex }: ReaderProps) {
-  const [selectedWord, setSelectedWord] = useState<WordDetails | null>(null);
-  const [selectedSentence, setSelectedSentence] = useState<{ text: string, translation: string, id: string } | null>(null);
-  const [drawerAnchor, setDrawerAnchor] = useState<'top' | 'bottom'>('bottom');
-  const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
   const [loadingArticleTitle, setLoadingArticleTitle] = useState<string>("");
-  const [isModalLoading, setIsModalLoading] = useState(false);
   
   const [clickedWords, setClickedWords] = useState<Set<string>>(new Set());
+  // Word / sentence lookup (WordModal) — shared with the podcast player. A
+  // looked-up word counts as clicked so grade-on-visible skips it.
+  const lookup = useWordLookup({
+    onWordTouched: (key) => setClickedWords(prev => new Set(prev).add(key)),
+  });
 
   // ── Grade-on-visible ──────────────────────────────────────────────────────
   // A word is graded ('skip') once it has been FULLY on screen (no partial clip)
@@ -105,9 +101,7 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
   const readerFontWeight = useAppStore(s => s.readerFontWeight);
   const saveWordDefinition = useAppStore(s => s.saveWordDefinition);
   const recordWordSeen = useAppStore(s => s.recordWordSeen);
-  const setWordMastery = useAppStore(s => s.setWordMastery);
   const applyDifficultyEvent = useAppStore(s => s.applyDifficultyEvent);
-  const mergeWordRecords = useAppStore(s => s.mergeWordRecords);
   const setCurrentArticle = useAppStore(s => s.setCurrentArticle);
   const saveProcessedArticle = useAppStore(s => s.saveProcessedArticle);
 
@@ -309,9 +303,7 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
     setLoadingStep("Initializing reader...");
     setLoadingArticleTitle(initialArticle?.title || "読書家");
     setClickedWords(new Set());
-    setSelectedWord(null);
-    setSelectedSentence(null);
-    setActiveHighlightId(null);
+    lookup.clearSelection();
     
 
       
@@ -424,189 +416,8 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
     };
   }, [currentArticle]);
 
-  const determineAnchor = (e: any) => {
-    const y = 'clientY' in e ? e.clientY : (e.touches?.[0]?.clientY || 0);
-    // USER: "prefereably drop down from the top unless there is not enough space"
-    // We favor Top anchor (Word at bottom half)
-    // Threshold biased towards Top: if word is below 38vh, use Top.
-    setDrawerAnchor(y > window.innerHeight * 0.38 ? 'top' : 'bottom');
-  };
-
-  const handleWordClick = (details: WordDetails, sentText: string, e: any, tokenId: string) => {
-    if (touchLock.isLocked()) return;
-    if (activeHighlightId === tokenId) {
-      setActiveHighlightId(null);
-      setSelectedWord(null);
-      return;
-    }
-    // Enriched tokens can carry an empty meaning — an unlinkable proper noun
-    // (enrich.ts keeps its furigana but leaves meaning blank), or a JMDict entry
-    // that came through glossless during article enrichment. Trusting it here
-    // renders a permanent skeleton because this handler never fetches. Route to
-    // the real lookup path instead — it fetches (with timeout + error state) and
-    // honors the "tap falls back to dictionary-lookup" the enricher intended.
-    if (!details.meaning) {
-      handleDictionaryLookup(details.word, sentText, e, tokenId, details.jmdictEntryId);
-      return;
-    }
-    determineAnchor(e);
-    // Track under the canonical key (entry_id when linked, else the surface/lemma),
-    // so a click and a passive read of the same word land on one record (#39).
-    const key = canonicalWordKey({ jmdictEntryId: details.jmdictEntryId, word: details.word });
-    recordWordSeen(key);
-    setClickedWords(prev => new Set(prev).add(key));
-
-    const cached = wordDatabase[key];
-    const merged = { ...details, grammarNote: cached?.grammarNote || details.grammarNote };
-    setSelectedWord(merged);
-    setSelectedSentence(null);
-    setActiveHighlightId(tokenId);
-    setTargetRect(e.currentTarget.getBoundingClientRect());
-    saveWordDefinition(key, { ...details, surface: details.word });
-    // Looking a word up means it wasn't known: nudge its difficulty up.
-    applyDifficultyEvent(key, 'click', details.jlptLevel);
-
-    if (!merged.grammarNote) {
-      fetchWordGrammarInsight(details.word, sentText).then(insight => {
-        setSelectedWord(prev => {
-          if (!prev || prev.word !== details.word) return prev;
-          return { ...prev, grammarNote: insight };
-        });
-        saveWordDefinition(key, { grammarNote: insight });
-      });
-    }
-  };
-
-  const handleDictionaryLookup = async (word: string, contextSentence: string, e: any, tokenId: string, jmdictEntryId?: string) => {
-    if (touchLock.isLocked()) return;
-    if (activeHighlightId === tokenId) {
-      setActiveHighlightId(null);
-      setSelectedWord(null);
-      return;
-    }
-    determineAnchor(e);
-    // Canonical key: the entry_id when the token was already linked, else the surface
-    // word (a lookup that discovers an id later re-keys onto it — see below) (#39).
-    const key = canonicalWordKey({ jmdictEntryId, word });
-    recordWordSeen(key);
-    setClickedWords(prev => new Set(prev).add(key));
-    setSelectedSentence(null);
-
-    const localData = wordDatabase[key];
-    // Self-healing: If we have local data but it's missing important metadata (JLPT or JMDict ID),
-    // we allow the lookup to proceed to enrich the entry.
-    if (localData && localData.meaning && localData.meaning !== 'Implicitly parsed context' && localData.jlptLevel && localData.jmdictEntryId) {
-      applyDifficultyEvent(key, 'click', localData.jlptLevel);
-      setSelectedWord({
-        word,
-        reading: localData.reading,
-        meaning: localData.meaning,
-        grammarNote: localData.grammarNote,
-        furiganaMap: localData.furiganaMap,
-        jlptLevel: localData.jlptLevel,
-        pos: localData.pos,
-        jmdictEntryId: localData.jmdictEntryId
-      });
-      setActiveHighlightId(tokenId);
-      setTargetRect(e.currentTarget.getBoundingClientRect());
-
-      if (!localData.grammarNote) {
-        fetchWordGrammarInsight(word, contextSentence).then(insight => {
-          setSelectedWord(prev => {
-            if (!prev || prev.word !== word) return prev;
-            return { ...prev, grammarNote: insight };
-          });
-          saveWordDefinition(key, { grammarNote: insight });
-        });
-      }
-      return;
-    }
-
-    setSelectedWord({ 
-      word, 
-      reading: '...', 
-      meaning: '',
-      furiganaMap: Array.from(word).map(c => ({ kanji: c, kana: '' })) 
-    });
-    setSelectedSentence(null);
-    setTargetRect(e.currentTarget.getBoundingClientRect());
-    setActiveHighlightId(tokenId);
-    setIsModalLoading(true);
-
-    try {
-      // 1. QUICK PATH (JMDict Instant or Groq Fallback)
-      const quickDef = await fetchWordDefinitionQuick(word, contextSentence, jmdictEntryId);
-      const combinedInitial: WordDetails = {
-        word,
-        reading: quickDef.reading || '...',
-        // Leave empty when the lookup genuinely returned no gloss — the modal
-        // renders a terminal "no definition" state for that (a placeholder here
-        // would masquerade as still-loading and never resolve).
-        meaning: quickDef.meaning || '',
-        furiganaMap: quickDef.furiganaMap,
-        jlptLevel: quickDef.jlptLevel,
-        pos: quickDef.pos,
-        jmdictEntryId: quickDef.jmdictEntryId
-      };
-      setSelectedWord(combinedInitial);
-
-      // The lookup may resolve an entry_id for a token that had none pre-linked. Its
-      // canonical key is that id — migrate the surface-keyed record we just created
-      // onto it so the word stays a single record (#39).
-      const canonKey = canonicalWordKey({ jmdictEntryId: quickDef.jmdictEntryId || jmdictEntryId, word });
-      if (canonKey !== key) {
-        mergeWordRecords(key, canonKey);
-        setClickedWords(prev => new Set(prev).add(canonKey)); // keep grade-dedup aligned
-      }
-
-      // 2. SMART PATH (Gemini 3 Flash) - Parallel Context Analysis
-      fetchWordGrammarInsight(word, contextSentence).then((insight) => {
-        setSelectedWord(prev => {
-          if (!prev || prev.word !== word) return prev;
-          return { ...prev, grammarNote: insight };
-        });
-        // Cache the full enriched result
-        saveWordDefinition(canonKey, { ...combinedInitial, surface: word, grammarNote: insight });
-      });
-
-      // Cache initial quick data
-      saveWordDefinition(canonKey, { ...combinedInitial, surface: word });
-      // Now that the JLPT level is known, nudge difficulty up for this lookup.
-      applyDifficultyEvent(canonKey, 'click', quickDef.jlptLevel);
-      setIsModalLoading(false);
-    } catch (err) {
-      console.error("Word lookup failed:", err);
-      const timedOut = /timed out/i.test(err instanceof Error ? err.message : String(err));
-      const message = timedOut
-        ? 'Lookup timed out — the server is busy. Try again in a moment.'
-        : 'Lookup failed. Tap outside to dismiss.';
-      setSelectedWord(prev => (prev && prev.word === word)
-        ? { ...prev, reading: '—', meaning: message, grammarNote: '—' }
-        : prev);
-      setIsModalLoading(false);
-    }
-  };
-
-  const handleSentenceTranslate = async (sentence: string, sentenceId: string, e: any) => {
-    if (touchLock.isLocked()) return;
-    if (selectedSentence?.id === sentenceId) {
-      setSelectedSentence(null);
-      return;
-    }
-    determineAnchor(e);
-    setSelectedWord(null);
-    setSelectedSentence({ text: sentence, translation: '', id: sentenceId });
-    setTargetRect(e.currentTarget.getBoundingClientRect());
-    setActiveHighlightId(sentenceId);
-    setIsModalLoading(true);
-    const translation = await fetchSentenceTranslation(sentence, currentArticle?.blocks.map(b => b.content?.map(c => c.text).join('')).join('\n') || '');
-    setSelectedSentence({ text: sentence, translation, id: sentenceId });
-    setIsModalLoading(false);
-  };
-
-  const handleSetMastery = (level: 'hard' | 'medium' | 'easy') => {
-    if (selectedWord) setWordMastery(canonicalWordKey({ jmdictEntryId: selectedWord.jmdictEntryId, word: selectedWord.word }), level);
-  };
+  // Whole-article text handed to the sentence translator for context.
+  const articleContext = currentArticle?.blocks.map(b => b.content?.map(c => c.text).join('')).join('\n') || '';
 
   const renderParagraph = (block: any, blockIdx: number) => {
     // Before client enrichment finishes, a block may carry only raw text — render
@@ -638,7 +449,7 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
           /[。！？]/.test(part) ? (
             <span
               key={`${keyBase}-p${idx}`}
-              onClick={(e) => handleSentenceTranslate(sentText, sentenceId, e)}
+              onClick={(e) => lookup.translateSentence(sentText, sentenceId, e, articleContext)}
               style={{ cursor: 'pointer', padding: '0 0.25em', margin: '0 -0.1em' }}
             >
               {part}
@@ -651,8 +462,8 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
       return (
         <span 
           key={sentenceId} 
-          className={activeHighlightId === sentenceId ? 'sentence-highlight' : ''}
-          onDoubleClick={(e) => handleSentenceTranslate(sentText, sentenceId, e)}
+          className={lookup.activeHighlightId === sentenceId ? 'sentence-highlight' : ''}
+          onDoubleClick={(e) => lookup.translateSentence(sentText, sentenceId, e, articleContext)}
         >
           {sentTokens.map((segment, j) => {
             if (segment.furigana || segment.isInteractive) {
@@ -667,12 +478,12 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
                     word={segment.text}
                     furigana={segment.furigana}
                     hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[gradeKey]?.mastery)}
-                    isSelected={activeHighlightId === `${sentenceId}-${j}`}
+                    isSelected={lookup.activeHighlightId === `${sentenceId}-${j}`}
                     onClick={(e) => {
                       const tid = `${sentenceId}-${j}`;
-                      if (segment.details) handleWordClick(segment.details as WordDetails, sentText, e, tid);
+                      if (segment.details) lookup.openWord(segment.details as WordDetails, sentText, e, tid);
                       // Look up by lemma (鎮める) when we have it, not the surface form (鎮めて).
-                      else handleDictionaryLookup(segment.lemma ?? segment.text, sentText, e, tid, segment.jmdict_entry_id);
+                      else lookup.lookupWord(segment.lemma ?? segment.text, sentText, e, tid, segment.jmdict_entry_id);
                     }}
                   />
                 </span>
@@ -686,8 +497,8 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
                 return (
                   <span
                     key={`${sentenceId}-${j}-${index}`}
-                    className={activeHighlightId === `${sentenceId}-${j}-${index}` ? 'word-highlight' : ''}
-                    onClick={(e) => handleDictionaryLookup(w.segment, sentText, e, `${sentenceId}-${j}-${index}`)}
+                    className={lookup.activeHighlightId === `${sentenceId}-${j}-${index}` ? 'word-highlight' : ''}
+                    onClick={(e) => lookup.lookupWord(w.segment, sentText, e, `${sentenceId}-${j}-${index}`)}
                     style={{
                       cursor: 'pointer',
                       position: 'relative',
@@ -824,28 +635,7 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
         )}
       </div>
 
-      <WordModal 
-        isOpen={!!selectedWord || !!selectedSentence} 
-        onDismissStart={() => {
-          setSelectedWord(null);
-          setSelectedSentence(null);
-          setActiveHighlightId(null);
-        }}
-        onClose={() => { 
-          setSelectedWord(null); 
-          setSelectedSentence(null); 
-          setActiveHighlightId(null);
-          touchLock.lock();
-        }} 
-        mode={selectedSentence ? 'sentence' : 'word'}
-        wordData={selectedWord}
-        sentenceText={selectedSentence?.text}
-        sentenceTranslation={selectedSentence?.translation}
-        anchor={drawerAnchor}
-        onSetMastery={handleSetMastery}
-        isLoading={isModalLoading}
-        targetRect={targetRect}
-      />
+      <WordModal {...lookup.modalProps} />
     </>
   );
 }

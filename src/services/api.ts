@@ -113,7 +113,7 @@ export function isServerBusyError(error: unknown): boolean {
   return msg.includes('overload') || msg.includes('rate limit') || msg.includes('busy');
 }
 
-async function invokeEdgeFn<T = any>(name: string, body: object, timeoutMs?: number): Promise<T> {
+export async function invokeEdgeFn<T = any>(name: string, body: object, timeoutMs?: number): Promise<T> {
   const run = () => {
     const invocation = supabase.functions.invoke(name, { body });
     return timeoutMs
