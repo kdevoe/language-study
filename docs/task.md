@@ -497,3 +497,15 @@
     five write-gates). Ship: `supabase functions deploy process-article`
     (ensure-buffer unchanged), then merge frontend. Multi-part end-to-end
     needs a real account — test with Sandbox Study Mode ON.
+- [x] Nav: fold Progress into REVIEW (prep for podcasts' LISTEN tab, docs/podcast-design.md §6.1)
+  - [x] STUDY → REVIEW label; PROGRESS tab removed. Rail: NEWS · LIBRARY · REVIEW · SETTINGS
+        (SETTINGS is swapped for LISTEN in the podcasts PR).
+  - [x] Review.tsx: 復習 | 進捗 segmented control (Seen/Discover pill style) over
+        Flashcards and Progress; due-count badge on 復習; opens on 復習 when cards are
+        due, else 進捗; explicit choice remembered by App for the session. Both panes
+        stay mounted once visited so switching never re-snapshots the deck.
+  - [x] Focus mode hides the segmented control along with the nav.
+  - [x] Progress `embedded` drops its page title; deck snapshot moved to services/dueDeck.ts.
+  - Verified: build + lint clean on touched files; Playwright dev walkthrough (empty deck →
+    進捗 default, seeded deck badge 8 → 7 after a grade, focus hides control + nav,
+    segment switch keeps card position, choice remembered across tab switches).
