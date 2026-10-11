@@ -16,6 +16,7 @@ import {
 } from '../services/podcasts';
 import { castMember } from '../data/podcastCast';
 import { sharedAudio } from '../services/sharedAudio';
+import { cachedAudioUrl, saveAudio } from '../services/audioCache';
 
 // Podcast player (docs/podcast-design.md §6.2, mockup docs/mockups/listen.html):
 // the transcript IS the interface. The playing sentence gets a soft tint, the
@@ -87,6 +88,7 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
   // ── Load episode, audio URL and tokens ──
   useEffect(() => {
     let cancelled = false;
+    let objectUrl: string | null = null;
     (async () => {
       try {
         const full = await fetchEpisode(initial.id);
@@ -96,14 +98,23 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
         const raw: ArticleBlock[] = turns.map((t) => ({ type: 'paragraph', text: t.text }));
         setBlocks(raw);
         enrichArticle(raw).then((enriched) => { if (!cancelled) setBlocks(enriched); });
-        const url = await episodeAudioUrl(full);
+        // A saved copy plays from the device; otherwise stream and save it for next time.
+        const path = full.audio_path;
+        const local = path ? await cachedAudioUrl('podcast', path) : null;
+        if (local) objectUrl = local;
+        const url = local ?? await episodeAudioUrl(full);
+        if (!local && path) saveAudio('podcast', path, url);
         if (!cancelled) setAudioUrl(url);
       } catch (e) {
         console.error('[player] load failed:', e);
         if (!cancelled) setLoadError('エピソードを読み込めませんでした。');
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // After the shared element's cleanup has let go of it (effects unmount in order).
+      if (objectUrl) { const u = objectUrl; setTimeout(() => URL.revokeObjectURL(u), 0); }
+    };
   }, [initial.id]);
 
   const host = castMember(ep?.cast_ids?.host);

@@ -257,8 +257,11 @@ async function runVoiceStage(supabase: SupabaseClient, episodeId: string) {
       ep.script.turns.map((t) => ({ text: t.text, voiceId: voiceOf[t.speaker].voiceId })),
     );
     const audioPath = `${ep.user_id}/${ep.id}.mp3`;
+    // The file never changes once the episode is ready (only failed episodes are
+    // voiced again, and nothing has read them), so caches may keep it a year.
     const { error: upErr } = await supabase.storage.from(BUCKET).upload(audioPath, render.mp3, {
       contentType: 'audio/mpeg',
+      cacheControl: '31536000',
       upsert: true,
     });
     if (upErr) throw new Error(`audio upload failed: ${upErr.message}`);
