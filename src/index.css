@@ -235,14 +235,29 @@ ruby.peek-furigana rt {
   opacity: 0.8;
 }
 
-/* Song player (SongPlayer.tsx, mockup docs/mockups/music.html): the line being
-   sung is full strength, the rest faded. */
-.song-line {
-  opacity: 0.38;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+/* Song player (SongPlayer.tsx, mockup docs/mockups/lyrics.html, phone B): the
+   page goes soft blue; lyrics are bold serif, charcoal once sung, white while
+   still to come. */
+body.song-mode {
+  background-color: var(--accent-primary);
+  --chrome-bg: var(--accent-primary);
 }
-.song-line.cur {
-  opacity: 1;
+.song-line {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  margin-bottom: 1.05rem;
+  color: var(--bg-pure);
+  transition: color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.song-line.sung {
+  color: var(--text-main);
+}
+.song-gap {
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin: 0.4rem 0 1.4rem;
 }
 
 @keyframes lucide-spin {

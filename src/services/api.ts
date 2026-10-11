@@ -1066,6 +1066,7 @@ export async function upsertUserPreferences(
     song_styles?: string[];
     podcast_cast?: string[];
     podcast_personas?: Record<string, string>;
+    song_cover_style?: string | null;
   }
 ) {
   const { error } = await supabase

@@ -20,6 +20,8 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CLAUDE_OPUS, ELEVEN_MUSIC_MODEL, GEMINI_IMAGE } from '../_shared/models.ts';
 import {
+  COVER_STYLE_MAX_CHARS,
+  DEFAULT_COVER_STYLE,
   SONG_STYLES,
   SONG_PLAN_TOOL,
   PlanValidationError,
@@ -97,7 +99,7 @@ async function writePlan(prompt: string): Promise<{ raw: unknown; usage: Record<
     },
     body: JSON.stringify({
       model: CLAUDE_OPUS,
-      max_tokens: 8000,
+      max_tokens: 12000,
       tools: [SONG_PLAN_TOOL],
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: prompt }],
@@ -253,13 +255,14 @@ function parseMultipart(buf: Uint8Array, boundary: string): { type: string; body
   return parts;
 }
 
-async function paintCover(prompt: string): Promise<Uint8Array | null> {
+// Scene from the songwriter, look from the listener's art direction (or the default).
+async function paintCover(scene: string, artDirection: string): Promise<Uint8Array | null> {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE}:generateContent?key=${Deno.env.get('GEMINI_API_KEY')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Square album cover art. ${prompt} No text, letters, words or logos anywhere in the image.` }] }],
+        contents: [{ parts: [{ text: `Square album cover art.\nScene: ${scene}\nArt direction: ${artDirection}\nAn illustration, not a photograph: no photorealism, no 3D render, no glossy lighting. The artwork fills the whole square edge to edge: no border, frame, margin or paper edge around it. No text, letters, words or logos anywhere in the image. No recognisable real people.` }] }],
         generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1', imageSize: '512' } },
       }),
     });
@@ -282,7 +285,9 @@ async function runComposeStage(supabase: SupabaseClient, songId: string) {
   const plan = song.plan;
   try {
     const t0 = Date.now();
-    const [music, cover] = await Promise.all([composeSong(plan), paintCover(plan.cover_prompt)]);
+    const { data: prefs } = await supabase.from('user_preferences').select('song_cover_style').eq('user_id', song.user_id).maybeSingle();
+    const artDirection = (typeof prefs?.song_cover_style === 'string' && prefs.song_cover_style.trim().slice(0, COVER_STYLE_MAX_CHARS)) || DEFAULT_COVER_STYLE;
+    const [music, cover] = await Promise.all([composeSong(plan), paintCover(plan.cover_prompt, artDirection)]);
     const audioPath = `${song.user_id}/${song.id}.mp3`;
     // Never re-rendered once ready, so caches may keep it a year (docs/audio-cache-retention.md).
     const { error: upErr } = await supabase.storage.from(BUCKET).upload(audioPath, music.mp3, { contentType: 'audio/mpeg', cacheControl: '31536000', upsert: true });

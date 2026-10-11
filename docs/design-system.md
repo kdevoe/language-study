@@ -235,7 +235,7 @@ Source of truth: `src/components/Music.tsx`, `SongSheet.tsx`, `SongPlayer.tsx`; 
   
 - **New-song sheet:** the §6.2 sheet with PodcastSheet's three groups: スタイル | 自分で slider, then the style chips (serif 0.92rem; the picked one lifts like the slider thumb) or a description box, in one fixed-height pane so switching never moves the sheet; ＋ テーマ swaps for its field in the same slot; 1/2/3分 slider + 作る.
   
-- **Player:** cover, title and style, then the lyrics in serif with the sung line full strength and the rest faded (`.song-line` / `.cur`); it scrolls itself. Words are tappable like the reader (the song pauses). Controls reuse the podcast player's: speed, ⟲10 / ⟳10, play, リピート.
+- **Player** (mockup `docs/mockups/lyrics.html`, phone B): the whole page turns soft blue (`--accent-primary`, via `body.song-mode`, which also tints the back row and the browser's theme colour). Cover, title and style open big; as the page scrolls they shrink into the back row beside the chevron and pin there. Lyrics are bold serif (700, 1.5rem) in two colours: sung so far in `--text-main`, still to come in `--bg-pure`; ♪ marks the gap between sections. The page scrolls itself to keep the sung line about 40% down. Words are tappable like the reader (the song pauses). Controls are the podcast player's, unchanged: speed, ⟲10 / ⟳10, play, リピート.
 
 ### 6.14 Settings
 Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.html`.
@@ -247,6 +247,8 @@ Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.ht
 - **Pick lists** (song styles, hosts): one row each, serif name + optional muted tag + a one-line description. White row (`--bg-pure`, soft shadow) = on, transparent at 50% = off; tap the row to switch it. The heading carries an "N of M" count. A list keeps its minimum (one style; two hosts, one of them 標準語) by ignoring the tap that would break it.
   
 - **Editing in place:** 編集 on a host opens its personality as a serif underline textarea in the row, with 元に戻す (restore the original) and 保存 (serif 0.8rem, 保存 in `--text-main`).
+  
+- **One editable text** (the song cover's art direction) is a single white row with its text and 編集, plus a muted "Default" / "Your own" count in the heading. It uses the same in-place editor.
   
 - **詳細** (serif, muted, centred, chevron) at the bottom holds the one-off maintenance tools, the sandbox switch and the danger zone, unchanged.
 
