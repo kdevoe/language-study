@@ -40,7 +40,7 @@ export interface ArchiveCard {
 
 interface Props<T extends { id: string }> {
   titleId: UiLabelId;
-  /** The + at the end of the search row. */
+  /** The + beside the settings mark in the page heading. */
   onAdd: () => void;
   addLabel: string;
   items: T[];
@@ -201,7 +201,10 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
   }, [visible, createdAt]);
 
   const newestMonth = months[0]?.[0];
-  const isCollapsed = (k: string) => !q && (collapseOverrides.get(k) ?? k !== newestMonth);
+  // The newest month is the list itself: no heading, always open. Its heading
+  // only appears while searching or selecting (results by month, すべて選択).
+  const headless = (k: string) => k === newestMonth && !q && !selecting;
+  const isCollapsed = (k: string) => !headless(k) && !q && (collapseOverrides.get(k) ?? k !== newestMonth);
   const toggleMonth = (k: string) => {
     setOpenId(null);
     setCollapseOverrides((prev) => new Map(prev).set(k, !isCollapsed(k)));
@@ -237,11 +240,11 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
           <button onClick={exitSelect} className="serif" style={textBtn(true)}>完了</button>
         </div>
       ) : (
-        <PageHeading id={props.titleId} />
+        <PageHeading id={props.titleId} actions={<AddButton onClick={props.onAdd} label={props.addLabel} />} />
       )}
 
-      {/* Search: hero input on a hairline (design-system §6.4); + at the row's end */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: q ? '0.8rem' : '1.6rem' }}>
+      {/* Search: hero input on a hairline (design-system §6.4), full width */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: q ? '0.8rem' : '1.6rem' }}>
         <label style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', borderBottom: '1px solid var(--border-light)', padding: '0.35rem 0 0.55rem' }}>
           <Search size={18} strokeWidth={1.5} color="var(--text-muted)" style={{ flex: 'none' }} />
           <input
@@ -264,7 +267,6 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
             </button>
           )}
         </label>
-        {!selecting && <AddButton onClick={props.onAdd} label={props.addLabel} />}
       </div>
       {q && (
         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '1.4rem' }}>{visible.length}件</div>
@@ -293,44 +295,46 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
           const allSelected = rows.every((r) => selected.has(r.item.id));
           return (
             <section key={k} style={{ marginBottom: '2.2rem' }}>
-              <div
-                onClick={() => !q && toggleMonth(k)}
-                style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', cursor: q ? 'default' : 'pointer', userSelect: 'none', padding: '0.2rem 0' }}
-              >
-                <div>
-                  <span className="serif" style={{ fontSize: '1.35rem', fontWeight: 500, color: 'var(--text-main)' }}>{m}月</span>
-                  {k !== currentMonth && (
-                    <span style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.06em', color: 'var(--text-muted)', marginLeft: '0.45rem' }}>{y}</span>
+              {!headless(k) && (
+                <div
+                  onClick={() => !q && toggleMonth(k)}
+                  style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', cursor: q ? 'default' : 'pointer', userSelect: 'none', padding: '0.2rem 0' }}
+                >
+                  <div>
+                    <span className="serif" style={{ fontSize: '1.35rem', fontWeight: 500, color: 'var(--text-main)' }}>{m}月</span>
+                    {k !== currentMonth && (
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.06em', color: 'var(--text-muted)', marginLeft: '0.45rem' }}>{y}</span>
+                    )}
+                  </div>
+                  {selecting ? (
+                    <button
+                      className="serif"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          rows.forEach((r) => (allSelected ? next.delete(r.item.id) : next.add(r.item.id)));
+                          return next;
+                        });
+                      }}
+                      style={textBtn(false, '0.85rem')}
+                    >
+                      {allSelected ? '選択解除' : 'すべて選択'}
+                    </button>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+                      {rows.length}
+                      {!q && (
+                        <ChevronDown
+                          size={16}
+                          strokeWidth={1.5}
+                          style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: `transform 0.4s cubic-bezier(${EASE.join(',')})` }}
+                        />
+                      )}
+                    </span>
                   )}
                 </div>
-                {selecting ? (
-                  <button
-                    className="serif"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelected((prev) => {
-                        const next = new Set(prev);
-                        rows.forEach((r) => (allSelected ? next.delete(r.item.id) : next.add(r.item.id)));
-                        return next;
-                      });
-                    }}
-                    style={textBtn(false, '0.85rem')}
-                  >
-                    {allSelected ? '選択解除' : 'すべて選択'}
-                  </button>
-                ) : (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>
-                    {rows.length}
-                    {!q && (
-                      <ChevronDown
-                        size={16}
-                        strokeWidth={1.5}
-                        style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: `transform 0.4s cubic-bezier(${EASE.join(',')})` }}
-                      />
-                    )}
-                  </span>
-                )}
-              </div>
+              )}
               {collapsed && (
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                   {rows.length}{props.unit}{unfinished > 0 && ` · ${props.unfinishedLabel} ${unfinished}`}
@@ -346,7 +350,7 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
                     transition={{ duration: 0.4, ease: EASE }}
                     style={{ overflow: 'hidden', margin: '0 -12px', padding: '0 12px' }}
                   >
-                    <div style={{ paddingTop: '0.9rem' }}>
+                    <div style={{ paddingTop: headless(k) ? 0 : '0.9rem' }}>
                       <AnimatePresence initial={false}>
                         {rows.map(({ item, card: c, snippet }) => (
                           <SwipeRow
@@ -635,20 +639,18 @@ function SwipeRow({ id, openId, setOpenId, selecting, onDelete, onLongPress, onT
   );
 }
 
-/** The search row's +: a small white, lifted circle like the slider thumb (design-system §6.3). */
+/** The heading's +: a plain icon beside the settings mark, matching its size and weight (design-system §6.9). */
 function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
       style={{
-        width: '34px', height: '34px', flex: 'none', borderRadius: '50%', border: 'none', cursor: 'pointer',
-        backgroundColor: 'var(--bg-pure)', color: 'var(--text-main)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        width: '44px', height: '44px', flex: 'none', border: 'none', background: 'none', cursor: 'pointer',
+        color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
-      <Plus size={18} strokeWidth={1.5} />
+      <Plus size={22} strokeWidth={1.25} />
     </button>
   );
 }

@@ -148,7 +148,7 @@ Lucide icons, stroke width 1.5, 20–24px, `--text-muted` at rest, no background
 ### 6.8 Archive list (LISTEN, LIBRARY)
 Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-organize.html`.
 
-- **Months, not filters.** Items group by month under a serif month heading (year in small muted sans for any month but the current one) with the count and a chevron at the right. The newest month starts open and older ones collapsed; a collapsed month shows one muted summary line (`4本 · 未再生 2`).
+- **Months, not filters.** The newest month is the list itself: its items sit straight under the search row with no heading and are always open. Older months group under a serif month heading (year in small muted sans for any month but the current one) with the count and a chevron at the right, collapsed to start; a collapsed month shows one muted summary line (`4本 · 未再生 2`). The newest month's heading appears only while searching or selecting (for すべて選択).
   
 - **Search** is a hero input on a hairline under the page heading (§6.9), matching Japanese and English. Results stay grouped by month with every month open, under a muted `n件`. A hit in body text adds a short excerpt marked `EN` / `JA`, the match tinted `--accent-primary`.
   
@@ -158,7 +158,7 @@ Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-
   
 - **Undo, not confirm.** Deletes hide at once and reach the server after a 5s toast with 元に戻す (§6.6).
   
-- The `+` sits at the end of the search row: a small (34px) white lifted circle, not a black fill.
+- The `+` sits in the page heading, just left of the settings mark: a plain Lucide `Plus` matching the mark (22px, stroke 1.25, `--text-muted`, 44px hit area), not a lifted circle. The search row runs full width.
   
 ### 6.9 Page heading (tab pages)
 Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.html` (見出しに統合).
@@ -167,11 +167,11 @@ Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.
   
 - The **settings mark** is thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮.
   
-- Right-edge icons share one vertical line: the settings mark's icon centre sits 17px in from the content edge, the same as the 34px `+` in the archive search row below it.
+- The settings mark's icon centre sits 17px in from the content edge. Page actions (the archive `+`) sit beside it in the heading row, never stacked under it.
   
 - The first content after the heading starts 1.6rem below it (the heading's 1rem margin plus 0.6rem on News; the search row's margin on the archive pages).
   
-- The page's own controls sit directly below: search + `+` (LISTEN, LIBRARY), the 復習 | 進捗 segment (REVIEW).
+- The page's own controls sit directly below: search (LISTEN, LIBRARY), the 復習 | 進捗 segment (REVIEW).
   
 - **Reading surfaces** (Reader, podcast player) keep a fixed row with only the back arrow; it hides on scroll with the nav.
   

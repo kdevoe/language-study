@@ -14,7 +14,12 @@ import type { UiLabelId } from '../services/uiLabels';
 /** Opens Settings; provided by App so tabs don't thread a prop through. */
 export const OpenSettingsContext = createContext<() => void>(() => {});
 
-export function PageHeading({ id, settingsMark = true }: { id: UiLabelId; settingsMark?: boolean }) {
+export function PageHeading({ id, settingsMark = true, actions }: {
+  id: UiLabelId;
+  settingsMark?: boolean;
+  /** Page actions (e.g. the archive's +), sat just left of the settings mark. */
+  actions?: React.ReactNode;
+}) {
   const { shown } = useUiLabelState(id);
   const lookup = useWordLookup();
   const openWord = (e: React.MouseEvent<HTMLElement>) => {
@@ -33,15 +38,17 @@ export function PageHeading({ id, settingsMark = true }: { id: UiLabelId; settin
           <AdaptiveLabel id={id} event />
         </button>
       </h1>
-      {settingsMark && <SettingsMark />}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        {actions}
+        {settingsMark && <SettingsMark />}
+      </div>
       <WordModal {...lookup.modalProps} />
     </div>
   );
 }
 
 /** Thin slider lines: reads as settings, quieter than a gear. The 44px hit area hangs
- *  5px past the content edge so the icon's centre sits 17px in, on the same line as
- *  ArchiveList's 34px + button below it. */
+ *  5px past the content edge so the icon's centre sits 17px in. */
 export function SettingsMark() {
   const openSettings = useContext(OpenSettingsContext);
   return (
