@@ -224,6 +224,8 @@ interface AppState {
   songStyles: string[] | null;
   podcastCast: string[] | null;
   podcastPersonas: Record<string, string>;
+  /** Art direction for song covers; null = DEFAULT_COVER_STYLE. */
+  songCoverStyle: string | null;
   // Review-activity history (#73): count of schedule-advancing review events per
   // calendar day (YYYY-MM-DD → count), powering the study dashboard's heatmap.
   // Local-only, pruned to a rolling window so the persisted blob can't grow unbounded.
@@ -268,6 +270,7 @@ interface AppState {
   setSongStyles: (ids: string[]) => void;
   setPodcastCast: (ids: string[]) => void;
   setPodcastPersona: (id: string, text: string | null) => void;
+  setSongCoverStyle: (text: string | null) => void;
   /** #6 minimal slice (long-form design §7): when on, word-progress writes —
    *  reader grades, lookups, flashcard reviews, manual sets — are skipped
    *  entirely (local AND server), so testing doesn't pollute real SRS state. */
@@ -349,6 +352,7 @@ export const useAppStore = create<AppState>()(
       songStyles: null,
       podcastCast: null,
       podcastPersonas: {},
+      songCoverStyle: null,
       sandboxMode: false,
       lastIntakePromotionTs: null,
       reviewsByDay: {},
@@ -459,6 +463,13 @@ export const useAppStore = create<AppState>()(
         set({ podcastPersonas: next });
         currentUserId().then((uid) => {
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { podcast_personas: next }));
+        });
+      },
+      setSongCoverStyle: (text) => {
+        const clean = text?.trim().slice(0, 400) || null;
+        set({ songCoverStyle: clean });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { song_cover_style: clean }));
         });
       },
 
@@ -1221,6 +1232,7 @@ export const useAppStore = create<AppState>()(
             songStyles: remotePrefs.song_styles ?? state.songStyles,
             podcastCast: remotePrefs.podcast_cast ?? state.podcastCast,
             podcastPersonas: remotePrefs.podcast_personas ?? state.podcastPersonas,
+            songCoverStyle: remotePrefs.song_cover_style !== undefined ? remotePrefs.song_cover_style : state.songCoverStyle,
           }));
         }
 
@@ -1873,6 +1885,7 @@ export const useAppStore = create<AppState>()(
         songStyles: state.songStyles,
         podcastCast: state.podcastCast,
         podcastPersonas: state.podcastPersonas,
+        songCoverStyle: state.songCoverStyle,
         // Persisted so a mid-test reload (PWA testing) doesn't silently drop the
         // guard; the Settings toggle shows a clear warning while it's on.
         sandboxMode: state.sandboxMode,

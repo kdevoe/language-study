@@ -117,6 +117,8 @@ const listen = (editing) => `<div class="section"><h3>聞く</h3>
     <div class="setting"><div class="lbl">Songs</div>${slider(['Off', 'Every other day', 'Daily'], 1)}<div class="hint">Made from what you've been studying.</div></div>
     <div class="sub">Song styles <small>6 of 8</small></div>
     <div class="picks">${styles.map((s) => pick(['', ...s].slice(1).length ? [s[0], '', s[1], s[2]] : s)).join('')}</div>
+    <div class="sub">Cover art <small>Default</small></div>
+    <div class="picks"><div class="pick on"><div class="top"><span class="desc" style="margin:0">Flat risograph-print illustration with a Japanese-Scandinavian calm: simple geometric shapes, soft grain, a limited palette of warm off-white paper, pale mist blue, deep olive and charcoal…</span><span class="edit">編集</span></div></div></div>
     <div class="sub">Podcast hosts <small>6 of 7</small></div>
     <div class="picks">${hosts.map((h, i) => pick(h, editing && i === 0 ? true : false)).join('')}</div>
   </div>`;

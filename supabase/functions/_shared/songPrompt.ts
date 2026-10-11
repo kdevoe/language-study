@@ -1,7 +1,14 @@
 // Song writing (聞く › 音楽, docs/music-design.md): Claude turns a style (a preset
 // or the listener's own description) and a theme into a plan ElevenLabs Music
 // can sing: a title, an artist-free style description, lyrics per section with
-// durations and style tags, and a cover-art prompt.
+// durations and style tags, and a cover-art scene.
+//
+// The cover's look is NOT the songwriter's call: it writes only the scene, and
+// the art direction comes from the listener (Settings › 聞く, user_preferences.
+// song_cover_style) or DEFAULT_COVER_STYLE, so every cover shares the app's
+// quiet, illustrated look whatever the music style.
+export const DEFAULT_COVER_STYLE = 'Flat risograph-print illustration with a Japanese-Scandinavian calm: simple geometric shapes, soft grain and slight misregistration, a limited palette of warm off-white paper, pale mist blue, deep olive and charcoal, at most one small warm accent. Lots of empty space, one clear focal subject.';
+export const COVER_STYLE_MAX_CHARS = 400;
 //
 // Vocabulary works the way it does for articles (_shared/readerVocab.ts): the
 // reader's whole known lexicon goes in as the ALLOWED LIST, so the body of the
@@ -142,7 +149,7 @@ export const SONG_PLAN_TOOL = {
         description: 'The 4–8 most useful words a learner meets in these lyrics, dictionary form.',
         items: { type: 'object', required: ['word', 'reading', 'meaning'], properties: { word: { type: 'string' }, reading: { type: 'string' }, meaning: { type: 'string' } } },
       },
-      cover_prompt: { type: 'string', description: 'English image prompt for square album art: one scene that matches the song, an art style, a palette. No text, letters or logos; no real people.' },
+      cover_prompt: { type: 'string', description: 'English description of ONE scene for the square album art: the subject, setting, composition and mood that fit the song. Describe only what is shown, never an art style, medium or palette (the listener sets those). No text, letters or logos; no real people.' },
     },
   },
 } as const;

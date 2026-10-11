@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { useAppStore, type SongFrequency } from '../services/store';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { FEED_TOPICS, DEFAULT_FEED_TOPICS } from '../data/feedTopics';
-import { SONG_STYLES } from '../data/songStyles';
+import { COVER_STYLE_MAX_CHARS, DEFAULT_COVER_STYLE, SONG_STYLES } from '../data/songStyles';
 import { PODCAST_CAST } from '../data/podcastCast';
 import { SliderToggle } from './SliderToggle';
 import { PageHeading } from './PageHeading';
@@ -152,19 +152,21 @@ function PickRow({ on, name, tag, desc, onToggle, onEdit, children }: {
   );
 }
 
-// 編集 on a host: the personality opens in place as a serif underline field.
-// 保存 keeps the rewrite for this reader's episodes; 元に戻す restores the original.
-function PersonaEditor({ original, current, onSave, onClose }: { original: string; current: string; onSave: (text: string | null) => void; onClose: () => void }) {
+// 編集 on a host or the cover art: the text opens in place as a serif underline
+// field. 保存 keeps the rewrite; 元に戻す restores the original (saves null).
+function TextEditor({ original, current, onSave, onClose, maxLength = 200, lang = 'ja' }: {
+  original: string; current: string; onSave: (text: string | null) => void; onClose: () => void; maxLength?: number; lang?: string;
+}) {
   const [text, setText] = useState(current);
   const actStyle: React.CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.8rem', color: 'var(--text-muted)' };
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <textarea
         autoFocus
-        lang="ja"
-        rows={3}
+        lang={lang}
+        rows={lang === 'ja' ? 3 : 5}
         value={text}
-        maxLength={200}
+        maxLength={maxLength}
         onChange={(e) => setText(e.target.value)}
         style={{ width: '100%', marginTop: '0.4rem', border: 'none', borderBottom: '1px solid var(--text-muted)', background: 'transparent', fontFamily: 'var(--font-serif)', fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--text-main)', resize: 'none', outline: 'none' }}
       />
@@ -197,12 +199,14 @@ export function Settings() {
     uiLanguage, setUiLanguage,
     songFrequency, setSongFrequency,
     songStyles, setSongStyles,
+    songCoverStyle, setSongCoverStyle,
     podcastCast, setPodcastCast,
     podcastPersonas, setPodcastPersona,
     lastStudyPacingResetTs,
     lastFuriganaRealignTs
   } = useAppStore();
   const [editingHost, setEditingHost] = useState<string | null>(null);
+  const [editingCover, setEditingCover] = useState(false);
 
   // null = never chosen → the server-default lineup is what's effectively active.
   const selectedTopics = feedTopics ?? DEFAULT_FEED_TOPICS;
@@ -336,6 +340,33 @@ export function Settings() {
           ))}
         </div>
 
+        {/* The look of every song cover; the songwriter only describes the scene. */}
+        <SubHeading count={songCoverStyle ? 'Your own' : 'Default'}>Cover art</SubHeading>
+        <div style={{ borderRadius: '16px', padding: '0.75rem 1rem', backgroundColor: 'var(--bg-pure)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+          {editingCover ? (
+            <TextEditor
+              lang="en"
+              maxLength={COVER_STYLE_MAX_CHARS}
+              original={DEFAULT_COVER_STYLE}
+              current={songCoverStyle || DEFAULT_COVER_STYLE}
+              onSave={setSongCoverStyle}
+              onClose={() => setEditingCover(false)}
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{songCoverStyle || DEFAULT_COVER_STYLE}</div>
+              <button
+                onClick={() => setEditingCover(true)}
+                className="serif"
+                style={{ marginLeft: 'auto', flexShrink: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-muted)' }}
+              >
+                編集
+              </button>
+            </div>
+          )}
+        </div>
+        <div style={hintStyle}>How every cover looks. Each song picks its own scene.</div>
+
         <SubHeading count={`${onHosts.length} of ${ALL_HOST_IDS.length}`}>Podcast hosts</SubHeading>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
           {ALL_HOST_IDS.map((id) => {
@@ -352,7 +383,7 @@ export function Settings() {
                 onEdit={() => setEditingHost(id)}
               >
                 {editingHost === id ? (
-                  <PersonaEditor
+                  <TextEditor
                     original={m.persona}
                     current={custom || m.persona}
                     onSave={(t) => setPodcastPersona(id, t)}

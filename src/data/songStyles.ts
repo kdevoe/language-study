@@ -19,4 +19,10 @@ export const SONG_STYLES: SongStyleInfo[] = [
   { id: 'kids', label: '童謡', blurb: "Simple, cheerful children's song; slow and easy to sing along to." },
 ];
 
+// The cover art's look (mirrors DEFAULT_COVER_STYLE / COVER_STYLE_MAX_CHARS in
+// _shared/songPrompt.ts). Settings › 聞く shows it and lets the reader rewrite it;
+// the songwriter only ever describes the scene.
+export const DEFAULT_COVER_STYLE = 'Flat risograph-print illustration with a Japanese-Scandinavian calm: simple geometric shapes, soft grain and slight misregistration, a limited palette of warm off-white paper, pale mist blue, deep olive and charcoal, at most one small warm accent. Lots of empty space, one clear focal subject.';
+export const COVER_STYLE_MAX_CHARS = 400;
+
 export const styleLabel = (id: string) => SONG_STYLES.find((s) => s.id === id)?.label ?? 'オリジナル';

@@ -248,6 +248,8 @@ Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.ht
   
 - **Editing in place:** 編集 on a host opens its personality as a serif underline textarea in the row, with 元に戻す (restore the original) and 保存 (serif 0.8rem, 保存 in `--text-main`).
   
+- **One editable text** (the song cover's art direction) is a single white row with its text and 編集, plus a muted "Default" / "Your own" count in the heading. It uses the same in-place editor.
+  
 - **詳細** (serif, muted, centred, chevron) at the bottom holds the one-off maintenance tools, the sandbox switch and the danger zone, unchanged.
 
 ## 7. Copy
