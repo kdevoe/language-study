@@ -16,6 +16,7 @@ import {
   importPastedText,
 } from '../services/api';
 import { supabase } from '../services/supabase';
+import { readListCache, writeListCache } from '../services/listCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -57,8 +58,9 @@ export function PartCount({ work }: { work: LongFormWork }) {
 // plus the import sheet behind +.
 
 export function Library({ onOpenWork, titleSwitch }: Props) {
-  const [works, setWorks] = useState<LongFormWork[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Last-loaded works show at once; the fetch below refreshes them.
+  const [works, setWorks] = useState<LongFormWork[]>(() => readListCache<LongFormWork>('works') ?? []);
+  const [isLoading, setIsLoading] = useState(() => readListCache('works') === null);
   const [sheetOpen, setSheetOpen] = useState(false);
   useScrollLock(sheetOpen);
   const [importTab, setImportTab] = useState<'paste' | 'url'>('paste');
@@ -77,15 +79,21 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
   }, [error]);
 
   const loadWorks = useCallback(async () => {
-    const userId = await resolveUserId();
-    if (!userId) { setIsLoading(false); return; }
-    const list = await fetchWorks(userId);
-    if (!mountedRef.current) return;
-    setWorks(list);
-    setIsLoading(false);
+    try {
+      const userId = await resolveUserId();
+      if (!userId) return;
+      const list = await fetchWorks(userId);
+      if (mountedRef.current) setWorks(list);
+    } catch (e) {
+      console.error('[library] fetchWorks failed; keeping the cached list:', e);
+    } finally {
+      if (mountedRef.current) setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadWorks(); }, [loadWorks]);
+  // Imports and deletes change the list locally; keep the cache in step.
+  useEffect(() => { if (!isLoading) writeListCache('works', works); }, [works, isLoading]);
 
   const chars = pasteText.trim().length;
   const trimmedUrl = urlText.trim();

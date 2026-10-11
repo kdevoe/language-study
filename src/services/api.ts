@@ -92,6 +92,7 @@ export const workPartArticleId = (workId: string, partIndex: number) => `lf-${wo
 import { supabase } from './supabase'
 import { captureError } from './monitoring'
 import type { SearchCorpus } from './archiveSearch'
+import { writeListCache } from './listCache'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -378,10 +379,9 @@ export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
       .eq('user_id', userId)
       .not('work_id', 'is', null),
   ]);
-  if (worksRes.error) {
-    console.error('[api] fetchWorks failed:', worksRes.error);
-    return [];
-  }
+  // Thrown, not an empty list: the caller is showing cached cards and a failed
+  // refresh must not wipe them.
+  if (worksRes.error) throw worksRes.error;
   if (partsRes.error) console.warn('[api] fetchWorks part lookup failed:', partsRes.error);
 
   const partsByWork = new Map<string, WorkPartState[]>();
@@ -392,7 +392,7 @@ export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
     partsByWork.set(p.work_id, list);
   });
 
-  return (worksRes.data ?? []).map((row) => {
+  const works = (worksRes.data ?? []).map((row) => {
     const parts = (partsByWork.get(row.id) ?? []).sort((a, b) => a.index - b.index);
     const first = parts.find((p) => p.index === 1);
     return {
@@ -403,6 +403,8 @@ export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
       partReady: !!first && first.status !== 'failed' && first.status !== 'pending',
     };
   });
+  writeListCache('works', works);
+  return works;
 }
 
 /** Japanese part text + English original per work, for Library search

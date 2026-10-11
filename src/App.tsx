@@ -12,6 +12,7 @@ import type { PodcastEpisode } from './services/podcasts'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
+import { clearListCaches, readListCache, writeListCache } from './services/listCache'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
 import { ChevronLeft } from 'lucide-react'
@@ -320,8 +321,9 @@ function App() {
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'SIGNED_OUT') clearListCaches();
       // IMPORTANT: this callback runs while GoTrue still holds its navigator
       // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
       // inside it would re-enter the lock and deadlock — hanging every later
@@ -604,6 +606,17 @@ function App() {
     handleOpenEpisode(episode);
   };
   const visibleArticles = (articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id));
+  // 今日's two news picks, from the last feed while this launch's feed loads
+  // (NewsAPI + the ready buffer can take a while on open). Light copies: a
+  // processed pick opens from articlesCache by id, so its blocks aren't kept.
+  const [lastNews] = useState(() => readListCache<NewsArticle>('news') ?? []);
+  useEffect(() => {
+    if (visibleArticles.length === 0) return;
+    writeListCache('news', visibleArticles.slice(0, 2).map(a => (articlesCache[a.id] ? { ...a, blocks: [] } : a)));
+  }, [articles, dismissedArticleIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const todayNews = visibleArticles.length > 0 || !isLoadingFeed
+    ? visibleArticles
+    : lastNews.filter(a => !(dismissedArticleIds || []).includes(a.id));
   // The title switches of 読む (ニュース | 本棚) and 聞く (番組 | 音楽); a switch lands at the top.
   const switchPage = (apply: () => void) => { muteChromeScroll(); window.scrollTo(0, 0); apply(); };
   const readTitleSwitch: TitleSwitch = {
@@ -807,7 +820,7 @@ function App() {
             onOpenArticle={handleTodayArticle}
             onShowNews={() => showRead('news')}
             onOpenEpisode={handleTodayEpisode}
-            news={visibleArticles}
+            news={todayNews}
           />
         )}
         {activeTab === 'read' && readSegment === 'news' && (
