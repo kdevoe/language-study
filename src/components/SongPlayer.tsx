@@ -13,17 +13,26 @@ import { styleLabel } from '../data/songStyles';
 import { isUnlockClip, sharedAudio } from '../services/sharedAudio';
 import { cachedAudioUrl, saveAudio } from '../services/audioCache';
 
-// Song player (mockup docs/mockups/music.html, phone 4): cover, title and style,
-// then the lyrics. The line being sung is full strength and the rest faded; the
-// page scrolls itself to keep it ~40% down until the listener scrolls away
-// (↓ 再生位置へ re-syncs). Tapping a word pauses and opens its card. Line times
-// come from ElevenLabs' phrase timestamps (songs.timing); a line with no match
-// leaves the previous one lit. Plays on the app's shared audio element, which
-// the opening tap unlocked, and keeps a copy on the device (audioCache).
+// Song player (mockup docs/mockups/lyrics.html, phone B 霧): the whole player
+// sits on soft blue (body.song-mode). Cover, title and style open big; as the
+// page scrolls they shrink into the back row and pin there. Lyrics are bold
+// serif in two colours: everything sung so far in charcoal, what's still to
+// come in white (.song-line.sung); ♪ marks the gap between sections. The page
+// scrolls itself to keep the sung line ~40% down until the listener scrolls
+// away (↓ 再生位置へ re-syncs). Tapping a word pauses and opens its card. Line
+// times come from ElevenLabs' phrase timestamps (songs.timing); a line with no
+// match stays with the line before it. Plays on the app's shared audio element,
+// which the opening tap unlocked, and keeps a copy on the device (audioCache).
+// The transport is the podcast player's, unchanged.
 
 const SPEEDS = [0.75, 0.9, 1];
 const SKIP_S = 10;
 const SCROLL_ANCHOR = 0.4;
+const MIST = '#d4e0e8'; // --accent-primary, for the browser chrome (theme-color)
+// Header morph: open (big cover, title under it) → pinned (thumb + title in the back row).
+const THUMB = 40;
+const smooth = (k: number) => { const x = Math.min(1, Math.max(0, k)); return x * x * (3 - 2 * x); };
+const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
 interface Token {
   text: string;
@@ -61,8 +70,13 @@ export function SongPlayer({ song: initial }: { song: Song }) {
   const autoplayed = useRef(false);
   const counted = useRef(false);
   const lyricsRef = useRef<HTMLDivElement | null>(null);
+  // Every lyric row (lines and ♪ gaps) in page order; t is NaN for untimed rows.
   const linesRef = useRef<{ t: number; el: HTMLElement }[]>([]);
   const curLineRef = useRef<HTMLElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const coverRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLDivElement | null>(null);
+  const [geo, setGeo] = useState<{ top: number; left: number; width: number; cover: number } | null>(null);
   const autoScrollRef = useRef(true);
   const programmaticScrollUntil = useRef(0);
   const resumeAfterModal = useRef(false);
@@ -110,19 +124,23 @@ export function SongPlayer({ song: initial }: { song: Song }) {
     const el = curLineRef.current;
     if (!el) return;
     const top = el.getBoundingClientRect().top + window.scrollY - window.innerHeight * SCROLL_ANCHOR;
+    // Near the start, stay fully open (big cover) rather than resting half-shrunk.
+    const pinAt = Math.min(250, window.innerWidth * 0.7) * 0.8;
     programmaticScrollUntil.current = Date.now() + 900;
-    window.scrollTo({ top, behavior: 'smooth' });
+    window.scrollTo({ top: top < pinAt ? 0 : top, behavior: 'smooth' });
   }, []);
 
   const tick = useCallback(() => {
     const t = (audioRef.current?.currentTime ?? 0) * 1000;
     const lines = linesRef.current;
-    let hit: HTMLElement | null = null;
-    for (const l of lines) { if (l.t <= t) hit = l.el; else break; }
+    // The current row is the last timed line already started; it and every row
+    // before it count as sung.
+    let cur = -1;
+    lines.forEach((l, i) => { if (Number.isFinite(l.t) && l.t <= t) cur = i; });
+    const hit = cur >= 0 ? lines[cur].el : null;
     if (hit !== curLineRef.current) {
-      curLineRef.current?.classList.remove('cur');
       curLineRef.current = hit;
-      hit?.classList.add('cur');
+      lines.forEach((l, i) => l.el.classList.toggle('sung', i <= cur));
       if (hit && autoScrollRef.current) scrollToCurrent();
     }
   }, [scrollToCurrent]);
@@ -131,12 +149,68 @@ export function SongPlayer({ song: initial }: { song: Song }) {
     const root = lyricsRef.current;
     if (!root) return;
     linesRef.current = Array.from(root.querySelectorAll<HTMLElement>('.song-line'))
-      .map((el) => ({ t: Number(el.dataset.start), el }))
-      .filter((l) => Number.isFinite(l.t))
-      .sort((a, b) => a.t - b.t);
+      .map((el) => ({ t: el.dataset.start ? Number(el.dataset.start) : NaN, el }));
     curLineRef.current = null;
+    linesRef.current.forEach((l) => l.el.classList.remove('sung'));
     tick();
   }, [blocks, tick]);
+
+  // ── Soft-blue page while the player is open ──
+  useEffect(() => {
+    document.body.classList.add('song-mode');
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const was = meta?.content;
+    if (meta) meta.content = MIST;
+    return () => {
+      document.body.classList.remove('song-mode');
+      if (meta && was) meta.content = was;
+    };
+  }, []);
+
+  // ── Header morph, driven by the page scroll ──
+  // Measured once laid out (and on resize): where the player column starts.
+  useEffect(() => {
+    const measure = () => {
+      const r = rootRef.current?.getBoundingClientRect();
+      if (!r) return;
+      setGeo({ top: r.top + window.scrollY, left: r.left, width: r.width, cover: Math.min(250, window.innerWidth * 0.7) });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [song, blocks]);
+
+  useEffect(() => {
+    if (!geo) return;
+    // The app's back row: chevron centred at (y0 − 62px) — see App's header
+    // padding — so the pinned thumb sits in that row, just right of the chevron.
+    const rowMid = geo.top - 62;
+    const range = geo.cover * 0.8;
+    const layout = () => {
+      const e = smooth(window.scrollY / range);
+      const cover = coverRef.current, title = titleRef.current;
+      if (!cover || !title) return;
+      const size = lerp(geo.cover, THUMB, e);
+      const left = lerp(geo.left + (geo.width - geo.cover) / 2, 58, e);
+      const top = lerp(geo.top + 6, rowMid - THUMB / 2, e);
+      Object.assign(cover.style, { width: `${size}px`, height: `${size}px`, left: `${left}px`, top: `${top}px`, borderRadius: `${lerp(20, 8, e)}px` });
+      // The title rides under the cover, then moves beside it; it never overlaps.
+      const below = e < 0.55;
+      const fade = Math.abs(e - 0.55) < 0.08 ? Math.abs(e - 0.55) / 0.08 : 1;
+      const tw = title.offsetWidth, th = title.offsetHeight;
+      title.style.fontSize = `${lerp(1.5, 1, e)}rem`;
+      Object.assign(title.style, {
+        left: `${below ? left + (size - tw) / 2 : left + size + 12}px`,
+        top: `${below ? top + size + 16 : top + (size - th) / 2}px`,
+        textAlign: below ? 'center' : 'left',
+        opacity: String(fade),
+        maxWidth: below ? `${geo.width}px` : `${Math.max(120, window.innerWidth - (left + size + 12) - 16)}px`,
+      });
+    };
+    layout();
+    window.addEventListener('scroll', layout, { passive: true });
+    return () => window.removeEventListener('scroll', layout);
+  }, [geo]);
 
   useEffect(() => {
     if (!playing) return;
@@ -295,7 +369,6 @@ export function SongPlayer({ song: initial }: { song: Song }) {
         className="song-line serif"
         data-start={timing ? timing.start : undefined}
         onDoubleClick={() => { if (timing) { seek(timing.start / 1000); play(); } }}
-        style={{ fontSize: '1.15rem', lineHeight: 2.05, letterSpacing: '0.02em', color: 'var(--text-main)' }}
       >
         {tokens.map((tok, j) => {
           const tokenId = `${lineIdx}-${j}`;
@@ -324,23 +397,29 @@ export function SongPlayer({ song: initial }: { song: Song }) {
   };
 
   return (
-    <div className="fade-in" style={{ paddingBottom: '13rem' }}>
-      <div style={{ width: 'min(250px, 70vw)', aspectRatio: '1', borderRadius: '20px', margin: '0.4rem auto 0', backgroundColor: 'var(--bg-card)', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+    <div ref={rootRef} className="fade-in" style={{ paddingBottom: '13rem' }}>
+      {/* Cover + title: fixed, positioned by the scroll (see the header morph);
+          this spacer holds their open-state room in the page. */}
+      <div aria-hidden style={{ height: 'calc(min(250px, 70vw) + 7.2rem)' }} />
+      <div ref={coverRef} style={{ position: 'fixed', zIndex: 11, width: 'min(250px, 70vw)', aspectRatio: '1', borderRadius: '20px', backgroundColor: 'var(--bg-card)', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', overflow: 'hidden', visibility: geo ? 'visible' : 'hidden' }}>
         {cover && <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
       </div>
-      <h1 className="serif" style={{ fontSize: '1.5rem', fontWeight: 500, lineHeight: 1.4, textAlign: 'center', marginTop: '1.2rem', color: 'var(--text-main)' }}>{song.title}</h1>
-      <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textAlign: 'center', marginTop: '0.25rem' }}>
-        {styleLabel(song.style_key)}{duration > 0 && <> · {fmt(duration)}</>}
+      <div ref={titleRef} style={{ position: 'fixed', zIndex: 11, pointerEvents: 'none', visibility: geo ? 'visible' : 'hidden' }}>
+        <h1 className="serif" style={{ fontSize: 'inherit', fontWeight: 600, lineHeight: 1.35, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</h1>
+        <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', marginTop: '0.15rem', whiteSpace: 'nowrap' }}>
+          {styleLabel(song.style_key)}{duration > 0 && <> · {fmt(duration)}</>}
+        </div>
       </div>
 
-      <div ref={lyricsRef} style={{ marginTop: '2rem' }}>
-        {(song.plan?.sections ?? []).map((section, sIdx) => {
-          if (!section.lines.length) return null;
+      {/* A soft edge under the back row, so lyrics fade as they scroll beneath it. */}
+      {geo && <div aria-hidden style={{ position: 'fixed', left: 0, right: 0, top: `${geo.top - 21}px`, height: '28px', zIndex: 9, pointerEvents: 'none', background: 'linear-gradient(var(--accent-primary), rgba(212,224,232,0))' }} />}
+
+      <div ref={lyricsRef}>
+        {(song.plan?.sections ?? []).filter((s) => s.lines.length).map((section, n) => {
+          const sIdx = song.plan!.sections.indexOf(section);
           return (
             <div key={sIdx}>
-              <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.16em', color: 'var(--text-muted)', margin: '1.4rem 0 0.3rem', textTransform: 'uppercase' }}>
-                {section.name}
-              </div>
+              {n > 0 && <div className="song-line song-gap serif" aria-hidden>♪</div>}
               {section.lines.map((_, lIdx) => renderLine(blockIdx++, song.timing?.[sIdx]?.[lIdx] ?? null))}
             </div>
           );
@@ -356,7 +435,7 @@ export function SongPlayer({ song: initial }: { song: Song }) {
                 key={v.word}
                 onClick={(e) => { pauseForLookup(); lookup.lookupWord(v.word, fullText, e, `vocab-${v.word}`); }}
                 className="serif"
-                style={{ fontSize: '0.95rem', fontWeight: 500, backgroundColor: 'var(--bg-card)', padding: '0.45rem 0.9rem', borderRadius: '100px', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
+                style={{ fontSize: '0.95rem', fontWeight: 500, backgroundColor: 'var(--bg-pure)', padding: '0.45rem 0.9rem', borderRadius: '100px', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
               >
                 {v.word}
                 <span className="sans" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>{v.meaning}</span>
@@ -376,7 +455,7 @@ export function SongPlayer({ song: initial }: { song: Song }) {
       )}
 
       {/* Transport — fixed; the bottom nav is hidden while the player is open. */}
-      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 20, background: 'linear-gradient(to bottom, rgba(245,245,240,0), var(--bg-color) 22%)', padding: '2rem 1.4rem calc(1.4rem + env(safe-area-inset-bottom))' }}>
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 20, background: 'linear-gradient(to bottom, rgba(212,224,232,0), var(--accent-primary) 22%)', padding: '2rem 1.4rem calc(1.4rem + env(safe-area-inset-bottom))' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div
             role="slider"

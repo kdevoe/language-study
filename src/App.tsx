@@ -658,6 +658,7 @@ function App() {
     (activeTab === 'read' && readSegment === 'news' && newsView === 'reading') ||
     (activeTab === 'read' && readSegment === 'shelf' && libraryView === 'reading') ||
     (activeTab === 'listen' && listenView === 'player');
+  const songPlayerOpen = activeTab === 'listen' && listenView === 'player' && listenPage === 'music' && !!activeSong;
   const handleBack =
     activeTab === 'read' && readSegment === 'shelf' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
 
@@ -798,11 +799,12 @@ function App() {
             top: 0,
             left: 0,
             right: 0,
-            backgroundColor: 'var(--bg-color)',
+            backgroundColor: 'var(--chrome-bg, var(--bg-color))',
             zIndex: 10,
-            transform: showNav ? 'translateY(0)' : 'translateY(-100%)',
+            // The song player pins its cover and title into this row, so it stays put there.
+            transform: showNav || songPlayerOpen ? 'translateY(0)' : 'translateY(-100%)',
             transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
-            opacity: showNav ? 1 : 0
+            opacity: showNav || songPlayerOpen ? 1 : 0
           }}
         >
           <button onClick={handleBack} aria-label="戻る" style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', minHeight: '2.2rem' }}>
