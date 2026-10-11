@@ -760,7 +760,10 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
             tabIndex={behindBookmark && !endInView ? 0 : -1}
             style={{
               position: 'fixed', left: '50%', bottom: 'calc(1.4rem + env(safe-area-inset-bottom))', zIndex: 30,
-              transform: `translate(-50%, ${behindBookmark && !endInView ? '0' : '160%'})`,
+              // Hidden = slid past the bottom edge: its own height plus its bottom
+              // offset (incl. the safe area) plus room for the shadow.
+              transform: `translate(-50%, ${behindBookmark && !endInView ? '0' : 'calc(100% + 1.4rem + env(safe-area-inset-bottom) + 2rem)'})`,
+              pointerEvents: behindBookmark && !endInView ? 'auto' : 'none',
               transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
               display: 'flex', alignItems: 'center', gap: '0.55rem', whiteSpace: 'nowrap',
               padding: '0.6rem 1.3rem', border: 'none', borderRadius: '100px', cursor: 'pointer',
