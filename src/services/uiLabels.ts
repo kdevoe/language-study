@@ -11,12 +11,14 @@ import { rtkKanjiList } from '../data/rtkKanji';
 // reader's RTK progress — both spellings are one JMDict entry). Entry ids come
 // from jmdict_entries.
 
-export type UiLabelId = 'news' | 'library' | 'listen' | 'review' | 'search' | 'settings';
+export type UiLabelId = 'today' | 'read' | 'news' | 'library' | 'listen' | 'review' | 'search' | 'settings';
 
 interface JaStage {
   ja: string;
-  /** JMDict entry_id — the word database key once the word is linked. */
-  entryId: string;
+  /** JMDict entry_id — the word database key once the word is linked. Left out
+   *  when not yet verified against jmdict_entries: the word is then matched by
+   *  its surface, and a title tap looks it up by text. */
+  entryId?: string;
   /** Kanji the reader must also have reached in RTK order. */
   kanji?: string;
 }
@@ -27,6 +29,8 @@ interface UiLabel {
 }
 
 export const UI_LABELS: Record<UiLabelId, UiLabel> = {
+  today: { en: 'Today', stages: [{ ja: '今日' }] },
+  read: { en: 'Read', stages: [{ ja: '読む' }] },
   news: { en: 'News', stages: [{ ja: 'ニュース', entryId: '1091500' }] },
   // 聞く and 聴く share JMDict entry 1591110; 聴く waits for the kanji 聴 (RTK #890).
   listen: {
@@ -60,12 +64,18 @@ const kanjiReached = (kanji: string, rtkLevel: number | null) => {
   return i >= 0 && rtkLevel != null && i < rtkLevel;
 };
 
+/** The reader's record for a stage's word: by entry id, else by its surface. */
+function stageWord(stage: JaStage, wordDatabase: Record<string, WordData>): WordData | undefined {
+  if (stage.entryId) return wordDatabase[stage.entryId];
+  return wordDatabase[stage.ja] ?? Object.values(wordDatabase).find((w) => w.surface === stage.ja);
+}
+
 /** Highest stage whose word the reader knows (0 = none). */
 export function knownStage(id: UiLabelId, wordDatabase: Record<string, WordData>, rtkLevel: number | null): number {
   const { stages } = UI_LABELS[id];
   for (let i = stages.length - 1; i >= 0; i--) {
-    const { entryId, kanji } = stages[i];
-    if (wordDatabase[entryId]?.mastery === 'easy' && (!kanji || kanjiReached(kanji, rtkLevel))) return i + 1;
+    const { kanji } = stages[i];
+    if (stageWord(stages[i], wordDatabase)?.mastery === 'easy' && (!kanji || kanjiReached(kanji, rtkLevel))) return i + 1;
   }
   return 0;
 }

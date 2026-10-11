@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — 今日 and 読む</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: var(--font-sans); }
+.serif { font-family: var(--font-serif); }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 660px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.controls .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); align-self: center; }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 380px; height: 780px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── Page heading (design-system §6.9) ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1rem; }
+.heading h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; display: flex; align-items: baseline; gap: 0.6rem; }
+.heading .actions { display: flex; align-items: center; margin-right: -5px; }
+.icon-btn { width: 44px; height: 44px; border: none; background: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.icon-btn svg.i { stroke-width: 1.25; }
+
+/* ── Section kicker ── */
+.kicker-row { display: flex; justify-content: space-between; align-items: baseline; margin: 2rem 0 0.75rem; }
+.kicker-row .k { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); }
+.kicker-row .more { font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-muted); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.15rem; }
+.kicker-row .more svg.i { width: 15px; height: 15px; }
+
+/* ── Cards (design-system §6.5) ── */
+.card { background: var(--bg-card); border-radius: 24px; padding: 1.3rem 1.4rem; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); position: relative; overflow: hidden; cursor: pointer; transition: transform 0.1s; }
+.card:active { transform: scale(0.98); }
+.card.featured { background: var(--bg-pure); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.75rem; }
+.tag { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.15em; background: var(--bg-pure); color: var(--text-muted); padding: 0.3rem 0.7rem; border-radius: 8px; }
+.status { font-family: var(--font-serif); font-size: 0.8rem; font-weight: 600; color: var(--olive); }
+.card h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; line-height: 1.5; margin-bottom: 0.6rem; }
+.meta { font-size: 0.74rem; color: var(--text-muted); font-weight: 500; }
+.meta .dot { margin: 0 0.35rem; opacity: 0.5; }
+.card .edge { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent-primary); }
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── 今日: review card ── */
+.review-card { padding: 1.5rem 1.5rem 1.4rem; }
+.review-card .label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); }
+.review-card .count { font-family: var(--font-serif); font-size: 2.6rem; font-weight: 500; line-height: 1.2; margin: 0.35rem 0 0.2rem; }
+.review-card .count small { font-size: 1.1rem; margin-left: 0.2rem; }
+.review-card .row { display: flex; justify-content: space-between; align-items: center; margin-top: 0.9rem; }
+.start { font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 0.2rem; }
+.start svg.i { width: 18px; height: 18px; }
+.review-done { text-align: center; padding: 1.8rem 1rem 1.6rem; }
+.review-done .serif { font-size: 1.35rem; }
+.review-done p { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+.review-done button { margin-top: 0.8rem; background: none; border: none; font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); cursor: pointer; }
+
+/* ── 今日: kanji ── */
+.kanji-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; }
+.kanji { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 18px; padding: 0.9rem 0.4rem 0.7rem; text-align: center; cursor: pointer; }
+.kanji .k { font-family: var(--font-serif); font-size: 2rem; line-height: 1.2; }
+.kanji .kw { font-size: 0.68rem; color: var(--text-muted); font-weight: 500; }
+
+/* ── 今日: listen row ── */
+.listen { display: flex; align-items: center; gap: 0.9rem; padding: 1rem 1.2rem; }
+.listen .t { flex: 1; min-width: 0; }
+.listen .t div:first-child { font-family: var(--font-serif); font-size: 1rem; line-height: 1.45; }
+.play { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; flex: none; }
+.play svg.i { width: 16px; height: 16px; fill: var(--text-main); stroke: none; margin-left: 2px; }
+
+/* ── 今日: news list (no cards, typography only) ── */
+.news-item { padding: 0.85rem 0; border-top: 1px solid var(--border-light); cursor: pointer; }
+.news-item:first-child { border-top: none; padding-top: 0.2rem; }
+.news-item .t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.5; margin-bottom: 0.2rem; }
+
+/* ── 読む: segment (same as REVIEW's 復習 | 進捗) ── */
+.seg { display: inline-flex; background: var(--bg-card); border-radius: 100px; padding: 3px; margin-bottom: 1.6rem; }
+.seg button { border: none; background: transparent; cursor: pointer; font-family: var(--font-serif); font-size: 0.95rem; font-weight: 500; padding: 0.3rem 1.05rem; border-radius: 100px; color: var(--text-muted); }
+.seg button.on { background: var(--bg-pure); color: var(--text-main); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.search { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border-light); padding: 0.35rem 0 0.55rem; margin-bottom: 1.6rem; color: var(--text-muted); font-size: 1.15rem; }
+.month { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2.2rem; }
+.month .m { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 500; }
+.month .y { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; color: var(--text-muted); margin-left: 0.45rem; }
+.month .c { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; }
+.month .c svg.i { width: 16px; height: 16px; }
+.month-sum { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+/* ── Bottom nav ── */
+.nav { flex: none; display: flex; justify-content: space-around; align-items: center; padding: 0.7rem 0.4rem 1.4rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav button { flex: 1; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; color: var(--text-muted); font-family: var(--font-serif); font-size: 0.78rem; font-weight: 500; }
+.nav .ic { width: 62px; height: 38px; border-radius: 100px; display: flex; align-items: center; justify-content: center; transition: background-color 0.3s var(--ease); }
+.nav button.on { color: var(--text-main); font-weight: 700; }
+.nav button.on .ic { background: var(--accent-primary); }
+
+/* ── Notes ── */
+.notes { max-width: 760px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin-bottom: 0.8rem; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+.notes .open { margin-top: 1.2rem; font-size: 0.8rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="settings" viewBox="0 0 24 24"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · HOME</div>
+  <h1>今日 · 読む · 聞く · 復習</h1>
+  <p>A home tab, 今日, shows what's waiting today, and News and 本棚 merge into one 読む tab with a segment. The nav stays at four tabs. Settings appears only on 今日. Both phones are live: tap the nav, the 読む segment, and the cards on 今日.</p>
+  <div class="controls">
+    <span class="lbl">CARDS DUE</span>
+    <div class="pill-seg" id="dueCtl">
+      <button data-due="12" class="on">12 due</button>
+      <button data-due="0">None due</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone-label">ONE · 今日 (OPENS HERE)</div>
+    <div class="phone" data-phone="a"><div class="scroll"></div><nav class="nav"></nav></div>
+    <div class="phone-note">Review comes first, then the work in progress, today's kanji, a new podcast and two news picks. No stats or streaks; those stay in 進捗.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">TWO · 読む</div>
+    <div class="phone" data-phone="b"><div class="scroll"></div><nav class="nav"></nav></div>
+    <div class="phone-note">News and 本棚 share one tab. The + shows only on 本棚, where it belongs. There's no settings mark here.</div>
+  </div>
+</div>
+
+<div class="notes">
+  <h3>What changes</h3>
+  <ol>
+    <li><span class="n">1</span><div><b>今日 is the first tab and where the app opens.</b> Each block is a shortcut into another tab, not a copy: the review card starts the deck in 復習, 続きを読む opens the Reader at the しおり, a kanji opens its card, and the podcast plays in 聞く.</div></li>
+    <li><span class="n">2</span><div><b>Review leads.</b> It's the one thing that's time-sensitive, so it's the featured white card (§6.5). When nothing is due it shrinks to 何もありません with Discover as the onward action.</div></li>
+    <li><span class="n">3</span><div><b>Blocks hide when empty.</b> No work in progress → no 続きを読む. No new podcast → no 聞く row. A quiet day is a short page.</div></li>
+    <li><span class="n">4</span><div><b>読む = ニュース | 本棚,</b> in the same segment style as 復習 | 進捗. The 本棚 side is today's archive list unchanged (search, newest month without a heading, older months collapsed).</div></li>
+    <li><span class="n">5</span><div><b>Settings lives on 今日 only,</b> top-right where people look for it. The other tabs keep just their title, plus the + on 本棚 and 聞く.</div></li>
+  </ol>
+  <p class="open">Open questions: should 今日 remember the last tab instead of always opening first? Should the nav show a due-count badge on 復習 as well as the 今日 card?</p>
+</div>
+
+<script>
+const ic = (id, extra = '') => `<svg class="i" ${extra}><use href="#${id}"/></svg>`;
+const TABS = [['today', 'sun', '今日'], ['read', 'book', '読む'], ['listen', 'headphones', '聞く'], ['review', 'layers', '復習']];
+const state = { due: 12, a: { tab: 'today', seg: 'news' }, b: { tab: 'read', seg: 'news' } };
+
+function heading(title, actions) {
+  return `<div class="heading"><h2>${title}</h2><div class="actions">${actions}</div></div>`;
+}
+const settings = `<button class="icon-btn" aria-label="Settings">${ic('settings')}</button>`;
+const plus = `<button class="icon-btn" aria-label="Add">${ic('plus')}</button>`;
+
+function today(p) {
+  const review = state.due
+    ? `<div class="card featured review-card" data-go="review">
+         <div class="label">復習</div>
+         <div class="count">${state.due}<small>枚</small></div>
+         <div class="row"><span class="meta">新 3<span class="dot">·</span>復習 9<span class="dot">·</span>約6分</span><span class="start">始める${ic('chev')}</span></div>
+       </div>`
+    : `<div class="card review-done"><div class="serif">何もありません</div><p>Nothing due today.</p><button data-go="review">新しい言葉を探す</button></div>`;
+  return `
+    ${heading('今日', settings)}
+    ${review}
+
+    <div class="kicker-row"><span class="k">続きを読む</span></div>
+    <div class="card" data-go="read">
+      <div class="card-top"><span class="tag">IMPORT</span><span class="status">第3部 · 全4部</span></div>
+      <h3>Quiet Rooms, Long Winters: Japanese and Scandinavian Design in the Home</h3>
+      <div class="meta">約37,513字<span class="dot">·</span>しおり 第3部</div>
+      <div class="edge" style="width:58%"></div>
+    </div>
+
+    <div class="kicker-row"><span class="k">今日の漢字</span><span class="meta">RTK 412–414</span></div>
+    <div class="kanji-row">
+      <div class="kanji"><div class="k">影</div><div class="kw">shadow</div></div>
+      <div class="kanji"><div class="k">静</div><div class="kw">quiet</div></div>
+      <div class="kanji"><div class="k">窓</div><div class="kw">window</div></div>
+    </div>
+
+    <div class="kicker-row"><span class="k">聞く</span></div>
+    <div class="card listen" data-go="listen">
+      <div class="t"><div>北欧と日本 — 光の住まい</div><div class="meta">新しいポッドキャスト<span class="dot">·</span>12分</div></div>
+      <div class="play">${ic('play')}</div>
+    </div>
+
+    <div class="kicker-row"><span class="k">ニュース</span><button class="more" data-go="read">すべて${ic('chev')}</button></div>
+    <div>
+      <div class="news-item" data-go="read"><div class="t">京都の町家、若い世代が住み始める</div><div class="meta">CULTURE<span class="dot">·</span>N4<span class="dot">·</span>3分</div></div>
+      <div class="news-item" data-go="read"><div class="t">北海道で今年初めての雪</div><div class="meta">WEATHER<span class="dot">·</span>N4<span class="dot">·</span>2分</div></div>
+    </div>`;
+}
+
+function read(p) {
+  const s = state[p].seg;
+  const seg = `<div class="seg"><button data-seg="news" class="${s === 'news' ? 'on' : ''}">ニュース</button><button data-seg="shelf" class="${s === 'shelf' ? 'on' : ''}">本棚</button></div>`;
+  const body = s === 'news'
+    ? `<div class="stack">
+        <div class="card featured"><div class="card-top"><span class="tag" style="background:var(--accent-primary);color:var(--text-main)">DIGEST</span><span class="status" style="color:var(--text-muted)">今日</span></div><h3>今日のまとめ — 5つのニュース</h3><div class="meta">N4<span class="dot">·</span>6分</div></div>
+        <div class="card"><div class="card-top"><span class="tag">CULTURE</span></div><h3>京都の町家、若い世代が住み始める</h3><div class="meta">N4<span class="dot">·</span>3分</div></div>
+        <div class="card"><div class="card-top"><span class="tag">SCIENCE</span></div><h3>深い海で新しい魚が見つかる</h3><div class="meta">N4<span class="dot">·</span>4分</div></div>
+      </div>`
+    : `<div class="search">${ic('search', 'style="width:18px;height:18px"')}<span class="serif" style="font-family:var(--font-sans)">Search</span></div>
+      <div class="stack">
+        <div class="card"><div class="card-top"><span class="tag">IMPORT</span><span class="status">第3部 · 全4部</span></div><h3>Quiet Rooms, Long Winters</h3><div class="meta">約37,513字<span class="dot">·</span>全4部<span class="dot">·</span>3日前</div><div class="edge" style="width:58%"></div></div>
+        <div class="card"><div class="card-top"><span class="tag">IMPORT</span><span class="status" style="color:var(--text-muted)">完了</span></div><h3>Custom Silicon for Large Language Models</h3><div class="meta">約34,589字<span class="dot">·</span>全4部<span class="dot">·</span>先週</div></div>
+      </div>
+      <div class="month"><div><span class="m">9月</span><span class="y">2026</span></div><span class="c">1${ic('chev')}</span></div>
+      <div class="month-sum">1作品</div>`;
+  return heading('読む', s === 'shelf' ? plus : '') + seg + body;
+}
+
+function placeholder(title, line) {
+  return heading(title, '') + `<p class="meta" style="margin-top:2rem;text-align:center">${line}</p>`;
+}
+
+function render(p) {
+  const root = document.querySelector(`[data-phone="${p}"]`);
+  const st = state[p];
+  const scroll = root.querySelector('.scroll');
+  scroll.innerHTML =
+    st.tab === 'today' ? today(p)
+    : st.tab === 'read' ? read(p)
+    : st.tab === 'listen' ? placeholder('聞く', 'Unchanged: the archive list with + in the heading.')
+    : placeholder('復習', 'Unchanged: 復習 | 進捗, flashcards and focus mode.');
+  root.querySelector('.nav').innerHTML = TABS.map(([id, icon, label]) =>
+    `<button data-tab="${id}" class="${st.tab === id ? 'on' : ''}"><span class="ic">${ic(icon)}</span>${label}</button>`).join('');
+  root.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => { st.tab = b.dataset.tab; scroll.scrollTop = 0; render(p); });
+  root.querySelectorAll('[data-seg]').forEach((b) => b.onclick = () => { st.seg = b.dataset.seg; render(p); });
+  root.querySelectorAll('[data-go]').forEach((b) => b.onclick = (e) => {
+    e.stopPropagation();
+    st.tab = b.dataset.go;
+    if (st.tab === 'read') st.seg = b.closest('.card') && b.closest('.card').querySelector('.tag')?.textContent === 'IMPORT' ? 'shelf' : 'news';
+    scroll.scrollTop = 0;
+    render(p);
+  });
+}
+
+document.querySelectorAll('#dueCtl button').forEach((b) => b.onclick = () => {
+  state.due = Number(b.dataset.due);
+  document.querySelectorAll('#dueCtl button').forEach((x) => x.classList.toggle('on', x === b));
+  render('a'); render('b');
+});
+render('a'); render('b');
+</script>
+</body>
+</html>

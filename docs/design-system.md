@@ -145,7 +145,7 @@ Source of truth: Settings (JLPT, Article Intensity, Vocab Use, Kanji Use).
 Fixed at the top centre, `--bg-card`, radius 14px, 1px `--border-light`, shadow `0 6px 30px rgba(0,0,0,0.12)`, 0.85rem, tap to dismiss, auto-hides after about 5s. Keep messages to a few words (聴くタブで作成中).
 ### 6.7 Icon buttons
 Lucide icons, stroke width 1.5, 20–24px, `--text-muted` at rest, no background. An icon can show a "done" state by darkening to `--text-main`.
-### 6.8 Archive list (LISTEN, LIBRARY)
+### 6.8 Archive list (LISTEN, 読む's LIBRARY)
 Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-organize.html`.
 
 - **Months, not filters.** The newest month is the list itself: its items sit straight under the search row with no heading and are always open. Older months group under a serif month heading (year in small muted sans for any month but the current one) with the count and a chevron at the right, collapsed to start; a collapsed month shows one muted summary line (`4本 · 未再生 2`). The newest month's heading appears only while searching or selecting (for すべて選択).
@@ -163,15 +163,15 @@ Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-
 ### 6.9 Page heading (tab pages)
 Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.html` (見出しに統合).
 
-- **No global header on tab pages.** Each tab opens with one serif title (2rem) in one language, and the settings mark on the same line at the right. Nothing sits above it but the status bar.
+- **No global header on tab pages.** Each tab opens with one serif title (2rem) in one language. Nothing sits above it but the status bar.
   
-- The **settings mark** is thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮.
+- The **settings mark** sits only on 今日 (§6.12), at the right of its title: thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮. The other tabs show no settings mark.
   
-- The settings mark's icon centre sits 17px in from the content edge. Page actions (the archive `+`) sit beside it in the heading row, never stacked under it.
+- Right-edge heading icons (settings on 今日, `+` on LISTEN and 読む's LIBRARY) have their icon centre 17px in from the content edge. Page actions sit in the heading row, never stacked under it.
   
-- The first content after the heading starts 1.6rem below it (the heading's 1rem margin plus 0.6rem on News; the search row's margin on the archive pages).
+- The first content after the heading starts 1.6rem below it (the heading's 1rem margin plus 0.6rem on 今日; on 読む, the same 1.6rem below the segment; the search row's margin on LISTEN).
   
-- The page's own controls sit directly below: search (LISTEN, LIBRARY), the 復習 | 進捗 segment (REVIEW).
+- The page's own controls sit directly below: the ニュース | 本棚 segment (読む, then search on 本棚), search (LISTEN), the 復習 | 進捗 segment (REVIEW). Segments are the shared `Segment` component: serif labels on a `--bg-card` pill, the active one on white.
   
 - **Reading surfaces** (Reader, podcast player) keep a fixed row with only the back arrow; it hides on scroll with the nav.
   
@@ -192,7 +192,7 @@ Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`,
   
 - Settings → Interface Language overrides it: English / Adaptive / 日本語.
   
-- Japanese labels: ニュース (katakana, not 読む), 本棚 → 書庫, 聞く → 聴く, 復習, 検索, 設定. A new label needs its JMDict entry id in `UI_LABELS`.
+- Japanese labels: 今日, 読む, ニュース, 本棚 → 書庫, 聞く → 聴く, 復習, 検索, 設定. ニュース and 本棚 now label 読む's segment. A new label should carry its JMDict entry id in `UI_LABELS`; until it's verified (今日 and 読む), the word is matched by surface and a title tap looks it up by text.
   
 ### 6.11 Long-form part navigation
 Source of truth: `src/components/PartsSheet.tsx` and the part section of `Reader.tsx`, mockup `docs/mockups/longform-section-nav.html`.
@@ -209,6 +209,20 @@ Source of truth: `src/components/PartsSheet.tsx` and the part section of `Reader
   
 
 * * *
+
+### 6.12 今日 (home)
+Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.html`.
+
+- **Tabs:** 今日 · 読む · 聞く · 復習. The app opens on 今日. 読む holds the news feed and the 本棚 behind a ニュース | 本棚 segment.
+  
+- **What's waiting today, in order:** cards due (the featured white card: count in serif 2.6rem, 新 / 復習 split, 始める); 続きを読む (the last-opened work in progress, as an archive card); 今日の漢字 (the 3 newest RTK kanji with keywords; tap opens the word card); 聞く (a ready, unplayed podcast); ニュース (two headlines as plain text, すべて opens 読む).
+  
+- **Each block is a shortcut into the tab that owns it,** never a copy. A block with nothing to show is left out; with nothing due the review card shrinks to 何もありません with 新しい言葉を探す.
+  
+- Section kickers are 0.7rem sans, 600, `--text-muted`, 2rem above their block. **No stats, streaks or charts**: those belong in 進捗.
+  
+- No date beside the title.
+
 ## 7. Copy
 - Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.
   

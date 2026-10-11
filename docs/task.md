@@ -554,3 +554,8 @@
   - [x] Tab switch (bottom nav / settings) scrolls to top and keeps the nav showing (services/chromeScroll.ts)
 - [x] UI polish (2026-10-10): News first card 1.6rem below the heading; settings mark centred over the archive +;
       Japanese nav labels 0.78rem in a fixed 1rem line (design-system.md §6.9, §6.10)
+- [x] 今日 home tab (2026-10-11) — mockup docs/mockups/home-today.html, design-system.md §6.12
+  - [x] Tabs 今日 · 読む · 聞く · 復習; the app opens on 今日; News + 本棚 merge into 読む (ニュース | 本棚 segment)
+  - [x] 今日: cards due (→ 復習), 続きを読む (last-opened work at its しおり), 今日の漢字, new podcast, two news picks
+  - [x] Settings mark only on 今日; shared Segment component (REVIEW migrated)
+  - [ ] Verify JMDict entry ids for 今日 / 読む and add them to UI_LABELS (matched by surface until then)

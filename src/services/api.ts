@@ -338,6 +338,32 @@ function rowToWork(row: WorkRow): LongFormWork {
 /** The user's works (non-archived), newest first, each annotated with whether
  *  its first part is processed and openable. Works are a persistent collection
  *  — a Library, not a feed — so nothing here is dismissed or read-filtered. */
+/**
+ * The article to open a work at, and the block to pre-scroll to: the saved
+ * reading position's part when that part is processed (design §5: opening a
+ * work resumes where the reader left off), else part 1 from the top.
+ */
+export async function fetchWorkResumeArticle(
+  work: LongFormWork,
+  userId: string,
+): Promise<{ article: NewsArticle; resumeBlock: number } | null> {
+  if (!work.partReady || !work.partArticleId) return null;
+  const pos = work.readingPosition;
+  const resumable = !!pos
+    && pos.partIndex > 1
+    && pos.partIndex <= work.partCount
+    && (work.parts ?? []).some(p => p.index === pos.partIndex && p.status !== 'failed' && p.status !== 'pending');
+  const targetIndex = resumable ? pos!.partIndex : 1;
+  const targetId = targetIndex === 1 ? work.partArticleId : workPartArticleId(work.id, targetIndex);
+  let article = await fetchProcessedArticleById(targetId, userId);
+  if (!article && targetIndex !== 1) {
+    article = await fetchProcessedArticleById(work.partArticleId, userId);
+  }
+  if (!article) return null;
+  const resumeBlock = pos && article.partIndex === pos.partIndex ? (pos.blockIndex ?? 0) : 0;
+  return { article, resumeBlock };
+}
+
 export async function fetchWorks(userId: string): Promise<LongFormWork[]> {
   const [worksRes, partsRes] = await Promise.all([
     supabase

@@ -2,7 +2,10 @@ import { Reader } from './components/Reader'
 import { Feed } from './components/Feed'
 import { Library } from './components/Library'
 import { Onboarding } from './components/Onboarding'
-import { BottomNav } from './components/BottomNav'
+import { BottomNav, type Tab } from './components/BottomNav'
+import { Today, LAST_WORK_KEY } from './components/Today'
+import { Segment } from './components/Segment'
+import { AdaptiveLabel } from './components/AdaptiveLabel'
 import { Settings } from './components/Settings'
 import { Review, type ReviewSegment } from './components/Review'
 import { Listen } from './components/Listen'
@@ -24,7 +27,9 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'listen' | 'flashcards' | 'settings'>('news');
+  // The app opens on 今日; 読む holds the news feed and the 本棚 behind a segment.
+  const [activeTab, setActiveTab] = useState<Tab>('today');
+  const [readSegment, setReadSegment] = useState<'news' | 'shelf'>('news');
   const [showNav, setShowNav] = useState(true);
   // Flashcard focus mode: tapping into a card hides the bottom nav so the card
   // can use that space; Flashcards reports the state up from its card flow.
@@ -523,6 +528,7 @@ function App() {
     // Cache first so the Reader's cache path opens it instantly (never re-processes).
     saveProcessedArticle(article.id, article);
     setActiveWork(work);
+    try { localStorage.setItem(LAST_WORK_KEY, work.id); } catch { /* storage blocked */ }
     setWorkBookmark(work.readingPosition ?? null);
     setActiveWorkArticle(article);
     setWorkResumeBlock(resumeBlockIndex);
@@ -567,13 +573,50 @@ function App() {
   // in the LISTEN tab; the shared top toast says so.
   // Switching tabs (bottom nav or a heading's settings button) always lands at the
   // top with the chrome showing; the previous tab's scroll offset never carries over.
-  const handleTabChange = useCallback((tab: typeof activeTab) => {
+  const handleTabChange = useCallback((tab: Tab) => {
     muteChromeScroll();
     window.scrollTo(0, 0);
     setShowNav(true);
     setActiveTab(tab);
   }, []);
   const openSettings = useCallback(() => handleTabChange('settings'), [handleTabChange]);
+
+  // ── 今日: each block hands off to the tab that owns it ─────────────────────
+  const showRead = (segment: 'news' | 'shelf') => {
+    setReadSegment(segment);
+    handleTabChange('read');
+  };
+  const handleTodayReview = () => {
+    setReviewSegment('review');
+    handleTabChange('flashcards');
+  };
+  const handleTodayWork = (work: LongFormWork, article: NewsArticle, resumeBlock = 0) => {
+    showRead('shelf');
+    handleOpenWork(work, article, resumeBlock);
+  };
+  const handleTodayArticle = (article: NewsArticle) => {
+    showRead('news');
+    handleSelectArticle(article);
+  };
+  const handleTodayEpisode = (episode: PodcastEpisode) => {
+    handleTabChange('listen');
+    handleOpenEpisode(episode);
+  };
+  const visibleArticles = (articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id));
+  // 読む's ニュース | 本棚 segment; its labels follow the old tab titles' adaptive words.
+  // 1.6rem below it to the first content, as on every tab page (design-system §6.9).
+  const readSegmentControl = (
+    <div style={{ marginBottom: '1.6rem' }}>
+      <Segment
+        options={[
+          { id: 'news' as const, label: <AdaptiveLabel id="news" /> },
+          { id: 'shelf' as const, label: <AdaptiveLabel id="library" /> },
+        ]}
+        active={readSegment}
+        onChange={(segment) => { muteChromeScroll(); window.scrollTo(0, 0); setReadSegment(segment); }}
+      />
+    </div>
+  );
   const handlePodcastQueued = useCallback(() => setActionError('聴くタブで作成中'), []);
 
   const handleBackToListen = () => {
@@ -585,11 +628,11 @@ function App() {
   // chrome-hiding are shared across the reading surfaces (the podcast player
   // included — its transport bar takes the bottom nav's place).
   const isReading =
-    (activeTab === 'news' && newsView === 'reading') ||
-    (activeTab === 'library' && libraryView === 'reading') ||
+    (activeTab === 'read' && readSegment === 'news' && newsView === 'reading') ||
+    (activeTab === 'read' && readSegment === 'shelf' && libraryView === 'reading') ||
     (activeTab === 'listen' && listenView === 'player');
   const handleBack =
-    activeTab === 'library' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
+    activeTab === 'read' && readSegment === 'shelf' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
 
   // The scroll handler is registered once; it reads the reading state through a ref.
   const isReadingRef = useRef(isReading);
@@ -760,15 +803,23 @@ function App() {
         margin: '0 auto', 
         width: '100%' 
       }}>
-        {activeTab === 'news' && (
+        {activeTab === 'today' && (
+          <Today
+            onStartReview={handleTodayReview}
+            onOpenWork={handleTodayWork}
+            onOpenArticle={handleTodayArticle}
+            onShowNews={() => showRead('news')}
+            onOpenEpisode={handleTodayEpisode}
+            news={visibleArticles}
+          />
+        )}
+        {activeTab === 'read' && readSegment === 'news' && (
           newsView === 'hub' ? (
             <>
-            <PageHeading id="news" />
-            {/* Same 1.6rem (1rem heading margin + 0.6rem) between heading and first
-                content as the archive pages' search row. */}
-            <div style={{ height: '0.6rem' }} />
+            <PageHeading id="read" settingsMark={false} />
+            {readSegmentControl}
             <Feed 
-              articles={(articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
+              articles={visibleArticles.slice(0, 5)} 
               isLoading={isLoadingFeed} 
               isReplenishing={isReplenishing}
               onSelect={handleSelectArticle} 
@@ -783,9 +834,9 @@ function App() {
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} onPodcastQueued={handlePodcastQueued} />
           )
         )}
-        {activeTab === 'library' && (
+        {activeTab === 'read' && readSegment === 'shelf' && (
           libraryView === 'list' ? (
-            <Library onOpenWork={handleOpenWork} />
+            <Library onOpenWork={handleOpenWork} segment={readSegmentControl} />
           ) : (
             <Reader
               key={activeWorkArticle?.id}

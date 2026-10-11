@@ -1,7 +1,7 @@
-import { Newspaper, BookOpen, Headphones, Layers } from 'lucide-react';
+import { Sun, BookOpen, Headphones, Layers } from 'lucide-react';
 import { AdaptiveLabel } from './AdaptiveLabel';
 
-type Tab = 'news' | 'library' | 'listen' | 'flashcards' | 'settings';
+export type Tab = 'today' | 'read' | 'listen' | 'flashcards' | 'settings';
 
 interface Props {
   activeTab: Tab;
@@ -11,8 +11,8 @@ interface Props {
 
 export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
-    { id: 'news', label: 'news', icon: Newspaper },
-    { id: 'library', label: 'library', icon: BookOpen },
+    { id: 'today', label: 'today', icon: Sun },
+    { id: 'read', label: 'read', icon: BookOpen },
     { id: 'listen', label: 'listen', icon: Headphones },
     { id: 'flashcards', label: 'review', icon: Layers },
   ] as const;
@@ -36,7 +36,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
       opacity: isVisible ? 1 : 0
     }}>
       {/* Tabs sit in a centered group so the outer tabs aren't pushed to the
-          screen edges: with 4 tabs, full-width distribution left NEWS/REVIEW
+          screen edges: with 4 tabs, full-width distribution left the outer tabs
           hugging the bezels. Even gaps inside a capped width keep the edge
           inset about equal to the spacing between tabs on a phone. */}
       <div style={{ display: 'flex', justifyContent: 'space-evenly', width: '100%', maxWidth: '392px' }}>
