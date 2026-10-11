@@ -97,6 +97,10 @@ export function historyItem(plan: SongPlan, styleLabel: string, theme: string | 
 export interface SongSection {
   name: string;
   lines: string[];
+  /** The same lines as pronounced, in kana, phrase for phrase: what ElevenLabs
+   *  is sent to sing (it can drop or misread kanji: 段々 came out silent). The
+   *  reader still sees `lines`. Missing on older plans → `lines` is sung. */
+  sung?: string[];
   duration_ms: number;
   styles: string[];
   negative_styles: string[];
@@ -134,10 +138,11 @@ export const SONG_PLAN_TOOL = {
         type: 'array',
         items: {
           type: 'object',
-          required: ['name', 'lines', 'duration_ms', 'styles'],
+          required: ['name', 'lines', 'sung', 'duration_ms', 'styles'],
           properties: {
             name: { type: 'string', description: 'English section name, e.g. Intro, Verse 1, Pre-Chorus, Chorus, Bridge, Final Chorus, Outro.' },
             lines: { type: 'array', items: { type: 'string' }, description: 'Japanese lyric lines, sung text only. Separate phrases with a single half-width space. Empty for an instrumental section.' },
+            sung: { type: 'array', items: { type: 'string' }, description: 'The same lines, one for one, written as they are pronounced: hiragana (katakana for loanwords), no kanji, with exactly the same half-width-space phrase breaks. Particles as pronounced (topic は → わ, direction へ → え); repeat marks spelled out (段々 → だんだん). This is what the singer receives.' },
             duration_ms: { type: 'integer', description: 'Section length in ms, 5000–60000.' },
             styles: { type: 'array', items: { type: 'string' }, description: '2–4 English tags for this section (energy, arrangement, who sings).' },
             negative_styles: { type: 'array', items: { type: 'string' } },
@@ -207,6 +212,7 @@ LANGUAGE
 - Grammar at about ${levelLabel(level)} (one level easier than the listener — it's heard, not read), with poetic licence where a song needs it (dropped particles, repetition, inversion are fine).
 - Natural spoken Japanese a native songwriter would write. No English words or romaji in the lyrics.
 - Short lines (about 6–16 characters). Separate phrases inside a line with one half-width space, as in "走れ 走れ 時を越えて"; the singer's timing is matched phrase by phrase.
+- For every section also give \`sung\`: each line again exactly as pronounced, all kana (no kanji), same phrase breaks, particles as said (は → わ, へ → え). The singer sings from this, so every word must be there and read correctly; the listener reads \`lines\`.
 
 ${style}
 
@@ -225,6 +231,8 @@ ${vocabulary}
 Call submit_song with the finished plan.`;
 }
 
+const HAS_KANJI = /[\u3400-\u9fff\uf900-\ufaff々〆]/;
+
 /** Validate and repair Claude's plan: exact total length, ElevenLabs' chunk limits. */
 export function normalizePlan(raw: unknown, input: SongPromptInput): SongPlan {
   const p = raw as Partial<SongPlan> & { sections?: Partial<SongSection>[] };
@@ -233,13 +241,22 @@ export function normalizePlan(raw: unknown, input: SongPromptInput): SongPlan {
 
   const title = str(p.title).slice(0, 40);
   if (!title) throw new PlanValidationError('plan has no title');
-  const sections: SongSection[] = (p.sections ?? []).map((s, i) => ({
-    name: str(s.name).slice(0, 60) || `Section ${i + 1}`,
-    lines: strs(s.lines, 30).map((l) => l.replace(/[ \u3000]+/g, ' ').slice(0, 200)),
-    duration_ms: Number(s.duration_ms) || 0,
-    styles: strs(s.styles, 6),
-    negative_styles: strs(s.negative_styles, 6),
-  })).filter((s) => s.duration_ms > 0);
+  const clean = (l: string) => l.replace(/[ \u3000]+/g, ' ').slice(0, 200);
+  const phrases = (l: string) => l.split(' ').filter(Boolean).length;
+  const sections: SongSection[] = (p.sections ?? []).map((s, i) => {
+    const lines = strs(s.lines, 30).map(clean);
+    const sung = strs(s.sung, 30).map(clean);
+    return {
+      name: str(s.name).slice(0, 60) || `Section ${i + 1}`,
+      lines,
+      // A sung line must be kana-only and break into the same phrases as its
+      // display line (timing is matched phrase by phrase); otherwise sing the line.
+      sung: lines.map((l, j) => (sung[j] && !HAS_KANJI.test(sung[j]) && phrases(sung[j]) === phrases(l) ? sung[j] : l)),
+      duration_ms: Number(s.duration_ms) || 0,
+      styles: strs(s.styles, 6),
+      negative_styles: strs(s.negative_styles, 6),
+    };
+  }).filter((s) => s.duration_ms > 0);
   if (sections.length < 2) throw new PlanValidationError('plan needs at least two sections');
   if (!sections.some((s) => s.lines.length)) throw new PlanValidationError('plan has no lyrics');
 
@@ -274,7 +291,7 @@ export function normalizePlan(raw: unknown, input: SongPromptInput): SongPlan {
 export function toCompositionPlan(plan: SongPlan) {
   return {
     chunks: plan.sections.map((s, i) => ({
-      text: [`[${s.name}]`, ...s.lines].join('\n'),
+      text: [`[${s.name}]`, ...(s.sung ?? s.lines)].join('\n'),
       duration_ms: s.duration_ms,
       positive_styles: (i === 0 ? [...plan.global_styles, ...s.styles] : s.styles).slice(0, 10),
       negative_styles: [...plan.negative_styles, ...s.negative_styles].slice(0, 8),
@@ -292,7 +309,8 @@ export interface LineTiming { start: number; end: number }
 export function lineTimings(plan: SongPlan, words: { word: string; start_ms: number; end_ms: number }[]): (LineTiming | null)[][] {
   const norm = (s: string) => s.replace(/[\s\u3000、。！？!?「」『』…・〜~]/g, '');
   let p = 0;
-  return plan.sections.map((s) => s.lines.map((line) => {
+  // Match against what was sung (kana), which is what ElevenLabs time-stamps.
+  return plan.sections.map((s) => (s.sung ?? s.lines).map((line) => {
     let start: number | null = null;
     let end: number | null = null;
     for (const phrase of line.split(' ').filter(Boolean)) {

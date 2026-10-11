@@ -99,7 +99,7 @@ async function writePlan(prompt: string): Promise<{ raw: unknown; usage: Record<
     },
     body: JSON.stringify({
       model: CLAUDE_OPUS,
-      max_tokens: 8000,
+      max_tokens: 12000,
       tools: [SONG_PLAN_TOOL],
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: prompt }],
@@ -262,7 +262,7 @@ async function paintCover(scene: string, artDirection: string): Promise<Uint8Arr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Square album cover art.\nScene: ${scene}\nArt direction: ${artDirection}\nAn illustration, not a photograph: no photorealism, no 3D render, no glossy lighting. No text, letters, words or logos anywhere in the image. No recognisable real people.` }] }],
+        contents: [{ parts: [{ text: `Square album cover art.\nScene: ${scene}\nArt direction: ${artDirection}\nAn illustration, not a photograph: no photorealism, no 3D render, no glossy lighting. The artwork fills the whole square edge to edge: no border, frame, margin or paper edge around it. No text, letters, words or logos anywhere in the image. No recognisable real people.` }] }],
         generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1', imageSize: '512' } },
       }),
     });
