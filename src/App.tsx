@@ -13,6 +13,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
+import { unlockSharedAudio } from './services/sharedAudio'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
 import { ChevronLeft } from 'lucide-react'
@@ -565,6 +566,9 @@ function App() {
 
   // ── LISTEN (聴く): generated podcasts ─────────────────────────────────────
   const handleOpenEpisode = useCallback((episode: PodcastEpisode) => {
+    // Runs inside the opening tap: unlock the shared audio element so the
+    // player can start the episode as soon as it loads (services/sharedAudio.ts).
+    unlockSharedAudio();
     setActiveEpisode(episode);
     setListenView('player');
     setShowNav(true);
@@ -819,6 +823,8 @@ function App() {
             onOpenWork={handleTodayWork}
             onOpenArticle={handleTodayArticle}
             onShowNews={() => showRead('news')}
+            onShowLibrary={() => showRead('shelf')}
+            onShowShows={() => { setListenPage('shows'); handleTabChange('listen'); }}
             onOpenEpisode={handleTodayEpisode}
             news={todayNews}
           />

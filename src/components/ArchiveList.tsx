@@ -83,6 +83,8 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
+const twoLines: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
+
 const markStyle = { backgroundColor: 'var(--accent-primary)', color: 'var(--text-main)', borderRadius: '3px', padding: '0 2px' };
 
 export function ArchiveList<T extends { id: string }>(props: Props<T>) {
@@ -439,17 +441,20 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
 }
 
 // ── One card's contents ─────────────────────────────────────────────────────
-/** A card's top-right plain text (part count, length) — same weight as the Feed's READY. */
-export function CornerText({ children }: { children: ReactNode }) {
+/** A card's top-right plain text (part count, length) — same weight as the Feed's READY.
+ *  `compact` is 今日's one small label style (also its 番組 line and news kickers). */
+export function CornerText({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
   return (
-    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+    <span style={{ fontSize: compact ? '0.68rem' : '0.7rem', fontWeight: compact ? 700 : 800, color: 'var(--text-muted)', letterSpacing: compact ? '0.06em' : '0.05em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
       {children}
     </span>
   );
 }
 
-export function CardBody({ card, query, snippet, selecting, selected }: {
+export function CardBody({ card, query, snippet, selecting, selected, compact = false }: {
   card: ArchiveCard; query: string; snippet?: Snippet; selecting: boolean; selected: boolean;
+  /** 今日's card: the page's one title size, two lines at most. */
+  compact?: boolean;
 }) {
   return (
     <div
@@ -497,7 +502,10 @@ export function CardBody({ card, query, snippet, selecting, selected }: {
         ) : card.status}
       </div>
 
-      <h3 className="serif" style={{ fontSize: '1.35rem', lineHeight: 1.45, color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', maxWidth: card.tag ? '90%' : 'calc(100% - 3.5rem)' }}>
+      <h3 className="serif" style={{
+        ...(compact ? { fontSize: '1.05rem', lineHeight: 1.5, ...twoLines } : { fontSize: '1.35rem', lineHeight: 1.45 }),
+        color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', maxWidth: card.tag ? '90%' : 'calc(100% - 3.5rem)',
+      }}>
         <Highlight text={card.title} query={query} />
       </h3>
 
