@@ -71,7 +71,8 @@ export function AdaptiveLabel({ id, event = false, upper = false }: { id: UiLabe
     );
   }
   return (
-    <span ref={ref} className="ui-sw" lang={shown > 0 ? 'ja' : 'en'}>
+    // data-word lets CSS tune a specific word (e.g. nav optical centring, index.css).
+    <span ref={ref} className="ui-sw" lang={shown > 0 ? 'ja' : 'en'} data-word={labelText(id, shown, upper)}>
       {labelText(id, shown, upper)}
     </span>
   );

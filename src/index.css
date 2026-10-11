@@ -276,6 +276,12 @@ ruby.peek-furigana rt {
    No English caption afterwards — the switch itself is the announcement. */
 /* Nav labels: uppercase English reads at 0.6rem; kana/kanji need more size to stay legible. */
 .nav-label [lang="ja"] { font-size: 0.78rem; letter-spacing: 0.02em; }
+/* Optical centring: these words open with a dense kanji and close on a light
+   kana, so they read as sitting left of the icon even though the box is
+   centred. Nudge just those words; balanced pairs (今日, 復習) and English stay put. */
+.nav-label [data-word="読む"],
+.nav-label [data-word="聞く"],
+.nav-label [data-word="聴く"] { transform: translateX(1.5px); }
 .ui-sw { position: relative; display: inline-block; isolation: isolate; }
 .ui-sw-en { position: absolute; left: 0; top: 0; white-space: nowrap; }
 .ui-sw-ja { display: inline-block; white-space: nowrap; }
