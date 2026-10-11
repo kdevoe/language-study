@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { buildDeck, type Card } from '../services/dueDeck';
 import { schedule, seedSrsFromDifficulty, type Rating, type SrsState } from '../services/srs';
@@ -336,7 +336,10 @@ export function Flashcards({
             <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Discover
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{discoverIndex + 1} / {dTotal}</span>
+            <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {discoverIndex + 1} / {dTotal}
+              {focusActive && <ExitFocusButton onClick={() => setFocused(false)} />}
+            </span>
           </div>
           <div style={{ height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px', overflow: 'hidden' }}>
             <motion.div
@@ -448,7 +451,10 @@ export function Flashcards({
           <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             {card.kind === 'new' ? 'New' : 'Review'}
           </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{index + 1} / {total}</span>
+          <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {index + 1} / {total}
+            {focusActive && <ExitFocusButton onClick={() => setFocused(false)} />}
+          </span>
         </div>
         <div style={{ height: '3px', backgroundColor: 'var(--border-light)', borderRadius: '2px', overflow: 'hidden' }}>
           <motion.div
@@ -496,6 +502,29 @@ export function Flashcards({
         }
       />
     </div>
+  );
+}
+
+// Focus mode's explicit way out (tapping beside the card also works, but the
+// card fills nearly the whole screen). Sits after the count in the progress row;
+// the negative margins give it a thumb-sized target without moving the row.
+function ExitFocusButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      aria-label="Exit focus mode"
+      style={{
+        display: 'flex',
+        margin: '-0.7rem -0.7rem -0.7rem 0.35rem',
+        padding: '0.7rem',
+        border: 'none',
+        background: 'none',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+      }}
+    >
+      <X size={15} strokeWidth={1.5} />
+    </button>
   );
 }
 
