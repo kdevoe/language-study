@@ -7,6 +7,7 @@ import { findIn, matchItem } from '../services/archiveSearch';
 import type { SearchCorpus, Snippet } from '../services/archiveSearch';
 import type { UiLabelId } from '../services/uiLabels';
 import { PageHeading } from './PageHeading';
+import type { TitleSwitch } from './PageHeading';
 import { useAdaptiveText } from './AdaptiveLabel';
 
 // The archive list behind LISTEN (聴く) and LIBRARY (書庫), mockup
@@ -40,8 +41,8 @@ export interface ArchiveCard {
 
 interface Props<T extends { id: string }> {
   titleId: UiLabelId;
-  /** Rendered between the heading and the search row (読む's segment). */
-  subheader?: ReactNode;
+  /** The tab's other pages beside the title (読む: ニュース | 本棚). */
+  titleSwitch?: TitleSwitch;
   /** The + at the right of the page heading. */
   onAdd: () => void;
   addLabel: string;
@@ -242,9 +243,8 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
           <button onClick={exitSelect} className="serif" style={textBtn(true)}>完了</button>
         </div>
       ) : (
-        <PageHeading id={props.titleId} settingsMark={false} actions={<AddButton onClick={props.onAdd} label={props.addLabel} />} />
+        <PageHeading id={props.titleId} settingsMark={false} titleSwitch={props.titleSwitch} actions={<AddButton onClick={props.onAdd} label={props.addLabel} />} />
       )}
-      {!selecting && props.subheader}
 
       {/* Search: hero input on a hairline (design-system §6.4), full width */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: q ? '0.8rem' : '1.6rem' }}>

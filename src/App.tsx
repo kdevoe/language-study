@@ -4,8 +4,6 @@ import { Library } from './components/Library'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav, type Tab } from './components/BottomNav'
 import { Today, LAST_WORK_KEY } from './components/Today'
-import { Segment } from './components/Segment'
-import { AdaptiveLabel } from './components/AdaptiveLabel'
 import { Settings } from './components/Settings'
 import { Review, type ReviewSegment } from './components/Review'
 import { Listen } from './components/Listen'
@@ -18,7 +16,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
 import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
-import { OpenSettingsContext, PageHeading } from './components/PageHeading'
+import { OpenSettingsContext, PageHeading, type TitleSwitch } from './components/PageHeading'
 import { muteChromeScroll, isChromeScrollMuted } from './services/chromeScroll'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -27,9 +25,11 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  // The app opens on 今日; 読む holds the news feed and the 本棚 behind a segment.
+  // The app opens on 今日. 読む holds the news feed and the 本棚, 聞く the 番組 and
+  // 音楽; the page title switches between them (PageHeading's titleSwitch).
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [readSegment, setReadSegment] = useState<'news' | 'shelf'>('news');
+  const [listenPage, setListenPage] = useState<'shows' | 'music'>('shows');
   const [showNav, setShowNav] = useState(true);
   // Flashcard focus mode: tapping into a card hides the bottom nav so the card
   // can use that space; Flashcards reports the state up from its card flow.
@@ -599,24 +599,21 @@ function App() {
     handleSelectArticle(article);
   };
   const handleTodayEpisode = (episode: PodcastEpisode) => {
+    setListenPage('shows');
     handleTabChange('listen');
     handleOpenEpisode(episode);
   };
   const visibleArticles = (articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id));
-  // 読む's ニュース | 本棚 segment; its labels follow the old tab titles' adaptive words.
-  // 1.6rem below it to the first content, as on every tab page (design-system §6.9).
-  const readSegmentControl = (
-    <div style={{ marginBottom: '1.6rem' }}>
-      <Segment
-        options={[
-          { id: 'news' as const, label: <AdaptiveLabel id="news" /> },
-          { id: 'shelf' as const, label: <AdaptiveLabel id="library" /> },
-        ]}
-        active={readSegment}
-        onChange={(segment) => { muteChromeScroll(); window.scrollTo(0, 0); setReadSegment(segment); }}
-      />
-    </div>
-  );
+  // The title switches of 読む (ニュース | 本棚) and 聞く (番組 | 音楽); a switch lands at the top.
+  const switchPage = (apply: () => void) => { muteChromeScroll(); window.scrollTo(0, 0); apply(); };
+  const readTitleSwitch: TitleSwitch = {
+    pages: ['news', 'library'],
+    onSwitch: (id) => switchPage(() => setReadSegment(id === 'library' ? 'shelf' : 'news')),
+  };
+  const listenTitleSwitch: TitleSwitch = {
+    pages: ['shows', 'music'],
+    onSwitch: (id) => switchPage(() => setListenPage(id === 'music' ? 'music' : 'shows')),
+  };
   const handlePodcastQueued = useCallback(() => setActionError('聴くタブで作成中'), []);
 
   const handleBackToListen = () => {
@@ -816,8 +813,9 @@ function App() {
         {activeTab === 'read' && readSegment === 'news' && (
           newsView === 'hub' ? (
             <>
-            <PageHeading id="read" settingsMark={false} />
-            {readSegmentControl}
+            <PageHeading id="news" settingsMark={false} titleSwitch={readTitleSwitch} />
+            {/* Same 1.6rem (1rem heading margin + 0.6rem) to the first content as every tab page. */}
+            <div style={{ height: '0.6rem' }} />
             <Feed 
               articles={visibleArticles.slice(0, 5)} 
               isLoading={isLoadingFeed} 
@@ -836,7 +834,7 @@ function App() {
         )}
         {activeTab === 'read' && readSegment === 'shelf' && (
           libraryView === 'list' ? (
-            <Library onOpenWork={handleOpenWork} segment={readSegmentControl} />
+            <Library onOpenWork={handleOpenWork} titleSwitch={readTitleSwitch} />
           ) : (
             <Reader
               key={activeWorkArticle?.id}
@@ -853,8 +851,17 @@ function App() {
         {activeTab === 'listen' && (
           listenView === 'player' && activeEpisode ? (
             <PodcastPlayer key={activeEpisode.id} episode={activeEpisode} />
+          ) : listenPage === 'shows' ? (
+            <Listen onOpenEpisode={handleOpenEpisode} titleSwitch={listenTitleSwitch} />
           ) : (
-            <Listen onOpenEpisode={handleOpenEpisode} />
+            <>
+            <PageHeading id="music" settingsMark={false} titleSwitch={listenTitleSwitch} />
+            {/* Placeholder until music lands. */}
+            <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+              <div className="serif" style={{ fontSize: '1.35rem', color: 'var(--text-main)' }}>近日公開</div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Coming soon</p>
+            </div>
+            </>
           )
         )}
         {activeTab === 'flashcards' && (

@@ -558,4 +558,8 @@
   - [x] Tabs 今日 · 読む · 聞く · 復習; the app opens on 今日; News + 本棚 merge into 読む (ニュース | 本棚 segment)
   - [x] 今日: cards due (→ 復習), 続きを読む (last-opened work at its しおり), 今日の漢字, new podcast, two news picks
   - [x] Settings mark only on 今日; shared Segment component (REVIEW migrated)
-  - [ ] Verify JMDict entry ids for 今日 / 読む and add them to UI_LABELS (matched by surface until then)
+  - [x] Title switch replaces 読む's segment: ニュース | 本棚 in the heading, active 2rem / others 1.2rem at 50% (mockup docs/mockups/title-type.html #1)
+  - [x] 聞く gets the same switch: 番組 (podcasts) | 音楽 (近日公開 placeholder)
+  - [x] 今日 hides the review card when nothing is due
+  - [ ] Verify JMDict entry ids for 今日 / 読む / 番組 / 音楽 and add them to UI_LABELS (matched by surface until then)
+  - [ ] 音楽 page (music)

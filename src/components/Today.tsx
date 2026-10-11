@@ -101,8 +101,11 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
       <PageHeading id="today" />
       <div style={{ height: '0.6rem' }} />
 
-      {/* 復習 leads: the one time-sensitive thing, so it's the featured white card. */}
-      {deck.length > 0 ? (
+      {/* Blocks space 2rem apart; whichever shows first sits flush under the heading (index.css). */}
+      <div className="today-blocks">
+      {/* 復習 leads: the one time-sensitive thing, so it's the featured white card;
+          with nothing due it's left out like any other empty block. */}
+      {deck.length > 0 && (
         <button onClick={onStartReview} style={{ ...cardStyle, backgroundColor: 'var(--bg-pure)', padding: '1.5rem 1.5rem 1.4rem' }}>
           <div style={kickerStyle}>復習</div>
           <div className="serif" style={{ fontSize: '2.6rem', fontWeight: 500, lineHeight: 1.2, margin: '0.35rem 0 0.2rem' }}>
@@ -115,12 +118,6 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
             </span>
           </div>
         </button>
-      ) : (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '1.8rem 1rem 1.6rem', cursor: 'default' }}>
-          <div className="serif" style={{ fontSize: '1.35rem' }}>何もありません</div>
-          <p style={{ ...metaStyle, fontSize: '0.8rem', marginTop: '0.2rem' }}>Nothing due today.</p>
-          <button onClick={onStartReview} className="serif" style={{ ...linkStyle, marginTop: '0.8rem' }}>新しい言葉を探す</button>
-        </div>
       )}
 
       {work && (
@@ -197,6 +194,8 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
         </Section>
       )}
 
+      </div>
+
       <WordModal {...lookup.modalProps} />
     </div>
   );
@@ -204,8 +203,8 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
 
 function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '2rem 0 0.75rem' }}>
+    <section className="today-section">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
         <span style={kickerStyle}>{title}</span>
         {typeof aside === 'string' ? <span style={metaStyle}>{aside}</span> : aside}
       </div>

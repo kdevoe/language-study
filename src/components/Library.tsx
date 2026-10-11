@@ -5,6 +5,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { ArchiveList } from './ArchiveList';
 import type { ArchiveCard } from './ArchiveList';
+import type { TitleSwitch } from './PageHeading';
 import {
   LongFormWork,
   NewsArticle,
@@ -33,8 +34,8 @@ interface Props {
   /** Open a ready work in the Reader. The article is the processed part content;
    *  resumeBlockIndex pre-scrolls to the saved reading position (design §5). */
   onOpenWork: (work: LongFormWork, article: NewsArticle, resumeBlockIndex?: number) => void;
-  /** 読む's ニュース | 本棚 segment, shown under the heading. */
-  segment?: ReactNode;
+  /** 読む's ニュース | 本棚 title switch. */
+  titleSwitch?: TitleSwitch;
 }
 
 async function resolveUserId(): Promise<string | null> {
@@ -59,7 +60,7 @@ function relativeDate(iso: string): string {
 // delete, long-press to select (mockup docs/mockups/archive-organize.html) —
 // plus the import sheet behind +.
 
-export function Library({ onOpenWork, segment }: Props) {
+export function Library({ onOpenWork, titleSwitch }: Props) {
   const [works, setWorks] = useState<LongFormWork[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -211,8 +212,8 @@ export function Library({ onOpenWork, segment }: Props) {
       )}
 
       <ArchiveList
-        titleId="read"
-        subheader={segment}
+        titleId="library"
+        titleSwitch={titleSwitch}
         onAdd={() => setSheetOpen(true)}
         addLabel="コンテンツを追加"
         items={works}

@@ -10,15 +10,26 @@ import type { UiLabelId } from '../services/uiLabels';
 // global header on tab pages. Page controls (search, segment) sit right below.
 // Tapping the title opens its word card (§6.10): label words like 本棚 rarely
 // turn up in articles, so this is where the reader can meet and grade them.
+// A tab with more than one page (読む: ニュース | 本棚) sets the title as a
+// switch (§6.9, mockup docs/mockups/title-type.html #1): every page's word in a
+// fixed order on one baseline, the active one at 2rem, the others at 1.2rem and
+// half opacity; tapping one of those switches to it.
 
 /** Opens Settings; provided by App so tabs don't thread a prop through. */
 export const OpenSettingsContext = createContext<() => void>(() => {});
 
-export function PageHeading({ id, settingsMark = true, actions }: {
+export interface TitleSwitch {
+  /** Every page of the tab, in display order; the heading's `id` is the active one. */
+  pages: UiLabelId[];
+  onSwitch: (id: UiLabelId) => void;
+}
+
+export function PageHeading({ id, settingsMark = true, actions, titleSwitch }: {
   id: UiLabelId;
   settingsMark?: boolean;
   /** Page actions (e.g. the archive's +), sat just left of the settings mark. */
   actions?: React.ReactNode;
+  titleSwitch?: TitleSwitch;
 }) {
   const { shown } = useUiLabelState(id);
   const lookup = useWordLookup();
@@ -30,13 +41,24 @@ export function PageHeading({ id, settingsMark = true, actions }: {
   return (
     // 2.75rem + 1rem = 3.75rem, the space App's tab padding gave up (see App main).
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '2.75rem', marginBottom: '1rem' }}>
-      <h1 className="serif" translate="no" style={{ fontSize: '2rem', fontWeight: 500, lineHeight: 1.2, color: 'var(--text-main)' }}>
-        <button
-          onClick={openWord}
-          style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}
-        >
-          <AdaptiveLabel id={id} event />
-        </button>
+      <h1 className="serif" translate="no" style={{ fontSize: '2rem', fontWeight: 500, lineHeight: 1.2, color: 'var(--text-main)', display: 'flex', alignItems: 'baseline', gap: '0.95rem', minWidth: 0 }}>
+        {(titleSwitch?.pages ?? [id]).map((pageId) => pageId === id ? (
+          <button
+            key={pageId}
+            onClick={openWord}
+            style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap' }}
+          >
+            <AdaptiveLabel id={id} event />
+          </button>
+        ) : (
+          <button
+            key={pageId}
+            onClick={() => titleSwitch!.onSwitch(pageId)}
+            style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', fontSize: '1.2rem', color: 'inherit', opacity: 0.5, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            <AdaptiveLabel id={pageId} />
+          </button>
+        ))}
       </h1>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         {actions}

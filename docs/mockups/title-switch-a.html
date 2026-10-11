@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — title switch, A variants</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 700px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1700px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 380px; height: 760px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; touch-action: pan-y; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── Heading: titles on one baseline ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.6rem; gap: 0.5rem; }
+.row { display: flex; align-items: baseline; gap: 0.95rem; min-width: 0; }
+.row.fade-out { animation: rowOut 0.16s ease-in forwards; }
+.row.fade-in { animation: rowIn 0.32s var(--ease); }
+@keyframes rowOut { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tt { border: none; background: none; cursor: pointer; padding: 0; font-family: var(--font-serif); font-weight: 500; line-height: 1.2; white-space: nowrap; color: var(--text-main);
+  font-size: 1.2rem; opacity: 0.5; transition: font-size 0.45s var(--ease), opacity 0.45s var(--ease); display: inline-flex; align-items: flex-start; gap: 0.2rem; }
+.tt.on { font-size: 2rem; opacity: 1; cursor: default; }
+.scrubbing .tt { transition: none; }
+.hint { font-family: var(--font-sans); font-size: 0.6rem; font-weight: 700; color: var(--text-main); background: var(--accent-primary); border-radius: 100px; padding: 0 0.4rem; line-height: 1.35rem; margin-top: -0.1rem; }
+.hint.dot { width: 6px; height: 6px; padding: 0; background: var(--accent-progress); margin-top: 0.15rem; }
+.tt.on .hint { display: none; }
+.icon-btn { width: 44px; height: 44px; margin-right: -5px; border: none; background: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; transition: opacity 0.3s; }
+.icon-btn svg.i { stroke-width: 1.25; }
+.icon-btn.gone { opacity: 0; pointer-events: none; }
+
+/* Compact bar (variant 4): pinned once the big heading scrolls away. */
+.compact { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 0.9rem 1.25rem 0.6rem; background: var(--bg-color); border-bottom: 1px solid var(--border-light); display: flex; align-items: baseline; gap: 1rem;
+  transform: translateY(-100%); opacity: 0; transition: transform 0.35s var(--ease), opacity 0.35s; }
+.compact.show { transform: none; opacity: 1; }
+.compact button { border: none; background: none; cursor: pointer; padding: 0; font-family: var(--font-serif); font-size: 1rem; font-weight: 500; opacity: 0.5; display: inline-flex; gap: 0.2rem; align-items: flex-start; }
+.compact button.on { opacity: 1; font-weight: 700; }
+.compact button.on .hint { display: none; }
+
+/* ── Content ── */
+.page { animation: pageIn 0.35s var(--ease); }
+.page.from-left { animation-name: pageInL; }
+.scrubbing .page { animation: none; }
+@keyframes pageIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes pageInL { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.card { background: var(--bg-card); border-radius: 24px; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); padding: 1.4rem 1.5rem; position: relative; overflow: hidden; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.9rem; gap: 0.6rem; }
+.tag { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; background: var(--bg-pure); color: var(--text-muted); padding: 0.3rem 0.7rem; border-radius: 8px; }
+.status { font-family: var(--font-serif); font-size: 0.8rem; font-weight: 600; color: var(--olive); white-space: nowrap; }
+.card h3 { font-family: var(--font-serif); font-size: 1.25rem; font-weight: 500; line-height: 1.5; margin-bottom: 0.8rem; }
+.meta { font-size: 0.74rem; color: var(--text-muted); font-weight: 500; }
+.dotsep { margin: 0 0.35rem; opacity: 0.5; }
+.edge { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent-primary); }
+.search { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border-light); padding: 0.35rem 0 0.55rem; margin-bottom: 1.6rem; color: var(--text-muted); font-size: 1.05rem; }
+.search svg.i { width: 18px; height: 18px; }
+.track { display: flex; align-items: center; gap: 0.9rem; padding: 0.75rem 0; border-top: 1px solid var(--border-light); }
+.track:first-child { border-top: none; }
+.art { width: 46px; height: 46px; border-radius: 12px; background: var(--accent-primary); flex: none; }
+.track .t { flex: 1; min-width: 0; }
+.track .t div:first-child { font-family: var(--font-serif); font-size: 1rem; }
+.stub { margin-top: 2rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav button { width: 76px; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; transition: background-color 0.2s; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.6rem; line-height: 1rem; letter-spacing: 0.05em; font-weight: 500; margin-top: 2px; }
+.nav button.on { color: var(--text-main); }
+.nav button.on .ic { background: var(--accent-primary); }
+.nav button.on .ic svg.i { stroke-width: 1.9; }
+
+/* ── Notes ── */
+.notes { max-width: 820px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+@media (max-width: 440px) { .phone { height: 700px; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION · A</div>
+  <h1>Titles side by side, four ways</h1>
+  <p>Four takes on A, built to compare how the switch moves and what it tells you. The toggles apply to all four phones: a hint on the other title saying something is waiting there, a third page on 読む (雑誌, for Phase C magazines), and the label language. Tap a small title or drag the page sideways. Phone 4 needs scrolling.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">HINT</span><div class="pill-seg" data-ctl="hint"><button data-v="none">None</button><button data-v="count" class="on">Count</button><button data-v="dot">Dot</button></div></div>
+    <div class="ctl"><span class="lbl">読む PAGES</span><div class="pill-seg" data-ctl="pages"><button data-v="2" class="on">2</button><button data-v="3">3 (+ 雑誌)</button></div></div>
+    <div class="ctl"><span class="lbl">PODCAST WORD</span><div class="pill-seg" data-ctl="pod"><button data-v="番組" class="on">番組</button><button data-v="ラジオ">ラジオ</button><button data-v="ポッドキャスト">ポッドキャスト</button></div></div>
+    <div class="ctl"><span class="lbl">LABELS</span><div class="pill-seg" data-ctl="lang"><button data-v="en" class="on">English</button><button data-v="ja">Japanese</button></div></div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone-label">1 · FIXED ORDER, SIZE SWAP</div>
+    <div class="phone" data-phone="1"><div class="scroll"></div><nav class="nav"></nav></div>
+    <div class="phone-note">The titles never move. The one you pick grows in place and the other shrinks, so News is always on the left and Library on the right, which helps muscle memory.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">2 · ACTIVE FIRST</div>
+    <div class="phone" data-phone="2"><div class="scroll"></div><nav class="nav"></nav></div>
+    <div class="phone-note">The current page is always in the title position at the left edge, like a normal heading. The row crossfades on a switch, so positions change.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">3 · SCRUB WITH THE SWIPE</div>
+    <div class="phone" data-phone="3"><div class="scroll"></div><nav class="nav"></nav></div>
+    <div class="phone-note">Drag the page sideways and the titles follow your finger: one grows as the other shrinks. Let go past halfway to switch, or before it to snap back.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">4 · PINS SMALL ON SCROLL</div>
+    <div class="phone" data-phone="4"><div class="compact"></div><div class="scroll"></div><nav class="nav"></nav></div>
+    <div class="phone-note">Same as 1, but once the heading scrolls away a small bar of both titles pins to the top, so you can switch from deep in a list.</div>
+  </div>
+</div>
+
+<div class="notes">
+  <h3>Ideas in the phones</h3>
+  <ol>
+    <li><span class="n">1</span><div><b>Fixed order vs. active first.</b> Fixed order (1, 3, 4) keeps each page in one spot, and the size change alone says which page you're on. Active first (2) always puts the current page where a title normally sits, but positions jump on every switch. I lean toward fixed order.</div></li>
+    <li><span class="n">2</span><div><b>Hints on the other title.</b> A count (Library ²: works in progress; News ³: articles ready; Podcasts ¹: unplayed) or just a dot. This gives a reason to switch without adding UI. The count is more informative; the dot is quieter and closer to the zen brief.</div></li>
+    <li><span class="n">3</span><div><b>Scrub.</b> The title is a live indicator of the swipe, not just a result. It's the most physical option, but it has the same conflict with the Feed's card swipe as before, so the page drag would start from the heading or need more travel.</div></li>
+    <li><span class="n">4</span><div><b>Pin small on scroll.</b> The News feed and Library get long. Without a pinned bar, switching means scrolling back up. The bar only appears after scrolling, so the resting page stays bare.</div></li>
+    <li><span class="n">5</span><div><b>A shorter word for podcasts.</b> ポッドキャスト has no standard short form; clipped versions are only slang. 番組 ("show, programme") is a common everyday word, and 番組 | 音楽 pair neatly as two kanji each. Since it's a word readers will meet elsewhere, it's also worth learning. ラジオ is the casual alternative: many Japanese podcasters call their shows ラジオ. Set the label toggle to Japanese, then try each with the PODCAST WORD toggle.</div></li>
+    <li><span class="n">5b</span><div><b>Three pages.</b> ニュース 本棚 雑誌 fits on one line in both languages (try the toggle). Music on 聞く makes two. Four is the practical limit.</div></li>
+  </ol>
+  <h3>Smaller ideas not built here</h3>
+  <ol>
+    <li><span class="n">6</span><div><b>Word cards for every title.</b> Tapping the active title opens its word card, as now. A long-press on a small title could do the same without switching, so ニュース / 本棚 / 音楽 all stay learnable.</div></li>
+    <li><span class="n">7</span><div><b>The adaptive switch plays where the eye is.</b> When a sub-page word is learned (News → ニュース), its English→Japanese switch animation should play even while that title is the small one, so it isn't missed.</div></li>
+    <li><span class="n">8</span><div><b>Remember the page per tab,</b> and let 今日 deep-link to a page (すべて → ニュース, 続きを読む → 本棚). Tapping the nav icon of the tab you're already on could toggle pages, as a fast path.</div></li>
+    <li><span class="n">9</span><div><b>One component.</b> A <code>TitleSwitch</code> replaces PageHeading's single title for 読む and 聞く (and possibly 復習 | 進捗). It takes the pages, the active one, per-page actions (+) and hints.</div></li>
+  </ol>
+</div>
+
+<script>
+const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+const D = '<span class="dotsep">·</span>';
+const g = { lang: 'en', hint: 'count', pages: 2, pod: '番組' };
+const W = { read: ['Read', '読む'], listen: ['Listen', '聞く'], today: ['Today', '今日'], review: ['Review', '復習'], search: ['Search', '検索'] };
+const w = (pair) => pair[g.lang === 'ja' ? 1 : 0];
+
+const newsCards = [['CULTURE', '京都の町家、若い世代が住み始める', 'READY'], ['WEATHER', '北海道で今年初めての雪', 'READY'], ['SCIENCE', '深い海で新しい魚が見つかる', 'READY'], ['SPORTS', '大谷選手、今季五十本目', ''], ['TECH', '新しい電車、時速五百キロ', ''], ['FOOD', '秋の味覚、さんまが戻る', '']];
+const card = (tag, title, status, meta) => `<div class="card"><div class="top"><span class="tag">${tag}</span>${status ? `<span class="status">${status}</span>` : ''}</div><h3>${title}</h3><div class="meta">${meta}</div></div>`;
+const ALL_PAGES = {
+  read: [
+    { id: 'news', name: ['News', 'ニュース'], count: 3, plus: false, body: () => `<div class="stack">${newsCards.map(([t, h, s]) => card(t, h, s, '5分で読める')).join('')}</div>` },
+    { id: 'library', name: ['Library', '本棚'], count: 2, plus: true, body: () => `<div class="search">${ic('search')}<span>${w(W.search)}</span></div><div class="stack">
+      <div class="card"><div class="top"><span class="tag">IMPORT · URL</span><span class="status">第3部・全4部</span></div><h3>Quiet Rooms, Long Winters</h3><div class="meta">約37,513字${D}全4部${D}3日前</div><div class="edge" style="width:58%"></div></div>
+      <div class="card"><div class="top"><span class="tag">IMPORT</span><span class="status">第1部・全3部</span></div><h3>The Long Way to Kyoto</h3><div class="meta">約21,040字${D}全3部${D}先週</div><div class="edge" style="width:20%"></div></div>
+      ${card('IMPORT', 'Custom Silicon for Large Language Models', '', `約34,589字${D}全4部${D}9月`)}
+      ${card('IMPORT', 'A Field Guide to Moss Gardens', '', `約12,300字${D}全2部${D}9月`)}</div>` },
+    { id: 'magazines', name: ['Magazines', '雑誌'], count: 1, plus: false, body: () => `<div class="stack">${card('BRUTUS', '特集 — 一人で行く京都', '新', `N3${D}全12記事`)}${card('POPEYE', '街の喫茶店ガイド', '', `N3${D}全8記事`)}</div><p class="stub">Magazines are Phase C; placeholder content.</p>` },
+  ],
+  listen: [
+    { id: 'podcasts', get name() { return ['Podcasts', g.pod]; }, count: 1, plus: true, body: () => `<div class="search">${ic('search')}<span>${w(W.search)}</span></div><div class="stack">
+      ${card('ARTICLE', '北欧と日本 — 光の住まい', '新', `12分${D}今日`)}${card('TOPIC', '京都の秋の祭り', '', `9分${D}昨日`)}${card('ARTICLE', '深い海の生き物', '', `11分${D}先週`)}</div>` },
+    { id: 'music', name: ['Music', '音楽'], count: 0, plus: false, body: () => `<div>${[['夜に駆ける', 'YOASOBI · N3'], ['春よ、来い', '松任谷由実 · N4'], ['ひまわりの約束', '秦基博 · N4'], ['Lemon', '米津玄師 · N3'], ['さくら', '森山直太朗 · N4']].map(([t, m]) =>
+      `<div class="track"><div class="art"></div><div class="t"><div>${t}</div><div class="meta">${m}</div></div>${ic('chev')}</div>`).join('')}</div><p class="stub">Music is future work; placeholder list.</p>` },
+  ],
+};
+const pagesFor = (tab) => tab === 'read' ? ALL_PAGES.read.slice(0, g.pages) : ALL_PAGES[tab];
+const TABS = [['today', 'sun', W.today], ['read', 'book', W.read], ['listen', 'headphones', W.listen], ['review', 'layers', W.review]];
+const phones = {};
+['1', '2', '3', '4'].forEach((k) => phones[k] = { tab: 'read', sub: { read: 0, listen: 0 }, dir: 1 });
+
+const hint = (pg) => g.hint === 'none' || !pg.count ? '' : g.hint === 'dot' ? '<span class="hint dot"></span>' : `<span class="hint">${pg.count}</span>`;
+const titleBtn = (pg, j, on) => `<button class="tt ${on ? 'on' : ''}" data-go="${j}">${w(pg.name)}${hint(pg)}</button>`;
+
+function headingHTML(p, pages, i) {
+  const order = p === '2' ? [i, ...pages.map((_, j) => j).filter((j) => j !== i)] : pages.map((_, j) => j);
+  return `<div class="heading"><div class="row">${order.map((j) => titleBtn(pages[j], j, j === i)).join('')}</div>
+    <button class="icon-btn ${pages[i].plus ? '' : 'gone'}" aria-label="Add">${ic('plus')}</button></div>`;
+}
+const compactHTML = (pages, i) => pages.map((pg, j) => `<button data-go="${j}" class="${j === i ? 'on' : ''}">${w(pg.name)}${hint(pg)}</button>`).join('');
+
+function render(p) {
+  const root = document.querySelector(`[data-phone="${p}"]`);
+  const st = phones[p];
+  const scroll = root.querySelector('.scroll');
+  const pages = pagesFor(st.tab);
+  if (pages && st.sub[st.tab] >= pages.length) st.sub[st.tab] = 0;
+  if (!pages) {
+    scroll.innerHTML = `<div class="heading"><div class="row"><span class="tt on">${w(TABS.find((t) => t[0] === st.tab)[2])}</span></div></div><p class="stub">Not part of this exploration.</p>`;
+  } else {
+    const i = st.sub[st.tab];
+    scroll.innerHTML = headingHTML(p, pages, i) + `<div class="page">${pages[i].body()}</div>`;
+  }
+  const compact = root.querySelector('.compact');
+  if (compact) { compact.innerHTML = pages ? compactHTML(pages, st.sub[st.tab]) : ''; compact.classList.remove('show'); }
+  root.querySelector('.nav').innerHTML = TABS.map(([id, icon, label]) =>
+    `<button data-tab="${id}" class="${st.tab === id ? 'on' : ''}"><span class="ic">${ic(icon)}</span><span class="lab">${g.lang === 'en' ? label[0].toUpperCase() : label[1]}</span></button>`).join('');
+  root.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => {
+    // Tapping the active tab's icon cycles its pages (idea 8).
+    if (b.dataset.tab === st.tab && pages) return go(p, (st.sub[st.tab] + 1) % pages.length);
+    st.tab = b.dataset.tab; scroll.scrollTop = 0; render(p);
+  });
+  bindTitles(p);
+}
+
+function bindTitles(p) {
+  const root = document.querySelector(`[data-phone="${p}"]`);
+  root.querySelectorAll('[data-go]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); go(p, Number(b.dataset.go)); });
+}
+
+// Switch pages in place: the heading row stays in the DOM so sizes can animate.
+function go(p, j) {
+  const st = phones[p];
+  const pages = pagesFor(st.tab);
+  const cur = st.sub[st.tab];
+  if (!pages || j === cur || j < 0 || j >= pages.length) return;
+  st.dir = j > cur ? 1 : -1;
+  st.sub[st.tab] = j;
+  const root = document.querySelector(`[data-phone="${p}"]`);
+  const scroll = root.querySelector('.scroll');
+  const swapBody = () => {
+    const page = scroll.querySelector('.page');
+    page.className = `page ${st.dir < 0 ? 'from-left' : ''}`;
+    page.innerHTML = pages[j].body();
+    scroll.querySelector('.icon-btn').classList.toggle('gone', !pages[j].plus);
+    const compact = root.querySelector('.compact');
+    if (compact) compact.innerHTML = compactHTML(pages, j);
+    bindTitles(p);
+  };
+  if (p === '2') {
+    const row = scroll.querySelector('.row');
+    row.classList.add('fade-out');
+    setTimeout(() => {
+      const order = [j, ...pages.map((_, k) => k).filter((k) => k !== j)];
+      row.innerHTML = order.map((k) => titleBtn(pages[k], k, k === j)).join('');
+      row.classList.remove('fade-out'); row.classList.add('fade-in');
+      setTimeout(() => row.classList.remove('fade-in'), 340);
+      swapBody();
+    }, 160);
+  } else {
+    scroll.querySelectorAll('.row .tt').forEach((t) => {
+      t.classList.toggle('on', Number(t.dataset.go) === j);
+      t.style.fontSize = ''; t.style.opacity = '';
+    });
+    swapBody();
+  }
+  if (p !== '4' || scroll.scrollTop < 80) scroll.scrollTo({ top: 0 });
+  else scroll.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Sideways drag on the page. Phone 3 scrubs the titles live; the others switch on release.
+function bindSwipe(p) {
+  const root = document.querySelector(`[data-phone="${p}"]`);
+  const scroll = root.querySelector('.scroll');
+  let x0 = null, y0 = null, horiz = false, target = null;
+  scroll.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; x0 = e.clientX; y0 = e.clientY; horiz = false; target = null; });
+  scroll.addEventListener('pointermove', (e) => {
+    if (x0 == null) return;
+    const st = phones[p], pages = pagesFor(st.tab);
+    if (!pages) return;
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    if (!horiz) { if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) horiz = true; else return; }
+    if (p !== '3') return;
+    const cur = st.sub[st.tab];
+    const next = cur + (dx < 0 ? 1 : -1);
+    if (next < 0 || next >= pages.length) return;
+    target = next;
+    const t = Math.min(1, Math.abs(dx) / 220);
+    scroll.classList.add('scrubbing');
+    scroll.querySelectorAll('.row .tt').forEach((el) => {
+      const k = Number(el.dataset.go);
+      const size = k === cur ? 2 - 0.8 * t : k === next ? 1.2 + 0.8 * t : 1.2;
+      const op = k === cur ? 1 - 0.5 * t : k === next ? 0.5 + 0.5 * t : 0.5;
+      el.style.fontSize = `${size}rem`; el.style.opacity = op;
+    });
+    const page = scroll.querySelector('.page');
+    page.style.transform = `translateX(${dx * 0.35}px)`; page.style.opacity = 1 - 0.6 * t;
+  });
+  const end = (e) => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0; x0 = null;
+    const st = phones[p];
+    const page = scroll.querySelector('.page');
+    scroll.classList.remove('scrubbing');
+    if (page) { page.style.transform = ''; page.style.opacity = ''; }
+    if (!horiz) return;
+    if (p === '3') {
+      if (target != null && Math.abs(dx) > 110) go(p, target);
+      else scroll.querySelectorAll('.row .tt').forEach((el) => { el.style.fontSize = ''; el.style.opacity = ''; });
+    } else if (Math.abs(dx) > 60) go(p, st.sub[st.tab] + (dx < 0 ? 1 : -1));
+  };
+  scroll.addEventListener('pointerup', end);
+  scroll.addEventListener('pointerleave', end);
+  if (p === '4') scroll.addEventListener('scroll', () => root.querySelector('.compact').classList.toggle('show', scroll.scrollTop > 70));
+}
+
+Object.keys(phones).forEach((p) => { render(p); bindSwipe(p); });
+document.querySelectorAll('[data-ctl]').forEach((ctl) => ctl.querySelectorAll('button').forEach((b) => b.onclick = () => {
+  const key = ctl.dataset.ctl;
+  g[key] = key === 'pages' ? Number(b.dataset.v) : b.dataset.v;
+  ctl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  Object.keys(phones).forEach(render);
+}));
+</script>
+</body>
+</html>

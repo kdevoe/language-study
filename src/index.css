@@ -305,3 +305,7 @@ ruby.peek-furigana rt {
 @keyframes uiSwGlow { 0% { opacity: 0; transform: scale(0.7); } 27% { opacity: 0.8; transform: scale(1); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.2); } }
 @keyframes uiSwFadeOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes uiSwFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* 今日 (Today.tsx): blocks sit 2rem apart; the first one shown, whichever it is, sits flush under the heading. */
+.today-section { margin-top: 2rem; }
+.today-blocks > .today-section:first-child { margin-top: 0; }

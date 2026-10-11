@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, RotateCw } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
 import { ArchiveList } from './ArchiveList';
+import type { TitleSwitch } from './PageHeading';
 import type { ArchiveCard } from './ArchiveList';
 import {
   PodcastEpisode,
@@ -32,6 +33,8 @@ type ListenState = 'new' | 'partial' | 'done';
 
 interface Props {
   onOpenEpisode: (episode: PodcastEpisode) => void;
+  /** 聞く's 番組 | 音楽 title switch. */
+  titleSwitch?: TitleSwitch;
 }
 
 /** Quiet relative date for the card sub-line (same wording as the Library). */
@@ -73,7 +76,7 @@ function sourceTag(ep: PodcastEpisode): string {
   }
 }
 
-export function Listen({ onOpenEpisode }: Props) {
+export function Listen({ onOpenEpisode, titleSwitch }: Props) {
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -176,7 +179,8 @@ export function Listen({ onOpenEpisode }: Props) {
       )}
 
       <ArchiveList
-        titleId="listen"
+        titleId="shows"
+        titleSwitch={titleSwitch}
         onAdd={() => setSheetOpen(true)}
         addLabel="エピソードを作る"
         items={episodes}

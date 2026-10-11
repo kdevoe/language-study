@@ -11,7 +11,7 @@ import { rtkKanjiList } from '../data/rtkKanji';
 // reader's RTK progress — both spellings are one JMDict entry). Entry ids come
 // from jmdict_entries.
 
-export type UiLabelId = 'today' | 'read' | 'news' | 'library' | 'listen' | 'review' | 'search' | 'settings';
+export type UiLabelId = 'today' | 'read' | 'news' | 'library' | 'listen' | 'shows' | 'music' | 'review' | 'search' | 'settings';
 
 interface JaStage {
   ja: string;
@@ -31,6 +31,9 @@ interface UiLabel {
 export const UI_LABELS: Record<UiLabelId, UiLabel> = {
   today: { en: 'Today', stages: [{ ja: '今日' }] },
   read: { en: 'Read', stages: [{ ja: '読む' }] },
+  // 聞く's pages: 番組 for podcasts (ポッドキャスト is too long for the title switch).
+  shows: { en: 'Shows', stages: [{ ja: '番組' }] },
+  music: { en: 'Music', stages: [{ ja: '音楽' }] },
   news: { en: 'News', stages: [{ ja: 'ニュース', entryId: '1091500' }] },
   // 聞く and 聴く share JMDict entry 1591110; 聴く waits for the kanji 聴 (RTK #890).
   listen: {

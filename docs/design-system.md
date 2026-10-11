@@ -167,11 +167,13 @@ Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.
   
 - The **settings mark** sits only on 今日 (§6.12), at the right of its title: thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮. The other tabs show no settings mark.
   
-- Right-edge heading icons (settings on 今日, `+` on LISTEN and 読む's LIBRARY) have their icon centre 17px in from the content edge. Page actions sit in the heading row, never stacked under it.
+- Right-edge heading icons (settings on 今日, `+` on 番組 and 本棚) have their icon centre 17px in from the content edge. Page actions sit in the heading row, never stacked under it.
   
-- The first content after the heading starts 1.6rem below it (the heading's 1rem margin plus 0.6rem on 今日; on 読む, the same 1.6rem below the segment; the search row's margin on LISTEN).
+- The first content after the heading starts 1.6rem below it (the heading's 1rem margin plus 0.6rem on 今日 and 読む's ニュース; the search row's margin on the archive pages).
   
-- The page's own controls sit directly below: the ニュース | 本棚 segment (読む, then search on 本棚), search (LISTEN), the 復習 | 進捗 segment (REVIEW). Segments are the shared `Segment` component: serif labels on a `--bg-card` pill, the active one on white.
+- **Title switch** (mockup `docs/mockups/title-type.html`, #1): a tab with several pages sets them all in the title row instead of a segment, as 読む (ニュース | 本棚) and 聞く (番組 | 音楽) do. They stay in a fixed order on one baseline: the active page at 2rem, the others at 1.2rem and half opacity, 0.95rem apart, with no hint dot. Tapping a small title switches to that page (landing at the top); tapping the active one opens its word card as usual. Page actions follow the active page (`+` on 本棚 and 番組 only).
+  
+- The page's own controls sit directly below: search (本棚, 番組), the 復習 | 進捗 segment (REVIEW, the shared `Segment` component: serif labels on a `--bg-card` pill, the active one on white).
   
 - **Reading surfaces** (Reader, podcast player) keep a fixed row with only the back arrow; it hides on scroll with the nav.
   
@@ -192,7 +194,7 @@ Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`,
   
 - Settings → Interface Language overrides it: English / Adaptive / 日本語.
   
-- Japanese labels: 今日, 読む, ニュース, 本棚 → 書庫, 聞く → 聴く, 復習, 検索, 設定. ニュース and 本棚 now label 読む's segment. A new label should carry its JMDict entry id in `UI_LABELS`; until it's verified (今日 and 読む), the word is matched by surface and a title tap looks it up by text.
+- Japanese labels: 今日, 読む, ニュース, 本棚 → 書庫, 聞く → 聴く, 番組, 音楽, 復習, 検索, 設定. ニュース | 本棚 and 番組 | 音楽 are the page titles of 読む and 聞く (title switch, §6.9); 番組 stands in for ポッドキャスト, which is too long for it. A new label should carry its JMDict entry id in `UI_LABELS`; until it's verified (今日, 読む, 番組, 音楽), the word is matched by surface and a title tap looks it up by text.
   
 ### 6.11 Long-form part navigation
 Source of truth: `src/components/PartsSheet.tsx` and the part section of `Reader.tsx`, mockup `docs/mockups/longform-section-nav.html`.
@@ -213,11 +215,11 @@ Source of truth: `src/components/PartsSheet.tsx` and the part section of `Reader
 ### 6.12 今日 (home)
 Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.html`.
 
-- **Tabs:** 今日 · 読む · 聞く · 復習. The app opens on 今日. 読む holds the news feed and the 本棚 behind a ニュース | 本棚 segment.
+- **Tabs:** 今日 · 読む · 聞く · 復習. The app opens on 今日. 読む holds the news feed and the 本棚, 聞く the 番組 (podcasts) and 音楽 (a 近日公開 placeholder for now), each behind a title switch (§6.9).
   
 - **What's waiting today, in order:** cards due (the featured white card: count in serif 2.6rem, 新 / 復習 split, 始める); 続きを読む (the last-opened work in progress, as an archive card); 今日の漢字 (the 3 newest RTK kanji with keywords; tap opens the word card); 聞く (a ready, unplayed podcast); ニュース (two headlines as plain text, すべて opens 読む).
   
-- **Each block is a shortcut into the tab that owns it,** never a copy. A block with nothing to show is left out; with nothing due the review card shrinks to 何もありません with 新しい言葉を探す.
+- **Each block is a shortcut into the tab that owns it,** never a copy. A block with nothing to show is left out, the review card included when nothing is due; whichever block shows first sits right under the heading.
   
 - Section kickers are 0.7rem sans, 600, `--text-muted`, 2rem above their block. **No stats, streaks or charts**: those belong in 進捗.
   
