@@ -17,6 +17,7 @@ import { canonicalWordKey } from '../services/wordKey';
 import { useWordLookup } from '../hooks/useWordLookup';
 import { Headphones } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
+import { muteChromeScroll } from '../services/chromeScroll';
 
 
 interface ReaderProps {
@@ -215,6 +216,8 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
       if (els.length === 0) return;
       const el = els.find((e) => Number(e.dataset.blockIdx) >= resumeBlockIndex) ?? els[els.length - 1];
       const y = el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.35;
+      // Not a user scroll: keep the header up so the way back stays in reach.
+      muteChromeScroll();
       window.scrollTo({ top: Math.max(0, y) });
     });
   }, [currentArticle, initialArticle?.id, resumeBlockIndex]);

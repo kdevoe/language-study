@@ -39,7 +39,9 @@ export function PageHeading({ id, settingsMark = true }: { id: UiLabelId; settin
   );
 }
 
-/** Thin slider lines: reads as settings, quieter than a gear. */
+/** Thin slider lines: reads as settings, quieter than a gear. The 44px hit area hangs
+ *  5px past the content edge so the icon's centre sits 17px in, on the same line as
+ *  ArchiveList's 34px + button below it. */
 export function SettingsMark() {
   const openSettings = useContext(OpenSettingsContext);
   return (
@@ -47,7 +49,7 @@ export function SettingsMark() {
       onClick={openSettings}
       aria-label="Settings"
       style={{
-        width: '44px', height: '44px', marginRight: '-10px', border: 'none', background: 'none', cursor: 'pointer',
+        width: '44px', height: '44px', marginRight: '-5px', border: 'none', background: 'none', cursor: 'pointer',
         color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
