@@ -150,7 +150,7 @@ Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-
 
 - **Months, not filters.** Items group by month under a serif month heading (year in small muted sans for any month but the current one) with the count and a chevron at the right. The newest month starts open and older ones collapsed; a collapsed month shows one muted summary line (`4本 · 未再生 2`).
   
-- **Search** is a hero input on a hairline under the header, matching Japanese and English. Results stay grouped by month with every month open, under a muted `n件`. A hit in body text adds a short excerpt marked `EN` / `JA`, the match tinted `--accent-primary`.
+- **Search** is a hero input on a hairline under the page heading (§6.9), matching Japanese and English. Results stay grouped by month with every month open, under a muted `n件`. A hit in body text adds a short excerpt marked `EN` / `JA`, the match tinted `--accent-primary`.
   
 - **Swipe left to delete** (the Feed's gesture): a `--accent-danger` panel with a serif 削除 is revealed behind the card; a long swipe deletes outright. One row open at a time.
   
@@ -158,11 +158,42 @@ Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-
   
 - **Undo, not confirm.** Deletes hide at once and reach the server after a 5s toast with 元に戻す (§6.6).
   
-- The header's `+` is a white lifted circle (`AddButton`), not a black fill.
+- The `+` sits at the end of the search row: a small (34px) white lifted circle, not a black fill.
+  
+### 6.9 Page heading (tab pages)
+Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.html` (見出しに統合).
+
+- **No global header on tab pages.** Each tab opens with one serif title (2rem) in one language, and the settings mark on the same line at the right. Nothing sits above it but the status bar.
+  
+- The **settings mark** is thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮.
+  
+- The page's own controls sit directly below: search + `+` (LISTEN, LIBRARY), the 復習 | 進捗 segment (REVIEW).
+  
+- **Reading surfaces** (Reader, podcast player) keep a fixed row with only the back arrow; it hides on scroll with the nav.
+  
+- Never a bilingual kicker + title pair.
+  
+### 6.10 Adaptive labels
+Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`, keyframes in `src/index.css` (`.ui-sw`).
+
+- Page titles, bottom-nav labels and the search placeholder are **English by default** and turn **Japanese when the reader actually learns the word** (marked easy in the word database). Vocabulary, not JLPT level, drives it. The switch is sticky.
+  
+- A label can have **stages**: LIBRARY becomes 本棚, then 書庫 once that word is learned too. A stage can also wait for a kanji: LISTEN becomes 聞く, then 聴く once 聴 is within the reader's RTK progress (one JMDict entry, so the kanji is the signal). Each step plays the same event.
+  
+- **Tap a page title** to open its word card (the first Japanese word while the title is English, else the one shown). Label words like 本棚 rarely appear in articles, so this is where they get met and graded.
+  
+- The **switch is an event**, played once per label on its page title when it's on screen, one at a time (about 4.5s): a soft `--accent-primary` glow rises and the English brightens (0–1.2s); the English dissolves upward while the Japanese emerges blurred and widely spaced and comes into focus (1.2–3.2s); a small settle as the glow fades (3.2–4.5s). **No English caption afterwards.** Reduced motion gets a 0.6s crossfade.
+  
+- Nav labels follow the title's switched state without an event; the search placeholder switches quietly.
+  
+- Settings → Interface Language overrides it: English / Adaptive / 日本語.
+  
+- Japanese labels: ニュース (katakana, not 読む), 本棚 → 書庫, 聞く → 聴く, 復習, 検索, 設定. A new label needs its JMDict entry id in `UI_LABELS`.
+  
 
 * * *
 ## 7. Copy
-- Japanese UI, short. Prefer one word to a sentence.
+- Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.
   
 - No sentences explaining what a control obviously does. If a control needs explaining, redesign the control.
   

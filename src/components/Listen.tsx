@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, RotateCw } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
-import { AddButton, ArchiveList } from './ArchiveList';
+import { ArchiveList } from './ArchiveList';
 import type { ArchiveCard } from './ArchiveList';
 import {
   PodcastEpisode,
@@ -176,9 +176,9 @@ export function Listen({ onOpenEpisode }: Props) {
       )}
 
       <ArchiveList
-        kicker="LISTEN"
-        title="聴く"
-        headerAction={<AddButton onClick={() => setSheetOpen(true)} label="エピソードを作る" />}
+        titleId="listen"
+        onAdd={() => setSheetOpen(true)}
+        addLabel="エピソードを作る"
         items={episodes}
         isLoading={isLoading}
         createdAt={createdAtOf}

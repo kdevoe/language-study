@@ -4,6 +4,7 @@ import { useAppStore } from '../services/store';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { FEED_TOPICS, DEFAULT_FEED_TOPICS } from '../data/feedTopics';
 import { SliderToggle } from './SliderToggle';
+import { PageHeading } from './PageHeading';
 
 const stepperBtnStyle = (disabled: boolean): React.CSSProperties => ({
   width: '34px',
@@ -28,6 +29,12 @@ const lengthRows = [
   { kind: 'snippet', label: 'Snippet', hint: 'Only a short headline teaser' },
 ] as const;
 
+const UI_LANGUAGE_OPTIONS = [
+  { value: 'english', label: 'English' },
+  { value: 'adaptive', label: 'Adaptive' },
+  { value: 'japanese', label: <span lang="ja" translate="no">日本語</span> },
+] as const;
+
 export function Settings() {
   const {
     jlptLevel, setJlptLevel,
@@ -41,6 +48,7 @@ export function Settings() {
     readerFontSize, setReaderFontSize,
     readerFontWeight, setReaderFontWeight,
     sandboxMode, setSandboxMode,
+    uiLanguage, setUiLanguage,
     lastStudyPacingResetTs,
     lastFuriganaRealignTs
   } = useAppStore();
@@ -71,7 +79,9 @@ export function Settings() {
 
   return (
     <div className="fade-in" style={{ paddingBottom: '6rem' }}>
-      <h2 className="serif" style={{ fontSize: '2rem', marginBottom: '2.5rem', color: 'var(--text-main)' }}>Settings</h2>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <PageHeading id="settings" settingsMark={false} />
+      </div>
 
       {/* 1. Grammar Level (JLPT) */}
       <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
@@ -264,6 +274,27 @@ export function Settings() {
           display: none;
         }
       `}</style>
+
+      {/* 4.5 Interface language (design-system §6.10) */}
+      <div style={{ backgroundColor: 'var(--bg-card)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
+          Interface Language
+        </label>
+
+        <SliderToggle
+          options={UI_LANGUAGE_OPTIONS}
+          value={uiLanguage}
+          onChange={setUiLanguage}
+          ariaLabel="Interface language"
+          style={{ marginBottom: '1.2rem' }}
+        />
+
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          {uiLanguage === 'english' && "Page titles and tabs stay in English."}
+          {uiLanguage === 'adaptive' && "Page titles and tabs switch to Japanese as you learn their words."}
+          {uiLanguage === 'japanese' && "Page titles and tabs are always in Japanese."}
+        </p>
+      </div>
 
       {/* 5. Advanced Settings */}
       <details 

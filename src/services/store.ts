@@ -195,6 +195,8 @@ export interface WordData {
   promotedTs?: number | null;     // ms epoch — when it entered active study
 }
 
+export type UiLanguage = 'english' | 'adaptive' | 'japanese';
+
 interface AppState {
   isOnboarded: boolean;
   jlptLevel: number | null;
@@ -236,6 +238,12 @@ interface AppState {
   readArticleIds: string[];
   readerFontSize: number;
   readerFontWeight: number;
+  // Adaptive UI labels (docs/design-system.md §6.10): English by default, a label
+  // switches to Japanese once the reader learns its word. `labelStages` keeps the
+  // stage each label has switched to (0 English, 1.. Japanese) — sticky, so a
+  // label never flips back.
+  uiLanguage: UiLanguage;
+  labelStages: Record<string, number>;
   
   setOnboarded: (jlpt: number, rtk: number) => void;
   setJlptLevel: (level: number) => void;
@@ -261,6 +269,8 @@ interface AppState {
   resetFeedForNewDay: (now: number) => void;
   setReaderFontSize: (size: number) => void;
   setReaderFontWeight: (weight: number) => void;
+  setUiLanguage: (lang: UiLanguage) => void;
+  setLabelStage: (id: string, stage: number) => void;
   resetProgress: () => void;
   
   saveWordDefinition: (word: string, def: Partial<WordData>) => void;
@@ -339,6 +349,8 @@ export const useAppStore = create<AppState>()(
       readArticleIds: [],
       readerFontSize: 18,
       readerFontWeight: 500,
+      uiLanguage: 'adaptive',
+      labelStages: {},
 
       setOnboarded: (jlpt, rtk) => set({ isOnboarded: true, jlptLevel: jlpt, rtkLevel: rtk }),
 
@@ -445,6 +457,9 @@ export const useAppStore = create<AppState>()(
       }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
+      setUiLanguage: (lang) => set({ uiLanguage: lang }),
+      setLabelStage: (id, stage) => set((state) =>
+        (state.labelStages[id] ?? 0) >= stage ? {} : { labelStages: { ...state.labelStages, [id]: stage } }),
       
       resetProgress: () => {
         set({ 
@@ -1818,6 +1833,8 @@ export const useAppStore = create<AppState>()(
         readArticleIds: capIds(state.readArticleIds),
         readerFontSize: state.readerFontSize,
         readerFontWeight: state.readerFontWeight,
+        uiLanguage: state.uiLanguage,
+        labelStages: state.labelStages,
       }),
       migrate: (persistedState: any, version: number) => {
         let state = persistedState;
