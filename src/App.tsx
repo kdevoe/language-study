@@ -16,6 +16,7 @@ import { fetchNewsFeed, NewsArticle, LongFormWork, requestArticleProcessing, fet
 import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { OpenSettingsContext, PageHeading } from './components/PageHeading'
+import { muteChromeScroll, isChromeScrollMuted } from './services/chromeScroll'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -561,7 +562,15 @@ function App() {
 
   // Reader → PodcastSheet: the episode is made in the background and appears
   // in the LISTEN tab; the shared top toast says so.
-  const openSettings = useCallback(() => setActiveTab('settings'), []);
+  // Switching tabs (bottom nav or a heading's settings button) always lands at the
+  // top with the chrome showing; the previous tab's scroll offset never carries over.
+  const handleTabChange = useCallback((tab: typeof activeTab) => {
+    muteChromeScroll();
+    window.scrollTo(0, 0);
+    setShowNav(true);
+    setActiveTab(tab);
+  }, []);
+  const openSettings = useCallback(() => handleTabChange('settings'), [handleTabChange]);
   const handlePodcastQueued = useCallback(() => setActionError('聴くタブで作成中'), []);
 
   const handleBackToListen = () => {
@@ -579,22 +588,39 @@ function App() {
   const handleBack =
     activeTab === 'library' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
 
+  // The scroll handler is registered once; it reads the reading state through a ref.
+  const isReadingRef = useRef(isReading);
+  isReadingRef.current = isReading;
+
   useEffect(() => {
     let lastScrollY = window.scrollY;
+    // Where the current upward run began: reveal after 40px of total upward travel,
+    // so a slow scroll up works (a per-frame delta needed a fast flick).
+    let upAnchorY = lastScrollY;
     let ticking = false;
     const updateNav = () => {
       const currentScrollY = window.scrollY;
+      ticking = false;
+      if (isChromeScrollMuted()) {
+        lastScrollY = upAnchorY = currentScrollY;
+        return;
+      }
       const isAtBottom = (window.innerHeight + currentScrollY) >= document.body.offsetHeight - 50;
 
-      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+      if (isAtBottom && isReadingRef.current) {
+        // End of an article or part (完了 / 部・完): bring the header back so
+        // leaving is one tap away.
+        setShowNav(true);
+      } else if (currentScrollY <= 50) {
+        setShowNav(true);
+      } else if (currentScrollY > lastScrollY) {
         setShowNav(false);
-      } else if (lastScrollY - currentScrollY > 40 && !isAtBottom) {
-        // Require a 40px scroll UP to show the nav, AND prevent it from popping
-        // if we just bounced off the absolute bottom of the page
+        upAnchorY = currentScrollY;
+      } else if (upAnchorY - currentScrollY > 40 && !isAtBottom) {
+        // Don't pop the nav when bouncing off the bottom of a list.
         setShowNav(true);
       }
-      lastScrollY = currentScrollY > 0 ? currentScrollY : 0;
-      ticking = false;
+      lastScrollY = Math.max(0, currentScrollY);
     };
     const handleScroll = () => {
       if (!ticking) {
@@ -605,6 +631,7 @@ function App() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
 
   if (isInitializing && !DEV_MODE) {
     return (
@@ -734,6 +761,9 @@ function App() {
           newsView === 'hub' ? (
             <>
             <PageHeading id="news" />
+            {/* Same 1.6rem (1rem heading margin + 0.6rem) between heading and first
+                content as the archive pages' search row. */}
+            <div style={{ height: '0.6rem' }} />
             <Feed 
               articles={(articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
               isLoading={isLoadingFeed} 
@@ -778,7 +808,7 @@ function App() {
       </main>
       <BottomNav
         activeTab={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         isVisible={showNav && !isReading && !(activeTab === 'flashcards' && studyFocus)}
       />
     </div>

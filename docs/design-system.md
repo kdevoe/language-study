@@ -167,6 +167,10 @@ Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.
   
 - The **settings mark** is thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮.
   
+- Right-edge icons share one vertical line: the settings mark's icon centre sits 17px in from the content edge, the same as the 34px `+` in the archive search row below it.
+  
+- The first content after the heading starts 1.6rem below it (the heading's 1rem margin plus 0.6rem on News; the search row's margin on the archive pages).
+  
 - The page's own controls sit directly below: search + `+` (LISTEN, LIBRARY), the 復習 | 進捗 segment (REVIEW).
   
 - **Reading surfaces** (Reader, podcast player) keep a fixed row with only the back arrow; it hides on scroll with the nav.
@@ -184,7 +188,7 @@ Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`,
   
 - The **switch is an event**, played once per label on its page title when it's on screen, one at a time (about 4.5s): a soft `--accent-primary` glow rises and the English brightens (0–1.2s); the English dissolves upward while the Japanese emerges blurred and widely spaced and comes into focus (1.2–3.2s); a small settle as the glow fades (3.2–4.5s). **No English caption afterwards.** Reduced motion gets a 0.6s crossfade.
   
-- Nav labels follow the title's switched state without an event; the search placeholder switches quietly.
+- Nav labels follow the title's switched state without an event; the search placeholder switches quietly. Nav labels are uppercase sans at 0.6rem in English and 0.78rem in Japanese (kana and kanji aren't legible smaller), in a fixed 1rem line so the nav doesn't change height when a label switches.
   
 - Settings → Interface Language overrides it: English / Adaptive / 日本語.
   

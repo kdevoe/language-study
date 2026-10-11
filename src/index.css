@@ -274,6 +274,8 @@ ruby.peek-furigana rt {
        from the glow, blurred and widely spaced, and comes into focus.
    3 · settle (3.2–4.5s): a small settle; the glow fades.
    No English caption afterwards — the switch itself is the announcement. */
+/* Nav labels: uppercase English reads at 0.6rem; kana/kanji need more size to stay legible. */
+.nav-label [lang="ja"] { font-size: 0.78rem; letter-spacing: 0.02em; }
 .ui-sw { position: relative; display: inline-block; isolation: isolate; }
 .ui-sw-en { position: absolute; left: 0; top: 0; white-space: nowrap; }
 .ui-sw-ja { display: inline-block; white-space: nowrap; }

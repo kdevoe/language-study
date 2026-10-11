@@ -69,7 +69,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
               <Icon size={28} strokeWidth={isActive ? 1.9 : 1.5} />
             </div>
             {/* Labels follow the page titles: Japanese once that title has switched. */}
-            <span translate="no" style={{ fontSize: '0.6rem', letterSpacing: '0.05em', fontWeight: isActive ? 600 : 500, marginTop: '2px' }}>
+            <span translate="no" className="nav-label" style={{ display: 'block', height: '1rem', fontSize: '0.6rem', lineHeight: '1rem', letterSpacing: '0.05em', fontWeight: isActive ? 600 : 500, marginTop: '2px' }}>
               <AdaptiveLabel id={label} upper />
             </span>
           </button>

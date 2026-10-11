@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Long-Form Part Navigation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --border-light: #e0e0d8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --accent-danger: #fde2da;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease-control: cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: #e9e9e2;
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding: 2.5rem 1rem 4rem;
+}
+button { font: inherit; color: inherit; }
+
+.mock-header { max-width: 900px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 580px; margin: 0 auto; }
+
+.stage { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; align-items: flex-start; }
+
+/* ---------- phone frame ---------- */
+.phone {
+  width: 402px; height: 800px;
+  background: var(--bg-color);
+  border-radius: 44px;
+  border: 10px solid #1c1c1c;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.screen { height: 100%; overflow-y: auto; padding: 2.2rem 1.5rem 3rem; scroll-behavior: auto; }
+.screen.locked { overflow: hidden; }
+
+/* ---------- reader (mirrors Reader.tsx) ---------- */
+.meta-row { display: flex; gap: 1rem; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; }
+.meta-row .cat { background: var(--bg-card); padding: 0.2rem 0.6rem; border-radius: 4px; }
+.meta-row .icon-btn { margin-left: auto; background: none; border: none; padding: 0.25rem; color: var(--text-muted); display: flex; }
+
+/* NEW: the part indicator becomes the one entry point to navigation */
+.part-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: none; border: none; cursor: pointer;
+  font-size: 0.75rem; color: var(--text-muted);
+  padding: 0.2rem 0.1rem; margin: -0.2rem -0.1rem;
+  border-radius: 4px;
+  transition: color 0.4s var(--ease-control);
+}
+.part-chip:hover { color: var(--text-main); }
+.part-chip:active { transform: scale(0.98); }
+.part-chip svg { width: 13px; height: 13px; stroke-width: 1.5; }
+
+.article-title { font-family: var(--font-serif); font-size: 2.1rem; font-weight: 500; line-height: 1.3; margin-bottom: 2rem; }
+.title-rule { width: 40px; height: 1px; background: var(--text-muted); margin-bottom: 2rem; }
+
+.reading-content { font-family: var(--font-serif); font-size: 1.125rem; letter-spacing: 0.02em; }
+.reading-content p { line-height: 2.2; margin-bottom: 2em; }
+rt { font-size: 0.5em; color: var(--text-muted); }
+
+/* section break (as shipped in Phase B) */
+.section-end { text-align: center; margin: 4rem 0 2rem; }
+.section-end .fin { font-family: var(--font-serif); font-size: 1.25rem; margin-bottom: 0.7rem; }
+.section-end .stats { font-size: 0.78rem; color: var(--text-muted); line-height: 1.8; }
+.section-end .rule { width: 40px; height: 1px; background: var(--text-muted); margin: 1.8rem auto; }
+.capsule {
+  background: transparent; color: var(--text-main); cursor: pointer;
+  border: 1px solid var(--border-light); border-radius: 100px;
+  padding: 0.75rem 2.5rem; font-weight: 600;
+}
+.capsule:active { transform: scale(0.98); }
+.capsule .serif { font-family: var(--font-serif); font-size: 1.1rem; vertical-align: middle; }
+.capsule .sub { font-size: 0.72rem; color: var(--text-muted); margin-left: 0.7rem; vertical-align: middle; }
+.preparing { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--text-muted); font-size: 0.85rem; padding: 0.75rem 1.5rem; }
+.spin { width: 12px; height: 12px; border: 1.5px solid var(--border-light); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* NEW: quiet text links under the capsule */
+.break-links { display: flex; justify-content: center; gap: 1.6rem; margin-top: 1.4rem; }
+.text-link {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted);
+  transition: color 0.4s var(--ease-control);
+}
+.text-link:hover { color: var(--text-main); }
+
+/* NEW: return-to-bookmark pill, only while reading behind the bookmark */
+.return-pill {
+  position: absolute; left: 50%; bottom: calc(1.4rem + env(safe-area-inset-bottom));
+  transform: translate(-50%, 140%);
+  background: var(--bg-pure); color: var(--text-main);
+  border: none; border-radius: 100px; cursor: pointer;
+  padding: 0.6rem 1.3rem; white-space: nowrap;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.12);
+  display: flex; align-items: center; gap: 0.55rem;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 5;
+}
+.return-pill.show { transform: translate(-50%, 0); }
+.return-pill .serif { font-family: var(--font-serif); font-size: 0.95rem; }
+.return-pill .sub { font-size: 0.7rem; color: var(--text-muted); }
+.return-pill svg { width: 15px; height: 15px; stroke-width: 1.5; color: var(--text-muted); }
+
+/* ---------- bottom sheet (design-system §6.2) ---------- */
+.backdrop {
+  position: absolute; inset: 0; background: rgba(45,45,45,0.35);
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10;
+}
+.backdrop.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 11;
+  background: var(--bg-color);
+  border-radius: 28px 28px 0 0;
+  padding: 0.8rem 1.5rem calc(2.2rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+  transform: translateY(105%);
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 82%;
+  display: flex; flex-direction: column;
+}
+.sheet.open { transform: translateY(0); }
+.grabber { width: 36px; height: 4px; border-radius: 4px; background: var(--border-light); margin: 0 auto 1.4rem; flex-shrink: 0; }
+
+.sheet-head { margin-bottom: 1.6rem; flex-shrink: 0; }
+.sheet-head .work { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; line-height: 1.45; }
+.sheet-head .meta { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.8rem; font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.track { flex: 1; height: 3px; background: var(--border-light); border-radius: 3px; overflow: hidden; }
+.track .fill { height: 100%; background: var(--accent-progress); border-radius: 3px; transition: width 0.4s var(--ease-control); }
+
+.parts { list-style: none; overflow-y: auto; margin: 0 -0.6rem; padding: 0 0.6rem 0.2rem; }
+.part {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.85rem 1rem; margin-bottom: 0.25rem;
+  border-radius: 16px; cursor: pointer;
+  transition: background 0.4s var(--ease-control), box-shadow 0.4s var(--ease-control);
+}
+.part:active { transform: scale(0.98); }
+.part .num { width: 2.6rem; flex-shrink: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.part .body { flex: 1; min-width: 0; }
+.part .ttl { font-family: var(--font-serif); font-size: 1.02rem; font-weight: 500; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.part .ttl.quiet { color: var(--text-muted); }
+.part .state { flex-shrink: 0; margin-left: 0.4rem; font-size: 0.72rem; color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 0.35rem; }
+.part .state svg { width: 15px; height: 15px; stroke-width: 1.5; }
+.part.current { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.part.current .num, .part.current .state { color: var(--text-main); }
+.part.read .ttl { color: var(--text-muted); }
+.part.locked { cursor: default; opacity: 0.42; }
+.part.locked:active { transform: none; }
+.part.failed .state { background: var(--accent-danger); color: var(--text-main); padding: 0.15rem 0.6rem; border-radius: 100px; }
+.bookmark-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-progress); display: inline-block; }
+
+/* ---------- demo controls + legend ---------- */
+.side { max-width: 430px; display: flex; flex-direction: column; gap: 1.6rem; }
+.controls { background: var(--bg-pure); border-radius: 16px; padding: 1rem 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.controls h3 { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 0.7rem; }
+.seg { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.seg button { border: 1px solid var(--border-light); background: var(--bg-color); border-radius: 100px; padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; color: var(--text-muted); }
+.seg button.on { background: var(--text-main); color: #fff; border-color: var(--text-main); }
+.controls .row + .row { margin-top: 0.9rem; }
+.controls .hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.7rem; }
+
+.legend h2 { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; }
+.legend ol { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
+.legend li { display: flex; gap: 0.8rem; font-size: 0.84rem; background: var(--bg-pure); border-radius: 16px; padding: 0.9rem 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.legend .n { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--text-main); color: #fff; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+.legend .muted { color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.2rem; }
+.legend .q { background: #fbf6e9; }
+@media (max-width: 900px) { .stage { flex-direction: column; align-items: center; } }
+</style>
+</head>
+<body>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · LONG-FORM PART NAVIGATION</div>
+  <h1>Moving between parts</h1>
+  <p>Today a work only moves forward: 続きを読む at the end of each part. This adds one way back and one way to jump: tap the 第N部 indicator for a contents sheet. The reader stays as it is; nothing new appears until it's needed.</p>
+</div>
+
+<div class="stage">
+  <div class="phone">
+    <div class="screen" id="screen"></div>
+
+    <button class="return-pill" id="returnPill" onclick="returnToBookmark()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+      <span class="serif">しおりに戻る</span><span class="sub" id="returnSub">第2部</span>
+    </button>
+
+    <div class="backdrop" id="backdrop" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet" role="dialog" aria-label="目次">
+      <div class="grabber"></div>
+      <div class="sheet-head">
+        <div class="work">AIは医療をどう変えるか</div>
+        <div class="meta"><span>全4部</span><div class="track"><div class="fill" id="sheetFill"></div></div><span id="sheetPct">50%</span></div>
+      </div>
+      <ul class="parts" id="parts"></ul>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="controls">
+      <div class="row">
+        <h3>DEMO · PART 3 STATE</h3>
+        <div class="seg" id="segP3">
+          <button data-v="ready">ready</button>
+          <button data-v="next" class="on">not started</button>
+          <button data-v="pending">preparing</button>
+          <button data-v="failed">failed</button>
+        </div>
+      </div>
+      <div class="row">
+        <h3>DEMO · JUMP</h3>
+        <div class="seg">
+          <button onclick="openSheet()">open 目次</button>
+          <button onclick="scrollToEnd()">end of part</button>
+          <button onclick="resetDemo()">reset</button>
+        </div>
+      </div>
+      <div class="hint">Bookmark (furthest point read): part 2, mid-way. Tap rows in the sheet to move around.</div>
+    </div>
+
+    <div class="legend">
+      <h2>What this shows</h2>
+      <ol>
+        <li><span class="n">1</span><div><b>The 第N部 indicator becomes the entry point.</b> Same text and spot as today, plus a small chevron (only on works with more than one part). Tapping it opens 目次. Nothing new in the reader's top area.</div></li>
+        <li><span class="n">2</span><div><b>目次 sheet:</b> the work title and overall progress (furthest point, slate-blue line), then one row per part. The current part is white with the thumb shadow (§2: selection is white, never a colour). Parts already read are muted with a check. A small blue dot marks the しおり part.</div></li>
+        <li><span class="n">3</span><div><b>Parts are generated in order</b> (each one needs the previous part's continuity summary), so only the next unstarted part can be reached. Its row reads 準備する; tapping starts it and shows 準備中 in place. Later parts are faded and do nothing.<span class="muted">Failed shows a coral もう一度 tint (§2: accents only as tints). Try the part-3 states on the left.</span></div></li>
+        <li><span class="n">4</span><div><b>Revisiting never moves the bookmark backwards.</b> Opening an earlier part starts at its top. Library progress and the しおり stay at the furthest point. Tapping the しおり part resumes mid-part, like reopening from Library.</div></li>
+        <li><span class="n">5</span><div><b>しおりに戻る</b>: a small white pill shown only while you're reading <i>before</i> the bookmark. One tap goes back to where you were. It's hidden the rest of the time.</div></li>
+        <li><span class="n">6</span><div><b>Section break</b> keeps 続きを読む as the main action and adds quiet serif links beneath: <b>前の部</b> (from part 2 on) and <b>目次</b>.</div></li>
+        <li class="q"><span class="n">?</span><div><b>Open questions.</b> (a) Part titles: each part row already has the generated Japanese title, but if consecutive parts come out nearly identical we could show the first sentence instead. (b) Should 前の部 at the break also go at the <i>top</i> of a part? It's left out here to keep the reader top clean.</div></li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+const HEADPHONES = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>';
+
+const PART_TEXT = {
+  1: { title: 'AIが医療を変えはじめた', paras: [
+    '<ruby>人工知能<rt>じんこうちのう</rt></ruby>は、<ruby>医療<rt>いりょう</rt></ruby>の<ruby>世界<rt>せかい</rt></ruby>を大きく<ruby>変<rt>か</rt></ruby>えようとしている。アメリカの<ruby>病院<rt>びょういん</rt></ruby>では、AIが<ruby>医者<rt>いしゃ</rt></ruby>を<ruby>助<rt>たす</rt></ruby>ける<ruby>仕組<rt>しく</rt></ruby>みが少しずつ広がっている。',
+    '十年前、この<ruby>考<rt>かんが</rt></ruby>えは<ruby>夢<rt>ゆめ</rt></ruby>のようだった。しかし今では、多くの<ruby>研究者<rt>けんきゅうしゃ</rt></ruby>が<ruby>毎日<rt>まいにち</rt></ruby>この<ruby>問題<rt>もんだい</rt></ruby>に<ruby>取<rt>と</rt></ruby>り<ruby>組<rt>く</rt></ruby>んでいる。',
+    '<ruby>始<rt>はじ</rt></ruby>まりは小さな<ruby>研究室<rt>けんきゅうしつ</rt></ruby>だった。三人のチームが、<ruby>古<rt>ふる</rt></ruby>い<ruby>写真<rt>しゃしん</rt></ruby>を<ruby>集<rt>あつ</rt></ruby>めることから<ruby>始<rt>はじ</rt></ruby>めた。',
+    'その写真は、のちに<ruby>何百万枚<rt>なんびゃくまんまい</rt></ruby>にもなる。',
+  ]},
+  2: { title: '写真から病気を見つけるAI', paras: [
+    'この<ruby>変化<rt>へんか</rt></ruby>は、<ruby>研究室<rt>けんきゅうしつ</rt></ruby>だけの<ruby>話<rt>はなし</rt></ruby>ではない。<ruby>毎日<rt>まいにち</rt></ruby>の<ruby>診察<rt>しんさつ</rt></ruby>でも、AIの<ruby>力<rt>ちから</rt></ruby>が<ruby>使<rt>つか</rt></ruby>われ<ruby>始<rt>はじ</rt></ruby>めている。',
+    'たとえば、<ruby>写真<rt>しゃしん</rt></ruby>から<ruby>病気<rt>びょうき</rt></ruby>を見つける<ruby>技術<rt>ぎじゅつ</rt></ruby>がある。AIは<ruby>何百万枚<rt>なんびゃくまんまい</rt></ruby>もの写真を<ruby>学<rt>まな</rt></ruby>び、人間の目では見えない小さな<ruby>変化<rt>へんか</rt></ruby>を見つけることができる。',
+    'しかし、AIの<ruby>診断<rt>しんだん</rt></ruby>がいつも<ruby>正<rt>ただ</rt></ruby>しいわけではない。だから、<ruby>最後<rt>さいご</rt></ruby>に<ruby>決<rt>き</rt></ruby>めるのは、やはり人間の医者だ。',
+    'AIと医者が<ruby>協力<rt>きょうりょく</rt></ruby>することで、より早く、より<ruby>安全<rt>あんぜん</rt></ruby>な医療が<ruby>可能<rt>かのう</rt></ruby>になる。',
+  ]},
+  3: { title: 'AIと医者の新しい関係', paras: [
+    'では、医者の<ruby>仕事<rt>しごと</rt></ruby>はこれからどう<ruby>変<rt>か</rt></ruby>わるのだろうか。',
+    'ある医者は「AIは<ruby>新<rt>あたら</rt></ruby>しい<ruby>同僚<rt>どうりょう</rt></ruby>のようなものだ」と<ruby>言<rt>い</rt></ruby>う。<ruby>疲<rt>つか</rt></ruby>れないが、<ruby>患者<rt>かんじゃ</rt></ruby>の気持ちはわからない。',
+    'だからこそ、人間にしかできない<ruby>仕事<rt>しごと</rt></ruby>が、もっと<ruby>大切<rt>たいせつ</rt></ruby>になっていく。',
+  ]},
+};
+
+const P3_TITLE = PART_TEXT[3].title;
+let state;
+function resetDemo() {
+  state = {
+    current: 2,
+    bookmark: { part: 2, block: 1 },   // furthest point read
+    parts: { 1: 'read', 2: 'ready', 3: 'next', 4: 'locked' },
+  };
+  setP3Button('next');
+  render({ scrollTo: 'bookmark' });
+  closeSheet();
+}
+
+const screenEl = document.getElementById('screen');
+const pill = document.getElementById('returnPill');
+
+function overallPct() {
+  // furthest point, not current view: (part-1 + block/blocks) / partCount
+  const b = state.bookmark;
+  const n = PART_TEXT[b.part].paras.length;
+  return Math.round(((b.part - 1) + b.block / n) / 4 * 100);
+}
+
+function render({ scrollTo } = {}) {
+  const p = state.current;
+  const part = PART_TEXT[p];
+  const next = p + 1;
+  const nextState = state.parts[next];
+
+  let breakHtml;
+  if (next <= 4) {
+    let action;
+    if (nextState === 'ready' || nextState === 'read') {
+      action = `<button class="capsule" onclick="openPart(${next}, 'top')"><span class="serif">続きを読む</span><span class="sub">第${next}部へ</span></button>`;
+    } else if (nextState === 'failed') {
+      action = `<button class="capsule" style="color:var(--text-muted)" onclick="preparePart(${next})"><span class="serif">もう一度準備する</span></button>`;
+    } else {
+      action = `<div class="preparing"><span class="spin"></span>第${next}部を準備中…</div>`;
+    }
+    breakHtml = `
+      <div class="section-end">
+        <div class="fin">第${p}部・完</div>
+        <div class="stats">作品全体の約${overallPct()}%を読みました<br>この部で出会った言葉 6語</div>
+        <div class="rule"></div>
+        ${action}
+        <div class="break-links">
+          ${p > 1 ? `<button class="text-link" onclick="openPart(${p - 1}, 'top')">前の部</button>` : ''}
+          <button class="text-link" onclick="openSheet()">目次</button>
+        </div>
+      </div>`;
+  }
+
+  screenEl.innerHTML = `
+    <div class="meta-row">
+      <span class="cat">貼り付け</span>
+      <button class="part-chip" onclick="openSheet()" aria-label="目次を開く">第${p}部 / 全4部 ${CHEV}</button>
+      <span>約6分</span>
+      <span class="icon-btn">${HEADPHONES}</span>
+    </div>
+    <h1 class="article-title">${part.title}</h1>
+    <div class="title-rule"></div>
+    <div class="reading-content">
+      ${part.paras.map((t, i) => `<p data-block-idx="${i}">${t}</p>`).join('')}
+    </div>
+    ${breakHtml || ''}
+    <div style="height: 4rem"></div>`;
+
+  if (scrollTo === 'bookmark' && p === state.bookmark.part) {
+    const el = screenEl.querySelector(`[data-block-idx="${state.bookmark.block}"]`);
+    const go = () => { screenEl.scrollTop = el.offsetTop - screenEl.clientHeight / 2 + el.offsetHeight / 2; };
+    go(); document.fonts && document.fonts.ready.then(go);
+  } else {
+    screenEl.scrollTop = 0;
+  }
+  updatePill();
+  renderSheet();
+}
+
+function updatePill() {
+  const behind = state.current < state.bookmark.part;
+  pill.classList.toggle('show', behind);
+  document.getElementById('returnSub').textContent = `第${state.bookmark.part}部`;
+}
+
+function renderSheet() {
+  const pct = overallPct();
+  document.getElementById('sheetFill').style.width = pct + '%';
+  document.getElementById('sheetPct').textContent = pct + '%';
+
+  const rows = [1, 2, 3, 4].map(i => {
+    const s = state.parts[i];
+    const isCur = i === state.current;
+    const isMark = i === state.bookmark.part;
+    const known = PART_TEXT[i] && (s === 'read' || s === 'ready');
+    const title = known ? PART_TEXT[i].title : "";
+    let cls = 'part', right = '', click = `openPart(${i}, ${isMark ? "'bookmark'" : "'top'"})`;
+
+    if (isCur) { cls += ' current'; right = '読書中'; }
+    else if (s === 'read') { cls += ' read'; right = CHECK; }
+    else if (s === 'ready') { right = ''; }
+    else if (s === 'next') { right = '準備する'; click = `preparePart(${i})`; }
+    else if (s === 'pending') { right = '<span class="spin"></span>準備中'; click = ''; }
+    else if (s === 'failed') { cls += ' failed'; right = 'もう一度'; click = `preparePart(${i})`; }
+    else { cls += ' locked'; right = ''; click = ''; }
+
+    if (isMark && !isCur) right = `<span class="bookmark-dot"></span>しおり`;
+    else if (isMark && isCur) right = `<span class="bookmark-dot"></span>読書中`;
+
+    return `<li class="${cls}" ${click ? `onclick="${click}"` : ''}>
+      <span class="num">第${i}部</span>
+      <span class="body"><span class="ttl ${known ? '' : 'quiet'}">${title}</span></span>
+      <span class="state">${right}</span>
+    </li>`;
+  }).join('');
+  document.getElementById('parts').innerHTML = rows;
+}
+
+function openPart(i, where) {
+  if (!PART_TEXT[i]) return;
+  if (state.parts[i] === 'next' || state.parts[i] === 'locked') return;
+  state.current = i;
+  // Moving forward past the bookmark advances it; moving back never does.
+  if (i > state.bookmark.part) {
+    state.parts[state.bookmark.part] = 'read';
+    state.bookmark = { part: i, block: 0 };
+    if (i + 1 <= 4 && state.parts[i + 1] === 'locked') state.parts[i + 1] = 'next';
+  }
+  closeSheet();
+  render({ scrollTo: where });
+}
+
+function preparePart(i) {
+  state.parts[i] = 'pending';
+  if (i === 3) setP3Button('pending');
+  const y = screenEl.scrollTop;
+  render(); screenEl.scrollTop = y;
+  setTimeout(() => {
+    if (state.parts[i] !== 'pending') return;
+    state.parts[i] = 'ready';
+    if (i === 3) setP3Button('ready');
+    const y = screenEl.scrollTop;
+    render(); screenEl.scrollTop = y;
+  }, 1800);
+}
+
+function returnToBookmark() { openPart(state.bookmark.part, 'bookmark'); }
+function scrollToEnd() { closeSheet(); screenEl.scrollTo({ top: screenEl.scrollHeight, behavior: 'smooth' }); }
+
+function openSheet() {
+  renderSheet();
+  document.getElementById('backdrop').classList.add('open');
+  document.getElementById('sheet').classList.add('open');
+  screenEl.classList.add('locked');   // useScrollLock(open)
+}
+function closeSheet() {
+  document.getElementById('backdrop').classList.remove('open');
+  document.getElementById('sheet').classList.remove('open');
+  screenEl.classList.remove('locked');
+}
+
+function setP3Button(v) {
+  document.querySelectorAll('#segP3 button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+}
+document.querySelectorAll('#segP3 button').forEach(b => b.addEventListener('click', () => {
+  state.parts[3] = b.dataset.v;
+  state.parts[4] = 'locked';
+  if (state.current === 3 && b.dataset.v !== 'ready') state.current = 2;
+  setP3Button(b.dataset.v);
+  const y = screenEl.scrollTop; render(); screenEl.scrollTop = y;
+}));
+
+resetDemo();
+</script>
+</body>
+</html>
