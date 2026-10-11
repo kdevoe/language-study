@@ -444,6 +444,37 @@ export function isPartInProgressError(error: unknown): boolean {
   return (e?.status ?? e?.context?.status) === 409;
 }
 
+/** One part, for the Reader's 目次 sheet. Every part row stores the work's
+ *  title, so a part is shown by its opening line instead. */
+export interface WorkPartSummary extends WorkPartState {
+  opening: string;
+}
+
+/** Every existing part row of one work, in order, with each part's opening line. */
+export async function fetchWorkParts(workId: string, userId: string): Promise<WorkPartSummary[]> {
+  const { data, error } = await supabase
+    .from('processed_news')
+    .select('id, part_index, status, first:content->blocks->0')
+    .eq('user_id', userId)
+    .eq('work_id', workId)
+    .order('part_index');
+  if (error) throw error;
+  return (data ?? [])
+    .filter((p) => typeof p.part_index === 'number')
+    .map((p) => {
+      const b = (p.first ?? {}) as unknown as ArticleBlock;
+      const text = b.text ?? b.content?.map((t) => t.text).join('') ?? '';
+      return { index: p.part_index as number, articleId: p.id, status: p.status, opening: text.trim() };
+    });
+}
+
+/** True when `a` is further into the work than `b`. The saved position is the
+ *  furthest point read (しおり): going back to re-read never moves it. */
+export function isPositionAhead(a: WorkReadingPosition, b: WorkReadingPosition | null | undefined): boolean {
+  if (!b) return true;
+  return a.partIndex !== b.partIndex ? a.partIndex > b.partIndex : a.blockIndex > b.blockIndex;
+}
+
 /** Persist where the reader is in a work (fire-and-forget, caller debounces). */
 export async function saveWorkReadingPosition(
   workId: string,

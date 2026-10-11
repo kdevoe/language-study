@@ -12,7 +12,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { fetchNewsFeed, NewsArticle, LongFormWork, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
+import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
 import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { OpenSettingsContext, PageHeading } from './components/PageHeading'
@@ -47,6 +47,8 @@ function App() {
   // Invisible resume (design §5): block index the Reader pre-scrolls to when
   // reopening a work at its saved reading position.
   const [workResumeBlock, setWorkResumeBlock] = useState(0);
+  // The open work's しおり (furthest point read); the Reader only moves it forward.
+  const [workBookmark, setWorkBookmark] = useState<WorkReadingPosition | null>(null);
   // LISTEN (聴く) state: the episode list, or one episode open in the player.
   const [listenView, setListenView] = useState<'list' | 'player'>('list');
   const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null);
@@ -521,6 +523,7 @@ function App() {
     // Cache first so the Reader's cache path opens it instantly (never re-processes).
     saveProcessedArticle(article.id, article);
     setActiveWork(work);
+    setWorkBookmark(work.readingPosition ?? null);
     setActiveWorkArticle(article);
     setWorkResumeBlock(resumeBlockIndex);
     setLibraryView('reading');
@@ -528,12 +531,12 @@ function App() {
     window.scrollTo(0, 0);
   }, [saveProcessedArticle]);
 
-  // 続きを読む at a section break: swap the Reader (keyed by article id) to the
-  // next part, from the top — no resume offset on a fresh part.
-  const handleNextWorkPart = useCallback((article: NewsArticle) => {
+  // Moving between parts (続きを読む, 前の部, 目次, しおりに戻る): swap the Reader
+  // (keyed by article id) to that part, from the top or at the しおり block.
+  const handleOpenWorkPart = useCallback((article: NewsArticle, resumeBlock: number) => {
     saveProcessedArticle(article.id, article);
     setActiveWorkArticle(article);
-    setWorkResumeBlock(0);
+    setWorkResumeBlock(resumeBlock);
     setShowNav(true);
     window.scrollTo(0, 0);
   }, [saveProcessedArticle]);
@@ -788,7 +791,9 @@ function App() {
               key={activeWorkArticle?.id}
               initialArticle={activeWorkArticle}
               onComplete={handleFinishWork}
-              onNextPart={handleNextWorkPart}
+              onOpenPart={handleOpenWorkPart}
+              bookmark={workBookmark}
+              onBookmark={setWorkBookmark}
               resumeBlockIndex={workResumeBlock}
               onPodcastQueued={handlePodcastQueued}
             />
