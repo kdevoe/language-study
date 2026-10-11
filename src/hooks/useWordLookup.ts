@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { WordDetails } from '../components/WordModal';
 import { fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchSentenceTranslation } from '../services/api';
 import { useAppStore } from '../services/store';
@@ -32,6 +32,24 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
   const setWordMastery = useAppStore((s) => s.setWordMastery);
   const applyDifficultyEvent = useAppStore((s) => s.applyDifficultyEvent);
   const mergeWordRecords = useAppStore((s) => s.mergeWordRecords);
+  const insightSeq = useRef(0);
+
+  // Grammar insights are contextual (they explain the word in *this* sentence), so
+  // they're fetched fresh on every tap rather than served from wordDatabase — a
+  // cached note from another article reads as wrong. The latest one is still saved
+  // for the flashcard back. The sequence guard drops a slow response from an
+  // earlier tap so it can't overwrite the current one.
+  const loadGrammarInsight = (word: string, sentence: string, key: string, extra?: Partial<WordDetails> & { surface?: string }) => {
+    const seq = ++insightSeq.current;
+    fetchWordGrammarInsight(word, sentence).then(insight => {
+      if (seq !== insightSeq.current) return;
+      setSelectedWord(prev => {
+        if (!prev || prev.word !== word) return prev;
+        return { ...prev, grammarNote: insight };
+      });
+      saveWordDefinition(key, { ...extra, grammarNote: insight });
+    });
+  };
 
   const determineAnchor = (e: TapEvent) => {
     const y = 'clientY' in e ? e.clientY : (e.touches?.[0]?.clientY || 0);
@@ -65,9 +83,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
     recordWordSeen(key);
     onWordTouched?.(key);
 
-    const cached = wordDatabase[key];
-    const merged = { ...details, grammarNote: cached?.grammarNote || details.grammarNote };
-    setSelectedWord(merged);
+    setSelectedWord({ ...details, grammarNote: undefined });
     setSelectedSentence(null);
     setActiveHighlightId(tokenId);
     setTargetRect(e.currentTarget.getBoundingClientRect());
@@ -75,15 +91,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
     // Looking a word up means it wasn't known: nudge its difficulty up.
     applyDifficultyEvent(key, 'click', details.jlptLevel);
 
-    if (!merged.grammarNote) {
-      fetchWordGrammarInsight(details.word, sentText).then(insight => {
-        setSelectedWord(prev => {
-          if (!prev || prev.word !== details.word) return prev;
-          return { ...prev, grammarNote: insight };
-        });
-        saveWordDefinition(key, { grammarNote: insight });
-      });
-    }
+    loadGrammarInsight(details.word, sentText, key);
   };
 
   const lookupWord = async (word: string, contextSentence: string, e: TapEvent, tokenId: string, jmdictEntryId?: string) => {
@@ -111,7 +119,6 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
         word,
         reading: localData.reading,
         meaning: localData.meaning,
-        grammarNote: localData.grammarNote,
         furiganaMap: localData.furiganaMap,
         jlptLevel: localData.jlptLevel,
         pos: localData.pos,
@@ -120,15 +127,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
       setActiveHighlightId(tokenId);
       setTargetRect(rect);
 
-      if (!localData.grammarNote) {
-        fetchWordGrammarInsight(word, contextSentence).then(insight => {
-          setSelectedWord(prev => {
-            if (!prev || prev.word !== word) return prev;
-            return { ...prev, grammarNote: insight };
-          });
-          saveWordDefinition(key, { grammarNote: insight });
-        });
-      }
+      loadGrammarInsight(word, contextSentence, key);
       return;
     }
 
@@ -169,15 +168,8 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
         onWordTouched?.(canonKey); // keep grade-dedup aligned
       }
 
-      // 2. SMART PATH (Gemini 3 Flash) - Parallel Context Analysis
-      fetchWordGrammarInsight(word, contextSentence).then((insight) => {
-        setSelectedWord(prev => {
-          if (!prev || prev.word !== word) return prev;
-          return { ...prev, grammarNote: insight };
-        });
-        // Cache the full enriched result
-        saveWordDefinition(canonKey, { ...combinedInitial, surface: word, grammarNote: insight });
-      });
+      // 2. SMART PATH (Claude Haiku) - contextual grammar insight, always fresh
+      loadGrammarInsight(word, contextSentence, canonKey, { ...combinedInitial, surface: word });
 
       // Cache initial quick data
       saveWordDefinition(canonKey, { ...combinedInitial, surface: word });
