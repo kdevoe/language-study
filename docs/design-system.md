@@ -30,8 +30,8 @@ All colour comes from the tokens in `src/index.css`. Don't add new hex values to
 | `--border-light` | `#e0e0d8` | Slider track, resting button, hairline rules, the rare border |
 | `--text-main` | `#2d2d2d` | Body text, active labels |
 | `--text-muted` | `#666666` | Secondary text, inactive labels, kickers |
-| `--accent-primary` | `#d4e0e8` | Soft blue: badges and small highlights only |
-| `--accent-progress` | `#8fb0c4` | Muted slate blue: progress fills on a pale track |
+| `--accent-primary` | `#d4e0e8` | Soft blue: badges, small highlights, and the progress edge on cards |
+| `--accent-progress` | `#8fb0c4` | Muted slate blue: progress fills on a pale track (flashcard session bar, 目次 sheet). Too strong for a card edge |
 | `--accent-success` | `#dee5d5` | Soft green: success *tints* only |
 | `--accent-danger` | `#fde2da` | Soft coral: destructive or warning *tints* only |
 
@@ -140,7 +140,7 @@ Source of truth: Settings (JLPT, Article Intensity, Vocab Use, Kanji Use).
 - **Suggestions:** plain serif text buttons in `--text-muted`, no outline.
   
 ### 6.5 Cards
-`--bg-card` (or `--bg-pure` for a featured item such as the daily digest), radius 24px, padding `1.4rem 1.5rem`, 1px `--border-light`, shadow `0 4px 25px rgba(0,0,0,0.03)`. Kicker tag at top-left, status at top-right, serif title, one muted meta line. Progress is shown as a 3px bar along the bottom edge.
+`--bg-card` (or `--bg-pure` for a featured item such as the daily digest), radius 24px, padding `1.4rem 1.5rem`, 1px `--border-light`, shadow `0 4px 25px rgba(0,0,0,0.03)`. Kicker tag at top-left, status at top-right, serif title, one muted meta line. Progress is shown as a 3px `--accent-primary` bar along the bottom edge: a quiet hint, not a meter. (`--accent-progress` there pulled the eye off the title.)
 ### 6.6 Toast
 Fixed at the top centre, `--bg-card`, radius 14px, 1px `--border-light`, shadow `0 6px 30px rgba(0,0,0,0.12)`, 0.85rem, tap to dismiss, auto-hides after about 5s. Keep messages to a few words (聴くタブで作成中).
 ### 6.7 Icon buttons
@@ -193,6 +193,19 @@ Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`,
 - Settings → Interface Language overrides it: English / Adaptive / 日本語.
   
 - Japanese labels: ニュース (katakana, not 読む), 本棚 → 書庫, 聞く → 聴く, 復習, 検索, 設定. A new label needs its JMDict entry id in `UI_LABELS`.
+  
+### 6.11 Long-form part navigation
+Source of truth: `src/components/PartsSheet.tsx` and the part section of `Reader.tsx`, mockup `docs/mockups/longform-section-nav.html`.
+
+- **One entry point:** the Reader's `第N部 / 全M部` meta text, with a 13px chevron, opens the **目次** sheet (§6.2). Nothing else is added to the top of the reader.
+  
+- **目次 rows:** `第N部` in small sans, the part's opening line in serif (part rows all carry the work title, so the opening line is what tells them apart), and a state at the right. The current part is white with the thumb shadow; parts already read are muted with a check; the しおり part has a small `--accent-progress` dot.
+  
+- **Parts generate in order** (each needs the previous part's continuity), so only the first missing part can be started (準備する → 準備中). Parts after it are faded to 0.42 and inert. A failed part shows もう一度 on an `--accent-danger` tint.
+  
+- **しおり = the furthest point read.** Position saves only move it forward; an earlier part opens at its top; tapping the しおり part resumes mid-part. While reading behind it, a white pill **しおりに戻る** (toast shadow) sits at the bottom centre, hidden once the part's end is on screen.
+  
+- **End of a part:** 続きを読む stays the main action; under it (and under 完了 on the last part) quiet serif links **前の部** and **目次**.
   
 
 * * *

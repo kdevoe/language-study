@@ -545,9 +545,10 @@
   - [x] Swipe left to delete (long swipe deletes outright), long-press → select mode + bulk delete, 5s undo toast
   - [x] deleteEpisodes (row + MP3) / deleteWorks (parts cascade); LISTEN list limit 50 → 900
   - [x] database/29_archive_delete.sql applied to prod 2026-10-10 (storage delete policy for own podcast audio)
-- [ ] Long-form part navigation (2026-10-10) — mockup docs/mockups/longform-section-nav.html
-  - [ ] 第N部 chip → 目次 sheet (ready / 準備する / 準備中 / もう一度 / locked rows; しおり = furthest point)
-  - [ ] Revisits never move the bookmark back; しおりに戻る pill while behind it; 前の部 + 目次 links at the 部・完 break
+- [x] Long-form part navigation (2026-10-10) — mockup docs/mockups/longform-section-nav.html
+  - [x] 第N部 chip → 目次 sheet (ready / 準備する / 準備中 / もう一度 / locked rows; rows show each part's opening line)
+  - [x] しおり = furthest point (saves only move forward); しおりに戻る pill while behind it; 前の部 + 目次 links under 続きを読む / 完了
+  - [x] Card progress edge (LIBRARY / LISTEN) → --accent-primary; slate blue was too loud (design-system.md §2, §6.5, §6.11)
   - [x] Reader chrome: header reveals after 40px of cumulative upward scroll (was 40px in one frame = fast flick only),
         always shown near the top and at the end of an article/part, and not hidden by the long-form resume pre-scroll
   - [x] Tab switch (bottom nav / settings) scrolls to top and keeps the nav showing (services/chromeScroll.ts)

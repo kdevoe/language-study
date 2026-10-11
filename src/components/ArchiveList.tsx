@@ -499,7 +499,7 @@ function CardBody({ card, query, snippet, selecting, selected }: {
       )}
 
       {(card.progress ?? 0) > 0 && (
-        <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${Math.round(Math.min(1, card.progress!) * 100)}%`, backgroundColor: 'var(--accent-progress)' }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${Math.round(Math.min(1, card.progress!) * 100)}%`, backgroundColor: 'var(--accent-primary)' }} />
       )}
     </div>
   );

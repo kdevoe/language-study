@@ -256,7 +256,7 @@ export function Library({ onOpenWork }: Props) {
               initial={{ x: '-100%' }}
               animate={{ x: '0%' }}
               transition={{ duration: 20, ease: 'linear' }}
-              style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: '100%', backgroundColor: 'var(--accent-progress)' }}
+              style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: '100%', backgroundColor: 'var(--accent-primary)' }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.9rem' }}>
               <span style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.15em', backgroundColor: 'var(--bg-pure)', color: 'var(--text-muted)', padding: '0.3rem 0.7rem', borderRadius: '8px' }}>

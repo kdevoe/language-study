@@ -8,23 +8,33 @@ import {
   requestWorkPart,
   isPartInProgressError,
   saveWorkReadingPosition,
-  NewsArticle
+  fetchProcessedArticleById,
+  isPositionAhead,
+  workPartArticleId,
+  NewsArticle,
+  type WorkReadingPosition,
 } from '../services/api';
 import { supabase } from '../services/supabase';
 import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
 import { useWordLookup } from '../hooks/useWordLookup';
-import { Headphones } from 'lucide-react';
+import { Bookmark, ChevronDown, Headphones } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
+import { PartsSheet } from './PartsSheet';
 import { muteChromeScroll } from '../services/chromeScroll';
 
 
 interface ReaderProps {
   initialArticle?: any;
   onComplete?: () => void;
-  /** Long-form: swap the Reader to the next part (App re-keys by article id). */
-  onNextPart?: (article: NewsArticle) => void;
+  /** Long-form: swap the Reader to another part (App re-keys by article id),
+   *  pre-scrolled to `resumeBlock` (0 = the top). */
+  onOpenPart?: (article: NewsArticle, resumeBlock: number) => void;
+  /** Long-form しおり: the furthest point read in this work. Saves only move it
+   *  forward, so going back to re-read never loses the place. */
+  bookmark?: WorkReadingPosition | null;
+  onBookmark?: (position: WorkReadingPosition) => void;
   /** Long-form invisible resume: pre-scroll so this block sits mid-screen. */
   resumeBlockIndex?: number;
   /** A podcast episode was requested from this article (App shows a toast). */
@@ -53,7 +63,7 @@ function hitWeightFor(text: string, furigana?: string, mastery?: MasteryLevel): 
   return [...text].length <= 2 ? 'lo' : 'mid';
 }
 
-export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockIndex, onPodcastQueued }: ReaderProps) {
+export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBookmark, resumeBlockIndex, onPodcastQueued }: ReaderProps) {
   
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("Initializing feed...");
@@ -168,6 +178,58 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
     prepareNextPart();
   };
 
+  // The scroll effect reads the しおり through refs so a new bookmark doesn't
+  // re-register it.
+  const bookmarkRef = React.useRef(bookmark ?? null);
+  bookmarkRef.current = bookmark ?? null;
+  const onBookmarkRef = React.useRef(onBookmark);
+  onBookmarkRef.current = onBookmark;
+
+  // ── Part navigation: 目次 sheet, 前の部, しおりに戻る ─────────────────────
+  const [partsSheetOpen, setPartsSheetOpen] = useState(false);
+  const [partsUserId, setPartsUserId] = useState<string | null>(null);
+  useEffect(() => { if (workId) resolveUserId().then(setPartsUserId); }, [workId]);
+
+  const [openingPart, setOpeningPart] = useState(false);
+  const openPart = async (index: number, resume = false) => {
+    if (!workId || openingPart) return;
+    const id = workPartArticleId(workId, index);
+    let article: NewsArticle | null = useAppStore.getState().articlesCache[id] ?? null;
+    if (!article) {
+      const userId = await resolveUserId();
+      if (!userId) return;
+      setOpeningPart(true);
+      article = await fetchProcessedArticleById(id, userId);
+      setOpeningPart(false);
+    }
+    if (!article) return;
+    setPartsSheetOpen(false);
+    const mark = bookmarkRef.current;
+    onOpenPart?.(article, resume && mark?.partIndex === index ? mark.blockIndex : 0);
+  };
+
+  // しおりに戻る: only while reading a part before the しおり, and not once this
+  // part's end is on screen (its break already offers the way forward).
+  const endRef = React.useRef<HTMLDivElement | null>(null);
+  const [endInView, setEndInView] = useState(false);
+  useEffect(() => {
+    const el = endRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setEndInView(entry.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  });
+  const behindBookmark = !!workId && !!bookmark && partIndex < bookmark.partIndex;
+
+  // Quiet serif links under a part's end: back one part, and the 目次.
+  const linkStyle: React.CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.92rem', color: 'var(--text-muted)', padding: '0.3rem 0.2rem' };
+  const partLinks = workId && partCount > 1 ? (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: '1.6rem', marginTop: '1.4rem' }}>
+      {partIndex > 1 && <button className="serif" onClick={() => openPart(partIndex - 1)} style={linkStyle}>前の部</button>}
+      <button className="serif" onClick={() => setPartsSheetOpen(true)} style={linkStyle}>目次</button>
+    </div>
+  ) : null;
+
   // Scroll: fire the JIT trigger past ~60%, and persist the reading position
   // (debounced) so reopening the work resumes invisibly (design §5).
   useEffect(() => {
@@ -187,8 +249,14 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
         const at = els.find((el) => el.getBoundingClientRect().bottom > 120) ?? els[els.length - 1];
         const blockIndex = Number(at.dataset.blockIdx) || 0;
         const percent = Math.min(1, ((partIndex - 1) + (totalBlocks > 0 ? blockIndex / totalBlocks : 0)) / partCount);
+        const position = { partIndex, blockIndex, percent };
+        // The saved position is the しおり (furthest point): re-reading an earlier
+        // part or paragraph leaves it where it is.
+        if (!isPositionAhead(position, bookmarkRef.current)) return;
+        bookmarkRef.current = position;
+        onBookmarkRef.current?.(position);
         const userId = await resolveUserId();
-        if (userId) saveWorkReadingPosition(workId, userId, { partIndex, blockIndex, percent });
+        if (userId) saveWorkReadingPosition(workId, userId, position);
       }, 1500);
     };
     // A part shorter than ~1.7 viewports never scrolls — check once on mount so
@@ -555,7 +623,16 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ backgroundColor: 'var(--bg-card)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>{currentArticle.category}</span>
-            {partCount > 1 && <span>第{partIndex}部 / 全{partCount}部</span>}
+            {partCount > 1 && (
+              <button
+                onClick={() => setPartsSheetOpen(true)}
+                aria-label="目次を開く"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', padding: '0.2rem 0', cursor: 'pointer', fontSize: 'inherit', color: 'inherit' }}
+              >
+                第{partIndex}部 / 全{partCount}部
+                <ChevronDown size={13} strokeWidth={1.5} />
+              </button>
+            )}
             <span>{currentArticle.readTime}</span>
             <button
               onClick={() => setPodcastSheetOpen(true)}
@@ -583,10 +660,11 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
           /* Section break (design §5): replaces the 完了 capsule between parts —
              a quiet 部・完 line, overall percent, words-met recap, then the next
              part in the finish-button style (spinner while it JIT-prepares). */
-          <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+          <div ref={endRef} style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
             <div className="serif" style={{ fontSize: '1.25rem', color: 'var(--text-main)', marginBottom: '0.7rem' }}>第{partIndex}部・完</div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
-              作品全体の約{Math.round((partIndex / partCount) * 100)}%を読みました
+              {/* Overall progress is the furthest point, so re-reading part 1 doesn't say 25%. */}
+              作品全体の約{Math.round(Math.max(partIndex / partCount, bookmark?.percent ?? 0) * 100)}%を読みました
               {(gradedRef.current.size + clickedWords.size) > 0 && (
                 <><br />この部で出会った言葉 {gradedRef.current.size + clickedWords.size}語</>
               )}
@@ -594,7 +672,7 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
             <div style={{ width: '40px', height: '1px', backgroundColor: 'var(--text-muted)', margin: '1.8rem auto' }} />
             {nextPartState === 'ready' && nextPartArticleRef.current ? (
               <button
-                onClick={() => onNextPart?.(nextPartArticleRef.current!)}
+                onClick={() => onOpenPart?.(nextPartArticleRef.current!, 0)}
                 style={{
                   backgroundColor: 'transparent',
                   color: 'var(--text-main)',
@@ -629,10 +707,11 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
                 第{partIndex + 1}部を準備中…
               </div>
             )}
+            {partLinks}
           </div>
         ) : (
           /* Finish capsule: marks the article/work done. */
-          <div style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+          <div ref={endRef} style={{ textAlign: 'center', marginTop: '4rem', marginBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
              <button
                onClick={() => onComplete?.()}
                style={{
@@ -647,6 +726,7 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
              >
                <span className="serif" style={{ fontSize: '1.25rem', verticalAlign: 'middle' }}>完了</span>
              </button>
+             {partLinks}
           </div>
         )}
       </div>
@@ -658,6 +738,41 @@ export function Reader({ initialArticle, onComplete, onNextPart, resumeBlockInde
         onCreated={() => { setPodcastQueued(true); onPodcastQueued?.(); }}
         article={{ id: currentArticle.id, title: partCount > 1 ? `${currentArticle.title}（第${partIndex}部）` : currentArticle.title }}
       />
+      {workId && partCount > 1 && (
+        <>
+          <PartsSheet
+            open={partsSheetOpen}
+            onClose={() => setPartsSheetOpen(false)}
+            userId={partsUserId}
+            workId={workId}
+            workTitle={currentArticle.title}
+            partIndex={partIndex}
+            partCount={partCount}
+            bookmark={bookmark ?? null}
+            nextPartState={nextPartState}
+            onPrepareNext={retryNextPart}
+            onOpenPart={openPart}
+          />
+          {/* しおりに戻る: a white pill (design-system §6.11), only while behind the しおり. */}
+          <button
+            onClick={() => openPart(bookmark!.partIndex, true)}
+            aria-hidden={!(behindBookmark && !endInView)}
+            tabIndex={behindBookmark && !endInView ? 0 : -1}
+            style={{
+              position: 'fixed', left: '50%', bottom: 'calc(1.4rem + env(safe-area-inset-bottom))', zIndex: 30,
+              transform: `translate(-50%, ${behindBookmark && !endInView ? '0' : '160%'})`,
+              transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+              display: 'flex', alignItems: 'center', gap: '0.55rem', whiteSpace: 'nowrap',
+              padding: '0.6rem 1.3rem', border: 'none', borderRadius: '100px', cursor: 'pointer',
+              backgroundColor: 'var(--bg-pure)', color: 'var(--text-main)', boxShadow: '0 6px 30px rgba(0,0,0,0.12)',
+            }}
+          >
+            <Bookmark size={15} strokeWidth={1.5} color="var(--text-muted)" />
+            <span className="serif" style={{ fontSize: '0.95rem' }}>しおりに戻る</span>
+            {bookmark && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>第{bookmark.partIndex}部</span>}
+          </button>
+        </>
+      )}
     </>
   );
 }
