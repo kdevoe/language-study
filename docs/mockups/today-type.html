@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — 今日 type and alignment</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  /* Set by the TITLE SIZE slider (phone 2) */
+  --one-title: 1.05rem;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-family: inherit; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 140px; height: 4px; border-radius: 2px; background: var(--border-light); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.18); cursor: pointer; }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: none; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.18); cursor: pointer; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1800px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; min-height: 2.4em; }
+.phone { width: 380px; height: 1000px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; position: relative; }
+.scroll::-webkit-scrollbar { display: none; }
+/* GUIDES toggle: a hairline at the cards' text edge */
+.guide { display: none; position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed rgba(200, 60, 60, 0.55); pointer-events: none; z-index: 3; }
+body.guides .guide { display: block; }
+
+/* ── 今日, as built (cards untouched in every phone) ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.4rem; }
+.heading h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.icon-btn { width: 44px; height: 44px; margin-right: -5px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.blocks { display: flex; flex-direction: column; gap: 2rem; }
+.sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; color: var(--text-muted); }
+.sec-head svg.i { width: 19px; height: 19px; stroke-width: 1.8; }
+.serif { font-family: var(--font-serif); }
+.card { display: block; width: 100%; background: var(--bg-card); border-radius: 24px; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); position: relative; }
+.card.white { background: var(--bg-pure); }
+.review { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.4rem; }
+.count { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; line-height: 1.15; }
+.count small { font-size: 1rem; margin-left: 0.15rem; }
+.go { font-family: var(--font-serif); font-size: 0.95rem; display: flex; align-items: center; gap: 0.2rem; white-space: nowrap; }
+.go svg.i { width: 18px; height: 18px; }
+.work { padding: 1.5rem; }
+.work h3 { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 500; line-height: 1.45; max-width: calc(100% - 3.5rem); }
+.corner { position: absolute; top: 1.5rem; right: 1.5rem; line-height: 1; font-size: 0.7rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; }
+.listen { display: flex; align-items: center; gap: 0.9rem; padding: 1rem 1.2rem; }
+.listen .grow { flex: 1; min-width: 0; }
+.listen .t { font-family: var(--font-serif); font-size: 1rem; line-height: 1.45; }
+.listen .m { font-size: 0.74rem; color: var(--text-muted); font-weight: 500; }
+.play { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; flex: none; }
+.link { font-family: var(--font-serif); font-size: 0.88rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.15rem; }
+.link svg.i { width: 15px; height: 15px; }
+.news { display: flex; flex-direction: column; gap: 1.4rem; padding-top: 0.2rem; }
+.news .cat { display: block; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 0.35rem; }
+.news .hl { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── NEWS INDENT toggle (phones 1–3) ── */
+.indent .news { padding-left: 1.5rem; padding-right: 1.5rem; }
+.indent .sec-head .link { margin-right: 1.5rem; }
+
+/* ── Type systems ── */
+/* One small style for every label-ish line: corner count, 番組, news kicker. */
+.meta-one .corner, .meta-one .listen .m, .meta-one .news .cat {
+  font-family: var(--font-sans); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted);
+}
+/* Actions (始める, すべて) share one serif size. */
+.meta-one .go, .meta-one .link { font-size: 0.95rem; }
+
+/* Phone 2: one title size for every item title. */
+.one-title .work h3, .one-title .listen .t, .one-title .news .hl { font-size: var(--one-title); line-height: 1.5; }
+
+/* Phone 3: two tiers. The reading card keeps its card title (1.35rem, same as
+   the 本棚 page); everything else is one body title. */
+.two-tier .listen .t, .two-tier .news .hl { font-size: 1rem; line-height: 1.5; }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav button { width: 76px; border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); font-family: inherit; }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.78rem; line-height: 1rem; letter-spacing: 0.02em; font-weight: 500; margin-top: 2px; }
+.nav button.on { color: var(--text-main); }
+.nav button.on .lab { font-weight: 600; }
+.nav button.on .ic { background: var(--accent-primary); }
+.nav button.on .ic svg.i { stroke-width: 1.9; }
+
+/* ── Notes ── */
+.notes { max-width: 860px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+.notes table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.notes th, .notes td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+.notes th { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; color: var(--text-muted); }
+</style>
+</head>
+<body class="guides">
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="newspaper" viewBox="0 0 24 24"><path d="M15 18h-5"/><path d="M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/></symbol>
+    <symbol id="sliders" viewBox="0 0 24 24"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION</div>
+  <h1>今日: one type system, one text edge</h1>
+  <p>Cards keep their shape and padding in every phone. Phone 0 is the page as built. 1 only lines the news up with the text inside the cards. 2 and 3 also cut the type down to a small set: one style for every small label (the <code>3 / 4</code> count, 番組, the news category), one size for actions (始める, すべて), and either one title size for everything or two tiers. GUIDES draws the cards' text edge.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">NEWS INDENT</span><div class="pill-seg" data-ctl="indent"><button data-v="edge">Page edge</button><button data-v="card" class="on">Card text</button></div></div>
+    <div class="ctl"><span class="lbl">GUIDES</span><div class="pill-seg" data-ctl="guides"><button data-v="on" class="on">On</button><button data-v="off">Off</button></div></div>
+    <div class="ctl"><span class="lbl">TITLE SIZE (2)</span><input type="range" id="titleSize" min="0.95" max="1.4" step="0.05" value="1.05"><span class="lbl" id="titleVal" style="min-width:3.6em">1.05rem</span></div>
+  </div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<div class="notes">
+  <h3>Type on 今日</h3>
+  <table>
+    <tr><th>TEXT</th><th>NOW (0, 1)</th><th>ONE SIZE (2)</th><th>TWO TIERS (3)</th></tr>
+    <tr><td>復習 count</td><td>serif 1.8rem</td><td>serif 1.8rem</td><td>serif 1.8rem</td></tr>
+    <tr><td>本棚 card title</td><td>serif 1.35rem</td><td>serif <i>slider</i></td><td>serif 1.35rem</td></tr>
+    <tr><td>聞く title</td><td>serif 1.0rem</td><td>serif <i>slider</i></td><td>serif 1.0rem</td></tr>
+    <tr><td>News headline</td><td>serif 1.05rem</td><td>serif <i>slider</i></td><td>serif 1.0rem</td></tr>
+    <tr><td>始める · すべて</td><td>serif 0.95 · 0.88rem</td><td>serif 0.95rem</td><td>serif 0.95rem</td></tr>
+    <tr><td>3 / 4 · 番組 · category</td><td>sans 0.7 bold · 0.74 · 0.62 caps</td><td>sans 0.68rem bold</td><td>sans 0.68rem bold</td></tr>
+  </table>
+  <h3>My pick</h3>
+  <ol>
+    <li><span class="n">→</span><span>Built: 2 at 1.05rem with the news on the card text edge, and every title capped at two lines with an ellipsis. Earlier pick: 3 with the news on the card text edge. The reading card keeps the same title as the 本棚 page (cards unchanged), everything else drops to one body title, and the three small label styles become one. Six serif sizes become three (1.8 hero, 1.35 card, 1.0 body) plus 0.95 for actions; three small styles become one.</span></li>
+  </ol>
+</div>
+
+<script>
+const state = { indent: 'card', guides: 'on' };
+const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+
+const PHONES = [
+  { label: '0 · NOW', note: 'As built: news on the page edge, six serif sizes, three small styles.', cls: '', fixedEdge: true },
+  { label: '1 · ALIGN ONLY', note: 'Type unchanged; the news moves in to the cards’ text edge.', cls: '' },
+  { label: '2 · ONE TITLE SIZE (BUILT)', note: 'Every item title one size (slider); one small label style; one action size.', cls: 'meta-one one-title' },
+  { label: '3 · TWO TIERS', note: 'Reading card keeps its card title; all other titles one body size; one small style.', cls: 'meta-one two-tier' },
+];
+
+function page() {
+  return `
+    <div class="guide" style="left: calc(1.25rem + 1.5rem)"></div>
+    <div class="heading"><h2>今日</h2><span class="icon-btn">${ic('sliders')}</span></div>
+    <div class="blocks">
+      <section>
+        <div class="sec-head">${ic('layers')}</div>
+        <div class="card white review"><span class="count">33<small>枚</small></span><span class="go">始める${ic('chev')}</span></div>
+      </section>
+      <section>
+        <div class="sec-head">${ic('book')}</div>
+        <div class="card work"><span class="corner">3 / 4</span><h3>Quiet Rooms, Long Winters: Japanese and Scandinavian Design in the Home</h3></div>
+      </section>
+      <section>
+        <div class="sec-head">${ic('headphones')}</div>
+        <div class="card listen">
+          <div class="grow"><div class="t">今日のニュース：新しい薬と世界の動き、そしてハリケーン</div><div class="m">番組</div></div>
+          <span class="play"><svg viewBox="0 0 24 24" width="16" height="16" style="margin-left:2px"><path d="M6 4l14 8-14 8z" fill="#2d2d2d"/></svg></span>
+        </div>
+      </section>
+      <section>
+        <div class="sec-head">${ic('newspaper')}<span class="link">すべて${ic('chev')}</span></div>
+        <div class="news">
+          <div><span class="cat">RECENT NEWS</span><span class="hl">Attack on Riyadh airport killed 12 people and wounded over 300 more, Saudi authorities say</span></div>
+          <div><span class="cat">RECENT NEWS</span><span class="hl">DistroKid has been quietly taking down songs in response to UMG lawsuit</span></div>
+        </div>
+      </section>
+    </div>`;
+}
+
+const NAV = [['sun', '今日'], ['book', '読む'], ['headphones', '聞く'], ['layers', '復習']];
+const nav = () => `<div class="nav">${NAV.map(([i, l], n) =>
+  `<button class="${n === 0 ? 'on' : ''}"><span class="ic">${ic(i)}</span><span class="lab">${l}</span></button>`).join('')}</div>`;
+
+function render() {
+  document.body.classList.toggle('guides', state.guides === 'on');
+  document.getElementById('stage').innerHTML = PHONES.map((p) => {
+    const indent = !p.fixedEdge && state.indent === 'card' ? 'indent' : '';
+    return `
+      <div class="phone-wrap">
+        <div class="phone-label">${p.label}</div>
+        <div class="phone ${p.cls} ${indent}"><div class="scroll">${page()}</div>${nav()}</div>
+        <div class="phone-note">${p.note}</div>
+      </div>`;
+  }).join('');
+}
+
+document.querySelectorAll('.pill-seg').forEach((seg) => {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    state[seg.dataset.ctl] = b.dataset.v;
+    render();
+  });
+});
+const ts = document.getElementById('titleSize');
+ts.addEventListener('input', () => {
+  document.documentElement.style.setProperty('--one-title', ts.value + 'rem');
+  document.getElementById('titleVal').textContent = Number(ts.value).toFixed(2) + 'rem';
+});
+render();
+</script>
+</body>
+</html>

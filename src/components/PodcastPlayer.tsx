@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pause, Play, SkipBack, SkipForward } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { FuriganaText, HitWeight } from './FuriganaText';
 import { WordModal, WordDetails } from './WordModal';
 import type { ArticleBlock } from '../services/api';
@@ -15,6 +15,7 @@ import {
   saveListenPosition,
 } from '../services/podcasts';
 import { castMember } from '../data/podcastCast';
+import { sharedAudio } from '../services/sharedAudio';
 
 // Podcast player (docs/podcast-design.md §6.2, mockup docs/mockups/listen.html):
 // the transcript IS the interface. The playing sentence gets a soft tint, the
@@ -28,6 +29,8 @@ import { castMember } from '../data/podcastCast';
 const SPEEDS = [0.75, 0.9, 1, 1.15];
 const SAVE_EVERY_MS = 5000;
 const RESUME_REWIND_S = 2;
+/** The transport's skip buttons and the lock screen's seek actions. */
+const SKIP_S = 10;
 const SCROLL_ANCHOR = 0.4;
 
 interface Token {
@@ -62,7 +65,10 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [autoScroll, setAutoScroll] = useState(true);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // The app's shared element, unlocked by the tap that opened this episode
+  // (services/sharedAudio.ts), so it can start playing once the audio loads.
+  const audioRef = useRef<HTMLAudioElement | null>(sharedAudio());
+  const autoplayed = useRef(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<{ t: number; el: HTMLElement; sent: HTMLElement }[]>([]);
   const sentencesRef = useRef<{ t: number; el: HTMLElement }[]>([]);
@@ -175,6 +181,9 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
 
   useEffect(() => () => { persistPosition(); }, [persistPosition]);
 
+  const play = useCallback(() => { audioRef.current?.play().catch((e) => console.warn('[player] play blocked:', e)); }, []);
+  const pause = useCallback(() => { audioRef.current?.pause(); }, []);
+
   const onLoadedMetadata = () => {
     const audio = audioRef.current;
     if (!audio || !ep) return;
@@ -184,11 +193,45 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
       setNow(audio.currentTime);
       tick();
     }
+    // Opening an episode plays it. If the browser still refuses (no unlocking
+    // tap), the play button works as before.
+    if (!autoplayed.current) {
+      autoplayed.current = true;
+      play();
+    }
   };
 
   const onTimeUpdate = () => {
     if (Date.now() - lastSavedAt.current > SAVE_EVERY_MS) persistPosition();
   };
+
+  // ── The shared element: listeners and source ──
+  // Handlers read the latest state through a ref, so they're attached once.
+  const handlers = useRef({ onLoadedMetadata, onTimeUpdate, persistPosition, tick });
+  handlers.current = { onLoadedMetadata, onTimeUpdate, persistPosition, tick };
+  useEffect(() => {
+    const audio = audioRef.current!;
+    const on: [string, () => void][] = [
+      ['loadedmetadata', () => handlers.current.onLoadedMetadata()],
+      ['play', () => setPlaying(true)],
+      ['pause', () => { setPlaying(false); handlers.current.persistPosition(); setNow(audio.currentTime); }],
+      ['timeupdate', () => handlers.current.onTimeUpdate()],
+      ['ended', () => { setPlaying(false); handlers.current.persistPosition(true); }],
+      ['seeked', () => handlers.current.tick()],
+    ];
+    on.forEach(([type, fn]) => audio.addEventListener(type, fn));
+    return () => {
+      // The position was saved by the unmount effect above; now let go of the element.
+      on.forEach(([type, fn]) => audio.removeEventListener(type, fn));
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (audioUrl) audioRef.current!.src = audioUrl;
+  }, [audioUrl]);
 
   // ── Manual scroll pauses auto-scroll ──
   useEffect(() => {
@@ -205,8 +248,6 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
   }, [playing]);
 
   // ── Transport ──
-  const play = useCallback(() => { audioRef.current?.play().catch((e) => console.warn('[player] play blocked:', e)); }, []);
-  const pause = useCallback(() => { audioRef.current?.pause(); }, []);
   const seek = useCallback((t: number) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -236,6 +277,8 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
     seek(s[Math.min(s.length - 1, currentSentenceIndex() + 1)].t);
   }, [seek]);
 
+  const skip = useCallback((by: number) => seek((audioRef.current?.currentTime ?? 0) + by), [seek]);
+
   const cycleSpeed = () => {
     const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
     setRate(next);
@@ -258,8 +301,8 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
       ['pause', pause],
       ['previoustrack', prevSentence],
       ['nexttrack', nextSentence],
-      ['seekbackward', () => seek((audioRef.current?.currentTime ?? 0) - 10)],
-      ['seekforward', () => seek((audioRef.current?.currentTime ?? 0) + 10)],
+      ['seekbackward', () => skip(-SKIP_S)],
+      ['seekforward', () => skip(SKIP_S)],
     ];
     for (const [action, handler] of handlers) {
       try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* unsupported action */ }
@@ -269,7 +312,7 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
         try { navigator.mediaSession.setActionHandler(action, null); } catch { /* unsupported action */ }
       }
     };
-  }, [ep, host.name, guest.name, play, pause, prevSentence, nextSentence, seek]);
+  }, [ep, host.name, guest.name, play, pause, prevSentence, nextSentence, skip]);
 
   // ── Word taps: pause, look up, resume when the modal closes ──
   const pauseForLookup = () => {
@@ -384,17 +427,6 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
 
   return (
     <div className="fade-in" style={{ paddingBottom: '13rem' }}>
-      <audio
-        ref={audioRef}
-        src={audioUrl ?? undefined}
-        preload="auto"
-        onLoadedMetadata={onLoadedMetadata}
-        onPlay={() => setPlaying(true)}
-        onPause={() => { setPlaying(false); persistPosition(); setNow(audioRef.current?.currentTime ?? 0); }}
-        onTimeUpdate={onTimeUpdate}
-        onEnded={() => { setPlaying(false); persistPosition(true); }}
-        onSeeked={tick}
-      />
 
       <div style={{ margin: '0.4rem 0 2rem' }}>
         <h1 className="serif" style={{ fontSize: '1.7rem', fontWeight: 500, lineHeight: 1.4, marginBottom: '0.7rem', color: 'var(--text-main)' }}>
@@ -468,7 +500,7 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
             <button onClick={cycleSpeed} aria-label="再生速度" style={pillStyle(rate !== 1)}>
               {rate === 1 ? '1.0' : rate}×
             </button>
-            <button onClick={prevSentence} aria-label="前の文" style={iconBtn}><SkipBack size={20} strokeWidth={1.5} /></button>
+            <button onClick={() => skip(-SKIP_S)} aria-label={`${SKIP_S}秒戻る`} style={iconBtn}><SkipIcon dir="back" /></button>
             <button
               onClick={() => (playing ? pause() : play())}
               aria-label={playing ? '一時停止' : '再生'}
@@ -477,7 +509,7 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
             >
               {playing ? <Pause size={22} fill="currentColor" strokeWidth={0} /> : <Play size={22} fill="currentColor" strokeWidth={0} style={{ marginLeft: '3px' }} />}
             </button>
-            <button onClick={nextSentence} aria-label="次の文" style={iconBtn}><SkipForward size={20} strokeWidth={1.5} /></button>
+            <button onClick={() => skip(SKIP_S)} aria-label={`${SKIP_S}秒進む`} style={iconBtn}><SkipIcon dir="forward" /></button>
             <button
               onClick={() => { setListenFirst((v) => !v); setRevealed(new Set()); }}
               aria-pressed={listenFirst}
@@ -509,3 +541,27 @@ const pillStyle = (on: boolean): React.CSSProperties => ({
   background: 'none',
   cursor: 'pointer',
 });
+
+/** Skip button glyph: a circular arrow with the seconds inside (the ±10s
+ *  transport, like most podcast players). Arcs from lucide's rotate-ccw/-cw. */
+function SkipIcon({ dir }: { dir: 'back' | 'forward' }) {
+  const back = dir === 'back';
+  return (
+    <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {back ? (
+        <>
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </>
+      ) : (
+        <>
+          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+        </>
+      )}
+      <text x="12" y="15.4" textAnchor="middle" fill="currentColor" stroke="none" style={{ fontFamily: 'var(--font-sans)', fontSize: '7.6px', fontWeight: 600 }}>
+        {SKIP_S}
+      </text>
+    </svg>
+  );
+}

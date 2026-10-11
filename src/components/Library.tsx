@@ -45,12 +45,12 @@ async function resolveUserId(): Promise<string | null> {
 
 /** Top-right of a work's card: the part being read and the total ("2 / 5").
  *  A single-part work has nothing to count, so it shows nothing. */
-export function PartCount({ work }: { work: LongFormWork }) {
+export function PartCount({ work, compact = false }: { work: LongFormWork; compact?: boolean }) {
   if (work.partCount <= 1) return null;
   const current = work.status === 'finished'
     ? work.partCount
     : Math.min(work.readingPosition?.partIndex ?? 1, work.partCount);
-  return <CornerText>{current} / {work.partCount}</CornerText>;
+  return <CornerText compact={compact}>{current} / {work.partCount}</CornerText>;
 }
 
 // LIBRARY tab: works in ArchiveList — grouped by month, searchable, swipe to
