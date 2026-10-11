@@ -2,7 +2,8 @@ import { Reader } from './components/Reader'
 import { Feed } from './components/Feed'
 import { Library } from './components/Library'
 import { Onboarding } from './components/Onboarding'
-import { BottomNav } from './components/BottomNav'
+import { BottomNav, type Tab } from './components/BottomNav'
+import { Today, LAST_WORK_KEY } from './components/Today'
 import { Settings } from './components/Settings'
 import { Review, type ReviewSegment } from './components/Review'
 import { Listen } from './components/Listen'
@@ -15,7 +16,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
 import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
-import { OpenSettingsContext, PageHeading } from './components/PageHeading'
+import { OpenSettingsContext, PageHeading, type TitleSwitch } from './components/PageHeading'
 import { muteChromeScroll, isChromeScrollMuted } from './services/chromeScroll'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -24,7 +25,11 @@ if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight
 function App() {
   const isOnboarded = useAppStore(state => state.isOnboarded);
   const checkDailyKanji = useAppStore(state => state.checkDailyKanji);
-  const [activeTab, setActiveTab] = useState<'news' | 'library' | 'listen' | 'flashcards' | 'settings'>('news');
+  // The app opens on 今日. 読む holds the news feed and the 本棚, 聞く the 番組 and
+  // 音楽; the page title switches between them (PageHeading's titleSwitch).
+  const [activeTab, setActiveTab] = useState<Tab>('today');
+  const [readSegment, setReadSegment] = useState<'news' | 'shelf'>('news');
+  const [listenPage, setListenPage] = useState<'shows' | 'music'>('shows');
   const [showNav, setShowNav] = useState(true);
   // Flashcard focus mode: tapping into a card hides the bottom nav so the card
   // can use that space; Flashcards reports the state up from its card flow.
@@ -523,6 +528,7 @@ function App() {
     // Cache first so the Reader's cache path opens it instantly (never re-processes).
     saveProcessedArticle(article.id, article);
     setActiveWork(work);
+    try { localStorage.setItem(LAST_WORK_KEY, work.id); } catch { /* storage blocked */ }
     setWorkBookmark(work.readingPosition ?? null);
     setActiveWorkArticle(article);
     setWorkResumeBlock(resumeBlockIndex);
@@ -567,13 +573,47 @@ function App() {
   // in the LISTEN tab; the shared top toast says so.
   // Switching tabs (bottom nav or a heading's settings button) always lands at the
   // top with the chrome showing; the previous tab's scroll offset never carries over.
-  const handleTabChange = useCallback((tab: typeof activeTab) => {
+  const handleTabChange = useCallback((tab: Tab) => {
     muteChromeScroll();
     window.scrollTo(0, 0);
     setShowNav(true);
     setActiveTab(tab);
   }, []);
   const openSettings = useCallback(() => handleTabChange('settings'), [handleTabChange]);
+
+  // ── 今日: each block hands off to the tab that owns it ─────────────────────
+  const showRead = (segment: 'news' | 'shelf') => {
+    setReadSegment(segment);
+    handleTabChange('read');
+  };
+  const handleTodayReview = () => {
+    setReviewSegment('review');
+    handleTabChange('flashcards');
+  };
+  const handleTodayWork = (work: LongFormWork, article: NewsArticle, resumeBlock = 0) => {
+    showRead('shelf');
+    handleOpenWork(work, article, resumeBlock);
+  };
+  const handleTodayArticle = (article: NewsArticle) => {
+    showRead('news');
+    handleSelectArticle(article);
+  };
+  const handleTodayEpisode = (episode: PodcastEpisode) => {
+    setListenPage('shows');
+    handleTabChange('listen');
+    handleOpenEpisode(episode);
+  };
+  const visibleArticles = (articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id));
+  // The title switches of 読む (ニュース | 本棚) and 聞く (番組 | 音楽); a switch lands at the top.
+  const switchPage = (apply: () => void) => { muteChromeScroll(); window.scrollTo(0, 0); apply(); };
+  const readTitleSwitch: TitleSwitch = {
+    pages: ['news', 'library'],
+    onSwitch: (id) => switchPage(() => setReadSegment(id === 'library' ? 'shelf' : 'news')),
+  };
+  const listenTitleSwitch: TitleSwitch = {
+    pages: ['shows', 'music'],
+    onSwitch: (id) => switchPage(() => setListenPage(id === 'music' ? 'music' : 'shows')),
+  };
   const handlePodcastQueued = useCallback(() => setActionError('聴くタブで作成中'), []);
 
   const handleBackToListen = () => {
@@ -585,11 +625,11 @@ function App() {
   // chrome-hiding are shared across the reading surfaces (the podcast player
   // included — its transport bar takes the bottom nav's place).
   const isReading =
-    (activeTab === 'news' && newsView === 'reading') ||
-    (activeTab === 'library' && libraryView === 'reading') ||
+    (activeTab === 'read' && readSegment === 'news' && newsView === 'reading') ||
+    (activeTab === 'read' && readSegment === 'shelf' && libraryView === 'reading') ||
     (activeTab === 'listen' && listenView === 'player');
   const handleBack =
-    activeTab === 'library' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
+    activeTab === 'read' && readSegment === 'shelf' ? handleBackToLibrary : activeTab === 'listen' ? handleBackToListen : handleBackToHub;
 
   // The scroll handler is registered once; it reads the reading state through a ref.
   const isReadingRef = useRef(isReading);
@@ -760,15 +800,24 @@ function App() {
         margin: '0 auto', 
         width: '100%' 
       }}>
-        {activeTab === 'news' && (
+        {activeTab === 'today' && (
+          <Today
+            onStartReview={handleTodayReview}
+            onOpenWork={handleTodayWork}
+            onOpenArticle={handleTodayArticle}
+            onShowNews={() => showRead('news')}
+            onOpenEpisode={handleTodayEpisode}
+            news={visibleArticles}
+          />
+        )}
+        {activeTab === 'read' && readSegment === 'news' && (
           newsView === 'hub' ? (
             <>
-            <PageHeading id="news" />
-            {/* Same 1.6rem (1rem heading margin + 0.6rem) between heading and first
-                content as the archive pages' search row. */}
+            <PageHeading id="news" settingsMark={false} titleSwitch={readTitleSwitch} />
+            {/* Same 1.6rem (1rem heading margin + 0.6rem) to the first content as every tab page. */}
             <div style={{ height: '0.6rem' }} />
             <Feed 
-              articles={(articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
+              articles={visibleArticles.slice(0, 5)} 
               isLoading={isLoadingFeed} 
               isReplenishing={isReplenishing}
               onSelect={handleSelectArticle} 
@@ -783,9 +832,9 @@ function App() {
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} onPodcastQueued={handlePodcastQueued} />
           )
         )}
-        {activeTab === 'library' && (
+        {activeTab === 'read' && readSegment === 'shelf' && (
           libraryView === 'list' ? (
-            <Library onOpenWork={handleOpenWork} />
+            <Library onOpenWork={handleOpenWork} titleSwitch={readTitleSwitch} />
           ) : (
             <Reader
               key={activeWorkArticle?.id}
@@ -802,8 +851,17 @@ function App() {
         {activeTab === 'listen' && (
           listenView === 'player' && activeEpisode ? (
             <PodcastPlayer key={activeEpisode.id} episode={activeEpisode} />
+          ) : listenPage === 'shows' ? (
+            <Listen onOpenEpisode={handleOpenEpisode} titleSwitch={listenTitleSwitch} />
           ) : (
-            <Listen onOpenEpisode={handleOpenEpisode} />
+            <>
+            <PageHeading id="music" settingsMark={false} titleSwitch={listenTitleSwitch} />
+            {/* Placeholder until music lands. */}
+            <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+              <div className="serif" style={{ fontSize: '1.35rem', color: 'var(--text-main)' }}>近日公開</div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Coming soon</p>
+            </div>
+            </>
           )
         )}
         {activeTab === 'flashcards' && (

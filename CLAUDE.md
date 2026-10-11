@@ -32,7 +32,8 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 - **State**: Zustand store in `services/store.ts`, persisted to localStorage under key `yugen-storage`. All user preferences (JLPT level, RTK level, study/vocab/furigana modes) and word progress live here, with async sync to Supabase.
 - **API layer**: `services/api.ts` wraps all Supabase Edge Function calls via `invokeEdgeFn()`. Also handles Supabase persistence (articles, word progress, preferences).
 - **Dictionary**: `services/jmdict.ts` queries JMDict tables in Supabase (216k+ entries). Lookup tries kanji form first, then kana, with LLM disambiguation for ambiguous matches.
-- **App.tsx** is the main orchestrator: manages auth state, beta whitelist gate, tab routing (Feed/Reader/Settings), and the JIT article pre-processor that keeps 1 article ahead processed.
+- **App.tsx** is the main orchestrator: manages auth state, beta whitelist gate, tab routing (今日 · 読む [ニュース | 本棚] · 聞く [番組 | 音楽] · 復習, plus Settings from 今日; a tab's pages switch from its title), and the JIT article pre-processor that keeps 1 article ahead processed.
+- **Today.tsx**: the 今日 home tab the app opens on — cards due, continue reading, today's kanji, a new podcast, news picks; each block hands off to its tab.
 - **Feed.tsx**: Swipe-to-dismiss article cards with Framer Motion gestures. Replenishes when <5 visible articles remain.
 - **Reader.tsx**: Renders processed article blocks with interactive word lookup, sentence translation, and mastery controls.
 - **WordModal.tsx**: Dictionary modal with definition, grammar insights, JLPT badges, and mastery quick-set buttons.

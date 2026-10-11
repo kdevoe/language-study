@@ -7,6 +7,7 @@ import { findIn, matchItem } from '../services/archiveSearch';
 import type { SearchCorpus, Snippet } from '../services/archiveSearch';
 import type { UiLabelId } from '../services/uiLabels';
 import { PageHeading } from './PageHeading';
+import type { TitleSwitch } from './PageHeading';
 import { useAdaptiveText } from './AdaptiveLabel';
 
 // The archive list behind LISTEN (聴く) and LIBRARY (書庫), mockup
@@ -40,7 +41,9 @@ export interface ArchiveCard {
 
 interface Props<T extends { id: string }> {
   titleId: UiLabelId;
-  /** The + beside the settings mark in the page heading. */
+  /** The tab's other pages beside the title (読む: ニュース | 本棚). */
+  titleSwitch?: TitleSwitch;
+  /** The + at the right of the page heading. */
   onAdd: () => void;
   addLabel: string;
   items: T[];
@@ -240,7 +243,7 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
           <button onClick={exitSelect} className="serif" style={textBtn(true)}>完了</button>
         </div>
       ) : (
-        <PageHeading id={props.titleId} actions={<AddButton onClick={props.onAdd} label={props.addLabel} />} />
+        <PageHeading id={props.titleId} settingsMark={false} titleSwitch={props.titleSwitch} actions={<AddButton onClick={props.onAdd} label={props.addLabel} />} />
       )}
 
       {/* Search: hero input on a hairline (design-system §6.4), full width */}
@@ -440,7 +443,7 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
 }
 
 // ── One card's contents ─────────────────────────────────────────────────────
-function CardBody({ card, query, snippet, selecting, selected }: {
+export function CardBody({ card, query, snippet, selecting, selected }: {
   card: ArchiveCard; query: string; snippet?: Snippet; selecting: boolean; selected: boolean;
 }) {
   return (
@@ -639,7 +642,7 @@ function SwipeRow({ id, openId, setOpenId, selecting, onDelete, onLongPress, onT
   );
 }
 
-/** The heading's +: a plain icon beside the settings mark, matching its size and weight (design-system §6.9). */
+/** The heading's +: a plain icon matching the settings mark's size and weight (design-system §6.9). */
 function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button

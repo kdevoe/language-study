@@ -5,17 +5,17 @@ import { CheckCircle2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { ArchiveList } from './ArchiveList';
 import type { ArchiveCard } from './ArchiveList';
+import type { TitleSwitch } from './PageHeading';
 import {
   LongFormWork,
   NewsArticle,
   deleteWorks,
-  fetchProcessedArticleById,
+  fetchWorkResumeArticle,
   fetchWorkSearchText,
   fetchWorks,
   importErrorMessage,
   importFromUrl,
   importPastedText,
-  workPartArticleId,
 } from '../services/api';
 import { supabase } from '../services/supabase';
 
@@ -34,6 +34,8 @@ interface Props {
   /** Open a ready work in the Reader. The article is the processed part content;
    *  resumeBlockIndex pre-scrolls to the saved reading position (design §5). */
   onOpenWork: (work: LongFormWork, article: NewsArticle, resumeBlockIndex?: number) => void;
+  /** 読む's ニュース | 本棚 title switch. */
+  titleSwitch?: TitleSwitch;
 }
 
 async function resolveUserId(): Promise<string | null> {
@@ -58,7 +60,7 @@ function relativeDate(iso: string): string {
 // delete, long-press to select (mockup docs/mockups/archive-organize.html) —
 // plus the import sheet behind +.
 
-export function Library({ onOpenWork }: Props) {
+export function Library({ onOpenWork, titleSwitch }: Props) {
   const [works, setWorks] = useState<LongFormWork[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -129,22 +131,9 @@ export function Library({ onOpenWork }: Props) {
     if (!userId) { setError('サインインが必要です。'); return; }
     setOpeningId(work.id);
     try {
-      // Resume at the saved position's part when that part is processed
-      // (design §5: tapping a card resumes where the reader left off).
-      const pos = work.readingPosition;
-      const resumable = !!pos
-        && pos.partIndex > 1
-        && pos.partIndex <= work.partCount
-        && (work.parts ?? []).some(p => p.index === pos.partIndex && p.status !== 'failed' && p.status !== 'pending');
-      const targetIndex = resumable ? pos!.partIndex : 1;
-      const targetId = targetIndex === 1 ? work.partArticleId : workPartArticleId(work.id, targetIndex);
-      let article = await fetchProcessedArticleById(targetId, userId);
-      if (!article && targetIndex !== 1) {
-        article = await fetchProcessedArticleById(work.partArticleId, userId);
-      }
-      if (!article) { setError('この作品を読み込めませんでした。'); return; }
-      const resumeBlock = pos && article.partIndex === pos.partIndex ? (pos.blockIndex ?? 0) : 0;
-      onOpenWork(work, article, resumeBlock);
+      const opened = await fetchWorkResumeArticle(work, userId);
+      if (!opened) { setError('この作品を読み込めませんでした。'); return; }
+      onOpenWork(work, opened.article, opened.resumeBlock);
     } finally {
       if (mountedRef.current) setOpeningId(null);
     }
@@ -224,6 +213,7 @@ export function Library({ onOpenWork }: Props) {
 
       <ArchiveList
         titleId="library"
+        titleSwitch={titleSwitch}
         onAdd={() => setSheetOpen(true)}
         addLabel="コンテンツを追加"
         items={works}

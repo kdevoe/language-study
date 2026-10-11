@@ -4,6 +4,7 @@ import { dueDeckSize } from '../services/dueDeck';
 import { Progress } from './Progress';
 import { useAppStore } from '../services/store';
 import { PageHeading } from './PageHeading';
+import { Segment } from './Segment';
 
 export type ReviewSegment = 'review' | 'progress';
 
@@ -60,63 +61,32 @@ export function Review({
   return (
     <div>
       {/* Focus mode hides the heading and control along with the nav so the card keeps the screen. */}
-      {!focused && <PageHeading id="review" />}
+      {!focused && <PageHeading id="review" settingsMark={false} />}
       {!focused && (
         <div style={{ height: SEGMENT_BAR_HEIGHT, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div
-            role="tablist"
-            style={{
-              display: 'inline-flex',
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '100px',
-              padding: '3px',
-            }}
-          >
-            {SEGMENTS.map(({ id, label }) => {
-              const isActive = active === id;
-              return (
-                <button
-                  key={id}
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => select(id)}
-                  className="serif"
+          <Segment
+            options={SEGMENTS.map(({ id, label }) => ({
+              id,
+              label,
+              badge: id === 'review' && remaining > 0 && (
+                <span
+                  className="sans"
                   style={{
-                    border: 'none',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    backgroundColor: 'var(--accent-primary)',
+                    color: 'var(--text-main)',
                     borderRadius: '100px',
-                    padding: '0.3rem 1.05rem',
-                    fontSize: '0.95rem',
-                    fontWeight: isActive ? 700 : 500,
-                    cursor: 'pointer',
-                    color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
-                    backgroundColor: isActive ? 'var(--bg-pure)' : 'transparent',
-                    boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
-                    transition: 'color 0.2s, background-color 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
+                    padding: '0.05rem 0.45rem',
                   }}
                 >
-                  {label}
-                  {id === 'review' && remaining > 0 && (
-                    <span
-                      className="sans"
-                      style={{
-                        fontSize: '0.62rem',
-                        fontWeight: 700,
-                        backgroundColor: 'var(--accent-primary)',
-                        color: 'var(--text-main)',
-                        borderRadius: '100px',
-                        padding: '0.05rem 0.45rem',
-                      }}
-                    >
-                      {remaining}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                  {remaining}
+                </span>
+              ),
+            }))}
+            active={active}
+            onChange={select}
+          />
           <span
             className="sans"
             style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, marginTop: '0.95rem' }}
