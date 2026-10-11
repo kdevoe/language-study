@@ -6,6 +6,7 @@ import { supabase } from './supabase';
 import { invokeEdgeFn, isServerBusyError } from './api';
 import type { SearchCorpus } from './archiveSearch';
 import { writeListCache } from './listCache';
+import { forgetAudio } from './audioCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -129,6 +130,7 @@ export async function deleteEpisodes(ids: string[]): Promise<void> {
   if (DEV_MODE || ids.length === 0) return;
   const { data: rows } = await supabase.from('podcast_episodes').select('audio_path').in('id', ids);
   const paths = (rows ?? []).map((r) => r.audio_path).filter((p): p is string => !!p);
+  forgetAudio('podcast', paths);
   if (paths.length) {
     const { error } = await supabase.storage.from('podcasts').remove(paths);
     if (error) console.warn('[podcasts] audio delete failed (row still deleted):', error);
