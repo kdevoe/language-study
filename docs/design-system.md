@@ -178,7 +178,9 @@ Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`,
 
 - Page titles, bottom-nav labels and the search placeholder are **English by default** and turn **Japanese when the reader actually learns the word** (marked easy in the word database). Vocabulary, not JLPT level, drives it. The switch is sticky.
   
-- A label can have **stages**: LIBRARY becomes 本棚, then 書庫 once that word is learned too. Each step plays the same event.
+- A label can have **stages**: LIBRARY becomes 本棚, then 書庫 once that word is learned too. A stage can also wait for a kanji: LISTEN becomes 聞く, then 聴く once 聴 is within the reader's RTK progress (one JMDict entry, so the kanji is the signal). Each step plays the same event.
+  
+- **Tap a page title** to open its word card (the first Japanese word while the title is English, else the one shown). Label words like 本棚 rarely appear in articles, so this is where they get met and graded.
   
 - The **switch is an event**, played once per label on its page title when it's on screen, one at a time (about 4.5s): a soft `--accent-primary` glow rises and the English brightens (0–1.2s); the English dissolves upward while the Japanese emerges blurred and widely spaced and comes into focus (1.2–3.2s); a small settle as the glow fades (3.2–4.5s). **No English caption afterwards.** Reduced motion gets a 0.6s crossfade.
   
@@ -186,7 +188,7 @@ Source of truth: `src/services/uiLabels.ts`, `src/components/AdaptiveLabel.tsx`,
   
 - Settings → Interface Language overrides it: English / Adaptive / 日本語.
   
-- Japanese labels: ニュース (katakana, not 読む), 本棚 → 書庫, 聴く, 復習, 検索, 設定. A new label needs its JMDict entry id in `UI_LABELS`.
+- Japanese labels: ニュース (katakana, not 読む), 本棚 → 書庫, 聞く → 聴く, 復習, 検索, 設定. A new label needs its JMDict entry id in `UI_LABELS`.
   
 
 * * *

@@ -534,9 +534,9 @@
   - [x] No global header on tab pages: one PageHeading per tab (title + slider-lines settings mark); reading keeps a
         back-arrow-only row; LISTEN/LIBRARY + moves to the end of the search row (34px)
   - [x] Adaptive labels: English default, Japanese when the reader learns the word (easy in wordDatabase — vocab,
-        not level); staged (LIBRARY 本棚 → 書庫); sticky `labelStages`; ~4.5s switch event on page titles, nav
+        not level); staged (LIBRARY 本棚 → 書庫, LISTEN 聞く → 聴く gated on RTK 聴); sticky `labelStages`; ~4.5s switch event on page titles, nav
         follows; Settings → Interface Language
-  - [ ] Maybe: tap a page title to open its word card (本棚/書庫 rarely appear in news, so they may never get graded)
+  - [x] Tap a page title → its word card (本棚/書庫 rarely appear in news, so this is where they get graded)
   - [x] index.html notranslate (Chrome was auto-translating the Japanese UI)
 - [x] Archive organize: LISTEN + LIBRARY (2026-10-10) — mockup docs/mockups/archive-organize.html, design-system.md §6.8
   - [x] Shared ArchiveList: month groups (newest open, older collapsed with a summary line), replaces the filter rows
