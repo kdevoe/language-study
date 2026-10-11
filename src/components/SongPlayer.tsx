@@ -17,7 +17,7 @@ import { cachedAudioUrl, saveAudio } from '../services/audioCache';
 // sits on soft blue (body.song-mode). Cover, title and style open big; as the
 // page scrolls they shrink into the back row and pin there. Lyrics are bold
 // serif in two colours: everything sung so far in charcoal, what's still to
-// come in white (.song-line.sung); ♪ marks the gap between sections. The page
+// come in pale ink (.song-line.sung); ♪ marks the gap between sections. The page
 // scrolls itself to keep the sung line ~40% down until the listener scrolls
 // away (↓ 再生位置へ re-syncs). Tapping a word pauses and opens its card. Line
 // times come from ElevenLabs' phrase timestamps (songs.timing); a line with no
