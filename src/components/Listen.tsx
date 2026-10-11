@@ -15,6 +15,7 @@ import {
   localDateKey,
   retryEpisode,
 } from '../services/podcasts';
+import { readListCache, writeListCache } from '../services/listCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -59,8 +60,12 @@ function sourceTag(ep: PodcastEpisode): string {
 }
 
 export function Listen({ onOpenEpisode, titleSwitch }: Props) {
-  const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Last-loaded episodes show at once; the fetch below refreshes them.
+  const [episodes, setEpisodes] = useState<PodcastEpisode[]>(() => readListCache<PodcastEpisode>('episodes') ?? []);
+  const [isLoading, setIsLoading] = useState(() => readListCache('episodes') === null);
+  // True once this visit has the server's list (not just the cache), so the
+  // daily-digest check below never acts on a stale copy.
+  const [fetched, setFetched] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -76,7 +81,7 @@ export function Listen({ onOpenEpisode, titleSwitch }: Props) {
   const load = useCallback(async () => {
     try {
       const list = await fetchEpisodes();
-      if (mountedRef.current) setEpisodes(list);
+      if (mountedRef.current) { setEpisodes(list); setFetched(true); }
     } catch (e) {
       console.error('[listen] fetchEpisodes failed:', e);
     } finally {
@@ -85,6 +90,8 @@ export function Listen({ onOpenEpisode, titleSwitch }: Props) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // Creates, retries and deletes change the list locally; keep the cache in step.
+  useEffect(() => { if (!isLoading) writeListCache('episodes', episodes); }, [episodes, isLoading]);
 
   // Poll while anything is being made; the edge function advances the rows.
   const anyInFlight = episodes.some(isInFlight);
@@ -96,7 +103,7 @@ export function Listen({ onOpenEpisode, titleSwitch }: Props) {
 
   // Morning radio: request today's digest once per day on first visit.
   useEffect(() => {
-    if (DEV_MODE || isLoading || digestRequestedRef.current) return;
+    if (DEV_MODE || !fetched || digestRequestedRef.current) return;
     digestRequestedRef.current = true;
     const today = localDateKey();
     if (episodes.some((e) => e.source_kind === 'digest' && e.source_ref === today)) return;
@@ -107,7 +114,7 @@ export function Listen({ onOpenEpisode, titleSwitch }: Props) {
     createEpisode({ kind: 'digest', date: today })
       .then((ep) => { if (mountedRef.current) setEpisodes((prev) => [ep, ...prev.filter((p) => p.id !== ep.id)]); })
       .catch((e) => console.info('[listen] daily digest not created:', e?.message ?? e));
-  }, [isLoading, episodes]);
+  }, [fetched, episodes]);
 
   const handleRetry = useCallback(async (ep: PodcastEpisode) => {
     try {

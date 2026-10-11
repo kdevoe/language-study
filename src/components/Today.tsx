@@ -13,6 +13,7 @@ import type { LongFormWork, NewsArticle } from '../services/api';
 import { fetchEpisodes } from '../services/podcasts';
 import type { PodcastEpisode } from '../services/podcasts';
 import { supabase } from '../services/supabase';
+import { readListCache } from '../services/listCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -39,6 +40,9 @@ function pickContinueWork(works: LongFormWork[]): LongFormWork | null {
   return inProgress.find((w) => w.id === lastId) ?? inProgress[0] ?? null;
 }
 
+/** A ready podcast not yet listened to. */
+const pickEpisode = (eps: PodcastEpisode[]) => eps.find((e) => e.status === 'ready' && !e.listened_at) ?? null;
+
 interface Props {
   onStartReview: () => void;
   onOpenWork: (work: LongFormWork, article: NewsArticle, resumeBlockIndex?: number) => void;
@@ -59,20 +63,23 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const [work, setWork] = useState<LongFormWork | null>(null);
+  // Both blocks start from the lists 本棚 and 番組 last loaded, then refresh.
+  const [work, setWork] = useState<LongFormWork | null>(() => pickContinueWork(readListCache<LongFormWork>('works') ?? []));
   const [openingWork, setOpeningWork] = useState(false);
   useEffect(() => {
-    resolveUserId().then(async (userId) => {
-      if (!userId) return;
-      const works = await fetchWorks(userId);
-      if (mountedRef.current) setWork(pickContinueWork(works));
-    });
+    resolveUserId()
+      .then(async (userId) => {
+        if (!userId) return;
+        const works = await fetchWorks(userId);
+        if (mountedRef.current) setWork(pickContinueWork(works));
+      })
+      .catch((e) => console.warn('[today] works failed:', e));
   }, []);
 
-  const [episode, setEpisode] = useState<PodcastEpisode | null>(null);
+  const [episode, setEpisode] = useState<PodcastEpisode | null>(() => pickEpisode(readListCache<PodcastEpisode>('episodes') ?? []));
   useEffect(() => {
     fetchEpisodes()
-      .then((eps) => { if (mountedRef.current) setEpisode(eps.find((e) => e.status === 'ready' && !e.listened_at) ?? null); })
+      .then((eps) => { if (mountedRef.current) setEpisode(pickEpisode(eps)); })
       .catch((e) => console.warn('[today] episodes failed:', e));
   }, []);
 

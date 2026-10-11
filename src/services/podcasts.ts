@@ -5,6 +5,7 @@
 import { supabase } from './supabase';
 import { invokeEdgeFn, isServerBusyError } from './api';
 import type { SearchCorpus } from './archiveSearch';
+import { writeListCache } from './listCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -93,7 +94,9 @@ export async function fetchEpisodes(): Promise<PodcastEpisode[]> {
     // digest is about 365 rows a year). Stays under PostgREST's 1000-row cap.
     .limit(900);
   if (error) throw error;
-  return (data ?? []) as PodcastEpisode[];
+  const episodes = (data ?? []) as PodcastEpisode[];
+  writeListCache('episodes', episodes);
+  return episodes;
 }
 
 /** Japanese script + English source per episode, for search (loaded on first search). */
