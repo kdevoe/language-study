@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Lyrics contrast</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700;800&display=swap');
+:root {
+  --bg-color: #f5f5f0; --bg-pure: #ffffff; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-primary: #d4e0e8; --accent-progress: #8fb0c4; --border-light: #e0e0d8; --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 760px; margin: 0 auto; }
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { position: relative; width: 380px; height: 820px; max-width: 100%; border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; background: var(--bg); }
+
+/* per-variant colours on the mist page: --sung lines up to now, --next lines to come.
+   Ratios are WCAG contrast against --accent-primary (#d4e0e8). */
+.v-white { --bg: var(--accent-primary); --sung: var(--text-main); --next: var(--bg-pure); --meta: #55636c; }
+.v-usuzumi { --bg: var(--accent-primary); --sung: var(--text-main); --next: #728997; --meta: #55636c; }
+.v-sumi { --bg: var(--accent-primary); --sung: var(--text-main); --next: #5e6f79; --meta: #55636c; }
+.v-nezumi { --bg: var(--accent-primary); --sung: var(--text-main); --next: #707578; --meta: #55636c; }
+
+.scroll { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: none; padding: 380px 1.5rem 220px; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* the header: big cover + title that shrinks into a pinned bar */
+.head { position: absolute; left: 0; right: 0; top: 0; z-index: 2; pointer-events: none; background: var(--bg); }
+.head .cover { position: absolute; border-radius: 18px; background-size: cover; background-position: center; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+.head .ttl { position: absolute; white-space: nowrap; }
+.head .ttl .t { font-family: var(--font-serif); font-weight: 600; color: var(--sung); }
+.head .ttl .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--meta); }
+.head .fade { position: absolute; left: 0; right: 0; bottom: -28px; height: 28px; background: linear-gradient(var(--bg), transparent); }
+
+.line { font-family: var(--font-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.45; letter-spacing: 0.02em; margin-bottom: 1.05rem; color: var(--next); transition: color 0.5s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+.line.sung { color: var(--sung); }
+.line .ph { transition: color 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+.v-fill .line.cur .ph { color: var(--next); }
+.v-fill .line.cur .ph.on { color: var(--sung); }
+.gap { font-family: var(--font-serif); font-size: 1.3rem; color: var(--next); margin: 0.4rem 0 1.4rem; transition: color 0.5s; }
+.gap.sung { color: var(--sung); }
+
+.ctrls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 2.4rem 1.6rem 1.6rem; background: linear-gradient(transparent, var(--bg) 28%); }
+.bar { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--sung) 15%, transparent); position: relative; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--sung); }
+.times { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--meta); margin-top: 0.4rem; font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; justify-content: center; gap: 2.2rem; margin-top: 0.5rem; }
+.row .p { width: 58px; height: 58px; border-radius: 50%; background: var(--bg-pure); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.row .p b { width: 0; height: 0; border-left: 15px solid var(--text-main); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+.row .p.on b { border: none; width: 16px; height: 18px; margin: 0; background: linear-gradient(90deg, var(--text-main) 0 35%, transparent 35% 65%, var(--text-main) 65%); }
+.row .sk { font-family: var(--font-serif); font-size: 0.85rem; color: var(--meta); }
+</style>
+</head>
+<body>
+<header class="mock-header">
+  <div class="kicker">BUILT (B) · MOCKUP · SONG LYRICS · UPCOMING-LINE CONTRAST</div>
+  <h1>Easier to read what's coming</h1>
+  <p>Same mist player as now. Only the colour of the lines still to come changes; sung lines stay charcoal (10.3:1). Each label gives the contrast against the blue page. The new colours are charcoal mixed into the app's blues and greys, so there's no new accent. All four phones play: tap a line to jump there.</p>
+</header>
+<div class="stage" id="stage"></div>
+<script>
+const COVER = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#f3efe4"/><rect x="0" y="62" width="100" height="38" fill="#2f3437"/><path d="M0 78 Q50 66 100 80 L100 100 L0 100Z" fill="#c9d6de"/><rect x="66" y="22" width="16" height="44" fill="#2f3437"/><rect x="71" y="30" width="5" height="5" fill="#e9b25c"/><rect x="84" y="34" width="12" height="32" fill="#c9d6de"/><path d="M14 64 Q10 40 26 30 Q22 48 30 62Z" fill="#5d6b3a"/><path d="M30 63 Q28 44 40 38 Q36 52 42 63Z" fill="#5d6b3a"/><rect x="40" y="70" width="16" height="6" rx="2" fill="#2f3437"/></svg>`);
+const SECTIONS = [
+  ['夏の夜 窓を開けて', '眠い町を 走る車', '台所の 小さな光', '君は まだ 起きてるかな'],
+  ['空が 段々 暗くなる', '大雨が もうすぐ 来る', 'でも 眠れない'],
+  ['風が 強い 夜だから', '君に 会いに 行くよ', '雨の 音も 歌になる', '眠らない 町を 走って', '風が 強い 夜だから'],
+  ['大使館の 前を 通る', '赤い 光が 揺れてる', '昔の 葉書 鞄の中', 'また 会おうと 書いてある'],
+];
+const PHONES = [
+  { cls: 'v-white', label: 'A · 白 WHITE (NOW) · 1.3:1', note: 'What ships today: white on soft blue. It looks airy, but the upcoming lines nearly disappear, especially outdoors or at low brightness.' },
+  { cls: 'v-usuzumi', label: 'B · 薄墨 PALE INK · 2.7:1', note: '#728997: the slate progress blue (--accent-progress) with 30% charcoal. It stays in the blue family and reads clearly, but it is still obviously lighter than what has been sung.' },
+  { cls: 'v-sumi', label: 'C · 墨 SLATE · 3.9:1', note: '#5e6f79: half slate, half charcoal. The easiest to read. The gap to the charcoal sung lines is smaller, so your place shows less strongly.' },
+  { cls: 'v-nezumi', label: 'D · 鼠 GREY · 3.5:1', note: '#707578: neutral grey (charcoal at 60% over the blue). The same idea as B and C without the blue tint; it looks a little flatter on the blue page.' },
+];
+
+function build(p, idx) {
+  const wrap = document.createElement('div'); wrap.className = 'phone-wrap';
+  wrap.innerHTML = `<div class="phone-label">${p.label}</div><div class="phone ${p.cls}">
+    <div class="scroll"></div>
+    <div class="head"><div class="cover" style="background-image:url('${COVER}')"></div><div class="ttl"><div class="t">風の強い夜</div><div class="s">シティポップ</div></div><div class="fade"></div></div>
+    <div class="ctrls"><div class="bar"><i></i></div><div class="times"><span class="a">0:00</span><span class="b">-2:00</span></div><div class="row"><span class="sk">⟲10</span><span class="p on"><b></b></span><span class="sk">⟳10</span></div></div>
+  </div><div class="phone-note">${p.note}</div>`;
+  const phone = wrap.querySelector('.phone'), sc = wrap.querySelector('.scroll'), head = wrap.querySelector('.head');
+  const cover = head.querySelector('.cover'), ttl = head.querySelector('.ttl'), t = ttl.querySelector('.t');
+  // lyrics
+  const lines = [];
+  SECTIONS.forEach((sec, si) => {
+    if (si) { const g = document.createElement('div'); g.className = 'gap'; g.textContent = '♪'; sc.appendChild(g); lines.push({ el: g, gap: true }); }
+    sec.forEach((l) => {
+      const d = document.createElement('div'); d.className = 'line';
+      d.innerHTML = l.split(' ').map((ph) => `<span class="ph">${ph}</span>`).join('　');
+      sc.appendChild(d); lines.push({ el: d, phs: [...d.querySelectorAll('.ph')] });
+    });
+  });
+  // header shrink: p = 0 (big, centred) → 1 (pinned bar)
+  const W = 360, lerp = (a, b, k) => a + (b - a) * k;
+  const layout = () => {
+    const k = Math.min(1, sc.scrollTop / 260), e = k * k * (3 - 2 * k);
+    const size = lerp(230, 46, e);
+    cover.style.width = cover.style.height = size + 'px';
+    cover.style.left = lerp((W - 230) / 2, 22, e) + 'px';
+    cover.style.top = lerp(46, 22, e) + 'px';
+    cover.style.borderRadius = lerp(18, 8, e) + 'px';
+    head.style.height = lerp(360, 90, e) + 'px';
+    t.style.fontSize = lerp(1.5, 1.02, e) + 'rem';
+    // The title rides under the cover, then slides in beside it: it never overlaps.
+    const tw = ttl.offsetWidth, cl = lerp((W - 230) / 2, 22, e), ct = lerp(46, 22, e);
+    const below = e < 0.55;
+    ttl.style.left = (below ? cl + (size - tw) / 2 : cl + size + 14) + 'px';
+    ttl.style.top = (below ? ct + size + 14 : ct + (size - ttl.offsetHeight) / 2) + 'px';
+    ttl.style.textAlign = below ? 'center' : 'left';
+    ttl.style.opacity = Math.abs(e - 0.55) < 0.08 ? Math.abs(e - 0.55) / 0.08 : 1;
+  };
+  let userAt = 0;
+  sc.addEventListener('scroll', layout);
+  ['wheel', 'touchstart', 'pointerdown'].forEach((ev) => sc.addEventListener(ev, () => { userAt = Date.now(); }, { passive: true }));
+  // playback simulation
+  let cur = -1, ph = 0, tick = 0;
+  const TOTAL = 120, per = 2.6;
+  const set = (i) => {
+    cur = i; ph = 0;
+    lines.forEach((l, j) => { l.el.classList.toggle('sung', j <= i); l.el.classList.toggle('cur', j === i); l.phs?.forEach((s) => s.classList.remove('on')); });
+    if (lines[i]?.phs) lines[i].phs[0].classList.add('on');
+    if (Date.now() - userAt > 3000 && lines[i]) {
+      // Keep the sung line about a third down, under the pinned bar; near the
+      // top of the song, stay fully open (big cover) rather than half-shrunk.
+      const target = lines[i].el.offsetTop - 250;
+      sc.scrollTo({ top: target < 260 ? 0 : target, behavior: 'smooth' });
+    }
+  };
+  lines.forEach((l, j) => l.el.addEventListener('click', () => { userAt = 0; set(j); }));
+  const bar = wrap.querySelector('.bar i'), ta = wrap.querySelector('.times .a'), tb = wrap.querySelector('.times .b');
+  setInterval(() => {
+    tick++;
+    const steps = Math.round(per * 4);
+    if (cur < 0 || tick % steps === 0) set((cur + 1) % lines.length);
+    else if (lines[cur]?.phs) {
+      const n = lines[cur].phs.length, want = Math.min(n - 1, Math.floor(((tick % steps) / steps) * n));
+      lines[cur].phs.forEach((s, j) => s.classList.toggle('on', j <= want));
+    }
+    const secs = Math.min(TOTAL, (cur + (tick % steps) / steps) * per + 8);
+    const f = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    bar.style.width = (secs / TOTAL * 100) + '%'; ta.textContent = f(secs); tb.textContent = '-' + f(TOTAL - secs);
+  }, 250 + idx * 3);
+  // start partly scrolled so the pinned bar shows; the first phone starts at the top
+  requestAnimationFrame(() => { layout(); if (idx) { userAt = Date.now() + 2000; sc.scrollTop = 420; } });
+  return wrap;
+}
+PHONES.forEach((p, i) => document.getElementById('stage').appendChild(build(p, i)));
+</script>
+</body>
+</html>

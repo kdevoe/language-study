@@ -236,8 +236,9 @@ ruby.peek-furigana rt {
 }
 
 /* Song player (SongPlayer.tsx, mockup docs/mockups/lyrics.html, phone B): the
-   page goes soft blue; lyrics are bold serif, charcoal once sung, white while
-   still to come. */
+   page goes soft blue; lyrics are bold serif, charcoal once sung, pale ink while
+   still to come (mockup docs/mockups/lyrics-contrast.html, B: --accent-progress
+   with 30% charcoal, 2.7:1 on the blue; white was 1.3:1 and hard to read). */
 body.song-mode {
   background-color: var(--accent-primary);
   --chrome-bg: var(--accent-primary);
@@ -248,7 +249,7 @@ body.song-mode {
   line-height: 1.45;
   letter-spacing: 0.02em;
   margin-bottom: 1.05rem;
-  color: var(--bg-pure);
+  color: #728997;
   transition: color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .song-line.sung {
