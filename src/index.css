@@ -235,6 +235,16 @@ ruby.peek-furigana rt {
   opacity: 0.8;
 }
 
+/* Song player (SongPlayer.tsx, mockup docs/mockups/music.html): the line being
+   sung is full strength, the rest faded. */
+.song-line {
+  opacity: 0.38;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.song-line.cur {
+  opacity: 1;
+}
+
 @keyframes lucide-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

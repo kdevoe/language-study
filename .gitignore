@@ -43,3 +43,6 @@ scripts/podcast-spike/
 public/podcast-dev/
 .tmp_rewrite_prompt.mjs
 scripts/out/
+
+# Dev-mode demo song (VITE_DEV_MODE), see services/songs.ts
+public/music-dev/

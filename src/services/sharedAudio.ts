@@ -23,6 +23,11 @@ export function sharedAudio(): HTMLAudioElement {
   return element;
 }
 
+/** True while the element still holds the unlock clip (not a real source). */
+export function isUnlockClip(audio: HTMLAudioElement | null): boolean {
+  return !!audio && audio.src === SILENT_WAV;
+}
+
 /** Call synchronously in the tap handler that opens something to play. */
 export function unlockSharedAudio(): void {
   const audio = sharedAudio();

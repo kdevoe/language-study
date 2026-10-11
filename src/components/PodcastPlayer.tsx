@@ -15,7 +15,7 @@ import {
   saveListenPosition,
 } from '../services/podcasts';
 import { castMember } from '../data/podcastCast';
-import { sharedAudio } from '../services/sharedAudio';
+import { isUnlockClip, sharedAudio } from '../services/sharedAudio';
 import { cachedAudioUrl, saveAudio } from '../services/audioCache';
 
 // Podcast player (docs/podcast-design.md §6.2, mockup docs/mockups/listen.html):
@@ -197,6 +197,9 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
 
   const onLoadedMetadata = () => {
     const audio = audioRef.current;
+    // The opening tap's silent unlock clip can finish loading after this mounts;
+    // only the real source counts (else it would use up the autoplay).
+    if (isUnlockClip(audio)) return;
     if (!audio || !ep) return;
     audio.playbackRate = rate;
     if (!ep.listened_at && ep.listen_position_ms > 0) {
@@ -555,7 +558,7 @@ const pillStyle = (on: boolean): React.CSSProperties => ({
 
 /** Skip button glyph: a circular arrow with the seconds inside (the ±10s
  *  transport, like most podcast players). Arcs from lucide's rotate-ccw/-cw. */
-function SkipIcon({ dir }: { dir: 'back' | 'forward' }) {
+export function SkipIcon({ dir, seconds = SKIP_S }: { dir: 'back' | 'forward'; seconds?: number }) {
   const back = dir === 'back';
   return (
     <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -571,7 +574,7 @@ function SkipIcon({ dir }: { dir: 'back' | 'forward' }) {
         </>
       )}
       <text x="12" y="15.4" textAnchor="middle" fill="currentColor" stroke="none" style={{ fontFamily: 'var(--font-sans)', fontSize: '7.6px', fontWeight: 600 }}>
-        {SKIP_S}
+        {seconds}
       </text>
     </svg>
   );

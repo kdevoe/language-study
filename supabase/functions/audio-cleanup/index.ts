@@ -5,13 +5,15 @@
 //   • objects in the bucket with no episode row are removed (orphans), through
 //     the Storage API, since deleting from storage.objects in SQL is refused.
 // Body: { dryRun?: true } reports what it would delete without deleting.
-// Music adds an entry to SWEEPS once its bucket and table exist.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const FAILED_AFTER_DAYS = 7;
 const BATCH = 100;
-const SWEEPS = [{ bucket: 'podcasts', table: 'podcast_episodes' }];
+const SWEEPS = [
+  { bucket: 'podcasts', table: 'podcast_episodes' },
+  { bucket: 'music', table: 'songs' },
+];
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });

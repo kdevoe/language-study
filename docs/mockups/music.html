@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — 音楽</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.serif { font-family: var(--font-serif); }
+
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1800px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; min-height: 2.4em; }
+.phone { width: 380px; height: 820px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; position: relative; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── page heading with title switch ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.6rem; }
+.titles { display: flex; align-items: baseline; gap: 0.95rem; }
+.titles .on { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.titles .off { font-family: var(--font-serif); font-size: 1.2rem; opacity: 0.5; }
+.icon-btn { width: 44px; height: 44px; margin-right: -5px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+
+/* ── song grid ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6rem 0.9rem; }
+.tile .cover { aspect-ratio: 1; border-radius: 16px; background: var(--bg-card); box-shadow: 0 4px 25px rgba(0,0,0,0.06); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.tile .t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.45; margin-top: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tile .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 0.2rem; }
+.working { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; font-size: 0.7rem; font-weight: 800; color: var(--text-muted); }
+.spin { width: 14px; height: 14px; border: 1.5px solid rgba(74,93,35,0.2); border-top-color: var(--olive); border-radius: 50%; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.c1 { background: linear-gradient(160deg, #f3c9a0 0%, #d98b6a 45%, #5b6b8c 100%); }
+.c2 { background: linear-gradient(200deg, #b9d3e0 0%, #e8d9c4 60%, #c49a7a 100%); }
+.c3 { background: linear-gradient(170deg, #2f3c55 0%, #8b6f9e 55%, #f0b48a 100%); }
+.c4 { background: linear-gradient(140deg, #dfe8d2 0%, #a9c19a 50%, #6f8a6a 100%); }
+.c5 { background: linear-gradient(190deg, #f6e3b4 0%, #f0a77c 60%, #b8566a 100%); }
+
+/* ── sheet ── */
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg-color); border-radius: 28px 28px 0 0; padding: 1.5rem 1.5rem 2.2rem; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); }
+.grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1.2rem; }
+.sheet h2 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin-bottom: 1rem; }
+.slider { position: relative; display: flex; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; }
+.slider span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); position: relative; z-index: 1; }
+.slider span.on { color: var(--text-main); font-weight: 700; }
+.slider .thumb { position: absolute; top: 4px; bottom: 4px; background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.pane { margin-top: 1.3rem; height: 124px; }
+.styles { display: flex; flex-wrap: wrap; gap: 0.35rem 0.4rem; }
+.styles span { font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted); padding: 0.3rem 0.75rem; border-radius: 100px; }
+.styles span.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 600; }
+.paste { width: 100%; height: 100%; border-radius: 16px; background: var(--bg-card); padding: 0.8rem 1rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; }
+.opt { height: 2.4rem; margin-top: 0.8rem; display: flex; align-items: center; font-size: 0.8rem; letter-spacing: 0.04em; color: var(--text-muted); }
+.opt.field { border-bottom: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-main); }
+.gorow { margin-top: 1.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.create { height: 45px; padding: 0 2rem; border-radius: 100px; font-family: var(--font-serif); font-size: 1.05rem; letter-spacing: 0.08em; font-weight: 700; background: var(--bg-pure); box-shadow: 0 4px 14px rgba(0,0,0,0.1); display: flex; align-items: center; }
+
+/* ── player ── */
+.back { height: 44px; display: flex; align-items: center; color: var(--text-muted); margin: -1rem 0 0.4rem -0.4rem; }
+.big-cover { width: 250px; aspect-ratio: 1; border-radius: 20px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+.song-title { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 500; text-align: center; margin-top: 1.2rem; line-height: 1.4; }
+.song-style { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); text-align: center; margin-top: 0.25rem; }
+.lyrics { margin-top: 2rem; padding-bottom: 12rem; }
+.sec { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin: 1.4rem 0 0.3rem; text-transform: uppercase; }
+.line { font-family: var(--font-serif); font-size: 1.15rem; line-height: 2.05; color: var(--text-main); opacity: 0.38; transition: opacity 0.4s; }
+.line.cur { opacity: 1; }
+.line .w { border-bottom: 1px dotted rgba(0,0,0,0.25); }
+.transport { position: absolute; left: 0; right: 0; bottom: 0; padding: 2rem 1.4rem 1.6rem; background: linear-gradient(to bottom, rgba(245,245,240,0), var(--bg-color) 22%); }
+.bar { position: relative; height: 18px; }
+.bar .track { position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: var(--border-light); }
+.bar .fill { position: absolute; left: 0; top: 8px; height: 2px; width: 38%; background: var(--text-main); }
+.bar .knob { position: absolute; top: 4px; left: 38%; width: 10px; height: 10px; border-radius: 50%; background: var(--text-main); transform: translateX(-5px); }
+.times { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-muted); }
+.controls { display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; }
+.pill { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; color: var(--text-muted); border: 1px solid var(--border-light); border-radius: 100px; padding: 0.35rem 0.7rem; min-width: 64px; text-align: center; }
+.pill.on { color: var(--text-main); border-color: var(--text-main); }
+.playbtn { width: 60px; height: 60px; border-radius: 50%; background: var(--text-main); color: var(--bg-pure); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,0.15); }
+.skip { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">BUILT · MOCKUP · 聞く › 音楽</div>
+  <h1>音楽: generated songs</h1>
+  <p>Songs written for your level by Claude Opus, sung by ElevenLabs Music, with cover art from Gemini. Pick a style or describe your own; real artists and song names are never sent or stored. Lyrics follow the song line by line, and any word opens its card.</p>
+</header>
+
+<div class="stage" id="stage"></div>
+
+<script>
+const ic = (name) => ({
+  plus: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  back: '<svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>',
+  retry: '<svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px;stroke-width:2.5"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
+}[name]);
+const skip = (back) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${back
+  ? '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'
+  : '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'}<text x="12" y="15.4" text-anchor="middle" fill="currentColor" stroke="none" style="font-family:Inter;font-size:7.6px;font-weight:600">10</text></svg>`;
+
+const heading = () => `<div class="heading"><div class="titles"><span class="off">番組</span><span class="on">音楽</span></div><span class="icon-btn">${ic('plus')}</span></div>`;
+
+const grid = () => `${heading()}
+  <div class="grid">
+    <div class="tile"><div class="cover"><div class="working"><div class="spin"></div>作曲中…</div></div><div class="t" style="color:var(--text-muted)">曲を準備中</div><div class="s">シティポップ</div></div>
+    <div class="tile"><div class="cover c1"></div><div class="t">時を駆けて</div><div class="s">アニメ主題歌</div></div>
+    <div class="tile"><div class="cover c2"></div><div class="t">朝のコーヒーと雨の音</div><div class="s">アコースティック</div></div>
+    <div class="tile"><div class="cover c3"></div><div class="t">夜の高速、君の声</div><div class="s">シティポップ</div></div>
+    <div class="tile"><div class="cover c4"></div><div class="t">にわのかえる</div><div class="s">童謡</div></div>
+    <div class="tile"><div class="cover"><span style="display:flex;align-items:center;gap:0.35rem;font-size:0.7rem;font-weight:800;color:#a8553f">${ic('retry')} 再試行</span></div><div class="t" style="color:var(--text-muted)">曲を準備中</div><div class="s">オリジナル</div></div>
+  </div>`;
+
+const sheet = (custom) => `${grid()}
+  <div class="backdrop"></div>
+  <div class="sheet">
+    <div class="grabber"></div>
+    <h2>新しい曲</h2>
+    <div class="slider"><div class="thumb" style="left:${custom ? 'calc(50%)' : '4px'};width:calc(50% - 4px)"></div><span class="${custom ? '' : 'on'}">スタイル</span><span class="${custom ? 'on' : ''}">自分で</span></div>
+    <div class="pane">${custom
+      ? '<div class="paste">どんな曲？　雰囲気、テンポ、楽器、声…<br><span style="color:var(--text-main)">A slow, dreamy summer song with a warm female voice, ukulele and soft brushed drums, nostalgic but happy.</span></div>'
+      : `<div class="styles">${['アニメ主題歌', 'シティポップ', 'バラード', 'アコースティック', 'ロック', 'ローファイ', 'エレクトロ', '童謡'].map((s, i) => `<span class="${i === 1 ? 'on' : ''}">${s}</span>`).join('')}</div>`}</div>
+    ${custom ? '<div class="opt">＋ テーマ</div>' : '<div class="opt field">夏の終わりの帰り道</div>'}
+    <div class="gorow">
+      <div class="slider" style="width:200px"><div class="thumb" style="left:calc(4px + (100% - 8px) / 3);width:calc((100% - 8px) / 3)"></div><span>1分</span><span class="on">2分</span><span>3分</span></div>
+      <span class="create">作る</span>
+    </div>
+  </div>`;
+
+const lyric = (text, cur) => `<div class="line${cur ? ' cur' : ''}">${text.split(' ').map((w) => `<span class="w">${w}</span>`).join('　')}</div>`;
+const player = () => `
+  <div class="back">${ic('back')}</div>
+  <div class="big-cover c1"></div>
+  <div class="song-title">時を駆けて</div>
+  <div class="song-style">アニメ主題歌 · 2:48</div>
+  <div class="lyrics">
+    <div class="sec">Verse 1</div>
+    ${lyric('目覚ましより 早く 胸が 騒いで', false)}
+    ${lyric('夢の 続き みたいな 誰かの 横顔', true)}
+    ${lyric('名前も 知らないのに 確かに 知ってる', false)}
+    <div class="sec">Chorus</div>
+    ${lyric('走れ 走れ 時を 越えて', false)}
+    ${lyric('千の 朝を 飛び越えて 君のもとへ', false)}
+  </div>
+  <div class="transport">
+    <div class="bar"><div class="track"></div><div class="fill"></div><div class="knob"></div></div>
+    <div class="times"><span>1:04</span><span>-1:44</span></div>
+    <div class="controls">
+      <span class="pill">1.0×</span>
+      <span class="skip">${skip(true)}</span>
+      <span class="playbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>
+      <span class="skip">${skip(false)}</span>
+      <span class="pill on">リピート</span>
+    </div>
+  </div>`;
+
+const phones = [
+  { label: '1 · 音楽', note: 'A grid of covers: title (serif 1.05rem, two lines) over the style. In-flight songs show their stage; a failed one offers 再試行. + opens the sheet; long-press a tile to delete.', html: grid() },
+  { label: '2 · 新しい曲 · スタイル', note: 'Pick one of eight styles (the selected one lifts like the slider thumb). The optional theme hides behind ＋ テーマ until asked for. Length 1 / 2 / 3分.', html: sheet(false) },
+  { label: '3 · 新しい曲 · 自分で', note: 'Describe your own in English or Japanese. References to real artists are turned into plain style words before anything is sent or saved.', html: sheet(true) },
+  { label: '4 · PLAYER', note: 'Cover, title and style, then the lyrics: the line being sung is full strength, the rest faded; it scrolls itself. Tap any word for its card (the song pauses). リピート loops the song.', html: player() },
+];
+document.getElementById('stage').innerHTML = phones.map((p) => `
+  <div class="phone-wrap">
+    <div class="phone-label">${p.label}</div>
+    <div class="phone"><div class="scroll">${p.html}</div></div>
+    <div class="phone-note">${p.note}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>

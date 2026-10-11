@@ -23,7 +23,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, ELEVEN_DIALOGUE_MODEL } from '../_shared/models.ts';
-import { pickPairing, personaById, type PairHistory, type Persona } from '../_shared/podcastCast.ts';
+import { CAST, STANDARD, pickPairing, personaById, type PairHistory, type Persona } from '../_shared/podcastCast.ts';
 import {
   buildPodcastPrompt,
   normalizeScript,
@@ -188,10 +188,15 @@ async function runScriptStage(supabase: SupabaseClient, episodeId: string) {
   const { data: ep } = await supabase.from('podcast_episodes').select('*').eq('id', episodeId).single<EpisodeRow>();
   if (!ep) return;
   try {
-    const host = personaById(ep.cast_ids?.host ?? '');
-    const guest = personaById(ep.cast_ids?.guest ?? '');
+    const { data: prefs } = await supabase.from('user_preferences').select('jlpt_level, podcast_personas').eq('user_id', ep.user_id).maybeSingle();
+    // The reader's own rewrite of a host's personality (Settings › 聞く) replaces the original.
+    const withOverride = (p: Persona | undefined) => {
+      const text = (prefs?.podcast_personas as Record<string, string> | null)?.[p?.id ?? ''];
+      return p && typeof text === 'string' && text.trim() ? { ...p, persona: text.trim().slice(0, 200) } : p;
+    };
+    const host = withOverride(personaById(ep.cast_ids?.host ?? ''));
+    const guest = withOverride(personaById(ep.cast_ids?.guest ?? ''));
     if (!host || !guest) throw new Error('episode has no valid cast');
-    const { data: prefs } = await supabase.from('user_preferences').select('jlpt_level').eq('user_id', ep.user_id).maybeSingle();
     const items = await loadSources(supabase, ep);
     const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')!, httpOptions: { apiVersion: 'v1beta' } });
     const t0 = Date.now();
@@ -429,7 +434,12 @@ Deno.serve(async (req) => {
     .filter((r) => r.cast_ids?.host && r.cast_ids?.guest)
     .slice(0, ROTATION_HISTORY)
     .map((r) => ({ host: r.cast_ids.host, guest: r.cast_ids.guest }));
-  const { host, guest } = pickPairing(history);
+  // Only the hosts the reader keeps in rotation (Settings › 聞く), if that still
+  // leaves a pairing with a 標準語 speaker; otherwise the full cast.
+  const { data: castPrefs } = await supabase.from('user_preferences').select('podcast_cast').eq('user_id', userId).maybeSingle();
+  const chosen = CAST.filter((p) => !castPrefs?.podcast_cast?.length || castPrefs.podcast_cast.includes(p.id));
+  const pool = chosen.length >= 2 && chosen.some((p) => p.dialect === STANDARD) ? chosen : CAST;
+  const { host, guest } = pickPairing(history, Math.random, pool);
 
   const { data: episode, error } = await supabase.from('podcast_episodes').insert({
     user_id: userId,

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Settings</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+:root {
+  --bg-color: #f5f5f0; --bg-pure: #ffffff; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-primary: #d4e0e8; --border-light: #e0e0d8; --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+.serif { font-family: var(--font-serif); }
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 380px; height: 860px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; }
+.scroll { height: 100%; overflow-y: auto; padding: 2.4rem 1.25rem 3rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+h2.page { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; margin-bottom: 1.6rem; }
+.section { margin-bottom: 3rem; }
+.section > h3 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin-bottom: 1.2rem; }
+.setting { margin-bottom: 1.6rem; }
+.setting .lbl { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: baseline; }
+.setting .lbl small { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+.hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.45rem; line-height: 1.5; }
+.slider { position: relative; display: flex; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; }
+.slider span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); position: relative; z-index: 1; }
+.slider span.on { color: var(--text-main); font-weight: 700; }
+.slider .thumb { position: absolute; top: 4px; bottom: 4px; background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.stepper { display: flex; align-items: center; gap: 0.75rem; }
+.stepper b { width: 34px; height: 34px; border-radius: 100px; background: var(--border-light); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.stepper span { min-width: 1.5rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chips span { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); padding: 0.4rem 0.9rem; border-radius: 100px; background: var(--border-light); }
+.chips span.on { background: var(--bg-pure); color: var(--text-main); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.sub { font-size: 0.82rem; font-weight: 600; display: flex; justify-content: space-between; align-items: baseline; margin: 1.4rem 0 0.6rem; }
+.sub small { font-size: 0.72rem; font-weight: 500; color: var(--text-muted); }
+.picks { display: flex; flex-direction: column; gap: 0.45rem; }
+.pick { border-radius: 16px; padding: 0.75rem 1rem; background: transparent; opacity: 0.5; }
+.pick.on { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.08); opacity: 1; }
+.pick .top { display: flex; align-items: baseline; gap: 0.5rem; }
+.pick .name { font-family: var(--font-serif); font-size: 1.02rem; font-weight: 600; }
+.pick .tag { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.pick .edit { margin-left: auto; font-family: var(--font-serif); font-size: 0.78rem; color: var(--text-muted); }
+.pick .desc { font-size: 0.76rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.15rem; }
+.pick textarea { width: 100%; margin-top: 0.4rem; border: none; border-bottom: 1px solid var(--text-muted); background: transparent; font-family: var(--font-serif); font-size: 0.85rem; line-height: 1.6; color: var(--text-main); resize: none; outline: none; }
+.pick .acts { display: flex; justify-content: flex-end; gap: 1.1rem; margin-top: 0.35rem; font-family: var(--font-serif); font-size: 0.8rem; color: var(--text-muted); }
+.pick .acts b { color: var(--text-main); }
+.more { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); text-align: center; margin-top: 1rem; }
+input[type=range] { width: 100%; accent-color: var(--text-main); }
+.annot { outline: 2px dashed rgba(200,60,60,0.5); outline-offset: 6px; border-radius: 12px; }
+</style>
+</head>
+<body>
+<header class="mock-header">
+  <div class="kicker">BUILT · MOCKUP · SETTINGS</div>
+  <h1>Settings, regrouped</h1>
+  <p>Nine boxed cards with paragraphs become four plain sections: 学習, 読む, 聞く, 表示. Serif section titles and space do the grouping; each setting keeps one short line at most. The one-off maintenance tools (deck rebalance, furigana re-align, sandbox, reset) move behind 詳細 at the bottom. 聞く is new: the podcast hosts and the song styles, both as pick lists you can view and change.</p>
+</header>
+<div class="stage" id="stage"></div>
+<script>
+const slider = (opts, on, w) => `<div class="slider"${w ? ` style="width:${w}"` : ''}><div class="thumb" style="left:calc(4px + ${on} * (100% - 8px) / ${opts.length});width:calc((100% - 8px) / ${opts.length})"></div>${opts.map((o, i) => `<span class="${i === on ? 'on' : ''}">${o}</span>`).join('')}</div>`;
+const stepper = (n) => `<div class="stepper"><b>−</b><span>${n}</span><b>+</b></div>`;
+const hosts = [
+  ['ハルカ', '', '30代。明るく好奇心旺盛で、リスナーと同じ目線で素朴な質問をする。', true],
+  ['ヨウコ', '', '50代。落ち着いたベテランの語り手。やさしく、具体例を使って説明する。', true],
+  ['ソウタ', '', '40代。物知りで穏やかな解説役。難しいことを短い文でやさしく説明する。', true],
+  ['ユウキ', '', '20代。元気で好奇心が強い。カジュアルだが聞き取りやすく話す。', true],
+  ['ケンジ', '関西弁', '30代。気さくでノリがいい。ツッコミ役で、リスナーの気持ちを代弁する。', true],
+  ['アヤ', '関西弁', '20代後半。明るくて機転がきく。身近な例えで話を面白くする。', false],
+  ['タクミ', '博多弁', '30代。おおらかでユーモアがある。のんびりした口調で場を和ませる。', true],
+];
+const styles = [
+  ['アニメ主題歌', 'Fast, soaring pop-rock: piano intro, galloping drums, strings at the chorus.', true],
+  ['シティポップ', '1980s city pop: slap bass, electric piano, a warm relaxed voice, night drives.', true],
+  ['バラード', 'Slow piano ballad that opens into strings; tender, close vocal.', true],
+  ['アコースティック', 'Warm acoustic guitar folk-pop, handclaps, a gentle friendly voice.', true],
+  ['ロック', 'Driving guitar rock with a big shout-along chorus.', false],
+  ['ローファイ', 'Chill lo-fi: dusty drums, mellow keys, a soft breathy voice.', true],
+  ['エレクトロ', 'Bright electro-pop, sparkling synths, four-on-the-floor.', false],
+  ['童謡', 'Simple, cheerful children\'s song; slow and easy to sing along to.', true],
+];
+const pick = ([name, tag, desc, on], editing) => `<div class="pick${on ? ' on' : ''}${editing ? ' annot' : ''}">
+  <div class="top"><span class="name">${name}</span>${tag ? `<span class="tag">${tag}</span>` : ''}${editing === undefined ? '' : `<span class="edit">${editing ? '' : '編集'}</span>`}</div>
+  ${editing ? `<textarea rows="3">${desc}もっとゆっくり話して、ときどきダジャレを言う。</textarea><div class="acts"><span>元に戻す</span><b>保存</b></div>` : `<div class="desc">${desc}</div>`}
+</div>`;
+
+const top = `<h2 class="page">Settings</h2>
+  <div class="section"><h3>学習</h3>
+    <div class="setting"><div class="lbl">JLPT</div>${slider(['N5', 'N4', 'N3', 'N2', 'N1'], 1)}</div>
+    <div class="setting"><div class="row"><div class="lbl" style="margin:0">New words / day</div>${stepper(3)}</div><div class="hint">Easiest first. 0 pauses new words.</div></div>
+    <div class="setting"><div class="row"><div class="lbl" style="margin:0">RTK kanji <small>&nbsp;of 2,200</small></div>${stepper(412)}</div><div class="hint">Goes up 3 a day.</div></div>
+  </div>
+  <div class="section"><h3>読む</h3>
+    <div class="setting"><div class="lbl">Topics</div><div class="chips">${['World', 'Japan', 'Technology', 'Science', 'Business', 'Culture', 'Sports', 'Health'].map((t, i) => `<span class="${[0, 1, 2, 3, 5].includes(i) ? 'on' : ''}">${t}</span>`).join('')}</div></div>
+    <div class="setting"><div class="lbl">Intensity</div>${slider(['Leisure', 'Balanced', 'Intensive'], 1)}<div class="hint">About 95% known words, a few review and new.</div></div>
+    <div class="setting"><div class="lbl">Length <small>paragraphs</small></div>
+      ${[['Full text', 6], ['Partial', 4], ['Snippet', 2]].map(([l, n]) => `<div class="row" style="margin-bottom:0.6rem"><span style="font-size:0.85rem">${l}</span>${stepper(n)}</div>`).join('')}
+    </div>
+    <div class="setting"><div class="lbl">Vocabulary</div>${slider(['Natural', 'Balanced', 'Study'], 1)}</div>
+    <div class="setting"><div class="lbl">Kanji</div>${slider(['Natural', 'Balanced', 'Study'], 1)}</div>
+  </div>`;
+
+const listen = (editing) => `<div class="section"><h3>聞く</h3>
+    <div class="setting"><div class="lbl">Songs</div>${slider(['Off', 'Every other day', 'Daily'], 1)}<div class="hint">Made from what you've been studying.</div></div>
+    <div class="sub">Song styles <small>6 of 8</small></div>
+    <div class="picks">${styles.map((s) => pick(['', ...s].slice(1).length ? [s[0], '', s[1], s[2]] : s)).join('')}</div>
+    <div class="sub">Podcast hosts <small>6 of 7</small></div>
+    <div class="picks">${hosts.map((h, i) => pick(h, editing && i === 0 ? true : false)).join('')}</div>
+  </div>`;
+
+const display = `<div class="section"><h3>表示</h3>
+    <div class="setting"><div class="lbl">Interface</div>${slider(['English', 'Adaptive', '日本語'], 1)}</div>
+    <div class="setting"><div class="lbl">Text size <small>18px</small></div><input type="range" min="14" max="32" value="18"></div>
+    <div class="setting"><div class="lbl">Weight <small>400</small></div><input type="range" min="300" max="700" step="100" value="400"></div>
+  </div>
+  <div class="more">詳細 ⌄</div>`;
+
+const phones = [
+  { label: '1 · TOP', note: '学習 and 読む. No boxes; titles and spacing group. Hints are one line and only where the control needs one.', html: top },
+  { label: '2 · 聞く', note: 'Song frequency, then the styles and hosts as pick lists: white = in the rotation, faded = left out. Tap a row to switch it; 編集 rewrites a host\'s personality.', html: listen(false) },
+  { label: '3 · EDITING A HOST', note: '編集 opens the personality in place (serif, underline field). 保存 keeps it for your episodes; 元に戻す restores the original. At least two hosts stay on, one of them standard Japanese.', html: listen(true) },
+  { label: '4 · 表示 + 詳細', note: 'Display last. 詳細 opens the maintenance tools (deck rebalance, furigana, sandbox, reset), unchanged.', html: display },
+];
+document.getElementById('stage').innerHTML = phones.map((p) => `<div class="phone-wrap"><div class="phone-label">${p.label}</div><div class="phone"><div class="scroll">${p.html}</div></div><div class="phone-note">${p.note}</div></div>`).join('');
+</script>
+</body>
+</html>
