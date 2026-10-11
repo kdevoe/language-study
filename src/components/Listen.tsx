@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
-import { ArchiveList } from './ArchiveList';
+import { ArchiveList, CornerText } from './ArchiveList';
 import type { TitleSwitch } from './PageHeading';
 import type { ArchiveCard } from './ArchiveList';
 import {
@@ -15,7 +15,6 @@ import {
   localDateKey,
   retryEpisode,
 } from '../services/podcasts';
-import { castMember } from '../data/podcastCast';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -37,25 +36,8 @@ interface Props {
   titleSwitch?: TitleSwitch;
 }
 
-/** Quiet relative date for the card sub-line (same wording as the Library). */
-function relativeDate(iso: string): string {
-  const then = new Date(iso);
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86_400_000);
-  if (days <= 0) return '今日';
-  if (days === 1) return '昨日';
-  if (days < 7) return `${days}日前`;
-  return then.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-}
-
-const durationLabel = (ep: PodcastEpisode) => {
-  if (!ep.duration_ms) return `約${ep.minutes}分`;
-  const s = Math.round(ep.duration_ms / 1000);
-  return `${Math.floor(s / 60)}分${String(s % 60).padStart(2, '0')}秒`;
-};
-
-const progressOf = (ep: PodcastEpisode) =>
-  ep.listened_at ? 1 : ep.duration_ms ? Math.min(1, ep.listen_position_ms / ep.duration_ms) : 0;
+const totalMinutes = (ep: PodcastEpisode) =>
+  ep.duration_ms ? Math.max(1, Math.round(ep.duration_ms / 60_000)) : ep.minutes;
 
 function stateOf(ep: PodcastEpisode): ListenState {
   if (ep.listened_at) return 'done';
@@ -141,30 +123,13 @@ export function Listen({ onOpenEpisode, titleSwitch }: Props) {
     if (mountedRef.current) setEpisodes((prev) => prev.filter((p) => !ids.includes(p.id)));
   }, []);
 
-  const card = useCallback((ep: PodcastEpisode): ArchiveCard => {
-    const host = castMember(ep.cast_ids?.host);
-    const guest = castMember(ep.cast_ids?.guest);
-    const dialect = host.dialect ?? guest.dialect;
-    const isDigest = ep.source_kind === 'digest';
-    const dot = <span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>;
-    return {
-      tag: sourceTag(ep),
-      status: statusCorner(ep, handleRetry),
-      title: ep.title || (isDigest ? '今日のニュースから' : 'エピソードを準備中'),
-      titleMuted: !ep.title,
-      meta: (
-        <>
-          <span style={{ color: 'var(--text-main)' }}>{host.name} × {guest.name}</span>
-          {dialect && <>{dot}{dialect}</>}
-          {dot}{durationLabel(ep)}
-          {dot}{relativeDate(ep.created_at)}
-        </>
-      ),
-      progress: progressOf(ep),
-      featured: isDigest,
-      openable: ep.status === 'ready',
-    };
-  }, [handleRetry]);
+  const card = useCallback((ep: PodcastEpisode): ArchiveCard => ({
+    tag: sourceTag(ep),
+    status: statusCorner(ep, handleRetry),
+    title: ep.title || (ep.source_kind === 'digest' ? '今日のニュースから' : 'エピソードを準備中'),
+    titleMuted: !ep.title,
+    openable: ep.status === 'ready',
+  }), [handleRetry]);
 
   return (
     <>
@@ -239,21 +204,12 @@ function statusCorner(ep: PodcastEpisode, onRetry: (ep: PodcastEpisode) => void)
       </button>
     );
   }
+  // Ready: where you are and the total, in minutes ("4 / 12分"); just the
+  // length before you start, and the full length once it's been heard.
+  const total = totalMinutes(ep);
   const state = stateOf(ep);
-  if (state === 'done') {
-    return (
-      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-        <CheckCircle2 size={16} strokeWidth={2.5} />
-        <span className="serif" style={{ fontSize: '0.8rem' }}>完了</span>
-      </span>
-    );
-  }
-  if (state === 'partial') {
-    return <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>途中 · {Math.round(progressOf(ep) * 100)}%</span>;
-  }
-  return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 800, color: '#4a5d23', letterSpacing: '0.05em' }}>
-      <CheckCircle2 size={16} strokeWidth={2.5} /> READY
-    </span>
-  );
+  const label = state === 'partial'
+    ? `${Math.min(total, Math.floor(ep.listen_position_ms / 60_000))} / ${total}分`
+    : state === 'done' ? `${total} / ${total}分` : `${total}分`;
+  return <CornerText>{label}</CornerText>;
 }

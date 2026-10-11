@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { ArchiveList } from './ArchiveList';
+import { ArchiveList, CornerText } from './ArchiveList';
 import type { ArchiveCard } from './ArchiveList';
 import type { TitleSwitch } from './PageHeading';
 import {
@@ -44,16 +42,14 @@ async function resolveUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
-/** Quiet relative date for the card sub-line. */
-function relativeDate(iso: string): string {
-  const then = new Date(iso);
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86_400_000);
-  if (days <= 0) return '今日';
-  if (days === 1) return '昨日';
-  if (days < 7) return `${days}日前`;
-  if (days < 30) return '先週';
-  return then.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+/** Top-right of a work's card: the part being read and the total ("2 / 5").
+ *  A single-part work has nothing to count, so it shows nothing. */
+export function PartCount({ work }: { work: LongFormWork }) {
+  if (work.partCount <= 1) return null;
+  const current = work.status === 'finished'
+    ? work.partCount
+    : Math.min(work.readingPosition?.partIndex ?? 1, work.partCount);
+  return <CornerText>{current} / {work.partCount}</CornerText>;
 }
 
 // LIBRARY tab: works in ArchiveList — grouped by month, searchable, swipe to
@@ -150,43 +146,15 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
     return fetchWorkSearchText(userId);
   }, []);
 
-  const card = useCallback((work: LongFormWork): ArchiveCard => {
-    const finished = work.status === 'finished';
-    const dot = <span style={{ margin: '0 0.35rem', opacity: 0.5 }}>·</span>;
-    let status: ReactNode;
-    if (openingId === work.id) {
-      status = <span style={statusStyle}>{spinner()} 読み込み中</span>;
-    } else if (finished) {
-      status = (
-        <span style={{ ...statusStyle, letterSpacing: '0.05em' }}>
-          <CheckCircle2 size={16} strokeWidth={2.5} />
-          <span className="serif" style={{ fontSize: '0.8rem' }}>完了</span>
-        </span>
-      );
-    } else if (work.partReady && work.partCount > 1 && work.readingPosition) {
-      status = (
-        <span className="serif" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a5d23', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-          第{Math.min(work.readingPosition.partIndex, work.partCount)}部・全{work.partCount}部
-        </span>
-      );
-    } else if (work.partReady) {
-      status = (
-        <span style={{ ...statusStyle, color: '#4a5d23', letterSpacing: '0.05em' }}>
-          <CheckCircle2 size={16} strokeWidth={2.5} /> READY
-        </span>
-      );
-    } else {
-      status = <span style={statusStyle}>{spinner()} 準備中</span>;
-    }
-    return {
-      tag: work.sourceType === 'magazine' ? 'MAGAZINE' : work.originUrl ? 'IMPORT · URL' : 'IMPORT',
-      status,
-      title: work.title,
-      meta: <>約{work.charCount.toLocaleString()}字{dot}全{work.partCount}部{dot}{relativeDate(work.createdAt)}</>,
-      progress: finished ? 0 : (work.readingPosition?.percent ?? 0),
-      openable: !!work.partReady,
-    };
-  }, [openingId]);
+  const card = useCallback((work: LongFormWork): ArchiveCard => ({
+    status: openingId === work.id
+      ? <span style={statusStyle}>{spinner()} 読み込み中</span>
+      : work.partReady
+        ? <PartCount work={work} />
+        : <span style={statusStyle}>{spinner()} 準備中</span>,
+    title: work.title,
+    openable: !!work.partReady,
+  }), [openingId]);
 
   return (
     <>

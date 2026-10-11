@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — 今日 review card</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 700px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 140px; height: 4px; border-radius: 2px; background: var(--border-light); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.18); cursor: pointer; }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: none; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.18); cursor: pointer; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 2100px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; min-height: 2.4em; }
+.phone { width: 380px; height: 760px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── 今日 page, as built ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.4rem; }
+.heading h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.icon-btn { width: 44px; height: 44px; margin-right: -5px; border: none; background: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.blocks { display: flex; flex-direction: column; gap: 2rem; }
+.sec-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; }
+.kick { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); }
+.meta { font-size: 0.74rem; color: var(--text-muted); font-weight: 500; }
+.dotsep { margin: 0 0.35rem; opacity: 0.5; }
+.serif { font-family: var(--font-serif); }
+.card { display: block; width: 100%; text-align: left; background: var(--bg-card); border-radius: 24px; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); cursor: pointer; position: relative; }
+.card.white { background: var(--bg-pure); }
+.work { padding: 1.5rem; }
+.work h3 { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 500; line-height: 1.45; max-width: calc(100% - 3.5rem); }
+.corner { position: absolute; top: 1.5rem; right: 1.5rem; line-height: 1; font-size: 0.7rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; }
+.rowcard { display: flex; align-items: center; gap: 0.9rem; padding: 1rem 1.2rem; }
+.rowcard .grow { flex: 1; min-width: 0; }
+.play { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; flex: none; }
+.news { display: flex; flex-direction: column; gap: 1.4rem; padding-top: 0.2rem; }
+.news .cat { display: block; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 0.35rem; }
+.news .hl { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.link { font-family: var(--font-serif); font-size: 0.88rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.15rem; }
+.link svg.i { width: 15px; height: 15px; }
+
+/* ── Review card variants ── */
+.go { font-family: var(--font-serif); font-size: 0.95rem; display: flex; align-items: center; gap: 0.2rem; white-space: nowrap; }
+.go svg.i { width: 18px; height: 18px; }
+.count { font-family: var(--font-serif); font-weight: 500; line-height: 1.15; }
+.count small { font-size: 0.55em; margin-left: 0.15rem; }
+
+/* 0 · now */
+.v0 { padding: 1.5rem 1.5rem 1.4rem; }
+.v0 .count { font-size: 2.6rem; line-height: 1.2; margin: 0.35rem 0 0.2rem; }
+.v0 .count small { font-size: 1.1rem; }
+.v0 .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 0.9rem; }
+
+/* 1 · one row */
+.v1 { display: flex; align-items: center; padding: 1.1rem 1.4rem; gap: 1rem; }
+.v1 .go { margin-left: auto; }
+.v1 .count { font-size: 1.8rem; }
+
+/* 2 · number as anchor */
+.v2 { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.4rem; }
+.v2 .num { font-family: var(--font-serif); font-size: 2.6rem; font-weight: 500; line-height: 1; min-width: 2.2ch; }
+.v2 .mid { flex: 1; min-width: 0; line-height: 1.4; }
+.v2 .mid .serif { font-size: 1rem; }
+
+/* 3 · lifted 始める button */
+.v3 { display: flex; align-items: center; gap: 0.9rem; padding: 1rem 1rem 1rem 1.4rem; }
+.v3 .grow { flex: 1; min-width: 0; }
+.v3 .grow .serif { font-size: 1.15rem; line-height: 1.4; }
+.lift { font-family: var(--font-serif); font-size: 0.95rem; background: var(--bg-pure); border-radius: 100px; padding: 0.55rem 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); white-space: nowrap; }
+
+/* 4 · same shape as 聞く */
+.v4 .serif { font-size: 1rem; line-height: 1.45; }
+
+/* 5 · one line */
+.v5 { display: flex; align-items: baseline; gap: 0.8rem; padding: 1.05rem 1.4rem; }
+.v5 .kick { flex: none; }
+.v5 .count { font-size: 1.35rem; }
+.v5 .meta { flex: 1; }
+.v5 .go { align-self: center; }
+
+/* Icon placements */
+.ric { width: 22px; height: 22px; color: var(--text-muted); stroke-width: 1.4; }
+.v0 .ric { margin-bottom: 0.2rem; }
+.v1 .ric, .v2 .ric, .v3 .ric { margin-right: -0.2rem; }
+.v5 .ric { width: 18px; height: 18px; align-self: center; margin-right: -0.3rem; }
+svg.i.ric-corner { position: absolute; top: 0.85rem; left: 1.4rem; width: 13px; height: 13px; color: var(--text-muted); stroke-width: 1.6; }
+.card.has-corner { padding-top: 2.1rem; }
+.card.v0.has-corner { padding-top: 2.4rem; }
+:root { --ric-size: 19px; }
+svg.i.ric-label { width: var(--ric-size); height: var(--ric-size); stroke-width: 1.8; }
+.kick.with-icon { display: flex; align-items: center; gap: 0.4rem; line-height: 1; }
+.sec-head { align-items: center; }
+body.no-label-text .ktext { display: none; }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav button { width: 76px; border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.6rem; line-height: 1rem; letter-spacing: 0.05em; font-weight: 500; margin-top: 2px; }
+.nav button.on { color: var(--text-main); }
+.nav button.on .ic { background: var(--accent-primary); }
+.nav button.on .ic svg.i { stroke-width: 1.9; }
+
+/* ── Notes ── */
+.notes { max-width: 820px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+@media (max-width: 440px) { .phone { height: 700px; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="sliders" viewBox="0 0 24 24"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></symbol>
+    <symbol id="newspaper" viewBox="0 0 24 24"><path d="M15 18h-5"/><path d="M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION</div>
+  <h1>The 復習 card, five ways</h1>
+  <p>The card at the top of 今日 is too tall for what it says. Phone 0 is how it looks now; 1–5 are shorter takes, each shown in the full page so you can see how it sits above 続きを読む, 聞く and ニュース. Round three, as built: white card, no 新 / 復習 split, and every section label led by its tab's icon (On label). ICON SIZE sets the label icons live; the label text is 11px. Phone 1 is what the app now ships: 19px icons with no label text, and the reading block labelled 本棚 (the app's adaptive label for that page) rather than 続きを読む. The toggles apply to all six phones; ICON tries it inside the card, small in the card's top-left corner, or beside the label.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">CARDS DUE</span><div class="pill-seg" data-ctl="due"><button data-v="small">3</button><button data-v="mid" class="on">17</button><button data-v="big">142</button></div></div>
+    <div class="ctl"><span class="lbl">ICON</span><div class="pill-seg" data-ctl="icon"><button data-v="none">None</button><button data-v="lead">In card</button><button data-v="corner">Corner</button><button data-v="label" class="on">On label</button></div></div>
+    <div class="ctl"><span class="lbl">LABEL TEXT</span><div class="pill-seg" data-ctl="labelText"><button data-v="on">Show</button><button data-v="off" class="on">Hide</button></div></div>
+    <div class="ctl"><span class="lbl">ICON SIZE</span><input type="range" id="ricSize" min="10" max="24" step="1" value="19"><span class="lbl" id="ricVal" style="min-width:3.2em">19px</span></div>
+  </div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<div class="notes">
+  <h3>The five</h3>
+  <ol>
+    <li><span class="n">1</span><span><b>One row.</b> The count on the left at 1.8rem, 始める on the right. 復習 moves out to the section label like every other block. About half the height of now.</span></li>
+    <li><span class="n">2</span><span><b>Number as anchor.</b> Keeps the big 2.6rem number but puts it beside the words instead of above them, so the size stays and the empty band goes.</span></li>
+    <li><span class="n">3</span><span><b>Lifted 始める.</b> The action becomes a white pill with the thumb shadow (the "ready" lift from the design system), so the card itself can sit on the soft fill and the button carries the emphasis.</span></li>
+    <li><span class="n">4</span><span><b>Same shape as 聞く.</b> Title, small meta, round white button on the right: review and listen become siblings, told apart by their button and label. Most uniform, least prominent.</span></li>
+    <li><span class="n">5</span><span><b>One line.</b> Label, count and 始める on a single baseline inside the card. The shortest; with the split gone it no longer crowds at 142.</span></li>
+  </ol>
+  <h3>My pick</h3>
+  <ol>
+    <li><span class="n">→</span><span>Built: 1 with icons on the labels. Earlier pick: 1, or 2 if you want the number to stay the hero. Both keep review as the white, time-sensitive card while matching the left-text, right-action rhythm of 聞く below it.</span></li>
+  </ol>
+</div>
+
+<script>
+const state = { due: 'mid', split: 'off', icon: 'label', labelText: 'off' };
+document.body.classList.add('no-label-text');
+const DUE = { small: [3, 1], mid: [17, 5], big: [142, 20] }; // [total, new]
+const chev = '<svg class="i"><use href="#chev"/></svg>';
+
+const VARIANTS = [
+  { label: '0 · NOW', note: 'As built: label inside, count on its own row, split and 始める below.', labelOutside: false, render: (n, nw, split) => `
+      <div class="card ${fill()} v0">${corner()}${lead()}
+        <div class="kick">復習</div>
+        <div class="count">${n}<small>枚</small></div>
+        <div class="foot"><span class="meta">${split ? `新 ${nw}<span class="dotsep">·</span>復習 ${n - nw}` : ''}</span><span class="go">始める${chev}</span></div>
+      </div>` },
+  { label: '1 · ONE ROW (BUILT)', note: 'Count left, 始める right; label outside like the other blocks.', labelOutside: true, render: (n, nw, split) => `
+      <div class="card ${fill()} v1">${corner()}${lead()}
+        <div>
+          <div class="count">${n}<small>枚</small></div>
+          ${split ? `<div class="meta">新 ${nw}<span class="dotsep">·</span>復習 ${n - nw}</div>` : ''}
+        </div>
+        <span class="go">始める${chev}</span>
+      </div>` },
+  { label: '2 · NUMBER AS ANCHOR', note: 'Big number kept, set beside the words instead of above them.', labelOutside: true, render: (n, nw, split) => `
+      <div class="card ${fill()} v2">${corner()}${lead()}
+        <div class="num">${n}</div>
+        <div class="mid">
+          <div class="serif">枚のカード</div>
+          ${split ? `<div class="meta">新 ${nw}<span class="dotsep">·</span>復習 ${n - nw}</div>` : ''}
+        </div>
+        <span class="go">${chev}</span>
+      </div>` },
+  { label: '3 · LIFTED 始める', note: 'The action is a white lifted pill; the card can stay soft.', labelOutside: true, render: (n, nw, split) => `
+      <div class="card ${fill()} v3">${corner()}${lead()}
+        <div class="grow">
+          <div class="serif">${n}枚</div>
+          ${split ? `<div class="meta">新 ${nw}<span class="dotsep">·</span>復習 ${n - nw}</div>` : ''}
+        </div>
+        <span class="lift">始める</span>
+      </div>` },
+  { label: '4 · SAME SHAPE AS 聞く', note: 'Mirrors the podcast row: text left, round button right.', labelOutside: true, render: (n, nw, split) => `
+      <div class="card ${fill()} rowcard v4">${corner()}${lead()}
+        <div class="grow">
+          <div class="serif">${n}枚のカード</div>
+          ${split ? `<div class="meta">新 ${nw}<span class="dotsep">·</span>復習 ${n - nw}</div>` : ''}
+        </div>
+        <span class="play">${chev}</span>
+      </div>` },
+  { label: '5 · ONE LINE', note: 'Everything on one baseline inside the card. Shortest.', labelOutside: false, render: (n, nw, split) => `
+      <div class="card ${fill()} v5">${corner()}${lead()}
+        <span class="kick">復習</span>
+        <span class="count">${n}<small>枚</small></span>
+        <span class="meta">${split ? `新 ${nw}<span class="dotsep">·</span>${n - nw}` : ''}</span>
+        <span class="go">始める${chev}</span>
+      </div>` },
+];
+
+function fill() { return 'white' + (state.icon === 'corner' ? ' has-corner' : ''); }
+// The REVIEW tab's icon (lucide layers): leading inside the card, tucked in the
+// card's top-left corner, or beside the 復習 label above it.
+const lead = () => state.icon === 'lead' ? '<svg class="i ric"><use href="#layers"/></svg>' : '';
+const corner = () => state.icon === 'corner' ? '<svg class="i ric-corner"><use href="#layers"/></svg>' : '';
+const labelIcon = (id = 'layers') => state.icon === 'label' ? `<svg class="i ric-label"><use href="#${id}"/></svg>` : '';
+const kick = (id, t) => `<span class="kick with-icon" aria-label="${t}">${labelIcon(id)}<span class="ktext">${t}</span></span>`;
+
+function page(v) {
+  const [n, nw] = DUE[state.due];
+  const review = v.labelOutside
+    ? `<section><div class="sec-head"><span class="kick with-icon" aria-label="復習">${labelIcon()}<span class="ktext">復習</span></span></div>${v.render(n, nw, state.split === 'on')}</section>`
+    : v.render(n, nw, state.split === 'on');
+  return `
+    <div class="heading"><h2>今日</h2><span class="icon-btn"><svg class="i"><use href="#sliders"/></svg></span></div>
+    <div class="blocks">
+      ${review}
+      <section>
+        <div class="sec-head">${kick('book', '本棚')}</div>
+        <div class="card work"><span class="corner">2 / 4</span><h3>村上春樹「職業としての小説家」より</h3></div>
+      </section>
+      <section>
+        <div class="sec-head">${kick('headphones', '聞く')}</div>
+        <div class="card rowcard">
+          <div class="grow"><div class="serif" style="font-size:1rem;line-height:1.45">秋の京都、紅葉と観光客</div><div class="meta">番組</div></div>
+          <span class="play"><svg viewBox="0 0 24 24" width="16" height="16" style="margin-left:2px"><path d="M6 4l14 8-14 8z" fill="#2d2d2d"/></svg></span>
+        </div>
+      </section>
+      <section>
+        <div class="sec-head">${kick('newspaper', 'ニュース')}<span class="link">すべて${chev}</span></div>
+        <div class="news">
+          <div><span class="cat">WORLD</span><span class="hl">Attack on Riyadh airport killed 12 people and wounded over 300 more, Saudi authorities say</span></div>
+          <div><span class="cat">TECHNOLOGY</span><span class="hl">A Cray-1 supercomputer replica from 30 "obsolete" Mac Minis</span></div>
+        </div>
+      </section>
+    </div>`;
+}
+
+const NAV = [['sun', '今日', true], ['book', '読む'], ['headphones', '聞く'], ['layers', '復習']];
+const nav = () => `<div class="nav">${NAV.map(([ic, l, on]) =>
+  `<button class="${on ? 'on' : ''}"><span class="ic"><svg class="i"><use href="#${ic}"/></svg></span><span class="lab">${l}</span></button>`).join('')}</div>`;
+
+function render() {
+  document.getElementById('stage').innerHTML = VARIANTS.map((v) => `
+    <div class="phone-wrap">
+      <div class="phone-label">${v.label}</div>
+      <div class="phone"><div class="scroll">${page(v)}</div>${nav()}</div>
+      <div class="phone-note">${v.note}</div>
+    </div>`).join('');
+}
+
+document.querySelectorAll('.pill-seg').forEach((seg) => {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    state[seg.dataset.ctl] = b.dataset.v;
+    document.body.classList.toggle('no-label-text', state.labelText === 'off');
+    render();
+  });
+});
+const ricSize = document.getElementById('ricSize');
+ricSize.addEventListener('input', () => {
+  document.documentElement.style.setProperty('--ric-size', ricSize.value + 'px');
+  document.getElementById('ricVal').textContent = ricSize.value + 'px';
+});
+render();
+</script>
+</body>
+</html>

@@ -25,16 +25,12 @@ const FULL_SWIPE = 0.55;
 const UNDO_MS = 5000;
 
 export interface ArchiveCard {
-  tag: string;
+  /** Top-left label; left out where it says nothing (long-form works). */
+  tag?: string;
   status: ReactNode;
   title: string;
   /** Muted when the item has no real title yet (e.g. still being made). */
   titleMuted?: boolean;
-  meta: ReactNode;
-  /** 0–1, drawn as a thin bar along the bottom edge. */
-  progress?: number;
-  /** White card (e.g. the daily digest) instead of the soft card fill. */
-  featured?: boolean;
   /** False for items that can't be opened yet; taps do nothing. */
   openable: boolean;
 }
@@ -185,7 +181,7 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
     for (const item of items) {
       if (hidden.has(item.id)) continue;
       const c = card(item);
-      const m = matchItem([c.title, c.tag], corpus?.get(item.id), q);
+      const m = matchItem([c.title, c.tag ?? ''], corpus?.get(item.id), q);
       if (m.hit) rows.push({ item, card: c, snippet: m.snippet });
     }
     return rows;
@@ -443,15 +439,24 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
 }
 
 // ── One card's contents ─────────────────────────────────────────────────────
+/** A card's top-right plain text (part count, length) — same weight as the Feed's READY. */
+export function CornerText({ children }: { children: ReactNode }) {
+  return (
+    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+      {children}
+    </span>
+  );
+}
+
 export function CardBody({ card, query, snippet, selecting, selected }: {
   card: ArchiveCard; query: string; snippet?: Snippet; selecting: boolean; selected: boolean;
 }) {
   return (
     <div
       style={{
-        backgroundColor: selected || card.featured ? 'var(--bg-pure)' : 'var(--bg-card)',
+        backgroundColor: selected ? 'var(--bg-pure)' : 'var(--bg-card)',
         borderRadius: '24px',
-        padding: '1.4rem 1.5rem',
+        padding: '1.5rem',
         border: '1px solid var(--border-light)',
         boxShadow: selected ? '0 2px 8px rgba(0,0,0,0.1)' : '0 4px 25px rgba(0,0,0,0.03)',
         cursor: selecting || card.openable ? 'pointer' : 'default',
@@ -460,16 +465,21 @@ export function CardBody({ card, query, snippet, selecting, selected }: {
         transition: `background-color 0.4s cubic-bezier(${EASE.join(',')}), box-shadow 0.4s cubic-bezier(${EASE.join(',')})`,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.9rem', gap: '0.6rem' }}>
-        <span style={{
-          fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.15em',
-          backgroundColor: card.featured ? 'var(--accent-primary)' : 'var(--bg-pure)',
-          color: card.featured ? 'var(--text-main)' : 'var(--text-muted)',
-          padding: '0.3rem 0.7rem', borderRadius: '8px',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%',
-        }}>
-          <Highlight text={card.tag} query={query} />
-        </span>
+      {/* Without a tag the corner floats beside the title instead of taking a row. */}
+      <div style={card.tag
+        ? { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', gap: '0.6rem' }
+        : { position: 'absolute', top: '1.5rem', right: '1.5rem', lineHeight: 1 }}>
+        {card.tag ? (
+          <span style={{
+            fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em',
+            backgroundColor: 'var(--bg-pure)',
+            color: 'var(--text-muted)',
+            padding: '0.3rem 0.7rem', borderRadius: '8px',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%',
+          }}>
+            <Highlight text={card.tag} query={query} />
+          </span>
+        ) : null}
         {selecting ? (
           <span
             aria-hidden
@@ -487,11 +497,9 @@ export function CardBody({ card, query, snippet, selecting, selected }: {
         ) : card.status}
       </div>
 
-      <h3 className="serif" style={{ fontSize: '1.25rem', fontWeight: 500, lineHeight: 1.5, color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', marginBottom: '0.8rem', maxWidth: '95%' }}>
+      <h3 className="serif" style={{ fontSize: '1.35rem', lineHeight: 1.45, color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', maxWidth: card.tag ? '90%' : 'calc(100% - 3.5rem)' }}>
         <Highlight text={card.title} query={query} />
       </h3>
-
-      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>{card.meta}</div>
 
       {snippet && (
         <div
@@ -503,10 +511,6 @@ export function CardBody({ card, query, snippet, selecting, selected }: {
           </span>
           {snippet.before}<mark style={markStyle}>{snippet.match}</mark>{snippet.after}
         </div>
-      )}
-
-      {(card.progress ?? 0) > 0 && (
-        <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${Math.round(Math.min(1, card.progress!) * 100)}%`, backgroundColor: 'var(--accent-primary)' }} />
       )}
     </div>
   );

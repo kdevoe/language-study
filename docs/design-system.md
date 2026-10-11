@@ -140,7 +140,7 @@ Source of truth: Settings (JLPT, Article Intensity, Vocab Use, Kanji Use).
 - **Suggestions:** plain serif text buttons in `--text-muted`, no outline.
   
 ### 6.5 Cards
-`--bg-card` (or `--bg-pure` for a featured item such as the daily digest), radius 24px, padding `1.4rem 1.5rem`, 1px `--border-light`, shadow `0 4px 25px rgba(0,0,0,0.03)`. Kicker tag at top-left, status at top-right, serif title, one muted meta line. Progress is shown as a 3px `--accent-primary` bar along the bottom edge: a quiet hint, not a meter. (`--accent-progress` there pulled the eye off the title.)
+Same as the Feed's news card: `--bg-card`, radius 24px, padding `1.5rem`, 1px `--border-light`, shadow `0 4px 25px rgba(0,0,0,0.03)`. Kicker tag at top-left, one plain status at top-right, serif title at 1.35rem. Nothing below the title: no meta line, no progress bar. The top-right says where you are, nothing more: `2 / 4` (part read / total) for a long-form work, `4 / 12分` for a podcast in progress (just `12分` before it starts). Long-form works carry no tag; their count then floats in the corner beside the title instead of taking a row, and a single-part work shows no count.
 ### 6.6 Toast
 Fixed at the top centre, `--bg-card`, radius 14px, 1px `--border-light`, shadow `0 6px 30px rgba(0,0,0,0.12)`, 0.85rem, tap to dismiss, auto-hides after about 5s. Keep messages to a few words (聴くタブで作成中).
 ### 6.7 Icon buttons
@@ -217,7 +217,7 @@ Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.htm
 
 - **Tabs:** 今日 · 読む · 聞く · 復習. The app opens on 今日. 読む holds the news feed and the 本棚, 聞く the 番組 (podcasts) and 音楽 (a 近日公開 placeholder for now), each behind a title switch (§6.9).
   
-- **What's waiting today, in order:** cards due (the featured white card: count in serif 2.6rem, 新 / 復習 split, 始める); 続きを読む (the last-opened work in progress, as an archive card); 今日の漢字 (the 3 newest RTK kanji with keywords; tap opens the word card); 聞く (a ready, unplayed podcast); ニュース (two headlines as plain text, すべて opens 読む).
+- **What's waiting today, in order:** cards due (one white row: count in serif 1.8rem on the left, 始める › on the right; no 新 / 復習 split); 本棚 (the last-opened work in progress, as an archive card); 聞く (a ready, unplayed podcast: title over the adaptive 番組 label, with a play button); ニュース (two headlines as plain text, no card: a small sans category kicker over a serif headline clamped to two lines, 1.4rem between picks; すべて opens 読む). Every block is marked by its tab's icon alone (復習 layers, 本棚 book, 聞く headphones, ニュース newspaper) at 19px in `--text-muted`, with no label text; the word stays as the icon's accessible name (the page's adaptive label where there is one). Text inside a block that names a page uses that page's adaptive label (番組), so it reads the same as the page it opens. Each kind keeps its own shape (a card for reading, a play row for audio, plain text for news) so the page doesn't read as one list.
   
 - **Each block is a shortcut into the tab that owns it,** never a copy. A block with nothing to show is left out, the review card included when nothing is due; whichever block shows first sits right under the heading.
   
