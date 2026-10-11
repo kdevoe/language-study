@@ -1062,6 +1062,10 @@ export async function upsertUserPreferences(
     target_paragraphs_snippet?: number;
     new_words_per_day?: number;
     feed_topics?: string[];
+    song_frequency?: 'off' | 'every_other_day' | 'daily';
+    song_styles?: string[];
+    podcast_cast?: string[];
+    podcast_personas?: Record<string, string>;
   }
 ) {
   const { error } = await supabase

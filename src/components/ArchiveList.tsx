@@ -655,7 +655,7 @@ function SwipeRow({ id, openId, setOpenId, selecting, onDelete, onLongPress, onT
 }
 
 /** The heading's +: a plain icon matching the settings mark's size and weight (design-system §6.9). */
-function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
+export function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}

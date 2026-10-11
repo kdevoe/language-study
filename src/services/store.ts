@@ -21,6 +21,8 @@ export const DIFFICULTY_MAX = 10;
 const clampDifficulty = (n: number) =>
   Math.max(DIFFICULTY_MIN, Math.min(DIFFICULTY_MAX, Math.round(n)));
 
+export type SongFrequency = 'off' | 'every_other_day' | 'daily';
+
 export function bucketForDifficulty(difficulty: number): Exclude<MasteryLevel, 'unseen'> {
   if (difficulty <= 3) return 'easy';
   if (difficulty <= 7) return 'medium';
@@ -215,6 +217,13 @@ interface AppState {
   // the queue into active study, and when the last promotion pass ran (daily gate).
   newWordsPerDay: number;
   lastIntakePromotionTs: number | null;
+  // 聞く (docs/music-design.md): how often an automatic song is made, which styles
+  // it draws from and which podcast hosts rotate (null = all), plus the reader's
+  // own rewrites of host personalities (persona id → text; absent = original).
+  songFrequency: SongFrequency;
+  songStyles: string[] | null;
+  podcastCast: string[] | null;
+  podcastPersonas: Record<string, string>;
   // Review-activity history (#73): count of schedule-advancing review events per
   // calendar day (YYYY-MM-DD → count), powering the study dashboard's heatmap.
   // Local-only, pruned to a rolling window so the persisted blob can't grow unbounded.
@@ -255,6 +264,10 @@ interface AppState {
   setTargetParagraphs: (kind: 'full' | 'partial' | 'snippet', value: number) => void;
   setFeedTopics: (topics: string[]) => void;
   setNewWordsPerDay: (n: number) => void;
+  setSongFrequency: (f: SongFrequency) => void;
+  setSongStyles: (ids: string[]) => void;
+  setPodcastCast: (ids: string[]) => void;
+  setPodcastPersona: (id: string, text: string | null) => void;
   /** #6 minimal slice (long-form design §7): when on, word-progress writes —
    *  reader grades, lookups, flashcard reviews, manual sets — are skipped
    *  entirely (local AND server), so testing doesn't pollute real SRS state. */
@@ -332,6 +345,10 @@ export const useAppStore = create<AppState>()(
       targetParagraphs: { full: 5, partial: 4, snippet: 3 },
       feedTopics: null,
       newWordsPerDay: 3,
+      songFrequency: 'every_other_day',
+      songStyles: null,
+      podcastCast: null,
+      podcastPersonas: {},
       sandboxMode: false,
       lastIntakePromotionTs: null,
       reviewsByDay: {},
@@ -411,6 +428,37 @@ export const useAppStore = create<AppState>()(
         set({ newWordsPerDay: v });
         currentUserId().then((uid) => {
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { new_words_per_day: v }));
+        });
+      },
+
+      setSongFrequency: (f) => {
+        set({ songFrequency: f });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { song_frequency: f }));
+        });
+      },
+      setSongStyles: (ids) => {
+        if (ids.length === 0) return; // at least one style stays on
+        const clean = [...new Set(ids)];
+        set({ songStyles: clean });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { song_styles: clean }));
+        });
+      },
+      setPodcastCast: (ids) => {
+        const clean = [...new Set(ids)];
+        set({ podcastCast: clean });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { podcast_cast: clean }));
+        });
+      },
+      setPodcastPersona: (id, text) => {
+        const next = { ...get().podcastPersonas };
+        const clean = text?.trim().slice(0, 200);
+        if (clean) next[id] = clean; else delete next[id];
+        set({ podcastPersonas: next });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { podcast_personas: next }));
         });
       },
 
@@ -1169,6 +1217,10 @@ export const useAppStore = create<AppState>()(
             },
             newWordsPerDay: remotePrefs.new_words_per_day ?? state.newWordsPerDay,
             feedTopics: remotePrefs.feed_topics ?? state.feedTopics,
+            songFrequency: remotePrefs.song_frequency ?? state.songFrequency,
+            songStyles: remotePrefs.song_styles ?? state.songStyles,
+            podcastCast: remotePrefs.podcast_cast ?? state.podcastCast,
+            podcastPersonas: remotePrefs.podcast_personas ?? state.podcastPersonas,
           }));
         }
 
@@ -1817,6 +1869,10 @@ export const useAppStore = create<AppState>()(
         targetParagraphs: state.targetParagraphs,
         feedTopics: state.feedTopics,
         newWordsPerDay: state.newWordsPerDay,
+        songFrequency: state.songFrequency,
+        songStyles: state.songStyles,
+        podcastCast: state.podcastCast,
+        podcastPersonas: state.podcastPersonas,
         // Persisted so a mid-test reload (PWA testing) doesn't silently drop the
         // guard; the Settings toggle shows a clear warning while it's on.
         sandboxMode: state.sandboxMode,

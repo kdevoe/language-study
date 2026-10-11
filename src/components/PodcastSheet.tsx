@@ -240,7 +240,7 @@ export function PodcastSheet({ open, onClose, onCreated, article }: Props) {
 
 /** Primary action (design-system §6.3): flat on the track colour until it can
  *  be pressed, then it becomes the slider thumb and lifts. */
-function CreateButton({ ready, busy, onClick }: { ready: boolean; busy: boolean; onClick: () => void }) {
+export function CreateButton({ ready, busy, onClick }: { ready: boolean; busy: boolean; onClick: () => void }) {
   const [pressed, setPressed] = useState(false);
   return (
     <button

@@ -20,6 +20,11 @@ verify_jwt = false
 [functions.dictionary-lookup]
 verify_jwt = false
 
+[functions.generate-song]
+# Auth is checked in code: user JWT via auth.getUser, the service key for the
+# internal stage self-calls, or x-cron-secret for the daily auto run.
+verify_jwt = false
+
 [functions.generate-podcast]
 # Auth is checked in code: user JWT via auth.getUser, or the service key for the
 # internal voice-stage self-call.

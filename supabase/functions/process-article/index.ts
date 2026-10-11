@@ -3,6 +3,7 @@ import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, type WordSignal } from '../_shared/wordPriority.ts';
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
+import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon } from '../_shared/readerVocab.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -429,43 +430,8 @@ const CLUSTER_WORDS_MAX = 4;
 // Katakana-only surfaces are excluded: loanwords read for free (they're English), the
 // prompt's blanket exception covers them, and keeping them out both saves tokens and
 // stops them cluttering the known-vocabulary list (user feedback).
-const KATAKANA_ONLY_RE = /^[ァ-ヶヽヾー・゠]+$/;
-// Prompt-size safety cap (~4k surfaces ≈ ~9k tokens) — known-first order means the
-// cap drops assumed-known tail words, never confirmed-easy ones.
-const LEXICON_MAX_WORDS = 4000;
-// Below this the list can't carry an article — fall back to the cluster pipeline.
-const LEXICON_MIN_WORDS = 300;
-
-// Page past supabase's 1000-row response cap (unranged .select() silently truncates).
-async function fetchAllRows<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
-  const out: T[] = [];
-  const SIZE = 1000;
-  for (let from = 0; ; from += SIZE) {
-    const { data, error } = await page(from, from + SIZE - 1);
-    if (error) throw error;
-    out.push(...(data ?? []));
-    if ((data ?? []).length < SIZE) break;
-  }
-  return out;
-}
-
-type EmbeddedEntry = { id: string; jmdict_kanji: { text: string; common: boolean }[]; jmdict_kana: { text: string; common: boolean }[] };
-
-// Preferred display surface for an entry: common kanji > common kana > any kanji
-// > any kana. Preferring a common KANA reading over a non-common kanji form keeps
-// words whose only kanji spelling is rare (その's 其の, とても's 迚も) in kana,
-// instead of feeding an unnatural surface into the vocab palette.
-function pickSurface(e: EmbeddedEntry): string | null {
-  const commonOf = (rows: { text: string; common: boolean }[]) =>
-    rows.find((r) => r.common)?.text ?? null;
-  const anyOf = (rows: { text: string; common: boolean }[]) => rows[0]?.text ?? null;
-  return (
-    commonOf(e.jmdict_kanji ?? []) ??
-    commonOf(e.jmdict_kana ?? []) ??
-    anyOf(e.jmdict_kanji ?? []) ??
-    anyOf(e.jmdict_kana ?? [])
-  );
-}
+// KATAKANA_ONLY_RE, the lexicon caps and builder live in _shared/readerVocab.ts
+// (shared with generate-song).
 
 function normalizeConcepts(raw: unknown): Concept[] {
   if (!Array.isArray(raw)) return [];
@@ -798,41 +764,7 @@ Deno.serve(async (req) => {
     // glossed topic words. See docs/vocab-palette-redesign.md (live-check + phase 2).
     let lexicon: { words: string[] } | undefined;
     try {
-      const [srsRows, n54Entries] = await Promise.all([
-        fetchAllRows<{ word_id: string; mastery_level: string }>((from, to) =>
-          supabase.from('user_word_progress').select('word_id, mastery_level').eq('user_id', userId).range(from, to)),
-        fetchAllRows<EmbeddedEntry>((from, to) =>
-          supabase.from('jmdict_entries').select('id, jmdict_kanji(text, common), jmdict_kana(text, common)').gte('jlpt_level', 4).range(from, to)),
-      ]);
-      const struggling = new Set(srsRows.filter((r) => r.mastery_level === 'medium' || r.mastery_level === 'hard').map((r) => r.word_id));
-      const easyIds = srsRows.filter((r) => r.mastery_level === 'easy').map((r) => r.word_id);
-      // Surfaces for confirmed-easy words above N4 (not covered by the N5/N4 fetch).
-      const n54ById = new Map(n54Entries.map((e) => [e.id, e]));
-      const missingEasy = easyIds.filter((id) => !n54ById.has(id));
-      const easyById = new Map<string, EmbeddedEntry>();
-      for (let i = 0; i < missingEasy.length; i += 200) {
-        const { data } = await supabase
-          .from('jmdict_entries')
-          .select('id, jmdict_kanji(text, common), jmdict_kana(text, common)')
-          .in('id', missingEasy.slice(i, i + 200));
-        for (const e of (data ?? []) as EmbeddedEntry[]) easyById.set(e.id, e);
-      }
-      // Known-first order: confirmed-easy leads, then assumed-known N5/N4 — minus words
-      // the reader actually graded medium/hard (their own evidence beats the JLPT tag).
-      const ordered = [
-        ...easyIds.map((id) => easyById.get(id) ?? n54ById.get(id)),
-        ...n54Entries.filter((e) => !struggling.has(e.id)),
-      ];
-      const words: string[] = [];
-      const seen = new Set<string>();
-      for (const e of ordered) {
-        if (!e) continue;
-        const s = pickSurface(e);
-        if (!s || seen.has(s) || KATAKANA_ONLY_RE.test(s)) continue;
-        seen.add(s);
-        words.push(s);
-        if (words.length >= LEXICON_MAX_WORDS) break;
-      }
+      const words = await buildLexicon(supabase, userId);
       if (words.length >= LEXICON_MIN_WORDS) lexicon = { words };
       console.log(`[process-article] Lexicon: ${words.length} allowed word(s)${lexicon ? '' : ` — below floor ${LEXICON_MIN_WORDS}, falling back to clusters`}`);
     } catch (lexErr) {

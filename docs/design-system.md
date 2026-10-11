@@ -216,7 +216,7 @@ Source of truth: `src/components/PartsSheet.tsx` and the part section of `Reader
 ### 6.12 今日 (home)
 Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.html`.
 
-- **Tabs:** 今日 · 読む · 聞く · 復習. The app opens on 今日. 読む holds the news feed and the 本棚, 聞く the 番組 (podcasts) and 音楽 (a 近日公開 placeholder for now), each behind a title switch (§6.9).
+- **Tabs:** 今日 · 読む · 聞く · 復習. The app opens on 今日. 読む holds the news feed and the 本棚, 聞く the 番組 (podcasts) and 音楽 (songs, §6.13), each behind a title switch (§6.9).
   
 - **What's waiting today, in order:** cards due (one white row: count in serif 1.8rem on the left, 始める › on the right; no 新 / 復習 split); 本棚 (the last-opened work in progress, as an archive card); 聞く (a ready, unplayed podcast: title over the adaptive 番組 label, with a play button); ニュース (two headlines as plain text, no card, inset 1.5rem so they start on the cards' text edge; すべて opens 読む). One type system on this page: every item title (本棚 card, 聞く row, news headline) is serif 1.05rem at two lines max with an ellipsis; every small label (part count, 番組, news category) is sans 0.68rem 700 at 0.06em; actions (始める, すべて) are serif 0.95rem; only the 復習 count is larger (1.8rem). The 本棚 card here uses `CardBody compact`, so the 本棚 page keeps its 1.35rem titles. Every block is marked by its tab's icon alone (復習 layers, 本棚 book, 聞く headphones, ニュース newspaper) at 19px in `--text-muted`, with no label text; the word stays as the icon's accessible name (the page's adaptive label where there is one). Each icon is a button (padded to a ~40px tap target) that opens its block's page: 復習 → Review, 本棚 → 読む's 本棚, 聞く → 番組, ニュース → 読む's ニュース. Text inside a block that names a page uses that page's adaptive label (番組), so it reads the same as the page it opens. Each kind keeps its own shape (a card for reading, a play row for audio, plain text for news) so the page doesn't read as one list.
   
@@ -225,6 +225,30 @@ Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.htm
 - Section kickers are 0.7rem sans, 600, `--text-muted`, 2rem above their block. **No stats, streaks or charts**: those belong in 進捗.
   
 - No date beside the title.
+
+### 6.13 音楽 (songs)
+Source of truth: `src/components/Music.tsx`, `SongSheet.tsx`, `SongPlayer.tsx`; mockup `docs/mockups/music.html`.
+
+- **Grid:** two columns of square covers (16px radius, the card shadow), newest first. Under each: the title, serif 1.05rem at two lines max, over the style label in the small-label style (sans 0.68rem 700, 0.06em). An in-flight song shows its stage (作詞中… / 作曲中…) with the olive spinner; a failed one shows 再試行. Empty state: まだ曲がありません, one hint line.
+  
+- **Delete:** long-press a tile for a full-tile 削除; the delete waits 5s behind a 元に戻す toast (undo, never confirm).
+  
+- **New-song sheet:** the §6.2 sheet with PodcastSheet's three groups: スタイル | 自分で slider, then the style chips (serif 0.92rem; the picked one lifts like the slider thumb) or a description box, in one fixed-height pane so switching never moves the sheet; ＋ テーマ swaps for its field in the same slot; 1/2/3分 slider + 作る.
+  
+- **Player:** cover, title and style, then the lyrics in serif with the sung line full strength and the rest faded (`.song-line` / `.cur`); it scrolls itself. Words are tappable like the reader (the song pauses). Controls reuse the podcast player's: speed, ⟲10 / ⟳10, play, リピート.
+
+### 6.14 Settings
+Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.html`.
+
+- **Four plain sections,** no boxes: 学習 (JLPT, new words/day, RTK), 読む (topics, intensity, length, vocabulary, kanji), 聞く (songs, song styles, podcast hosts), 表示 (interface, text size, weight). Section titles are serif 1.3rem 600, 3rem apart; spacing does the grouping.
+  
+- **A setting** is a label (sans 0.85rem 600, value or unit in a muted `small` on the right) over its control, with at most one hint line (0.75rem muted). Numbers use the round −/+ stepper; a long range (RTK) also takes a typed number.
+  
+- **Pick lists** (song styles, hosts): one row each, serif name + optional muted tag + a one-line description. White row (`--bg-pure`, soft shadow) = on, transparent at 50% = off; tap the row to switch it. The heading carries an "N of M" count. A list keeps its minimum (one style; two hosts, one of them 標準語) by ignoring the tap that would break it.
+  
+- **Editing in place:** 編集 on a host opens its personality as a serif underline textarea in the row, with 元に戻す (restore the original) and 保存 (serif 0.8rem, 保存 in `--text-main`).
+  
+- **詳細** (serif, muted, centred, chevron) at the bottom holds the one-off maintenance tools, the sandbox switch and the danger zone, unchanged.
 
 ## 7. Copy
 - Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.
@@ -240,7 +264,7 @@ Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.htm
   
 - **Black primary actions:** the Library import button uses a `--text-main` fill (the Listen and Library `+` buttons are fixed, §6.8).
   
-- **Two toggle styles:** REVIEW's 復習 | 進捗 control (serif, `--bg-card` track, no sliding thumb) differs from the Settings slider.
+- **Two toggle styles:** REVIEW's 復習 | 進捗 control (serif, `--bg-card` track, no sliding thumb) differs from the slider toggle.
   
 - **Outlined black-fill pills** remain in the Library import sheet (貼り付け | URL) and should become the slider toggle. (The Library and Listen filter rows are gone, replaced by §6.8.)
   

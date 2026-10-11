@@ -8,6 +8,9 @@ import { Settings } from './components/Settings'
 import { Review, type ReviewSegment } from './components/Review'
 import { Listen } from './components/Listen'
 import { PodcastPlayer } from './components/PodcastPlayer'
+import { Music } from './components/Music'
+import { SongPlayer } from './components/SongPlayer'
+import type { Song } from './services/songs'
 import type { PodcastEpisode } from './services/podcasts'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
@@ -59,6 +62,7 @@ function App() {
   // LISTEN (聴く) state: the episode list, or one episode open in the player.
   const [listenView, setListenView] = useState<'list' | 'player'>('list');
   const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null);
+  const [activeSong, setActiveSong] = useState<Song | null>(null);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
@@ -575,6 +579,15 @@ function App() {
     window.scrollTo(0, 0);
   }, []);
 
+  const handleOpenSong = useCallback((song: Song) => {
+    unlockSharedAudio(); // inside the tap, as for episodes
+    setActiveEpisode(null);
+    setActiveSong(song);
+    setListenView('player');
+    setShowNav(true);
+    window.scrollTo(0, 0);
+  }, []);
+
   // Reader → PodcastSheet: the episode is made in the background and appears
   // in the LISTEN tab; the shared top toast says so.
   // Switching tabs (bottom nav or a heading's settings button) always lands at the
@@ -868,19 +881,14 @@ function App() {
           )
         )}
         {activeTab === 'listen' && (
-          listenView === 'player' && activeEpisode ? (
+          listenView === 'player' && listenPage === 'music' && activeSong ? (
+            <SongPlayer key={activeSong.id} song={activeSong} />
+          ) : listenView === 'player' && activeEpisode ? (
             <PodcastPlayer key={activeEpisode.id} episode={activeEpisode} />
           ) : listenPage === 'shows' ? (
             <Listen onOpenEpisode={handleOpenEpisode} titleSwitch={listenTitleSwitch} />
           ) : (
-            <>
-            <PageHeading id="music" settingsMark={false} titleSwitch={listenTitleSwitch} />
-            {/* Placeholder until music lands. */}
-            <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-              <div className="serif" style={{ fontSize: '1.35rem', color: 'var(--text-main)' }}>近日公開</div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Coming soon</p>
-            </div>
-            </>
+            <Music onOpenSong={handleOpenSong} titleSwitch={listenTitleSwitch} />
           )
         )}
         {activeTab === 'flashcards' && (

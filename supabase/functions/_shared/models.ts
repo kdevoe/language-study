@@ -29,3 +29,13 @@ export const GROQ_CLUSTER = 'llama-3.3-70b-versatile';
  *  v3: ~35% faster generation and a 7–20 dB lower noise floor on every voice
  *  (docs/podcast-design.md "Spike results"). */
 export const ELEVEN_DIALOGUE_MODEL = 'eleven_v4';
+
+/** Claude — song writing (generate-song): style description, lyrics, cover prompt. */
+export const CLAUDE_OPUS = 'claude-opus-5-5';
+
+/** ElevenLabs — song generation (generate-song). v2.5 takes chunked composition
+ *  plans with lyrics and returns per-phrase timestamps. */
+export const ELEVEN_MUSIC_MODEL = 'music_v2_5';
+
+/** Gemini — song cover art (generate-song). */
+export const GEMINI_IMAGE = 'gemini-3.1-flash-image';
