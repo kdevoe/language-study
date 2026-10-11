@@ -1,4 +1,5 @@
 import { Newspaper, BookOpen, Headphones, Layers } from 'lucide-react';
+import { AdaptiveLabel } from './AdaptiveLabel';
 
 type Tab = 'news' | 'library' | 'listen' | 'flashcards' | 'settings';
 
@@ -10,10 +11,10 @@ interface Props {
 
 export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
-    { id: 'news', label: 'NEWS', icon: Newspaper },
-    { id: 'library', label: 'LIBRARY', icon: BookOpen },
-    { id: 'listen', label: 'LISTEN', icon: Headphones },
-    { id: 'flashcards', label: 'REVIEW', icon: Layers },
+    { id: 'news', label: 'news', icon: Newspaper },
+    { id: 'library', label: 'library', icon: BookOpen },
+    { id: 'listen', label: 'listen', icon: Headphones },
+    { id: 'flashcards', label: 'review', icon: Layers },
   ] as const;
 
   return (
@@ -67,8 +68,9 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
             }}>
               <Icon size={28} strokeWidth={isActive ? 1.9 : 1.5} />
             </div>
-            <span style={{ fontSize: '0.6rem', letterSpacing: '0.05em', fontWeight: isActive ? 600 : 500, marginTop: '2px' }}>
-              {label}
+            {/* Labels follow the page titles: Japanese once that title has switched. */}
+            <span translate="no" style={{ fontSize: '0.6rem', letterSpacing: '0.05em', fontWeight: isActive ? 600 : 500, marginTop: '2px' }}>
+              <AdaptiveLabel id={label} upper />
             </span>
           </button>
         );

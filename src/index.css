@@ -259,3 +259,47 @@ ruby.peek-furigana rt {
   0% { transform: translateX(-50%) translateY(10px) scale(0.85); opacity: 0; }
   100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
 }
+
+/* English placeholder in the sans face, as English copy is elsewhere. */
+.archive-search[data-placeholder-lang="en"]::placeholder {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+}
+
+/* ── Adaptive label switch (docs/design-system.md §6.10) ──────────────────────
+   An English page title turns Japanese once the reader knows the word. The
+   switch is an event, about 4.5s, played once per label:
+   1 · cue (0–1.2s): a soft glow rises under the English, which brightens.
+   2 · change (1.2–3.2s): the English dissolves upward; the Japanese emerges
+       from the glow, blurred and widely spaced, and comes into focus.
+   3 · settle (3.2–4.5s): a small settle; the glow fades.
+   No English caption afterwards — the switch itself is the announcement. */
+.ui-sw { position: relative; display: inline-block; isolation: isolate; }
+.ui-sw-en { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.ui-sw-ja { display: inline-block; white-space: nowrap; }
+.ui-sw.playing .ui-sw-en {
+  animation: uiSwCue 1.2s ease-in-out both, uiSwOut 1.6s cubic-bezier(0.4, 0, 0.2, 1) 1.2s forwards;
+}
+.ui-sw.playing .ui-sw-ja {
+  animation: uiSwIn 2.6s cubic-bezier(0.22, 1, 0.36, 1) 1.5s both, uiSwSettle 0.9s ease-out 3.6s both;
+}
+.ui-sw.playing::after {
+  content: '';
+  position: absolute; left: -22%; right: -22%; top: -10%; bottom: -25%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(212, 224, 232, 0.95), rgba(212, 224, 232, 0) 68%);
+  animation: uiSwGlow 4.5s ease-in-out both;
+  z-index: -1;
+  pointer-events: none;
+}
+/* Reduced motion: a plain crossfade. */
+.ui-sw.fading .ui-sw-en { animation: uiSwFadeOut 0.6s ease both; }
+.ui-sw.fading .ui-sw-ja { animation: uiSwFadeIn 0.6s ease both; }
+
+@keyframes uiSwCue { 0% { filter: brightness(1); } 100% { filter: brightness(1.15); text-shadow: 0 0 18px rgba(212, 224, 232, 0.9); } }
+@keyframes uiSwOut { 0% { opacity: 1; filter: blur(0); transform: translateY(0); letter-spacing: 0; } 100% { opacity: 0; filter: blur(10px); transform: translateY(-22px); letter-spacing: 0.25em; } }
+@keyframes uiSwIn { 0% { opacity: 0; filter: blur(14px); transform: translateY(18px) scale(0.96); letter-spacing: 0.45em; } 45% { opacity: 1; } 100% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1.02); letter-spacing: 0; } }
+@keyframes uiSwSettle { from { transform: scale(1.02); } to { transform: scale(1); } }
+@keyframes uiSwGlow { 0% { opacity: 0; transform: scale(0.7); } 27% { opacity: 0.8; transform: scale(1); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.2); } }
+@keyframes uiSwFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes uiSwFadeIn { from { opacity: 0; } to { opacity: 1; } }

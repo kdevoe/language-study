@@ -5,6 +5,9 @@ import type { PanInfo } from 'framer-motion';
 import { Check, ChevronDown, Plus, Search, Trash2, X } from 'lucide-react';
 import { findIn, matchItem } from '../services/archiveSearch';
 import type { SearchCorpus, Snippet } from '../services/archiveSearch';
+import type { UiLabelId } from '../services/uiLabels';
+import { PageHeading } from './PageHeading';
+import { useAdaptiveText } from './AdaptiveLabel';
 
 // The archive list behind LISTEN (聴く) and LIBRARY (書庫), mockup
 // docs/mockups/archive-organize.html. iPhotos-like: items group by month, the
@@ -36,10 +39,10 @@ export interface ArchiveCard {
 }
 
 interface Props<T extends { id: string }> {
-  kicker: string;
-  title: string;
-  /** Right side of the header outside select mode (the + button). */
-  headerAction: ReactNode;
+  titleId: UiLabelId;
+  /** The + at the end of the search row. */
+  onAdd: () => void;
+  addLabel: string;
   items: T[];
   isLoading: boolean;
   createdAt: (item: T) => string;
@@ -86,6 +89,7 @@ const markStyle = { backgroundColor: 'var(--accent-primary)', color: 'var(--text
 export function ArchiveList<T extends { id: string }>(props: Props<T>) {
   const { items, createdAt, card, isUnfinished, onDelete, memoryKey } = props;
   const [query, setQuery] = useState('');
+  const searchLabel = useAdaptiveText('search');
   const [corpus, setCorpus] = useState<SearchCorpus | null>(null);
   const corpusRequested = useRef(false);
   const [selecting, setSelecting] = useState(false);
@@ -224,45 +228,44 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
 
   return (
     <div style={{ paddingBottom: '6rem' }}>
-      {/* Header: title + action, or the selection count + 完了 */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '1.1rem', minHeight: '64px' }}>
-        <div>
-          <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.2em', color: 'var(--text-muted)' }}>{props.kicker}</div>
-          {selecting ? (
-            <div className="serif" style={{ fontSize: '1.4rem', fontWeight: 500, lineHeight: 1.6, color: 'var(--text-main)' }}>
-              {selected.size ? `${selected.size}件を選択` : '項目を選択'}
-            </div>
-          ) : (
-            <h1 className="serif" translate="no" style={{ fontSize: '2rem', fontWeight: 500, lineHeight: 1.2, color: 'var(--text-main)' }}>{props.title}</h1>
-          )}
-        </div>
-        {selecting ? (
+      {/* Header: the page heading with search and + below it, or the selection count + 完了 */}
+      {selecting ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '2.75rem', marginBottom: '1rem' }}>
+          <div className="serif" style={{ fontSize: '1.4rem', fontWeight: 500, lineHeight: 1.6, color: 'var(--text-main)' }}>
+            {selected.size ? `${selected.size}件を選択` : '項目を選択'}
+          </div>
           <button onClick={exitSelect} className="serif" style={textBtn(true)}>完了</button>
-        ) : props.headerAction}
-      </div>
+        </div>
+      ) : (
+        <PageHeading id={props.titleId} />
+      )}
 
-      {/* Search: hero input on a hairline (design-system §6.4) */}
-      <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', borderBottom: '1px solid var(--border-light)', padding: '0.35rem 0 0.55rem', marginBottom: q ? '0.8rem' : '1.6rem' }}>
-        <Search size={18} strokeWidth={1.5} color="var(--text-muted)" style={{ flex: 'none' }} />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); if (e.target.value.trim()) ensureCorpus(); }}
-          onFocus={ensureCorpus}
-          placeholder="検索"
-          aria-label="検索"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          className="serif"
-          style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: '1.15rem', color: 'var(--text-main)' }}
-        />
-        {query && (
-          <button onClick={() => setQuery('')} aria-label="クリア" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.2rem', display: 'flex' }}>
-            <X size={16} strokeWidth={1.5} />
-          </button>
-        )}
-      </label>
+      {/* Search: hero input on a hairline (design-system §6.4); + at the row's end */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: q ? '0.8rem' : '1.6rem' }}>
+        <label style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', borderBottom: '1px solid var(--border-light)', padding: '0.35rem 0 0.55rem' }}>
+          <Search size={18} strokeWidth={1.5} color="var(--text-muted)" style={{ flex: 'none' }} />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); if (e.target.value.trim()) ensureCorpus(); }}
+            onFocus={ensureCorpus}
+            placeholder={searchLabel}
+            aria-label={searchLabel}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="serif archive-search"
+            data-placeholder-lang={searchLabel === 'Search' ? 'en' : 'ja'}
+            style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: '1.15rem', color: 'var(--text-main)' }}
+          />
+          {query && (
+            <button onClick={() => setQuery('')} aria-label="クリア" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.2rem', display: 'flex' }}>
+              <X size={16} strokeWidth={1.5} />
+            </button>
+          )}
+        </label>
+        {!selecting && <AddButton onClick={props.onAdd} label={props.addLabel} />}
+      </div>
       {q && (
         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '1.4rem' }}>{visible.length}件</div>
       )}
@@ -632,20 +635,20 @@ function SwipeRow({ id, openId, setOpenId, selecting, onDelete, onLongPress, onT
   );
 }
 
-/** The header's + button: a white, lifted circle like the slider thumb (design-system §6.3). */
-export function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
+/** The search row's +: a small white, lifted circle like the slider thumb (design-system §6.3). */
+function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
       style={{
-        width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+        width: '34px', height: '34px', flex: 'none', borderRadius: '50%', border: 'none', cursor: 'pointer',
         backgroundColor: 'var(--bg-pure)', color: 'var(--text-main)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       }}
     >
-      <Plus size={22} strokeWidth={1.5} />
+      <Plus size={18} strokeWidth={1.5} />
     </button>
   );
 }

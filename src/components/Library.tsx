@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { AddButton, ArchiveList } from './ArchiveList';
+import { ArchiveList } from './ArchiveList';
 import type { ArchiveCard } from './ArchiveList';
 import {
   LongFormWork,
@@ -223,9 +223,9 @@ export function Library({ onOpenWork }: Props) {
       )}
 
       <ArchiveList
-        kicker="LIBRARY"
-        title="書庫"
-        headerAction={<AddButton onClick={() => setSheetOpen(true)} label="コンテンツを追加" />}
+        titleId="library"
+        onAdd={() => setSheetOpen(true)}
+        addLabel="コンテンツを追加"
         items={works}
         isLoading={isLoading}
         createdAt={createdAtOf}

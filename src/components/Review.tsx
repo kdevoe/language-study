@@ -3,6 +3,7 @@ import { Flashcards } from './Flashcards';
 import { dueDeckSize } from '../services/dueDeck';
 import { Progress } from './Progress';
 import { useAppStore } from '../services/store';
+import { PageHeading } from './PageHeading';
 
 export type ReviewSegment = 'review' | 'progress';
 
@@ -58,7 +59,8 @@ export function Review({
 
   return (
     <div>
-      {/* Focus mode hides the control along with the nav so the card keeps the screen. */}
+      {/* Focus mode hides the heading and control along with the nav so the card keeps the screen. */}
+      {!focused && <PageHeading id="review" />}
       {!focused && (
         <div style={{ height: SEGMENT_BAR_HEIGHT, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div

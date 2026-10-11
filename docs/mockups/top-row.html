@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Top row</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: var(--font-sans); }
+.serif { font-family: var(--font-serif); }
+
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 660px; margin: 0 auto; }
+.controls { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; margin-top: 1.2rem; }
+.control-row { display: flex; align-items: center; gap: 0.8rem; }
+.control-row .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); width: 4.5rem; text-align: right; }
+.control-row .seg { font-size: 0.8rem; }
+
+/* Settings slider (design-system §6.1) */
+.seg { display: flex; position: relative; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; }
+.seg .thumb { position: absolute; top: 4px; bottom: 4px; border-radius: 100px; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all var(--ease); }
+.seg button { flex: 1; position: relative; z-index: 1; border: none; background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); transition: color var(--ease); white-space: nowrap; }
+.seg button.active { color: var(--text-main); font-weight: 700; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; min-height: 3.6em; }
+.phone { width: 380px; height: 760px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.content { flex: 1; overflow: hidden; padding: 0 1.25rem; }
+
+/* ── Current header: centred brand + ⋮ ── */
+.hdr-current { display: flex; justify-content: space-between; align-items: center; padding: 1.7rem 1.25rem 1.5rem; }
+.hdr-current h1 { font-family: var(--font-serif); font-size: 1.4rem; letter-spacing: 0.1em; font-weight: 500; }
+.hdr-current .spacer { width: 24px; }
+.icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; padding: 0; }
+.icon.main { color: var(--text-main); }
+
+/* ── Proposed header: one quiet row ── */
+.hdr-new { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.25rem 1.2rem; min-height: 56px; }
+.date { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.level-chip { border: none; cursor: pointer; background: var(--border-light); color: var(--text-main); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; padding: 0.3rem 0.75rem; border-radius: 100px; transition: background-color var(--ease), box-shadow var(--ease); }
+.level-chip:hover { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+/* ── Right slot variants (all open Settings) ── */
+.right > [data-r] { display: none; }
+body[data-right="chip"] .right > [data-r="chip"],
+body[data-right="chipv"] .right > [data-r="chipv"],
+body[data-right="text"] .right > [data-r="text"],
+body[data-right="initial"] .right > [data-r="initial"],
+body[data-right="hanko"] .right > [data-r="hanko"],
+body[data-right="sliders"] .right > [data-r="sliders"],
+body[data-right="gear"] .right > [data-r="gear"] { display: flex; }
+.right { display: flex; align-items: center; }
+.chipv { display: inline-flex; align-items: center; gap: 0.25rem; }
+.chipv svg { opacity: 0.6; }
+.text-link { background: none; border: none; cursor: pointer; padding: 0.2rem 0; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); transition: color var(--ease); }
+.text-link:hover { color: var(--text-main); }
+.initial { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer; background: var(--border-light); color: var(--text-main); font-family: var(--font-serif); font-size: 0.95rem; font-weight: 600; align-items: center; justify-content: center; transition: background-color var(--ease), box-shadow var(--ease); }
+.initial:hover { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.name-row { display: none; }
+body[data-right="initial"] .name-row { display: flex; }
+.name-wrap { align-items: center; }
+.name-wrap > [data-n] { display: none; }
+body[data-name="fill"] .name-wrap > [data-n="fill"],
+body[data-name="ring"] .name-wrap > [data-n="ring"],
+body[data-name="bare"] .name-wrap > [data-n="bare"],
+body[data-name="two"] .name-wrap > [data-n="two"],
+body[data-name="lvl"] .name-wrap > [data-n="lvl"] { display: flex; }
+.initial.ring { background: transparent; box-shadow: inset 0 0 0 1px var(--text-muted); }
+.initial.ring:hover { background: var(--bg-pure); box-shadow: inset 0 0 0 1px var(--text-muted), 0 2px 8px rgba(0,0,0,0.1); }
+.initial.two { width: auto; min-width: 30px; padding: 0 0.55rem; border-radius: 100px; font-size: 0.8rem; letter-spacing: 0.06em; }
+.name-bare { background: none; border: none; cursor: pointer; padding: 0 0.15rem; font-family: var(--font-serif); font-size: 1.15rem; font-weight: 600; color: var(--text-main); opacity: 0.8; transition: opacity var(--ease); }
+.name-bare:hover { opacity: 1; }
+.name-lvl { display: inline-flex; align-items: center; gap: 0.3rem; }
+.name-lvl .serif { font-size: 0.85rem; font-weight: 600; }
+.name-lvl .dot { opacity: 0.45; }
+.hanko { width: 28px; height: 28px; border-radius: 5px; border: 1.25px solid var(--text-main); background: transparent; cursor: pointer; font-family: var(--font-serif); font-size: 0.95rem; font-weight: 600; color: var(--text-main); align-items: center; justify-content: center; opacity: 0.75; transition: opacity var(--ease); }
+.hanko:hover { opacity: 1; }
+
+/* ── Left slot variants ── */
+.left { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.left > [data-l] { display: none; align-items: baseline; gap: 0.45rem; white-space: nowrap; }
+body[data-left="date"] .left > [data-l="date"],
+body[data-left="season"] .left > [data-l="season"],
+body[data-left="kanji"] .left > [data-l="kanji"],
+body[data-left="word"] .left > [data-l="word"],
+body[data-left="due"] .left > [data-l="due"] { display: flex; }
+.mini { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.sep { color: var(--text-muted); opacity: 0.5; font-size: 0.72rem; }
+.tap { background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-serif); color: var(--text-main); }
+.tap.season { font-size: 0.95rem; }
+.tap.kanji { font-size: 1.15rem; line-height: 1; }
+.kanji-row { display: flex; gap: 0.55rem; align-items: baseline; }
+.tap.word { font-size: 1rem; }
+.due-btn { background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-main); }
+.due-btn .n { background: var(--accent-primary); border-radius: 100px; padding: 0.05rem 0.5rem; font-size: 0.68rem; }
+
+/* Tap card: a tiny WordModal stand-in under the row */
+.peek {
+  position: absolute; left: 1.25rem; top: 58px; z-index: 5; min-width: 180px; max-width: 260px;
+  background: var(--bg-pure); border-radius: 16px; padding: 0.8rem 1rem; box-shadow: 0 6px 30px rgba(0,0,0,0.12);
+  opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity 0.25s, transform 0.25s;
+}
+.peek.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.peek .w { font-family: var(--font-serif); font-size: 1.4rem; line-height: 1.2; }
+.peek .r { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+.peek .m { font-size: 0.82rem; margin-top: 0.45rem; line-height: 1.5; }
+
+/* ── Version 3: the mark joins the page heading's kicker line ── */
+.head-merge { display: none; margin: 1.7rem 0 1.2rem; }
+.head-merge .t-row h1 { line-height: 1.2; }
+.search-row { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.1rem; }
+.search-m { flex: 1; display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border-light); padding: 0.4rem 0.1rem 0.6rem; color: var(--text-muted); font-family: var(--font-serif); font-size: 1.05rem; }
+.sans-q { font-family: var(--font-sans); font-size: 0.95rem; }
+.add-sm { width: 34px; height: 34px; flex: none; border-radius: 50%; border: none; cursor: pointer; background: var(--bg-pure); color: var(--text-main); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform var(--ease), box-shadow var(--ease); }
+.add-sm:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+body[data-v="merge"] .content .search { display: none; }
+.lang-ja { display: none; }
+body[data-lang="ja"] .lang-ja { display: inline; }
+body[data-lang="ja"] .lang-en { display: none; }
+.search-m .lang-ja, .search-m .lang-en { display: none; }
+body[data-lang="ja"] .search-m .lang-ja, body:not([data-lang="ja"]) .search-m .lang-en { display: inline; }
+.lang-row { display: none; }
+body[data-v="merge"] .lang-row { display: flex; }
+.head-merge .k-row { display: flex; justify-content: space-between; align-items: center; min-height: 30px; }
+.head-merge .kicker { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.head-merge .t-row { display: flex; justify-content: space-between; align-items: center; }
+.head-merge h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+body[data-v="merge"] .head-merge { display: block; }
+body[data-v="merge"] .tab-head { display: none; }
+body[data-v="merge"] .hdr-current, body[data-v="merge"] .hdr-new:not(.reading) { display: none; }
+body[data-v="merge"] .hdr-new.reading { display: flex; }
+.nt { display: none; }
+body[data-newstitle="yomu"] .nt[data-t="yomu"], body[data-newstitle="news"] .nt[data-t="news"] { display: inline; }
+.news-title-row { display: none; }
+body[data-v="merge"][data-lang="ja"] .news-title-row { display: flex; }
+body[data-v="merge"] .left-row-ctl { opacity: 0.35; pointer-events: none; }
+
+body[data-v="current"] .hdr-new { display: none; }
+body[data-v="new"] .hdr-current { display: none; }
+
+/* ── Tab heading (Listen) ── */
+.tab-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 0.6rem 0 1.1rem; }
+body[data-v="new"] .tab-head { margin-top: 0.2rem; }
+.tab-head .kicker { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); }
+.tab-head h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.add { width: 48px; height: 48px; border-radius: 50%; border: none; background: var(--bg-pure); color: var(--text-main); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.1); cursor: pointer; }
+.search { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border-light); padding: 0.4rem 0.1rem 0.6rem; margin-bottom: 1.2rem; color: var(--text-muted); font-family: var(--font-serif); font-size: 1.05rem; }
+.month { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin: 0.2rem 0 0.7rem; }
+
+/* ── Cards ── */
+.card { background: var(--bg-card); border-radius: 24px; padding: 1.3rem 1.4rem; border: 1px solid var(--border-light); margin-bottom: 1.1rem; box-shadow: 0 4px 25px rgba(0,0,0,0.03); }
+.card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+.tag { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.15em; background: rgba(74,93,35,0.08); color: var(--olive); padding: 0.28rem 0.65rem; border-radius: 8px; }
+.tag.plain { background: var(--bg-pure); color: var(--text-muted); }
+.ready { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; color: var(--olive); }
+.card h3 { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.5; font-weight: 500; }
+.card .meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.6rem; }
+
+/* ── Review ── */
+.rv-today, .rv-row { display: flex; justify-content: space-between; align-items: flex-start; margin: 0.6rem 0 1.2rem; }
+.rv-row { margin: 1rem 0 0; }
+body[data-v="merge"] .rv-today { display: none; }
+.rv-seg { display: inline-flex; background: var(--bg-card); border-radius: 100px; padding: 3px; }
+.rv-seg button { border: none; border-radius: 100px; padding: 0.3rem 1.05rem; font-family: var(--font-serif); font-size: 0.95rem; background: transparent; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; }
+.rv-seg button.on { background: var(--bg-pure); color: var(--text-main); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.rv-seg .badge { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 700; background: var(--accent-primary); border-radius: 100px; padding: 0.05rem 0.45rem; }
+.rv-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; }
+.flash { margin-top: 1.2rem; height: 340px; border-radius: 24px; background: var(--bg-pure); box-shadow: 0 4px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.flash .fw { font-family: var(--font-serif); font-size: 2.6rem; }
+.flash .fh { font-size: 0.72rem; color: var(--text-muted); margin-top: 1rem; }
+
+/* ── Adaptive label switch: an event, not a flicker (about 4.5s) ──
+   1 · cue (0–1.2s): a soft glow rises under the English word, which brightens.
+   2 · change (1.2–3.2s): the English dissolves upward; the Japanese emerges
+       from the glow, blurred and widely spaced, and slowly comes into focus.
+   3 · settle (3.2–4.5s): a final small settle; the glow fades away.
+   No English caption afterwards — the switch itself is the announcement. */
+.sw { position: relative; display: inline-block; isolation: isolate; }
+.sw .sw-cap { display: none !important; }
+.sw.playing .sw-en { display: inline-block; position: absolute; left: 0; top: 0; animation: swCue 1.2s ease-in-out both, swOut 1.6s cubic-bezier(0.4, 0, 0.2, 1) 1.2s forwards; }
+.sw.playing .sw-ja, .sw.played .sw-ja { display: inline-block; }
+.sw.playing .sw-ja { animation: swIn 2.6s cubic-bezier(0.22, 1, 0.36, 1) 1.5s both, swSettle 0.9s ease-out 3.6s both; }
+.sw.played .sw-en { display: none !important; }
+.sw.playing::after {
+  content: ''; position: absolute; left: -22%; right: -22%; top: -10%; bottom: -25%; border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(212, 224, 232, 0.95), rgba(212, 224, 232, 0) 68%);
+  animation: glow 4.5s ease-in-out both; z-index: -1;
+}
+@keyframes swCue { 0% { filter: brightness(1); } 100% { filter: brightness(1.15); text-shadow: 0 0 18px rgba(212, 224, 232, 0.9); } }
+@keyframes swOut { 0% { opacity: 1; filter: blur(0); transform: translateY(0); letter-spacing: 0; } 100% { opacity: 0; filter: blur(10px); transform: translateY(-22px); letter-spacing: 0.25em; } }
+@keyframes swIn { 0% { opacity: 0; filter: blur(14px); transform: translateY(18px) scale(0.96); letter-spacing: 0.45em; } 45% { opacity: 1; } 100% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1.02); letter-spacing: 0; } }
+@keyframes swSettle { from { transform: scale(1.02); } to { transform: scale(1); } }
+@keyframes glow { 0% { opacity: 0; transform: scale(0.7); } 27% { opacity: 0.8; transform: scale(1); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.2); } }
+.play-btn { border: none; cursor: pointer; background: var(--bg-pure); color: var(--text-main); font-size: 0.8rem; font-weight: 700; padding: 0.6rem 1.2rem; border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+/* ── Reader ── */
+.r-meta { font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.9rem; margin: 0.6rem 0 0.9rem; }
+.r-meta .cat { background: var(--bg-card); padding: 0.15rem 0.55rem; border-radius: 4px; }
+.r-meta .hp { margin-left: auto; color: var(--text-muted); display: flex; }
+.reader h1 { font-family: var(--font-serif); font-size: 2rem; line-height: 1.3; font-weight: 500; margin-bottom: 1.4rem; }
+.rule { width: 40px; height: 1px; background: var(--text-muted); margin-bottom: 1.4rem; }
+.reader p { font-family: var(--font-serif); font-size: 17px; line-height: 2.2; margin-bottom: 1.1rem; }
+.hdr-new.reading { padding-top: 1.1rem; }
+
+.nav { height: 70px; border-top: 1px solid var(--border-light); background: var(--bg-color); display: flex; justify-content: space-around; align-items: center; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.12em; color: var(--text-muted); flex: none; }
+.nav .on { color: var(--text-main); }
+
+.measure { position: absolute; left: -10px; right: -10px; border-top: 1px dashed rgba(200,80,60,0.5); pointer-events: none; display: none; }
+.measure span { position: absolute; right: 14px; top: -18px; font-size: 0.6rem; font-weight: 700; color: rgba(200,80,60,0.8); background: var(--bg-color); padding: 0 4px; }
+body[data-measure="on"] .measure { display: block; }
+</style>
+</head>
+<body data-v="merge" data-left="season" data-right="sliders" data-name="fill" data-newstitle="news" data-lang="en" data-measure="off">
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · TOP ROW</div>
+  <h1>上の段 — 一行にまとめる</h1>
+  <p>Three versions: 現在 (today), 提案 (one quiet top row), and 見出しに統合 (no top row; one title per page with the Settings mark on its line, + on the search row; LANG flips the titles between English and Japanese). Tab pages lose the centred 読書家 and the ⋮. One quiet row remains: today's date on the left, and on the right a control that opens Settings. The page title (聴く) becomes the real heading and moves up. In the Reader the row is just the back arrow. Flip 現在 / 提案 to compare. The dashed line marks where the first piece of content starts.</p>
+  <div class="controls">
+    <div class="control-row"><span class="lbl">VERSION</span>
+      <div class="seg" data-key="v" style="width: 360px"><button data-val="current">現在</button><button data-val="new">提案</button><button data-val="merge" class="active">見出しに統合</button></div>
+    </div>
+    <div class="control-row left-row-ctl"><span class="lbl">LEFT</span>
+      <div class="seg" data-key="left" style="width: 540px"><button data-val="none">なし</button><button data-val="date">日付</button><button data-val="season" class="active">日付＋節気</button><button data-val="kanji">今日の漢字</button><button data-val="word">今日の言葉</button><button data-val="due">復習</button></div>
+    </div>
+    <div class="control-row"><span class="lbl">RIGHT</span>
+      <div class="seg" data-key="right" style="width: 560px"><button data-val="chip">N5</button><button data-val="chipv">N5 ⌄</button><button data-val="text">設定</button><button data-val="initial">頭文字</button><button data-val="hanko">判子</button><button data-val="sliders" class="active">スライダー</button><button data-val="gear">歯車</button></div>
+    </div>
+    <div class="control-row name-row"><span class="lbl">NAME</span>
+      <div class="seg" data-key="name" style="width: 460px"><button data-val="fill" class="active">円・塗り</button><button data-val="ring">円・線</button><button data-val="bare">文字のみ</button><button data-val="two">KD</button><button data-val="lvl">K · N5</button></div>
+    </div>
+    <div class="control-row lang-row"><span class="lbl">LANG</span>
+      <div class="seg" data-key="lang" style="width: 220px"><button data-val="en" class="active">English</button><button data-val="ja">日本語</button></div>
+    </div>
+    <div class="control-row"><span class="lbl">SWITCH</span><button class="play-btn" id="playSwitch">▶ Listen → 聴く を再生</button></div>
+    <div class="control-row news-title-row"><span class="lbl">NEWS見出し</span>
+      <div class="seg" data-key="newstitle" style="width: 220px"><button data-val="yomu">読む</button><button data-val="news" class="active">ニュース</button></div>
+    </div>
+    <div class="control-row"><span class="lbl">GUIDE</span>
+      <div class="seg" data-key="measure" style="width: 220px"><button data-val="off" class="active">なし</button><button data-val="on">位置線</button></div>
+    </div>
+  </div>
+</div>
+
+<template id="hdr-tab">
+  <div class="hdr-current">
+    <span class="spacer"></span>
+    <h1>読書家</h1>
+    <button class="icon" aria-label="Settings"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+  </div>
+  <div class="hdr-new">
+    <div class="peek"><div class="w"></div><div class="r"></div><div class="m"></div></div>
+    <div class="left">
+      <span data-l="date"><span class="date" data-date></span></span>
+      <span data-l="season"><span class="date" data-date></span><span class="sep">·</span><button class="tap season" data-peek="season" data-season></button></span>
+      <span data-l="kanji"><span class="mini">今日の漢字</span><span class="kanji-row"><button class="tap kanji" data-peek="k0">駅</button><button class="tap kanji" data-peek="k1">電</button><button class="tap kanji" data-peek="k2">線</button></span></span>
+      <span data-l="word"><span class="mini">今日の言葉</span><button class="tap word" data-peek="word">遅延</button></span>
+      <span data-l="due"><button class="due-btn">復習 <span class="n">8</span></button></span>
+    </div>
+    <div class="right">
+      <button data-r="chip" class="level-chip" aria-label="設定">N5</button>
+      <button data-r="chipv" class="level-chip chipv" aria-label="設定">N5<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button data-r="text" class="text-link" aria-label="設定">設定</button>
+      <span data-r="initial" class="name-wrap">
+        <button data-n="fill" class="initial" aria-label="設定">K</button>
+        <button data-n="ring" class="initial ring" aria-label="設定">K</button>
+        <button data-n="bare" class="name-bare" aria-label="設定">K</button>
+        <button data-n="two" class="initial two" aria-label="設定">KD</button>
+        <button data-n="lvl" class="level-chip name-lvl" aria-label="設定"><span class="serif">K</span><span class="dot">·</span>N5</button>
+      </span>
+      <button data-r="hanko" class="hanko" aria-label="設定">読</button>
+      <button data-r="sliders" class="icon" aria-label="設定"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg></button>
+      <button data-r="gear" class="icon" aria-label="設定"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+  </div>
+</template>
+
+<div class="stage">
+
+  <!-- 1 · LISTEN -->
+  <div class="phone-wrap">
+    <div class="phone-label">1 · LISTEN</div>
+    <div class="phone">
+      <div class="measure" data-measure-target="#l-first-m, #l-first"><span></span></div>
+      <div data-hdr="tab"></div>
+      <div class="content">
+        <div class="head-merge" id="l-first-m">
+          <div class="t-row"><h1 class="sw" id="swListen"><span class="lang-en sw-en">Listen</span><span class="lang-ja sw-ja">聴く</span><span class="sw-cap">Listen</span></h1><div data-mark></div></div>
+          <div class="search-row">
+            <div class="search-m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span class="lang-en sans-q">Search</span><span class="lang-ja">検索</span></div>
+            <button class="add-sm" aria-label="エピソードを作る"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+        </div>
+        <div class="tab-head" id="l-first">
+          <div><div class="kicker">LISTEN</div><h1>聴く</h1></div>
+          <button class="add" aria-label="エピソードを作る"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>検索</div>
+        <div class="month">10月</div>
+        <div class="card" style="background: var(--bg-pure)">
+          <div class="top"><span class="tag">DAILY DIGEST · 10月10日</span><span class="ready">● READY</span></div>
+          <h3>秋の新米と、宇宙の新しいニュース</h3>
+          <div class="meta">ハルカ × ケンジ · 4分52秒 · 今日</div>
+        </div>
+        <div class="card">
+          <div class="top"><span class="tag plain">記事から</span><span class="ready" style="color: var(--text-muted)">途中 · 42%</span></div>
+          <h3>東京の電車、なぜ時間通り？</h3>
+          <div class="meta">ミサキ × タクヤ · 関西弁 · 9分40秒 · 昨日</div>
+        </div>
+      </div>
+      <div class="nav"><span>NEWS</span><span>LIBRARY</span><span class="on">LISTEN</span><span>REVIEW</span></div>
+    </div>
+    <div class="phone-note" data-note="listen"></div>
+  </div>
+
+  <!-- 2 · NEWS -->
+  <div class="phone-wrap">
+    <div class="phone-label">2 · NEWS</div>
+    <div class="phone">
+      <div class="measure" data-measure-target="#n-first-m, #n-first"><span></span></div>
+      <div data-hdr="tab"></div>
+      <div class="content">
+        <div class="head-merge" id="n-first-m">
+          <div class="t-row"><h1><span class="lang-en">News</span><span class="lang-ja"><span class="nt" data-t="yomu">読む</span><span class="nt" data-t="news">ニュース</span></span></h1><div data-mark></div></div>
+        </div>
+        <div class="card" id="n-first">
+          <div class="top"><span class="tag">WORLD</span><span class="ready">✓ READY</span></div>
+          <h3>ICJ judge Navi Pillay wins Nobel peace prize for promoting international law</h3>
+        </div>
+        <div class="card">
+          <div class="top"><span class="tag">TECHNOLOGY</span><span class="ready">✓ READY</span></div>
+          <h3>Will Warner Bros. kill Skydance — or will David Ellison kill Warner Bros?</h3>
+        </div>
+        <div class="card">
+          <div class="top"><span class="tag">SCIENCE</span><span class="ready">✓ READY</span></div>
+          <h3>Why you've probably been thinking about narcolepsy all wrong</h3>
+        </div>
+        <div class="card">
+          <div class="top"><span class="tag">WORLD</span><span class="ready">✓ READY</span></div>
+          <h3>Isaias strengthens to become first Atlantic hurricane of 2026 season</h3>
+        </div>
+      </div>
+      <div class="nav"><span class="on">NEWS</span><span>LIBRARY</span><span>LISTEN</span><span>REVIEW</span></div>
+    </div>
+    <div class="phone-note" data-note="news"></div>
+  </div>
+
+  <!-- 3 · REVIEW -->
+  <div class="phone-wrap">
+    <div class="phone-label">3 · REVIEW</div>
+    <div class="phone">
+      <div class="measure" data-measure-target="#v-first-m, #v-first"><span></span></div>
+      <div data-hdr="tab"></div>
+      <div class="content">
+        <div class="head-merge" id="v-first-m">
+          <div class="t-row"><h1><span class="lang-en">Review</span><span class="lang-ja">復習</span></h1><div data-mark></div></div>
+          <div class="rv-row">
+            <div class="rv-seg"><button class="on">復習 <span class="badge">8</span></button><button>進捗</button></div>
+            <span class="rv-hint">今日 12 回</span>
+          </div>
+        </div>
+        <div class="rv-today" id="v-first">
+          <div class="rv-seg"><button class="on">復習 <span class="badge">8</span></button><button>進捗</button></div>
+          <span class="rv-hint">今日 12 回</span>
+        </div>
+        <div class="flash">
+          <div class="fw">遅延</div>
+          <div class="fh">tap to flip</div>
+        </div>
+      </div>
+      <div class="nav"><span>NEWS</span><span>LIBRARY</span><span>LISTEN</span><span class="on">REVIEW</span></div>
+    </div>
+    <div class="phone-note" data-note="review"></div>
+  </div>
+
+  <!-- 4 · READER -->
+  <div class="phone-wrap">
+    <div class="phone-label">4 · READER</div>
+    <div class="phone">
+      <div class="measure" data-measure-target="#r-first"><span></span></div>
+      <div class="hdr-current">
+        <button class="icon main" aria-label="戻る"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>読書家</h1>
+        <button class="icon" aria-label="Settings"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+      </div>
+      <div class="hdr-new reading">
+        <button class="icon main" aria-label="戻る"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span></span>
+      </div>
+      <div class="content reader">
+        <div class="r-meta" id="r-first">
+          <span class="cat">テクノロジー</span><span>第2部 / 全4部</span><span>約6分</span>
+          <span class="hp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg></span>
+        </div>
+        <h1>東京の電車は、なぜ時間通りに走るのか</h1>
+        <div class="rule"></div>
+        <p>東京の電車は、とても正確です。一日に何百万人もの人が電車に乗りますが、遅れることはほとんどありません。</p>
+        <p>その理由の一つは、運転士の訓練です。運転士は、駅に止まる時間を秒単位で練習します。</p>
+      </div>
+    </div>
+    <div class="phone-note" data-note="reader"></div>
+  </div>
+
+</div>
+
+<script>
+// Header template into each tab phone.
+const tpl = document.getElementById('hdr-tab');
+document.querySelectorAll('[data-hdr="tab"]').forEach((slot) => slot.replaceWith(tpl.content.cloneNode(true)));
+const rightTpl = tpl.content.querySelector('.right');
+document.querySelectorAll('[data-mark]').forEach((slot) => slot.replaceWith(rightTpl.cloneNode(true)));
+
+// Today, as the row shows it: 10月10日（土）
+const d = new Date();
+const dow = '日月火水木金土'[d.getDay()];
+document.querySelectorAll('[data-date]').forEach((el) => { el.textContent = `${d.getMonth() + 1}月${d.getDate()}日（${dow}）`; });
+
+// 二十四節気 — approximate start dates (they shift by a day year to year).
+const SEKKI = [
+  [1, 5, '小寒', 'しょうかん', 'Lesser cold — the cold sets in'],
+  [1, 20, '大寒', 'だいかん', 'Greater cold — the coldest days'],
+  [2, 4, '立春', 'りっしゅん', 'Start of spring'],
+  [2, 19, '雨水', 'うすい', 'Rain water — snow turns to rain'],
+  [3, 5, '啓蟄', 'けいちつ', 'Insects awaken'],
+  [3, 20, '春分', 'しゅんぶん', 'Spring equinox'],
+  [4, 4, '清明', 'せいめい', 'Pure and bright'],
+  [4, 20, '穀雨', 'こくう', 'Grain rain'],
+  [5, 5, '立夏', 'りっか', 'Start of summer'],
+  [5, 21, '小満', 'しょうまん', 'Lesser ripening'],
+  [6, 5, '芒種', 'ぼうしゅ', 'Grain in ear — rice planting'],
+  [6, 21, '夏至', 'げし', 'Summer solstice'],
+  [7, 7, '小暑', 'しょうしょ', 'Lesser heat'],
+  [7, 22, '大暑', 'たいしょ', 'Greater heat'],
+  [8, 7, '立秋', 'りっしゅう', 'Start of autumn'],
+  [8, 23, '処暑', 'しょしょ', 'The heat ends'],
+  [9, 7, '白露', 'はくろ', 'White dew'],
+  [9, 23, '秋分', 'しゅうぶん', 'Autumn equinox'],
+  [10, 8, '寒露', 'かんろ', 'Cold dew — autumn deepens'],
+  [10, 23, '霜降', 'そうこう', 'Frost descends'],
+  [11, 7, '立冬', 'りっとう', 'Start of winter'],
+  [11, 22, '小雪', 'しょうせつ', 'Lesser snow'],
+  [12, 7, '大雪', 'たいせつ', 'Greater snow'],
+  [12, 21, '冬至', 'とうじ', 'Winter solstice'],
+];
+function currentSekki(date) {
+  const m = date.getMonth() + 1, day = date.getDate();
+  let cur = SEKKI[SEKKI.length - 1];
+  for (const s of SEKKI) if (m > s[0] || (m === s[0] && day >= s[1])) cur = s;
+  return cur;
+}
+const sekki = currentSekki(d);
+document.querySelectorAll('[data-season]').forEach((el) => { el.textContent = sekki[2]; });
+
+const PEEKS = {
+  season: { w: sekki[2], r: sekki[3], m: `${sekki[4]}. One of the 24 seasonal divisions (二十四節気).` },
+  k0: { w: '駅', r: 'エキ', m: 'station — RTK keyword "station"' },
+  k1: { w: '電', r: 'デン', m: 'electricity — RTK keyword "electricity"' },
+  k2: { w: '線', r: 'セン', m: 'line — RTK keyword "line"' },
+  word: { w: '遅延', r: 'ちえん', m: 'delay — from your struggle list (looked up 3×)' },
+};
+document.querySelectorAll('[data-peek]').forEach((b) => b.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const peek = b.closest('.hdr-new').querySelector('.peek');
+  const p = PEEKS[b.dataset.peek];
+  const open = peek.classList.contains('show') && peek.dataset.k === b.dataset.peek;
+  document.querySelectorAll('.peek').forEach((x) => x.classList.remove('show'));
+  if (open) return;
+  peek.dataset.k = b.dataset.peek;
+  peek.querySelector('.w').textContent = p.w;
+  peek.querySelector('.r').textContent = p.r;
+  peek.querySelector('.m').textContent = p.m;
+  peek.classList.add('show');
+}));
+document.addEventListener('click', () => document.querySelectorAll('.peek').forEach((x) => x.classList.remove('show')));
+
+const LEFT_NOTES = {
+  none: 'Left: nothing. The row is just the control on the right, the most open option.',
+  date: 'Left: date only. Calm, but it teaches nothing.',
+  season: `Left: date + the current 二十四節気 (${sekki[2]}). It changes about every two weeks; tap it for the reading and meaning.`,
+  kanji: "Left: today's 3 new RTK kanji, the app's real daily drip. Tap one for its reading and keyword.",
+  word: 'Left: one word from your struggle list. A quiet nudge without a badge.',
+  due: 'Left: reviews due, tapping through to REVIEW. Useful, but it repeats the REVIEW tab.',
+};
+
+const RIGHT_NOTES = {
+  chip: 'Right: your level as a chip. Useful at a glance; your level is the main setting.',
+  chipv: 'Right: the chip plus a small chevron, a clearer "this opens something" hint.',
+  text: 'Right: 設定 as text, in the same voice as the date. The quietest option.',
+  initial: 'Right: your initial, the familiar "profile = settings" pattern. Use NAME to compare five takes.',
+  hanko: 'Right: a seal stamp (判子). The most on-theme and the least obvious.',
+  sliders: 'Right: thin slider lines at a 1.25 stroke. Still reads as settings, softer than the gear.',
+  gear: 'Right: the gear, for reference. Clearest, but the heaviest shape in the row.',
+};
+
+const NOTES = {
+  current: {
+    listen: 'Today: 読書家 centred above 聴く — two titles, and the ⋮ opens a page, not a menu.',
+    news: 'Today: the brand row is the only heading on the feed.',
+    reader: 'Today: back arrow, brand and ⋮ while reading.',
+  },
+  merge: {
+    listen: 'No top row: one title (one language) with the Settings mark on its line. + moves to the end of the search row, small, and acts on the list.',
+    news: 'News gets the same title row as the other tabs, so the mark has a home here too.',
+    reader: 'Unchanged from 提案: just the back arrow.',
+    review: 'Review gets the same title row; the 復習 | 進捗 toggle and today\'s count sit on the line below.',
+  },
+  new: {
+    listen: 'One row: date and Settings. 聴く is the heading and everything moves up.',
+    news: 'No page title needed: the date row heads the feed, and cards start higher.',
+    reader: 'Just the back arrow. The part and the 🎧 are already in the meta row below.',
+    review: 'Today\'s header over the REVIEW toggle.',
+  },
+};
+
+function measure() {
+  document.querySelectorAll('.measure').forEach((m) => {
+    const phone = m.closest('.phone');
+    const target = [...phone.querySelectorAll(m.dataset.measureTarget)].find((el) => el.offsetParent !== null);
+    const y = target.getBoundingClientRect().top - phone.getBoundingClientRect().top - 10;
+    m.style.top = `${y}px`;
+    m.querySelector('span').textContent = `${Math.round(y)}px`;
+  });
+}
+
+function apply() {
+  const v = document.body.dataset.v;
+  document.querySelectorAll('[data-note]').forEach((n) => {
+    n.textContent = NOTES[v][n.dataset.note] + (v === 'new' && n.dataset.note === 'listen' ? ' ' + LEFT_NOTES[document.body.dataset.left] : '')
+      + (v !== 'current' && n.dataset.note === 'news' ? ' ' + RIGHT_NOTES[document.body.dataset.right] : '');
+  });
+  requestAnimationFrame(measure);
+}
+
+function placeThumb(seg) {
+  const btns = [...seg.querySelectorAll('button')];
+  const i = Math.max(0, btns.findIndex((b) => b.classList.contains('active')));
+  const t = seg.querySelector('.thumb');
+  t.style.left = `calc(4px + ${i} * (100% - 8px) / ${btns.length})`;
+  t.style.width = `calc((100% - 8px) / ${btns.length})`;
+}
+document.querySelectorAll('.seg').forEach((seg) => {
+  const t = document.createElement('div');
+  t.className = 'thumb';
+  seg.prepend(t);
+  placeThumb(seg);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+    placeThumb(seg);
+    document.body.dataset[seg.dataset.key] = b.dataset.val;
+    apply();
+  });
+});
+document.getElementById('playSwitch').addEventListener('click', () => {
+  // Show it from English, then play the one-time switch to Japanese.
+  document.body.dataset.v = 'merge';
+  document.querySelectorAll('[data-key=v] button').forEach((b) => b.classList.toggle('active', b.dataset.val === 'merge'));
+  placeThumb(document.querySelector('[data-key=v]'));
+  document.body.dataset.lang = 'en';
+  document.querySelectorAll('[data-key=lang] button').forEach((b) => b.classList.toggle('active', b.dataset.val === 'en'));
+  placeThumb(document.querySelector('[data-key=lang]'));
+  apply();
+  const h = document.getElementById('swListen');
+  h.classList.remove('playing', 'played');
+  void h.offsetWidth;
+  h.classList.add('playing');
+  setTimeout(() => { h.classList.remove('playing'); h.classList.add('played'); }, 4600);
+});
+document.querySelectorAll('[data-key=lang] button').forEach((b) => b.addEventListener('click', () => {
+  document.getElementById('swListen').classList.remove('playing', 'played');
+}));
+document.fonts.ready.then(apply);
+apply();
+</script>
+</body>
+</html>

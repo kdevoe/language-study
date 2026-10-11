@@ -13,8 +13,9 @@ import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, LongFormWork, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
-import { MoreVertical, ChevronLeft } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
+import { OpenSettingsContext, PageHeading } from './components/PageHeading'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -560,6 +561,7 @@ function App() {
 
   // Reader → PodcastSheet: the episode is made in the background and appears
   // in the LISTEN tab; the shared top toast says so.
+  const openSettings = useCallback(() => setActiveTab('settings'), []);
   const handlePodcastQueued = useCallback(() => setActionError('聴くタブで作成中'), []);
 
   const handleBackToListen = () => {
@@ -654,6 +656,7 @@ function App() {
   if (!isOnboarded && !DEV_MODE) return <Onboarding />;
 
   return (
+    <OpenSettingsContext.Provider value={openSettings}>
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <UpdatePrompt />
       {actionError && (
@@ -682,45 +685,44 @@ function App() {
           {actionError}
         </div>
       )}
-      <header
-        data-shownav={showNav}
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          padding: 'max(1.5rem, env(safe-area-inset-top)) 1.25rem 1.5rem',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: 'var(--bg-color)',
-          zIndex: 10,
-          transform: showNav ? 'translateY(0)' : 'translateY(-100%)',
-          transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
-          opacity: showNav ? 1 : 0
-        }}
-      >
-        {isReading ? (
-          <button onClick={handleBack} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+      {/* Tab pages carry their own heading (PageHeading); only reading
+          surfaces get this fixed row, and it holds just the way back. */}
+      {isReading && (
+        <header
+          data-shownav={showNav}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: 'max(1.5rem, env(safe-area-inset-top)) 1.25rem 1.5rem',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'var(--bg-color)',
+            zIndex: 10,
+            transform: showNav ? 'translateY(0)' : 'translateY(-100%)',
+            transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s',
+            opacity: showNav ? 1 : 0
+          }}
+        >
+          <button onClick={handleBack} aria-label="戻る" style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', minHeight: '2.2rem' }}>
             <ChevronLeft size={24} strokeWidth={1.5} />
           </button>
-        ) : (
-          <div style={{ width: '24px' }} /> // Placeholder to maintain centered title
-        )}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h1 className="serif" translate="no" style={{ fontSize: '1.4rem', letterSpacing: '0.1em', color: 'var(--text-main)' }}>読書家</h1>
-        </div>
-        <button onClick={() => setActiveTab('settings')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-          <MoreVertical size={24} strokeWidth={1.5} />
-        </button>
-      </header>
+        </header>
+      )}
 
       <main style={{ 
         flex: 1, 
-        // Space for the fixed header. Mirror the header's own `max(1.5rem, safe-area)`
-        // top-padding floor — otherwise when the safe-area inset is small/zero, main
-        // under-reserves and the first card tucks ~4px under the header.
-        paddingTop: 'calc(5rem + max(1.5rem, env(safe-area-inset-top)))',
+        // Reading: space for the fixed back row. Mirror the header's own
+        // `max(1.5rem, safe-area)` top-padding floor — otherwise when the
+        // safe-area inset is small/zero, main under-reserves and the first card
+        // tucks under the header. Tab pages start with their own heading, so
+        // they only clear the status bar; the 3.75rem difference is the
+        // PageHeading's height, which keeps Flashcards'
+        // min-height math unchanged.
+        paddingTop: isReading
+          ? 'calc(5rem + max(1.5rem, env(safe-area-inset-top)))'
+          : 'calc(1.25rem + max(1.5rem, env(safe-area-inset-top)))',
         paddingRight: '1.25rem',
         paddingBottom: isReading ? '1rem' : '0rem',
         paddingLeft: '1.25rem',
@@ -730,6 +732,8 @@ function App() {
       }}>
         {activeTab === 'news' && (
           newsView === 'hub' ? (
+            <>
+            <PageHeading id="news" />
             <Feed 
               articles={(articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id)).slice(0, 5)} 
               isLoading={isLoadingFeed} 
@@ -741,6 +745,7 @@ function App() {
               onManualFetch={loadHub}
               isManualFetching={isLoadingFeed}
             />
+            </>
           ) : (
             <Reader key={activeArticle?.id} initialArticle={activeArticle} onComplete={handleFinishArticle} onPodcastQueued={handlePodcastQueued} />
           )
@@ -777,6 +782,7 @@ function App() {
         isVisible={showNav && !isReading && !(activeTab === 'flashcards' && studyFocus)}
       />
     </div>
+    </OpenSettingsContext.Provider>
   )
 }
 

@@ -528,8 +528,16 @@
   - [x] SliderToggle extracted from Settings (4 copies migrated; Vocab Use now reactive) and used for LISTEN filters
   - [x] useScrollLock: sheets + WordModal no longer let the page behind scroll
   - [x] docs/design-system.md (approved) + CLAUDE.md pointer
-  - [ ] Deploy generate-podcast (instructions field); until then requests are ignored
+  - [x] Deploy generate-podcast (instructions field) — deployed 2026-10-10
   - [ ] Design drift follow-ups (design-system.md §8): black + buttons, Library filter pills, REVIEW toggle, olive token
+- [x] Top row + adaptive labels (2026-10-10) — mockup docs/mockups/top-row.html, design-system.md §6.9–6.10
+  - [x] No global header on tab pages: one PageHeading per tab (title + slider-lines settings mark); reading keeps a
+        back-arrow-only row; LISTEN/LIBRARY + moves to the end of the search row (34px)
+  - [x] Adaptive labels: English default, Japanese when the reader learns the word (easy in wordDatabase — vocab,
+        not level); staged (LIBRARY 本棚 → 書庫); sticky `labelStages`; ~4.5s switch event on page titles, nav
+        follows; Settings → Interface Language
+  - [ ] Maybe: tap a page title to open its word card (本棚/書庫 rarely appear in news, so they may never get graded)
+  - [x] index.html notranslate (Chrome was auto-translating the Japanese UI)
 - [x] Archive organize: LISTEN + LIBRARY (2026-10-10) — mockup docs/mockups/archive-organize.html, design-system.md §6.8
   - [x] Shared ArchiveList: month groups (newest open, older collapsed with a summary line), replaces the filter rows
   - [x] Search (services/archiveSearch.ts): Japanese + English, case/width/kana-folded; body text loaded on first
