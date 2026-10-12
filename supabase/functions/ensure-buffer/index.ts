@@ -22,10 +22,21 @@ const corsHeaders = {
 const N = Number(Deno.env.get('JIT_BUFFER_N') ?? 2);        // target buffer depth
 const M = Number(Deno.env.get('JIT_DAILY_CAP') ?? 15);      // hard daily cap/user/24h
 const RECLAIM_MIN = Number(Deno.env.get('JIT_RECLAIM_MIN') ?? 5); // stale-pending window
+// Full text only: process-article refuses a story whose article body couldn't
+// be fetched (422 thin_source) — those came out as three sentences off a
+// headline. Each refusal frees its slot, and the buffer claims again with the
+// remaining stories from that topic first, so the topic mix holds. Bounded:
+// at most this many replacement rounds per run (each refused row is marked
+// failed, so it's never retried and still counts toward the daily cap), and
+// none started once the run is past REPLACEMENT_BUDGET_MS (a slow extraction
+// can take ~30s, and the function has a wall-clock limit).
+const MAX_REPLACEMENT_ROUNDS = 2;
+const REPLACEMENT_BUDGET_MS = 60_000;
 
 interface RawCard {
   id: string;
   title: string;
+  category?: string;
   sources?: { title?: string; url?: string; teaser?: string }[];
   blocks?: { content?: { text?: string }[] }[];
 }
@@ -119,70 +130,113 @@ Deno.serve(async (req) => {
 
     // ── Atomic claim under the per-user advisory lock (the authoritative truth;
     // the pre-check above is only an optimization). ───────────────────────────
-    const minimal = candidates.map((c) => ({ id: c.id, title: c.title }));
-    const { data: claim, error: rpcErr } = await admin.rpc('ensure_buffer_claim', {
-      p_user_id: userId,
-      p_candidates: minimal,
-      p_n: N,
-      p_m: M,
-      p_reclaim_minutes: RECLAIM_MIN,
-    });
-    if (rpcErr) {
+    const byId = new Map(candidates.map((c) => [c.id, c]));
+    const claimSlots = async (ordered: RawCard[]) => {
+      const { data, error } = await admin.rpc('ensure_buffer_claim', {
+        p_user_id: userId,
+        p_candidates: ordered.map((c) => ({ id: c.id, title: c.title })),
+        p_n: N,
+        p_m: M,
+        p_reclaim_minutes: RECLAIM_MIN,
+      });
+      if (error) throw error;
+      return data as { buffer?: number; produced24h?: number; deficit?: number; reclaimed?: number; claimed?: { id: string; title: string }[] } | null;
+    };
+
+    const startedAt = Date.now();
+    let claim: Awaited<ReturnType<typeof claimSlots>>;
+    try {
+      claim = await claimSlots(candidates);
+    } catch (rpcErr) {
       console.error('[ensure-buffer] ensure_buffer_claim error:', rpcErr);
-      return json({ error: rpcErr.message }, 500);
+      return json({ error: (rpcErr as { message?: string })?.message ?? String(rpcErr) }, 500);
     }
 
-    const claimed: { id: string; title: string }[] = claim?.claimed ?? [];
-    const byId = new Map(candidates.map((c) => [c.id, c]));
-
     // ── Produce each claimed slot (slow Gemini work, OUTSIDE the lock). ───────
-    let produced = 0, failed = 0;
-    for (const slot of claimed) {
-      const card = byId.get(slot.id);
-      const snippet = card?.blocks?.[0]?.content?.[0]?.text || slot.title;
-      let ok = false;
-      try {
-        const resp = await fetch(`${supabaseUrl}/functions/v1/process-article`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-          body: JSON.stringify({
-            userId,
-            articleId: slot.id,
-            title: slot.title,
-            snippet,
-            sources: card?.sources ?? [],
-          }),
-        });
-        ok = resp.ok; // process-article upserts the pending row → status='ready'
-        if (!ok) console.error(`[ensure-buffer] process-article ${resp.status} for ${slot.id}:`, await resp.text());
-      } catch (e) {
-        console.error(`[ensure-buffer] process-article threw for ${slot.id}:`, e instanceof Error ? e.message : e);
-      }
+    let produced = 0, failed = 0, thin = 0, claimedTotal = 0;
+    const markFailed = (id: string) => admin.from('processed_news')
+      .update({ status: 'failed', retry_count: 1 })
+      .eq('user_id', userId).eq('id', id).eq('status', 'pending');
 
-      if (ok) {
-        produced++;
-      } else {
-        failed++;
-        // Guardrail #4: failures don't revert into a deficit and don't loop — mark
-        // the claimed-but-unproduced row failed (still counts toward the daily cap)
-        // so the slot frees and the headline isn't retried indefinitely.
-        await admin.from('processed_news')
-          .update({ status: 'failed', retry_count: 1 })
-          .eq('user_id', userId).eq('id', slot.id).eq('status', 'pending');
+    // Returns the topics whose story was refused as too thin.
+    const produceSlots = async (slots: { id: string; title: string }[]) => {
+      const thinTopics: string[] = [];
+      for (const slot of slots) {
+        const card = byId.get(slot.id);
+        const snippet = card?.blocks?.[0]?.content?.[0]?.text || slot.title;
+        let ok = false;
+        try {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/process-article`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              userId,
+              articleId: slot.id,
+              title: slot.title,
+              snippet,
+              sources: card?.sources ?? [],
+              requireFull: true,
+            }),
+          });
+          ok = resp.ok; // process-article upserts the pending row → status='ready'
+          if (!ok) {
+            const text = await resp.text();
+            if (resp.status === 422 && text.includes('thin_source')) {
+              thin++;
+              thinTopics.push(card?.category ?? '');
+            } else {
+              console.error(`[ensure-buffer] process-article ${resp.status} for ${slot.id}:`, text);
+            }
+          }
+        } catch (e) {
+          console.error(`[ensure-buffer] process-article threw for ${slot.id}:`, e instanceof Error ? e.message : e);
+        }
+
+        if (ok) {
+          produced++;
+        } else {
+          failed++;
+          // Guardrail #4: failures don't revert into a deficit and don't loop — mark
+          // the claimed-but-unproduced row failed (still counts toward the daily cap)
+          // so the slot frees and the headline isn't retried indefinitely.
+          await markFailed(slot.id);
+        }
+      }
+      return thinTopics;
+    };
+
+    let slots = claim?.claimed ?? [];
+    for (let round = 0; slots.length > 0; round++) {
+      claimedTotal += slots.length;
+      const thinTopics = await produceSlots(slots);
+      if (thinTopics.length === 0 || round >= MAX_REPLACEMENT_ROUNDS || Date.now() - startedAt > REPLACEMENT_BUDGET_MS) break;
+      // Replace thin stories: the same topics' remaining candidates first (in
+      // their existing order), then everything else. The RPC skips any story
+      // this user already has a row for, including the ones just refused.
+      const want = new Set(thinTopics);
+      const reordered = [
+        ...candidates.filter((c) => want.has(c.category ?? '')),
+        ...candidates.filter((c) => !want.has(c.category ?? '')),
+      ];
+      try {
+        slots = (await claimSlots(reordered))?.claimed ?? [];
+      } catch (rpcErr) {
+        console.error('[ensure-buffer] replacement claim error:', rpcErr);
+        break;
       }
     }
 
     const reason = produced > 0 ? 'produced'
-      : claimed.length === 0 ? 'no-deficit-or-source'
+      : claimedTotal === 0 ? 'no-deficit-or-source'
       : 'all-failed';
     console.log(JSON.stringify({
       fn: 'ensure-buffer', userId,
       buffer: claim?.buffer, produced24h: claim?.produced24h,
       deficit: claim?.deficit, reclaimed: claim?.reclaimed,
-      claimed: claimed.length, produced, failed, reason,
+      claimed: claimedTotal, produced, failed, thin, reason,
     }));
 
-    return json({ ok: true, reason, claimed: claimed.length, produced, failed });
+    return json({ ok: true, reason, claimed: claimedTotal, produced, failed, thin });
 
   } catch (err) {
     console.error('[ensure-buffer] Error:', err);
