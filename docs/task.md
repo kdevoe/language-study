@@ -579,3 +579,8 @@
       part 1 is preparing; a failed or stalled (>6 min) part 1 shows 失敗 · タップで再試行 and retries in the
       background (`background: true`).
   - [ ] Deploy process-article (`supabase functions deploy process-article`) after the web app is live
+- [x] Song queue stopped after one song with the phone locked (2026-10-12): the hand-off unmounted the player
+      and fetched/signed the next song before playing; iOS suspends the page once audio stops, so it never
+      finished. SongPlayer now prepares the next song while one plays and, on 'ended' (hidden page),
+      lock-screen ⏭, a countdown end, or locking mid-countdown, swaps the source and plays inside the event;
+      the next player adopts the element without resetting it

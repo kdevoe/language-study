@@ -42,6 +42,16 @@ const REPEAT_LABEL: Record<Repeat, string> = { off: 'リピート', one: '1曲',
 const NEXT_REPEAT: Record<Repeat, Repeat> = { off: 'one', one: 'all', all: 'off' };
 // The queue's リピート outlives each song's player (each song remounts it).
 let sessionRepeat: Repeat = 'off';
+
+// The next song in the queue, loaded ahead while this one plays.
+interface Prepared { songId: string; full: SongFull; url: string; blob: boolean }
+// A song the outgoing player already started on the shared element. Locked
+// or in the background, iOS suspends the page as soon as audio stops, so the
+// usual hand-off (unmount, fetch the next song, sign its URL, then play) never
+// finished and the queue stopped after one song. Instead the outgoing player
+// swaps the prepared source in and plays it inside the 'ended' event, and the
+// next player adopts the element as it is (no reset, no reload).
+let carried: Prepared | null = null;
 const SKIP_S = 10;
 const SCROLL_ANCHOR = 0.4;
 const MIST = '#d4e0e8'; // --accent-primary, for the browser chrome (theme-color)
@@ -116,6 +126,7 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
   const autoScrollRef = useRef(true);
   const programmaticScrollUntil = useRef(0);
   const resumeAfterModal = useRef(false);
+  const prepared = useRef<Prepared | null>(null);
 
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const lookup = useWordLookup();
@@ -125,11 +136,21 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
+    // Adopt a song the previous player already started (see `carried`).
+    const carry = carried?.songId === initial.id ? carried : null;
+    carried = null;
     (async () => {
       try {
-        const full = await fetchSong(initial.id);
+        const full = carry?.full ?? await fetchSong(initial.id);
         if (cancelled) return;
         setSong(full);
+        if (carry) {
+          if (carry.blob) objectUrl = carry.url;
+          autoplayed.current = true;
+          counted.current = true;
+          recordPlay(full);
+          setPlaying(!audioRef.current!.paused);
+        }
         // One block per lyric line, so each line's tokens stay together.
         const raw: ArticleBlock[] = (full.plan?.sections ?? []).flatMap((s) => s.lines.map((l) => ({ type: 'paragraph' as const, text: l })));
         setBlocks(raw);
@@ -137,6 +158,7 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
         if (full.cover_path) coverUrls([full.cover_path]).then((m) => { if (!cancelled) setCover(m[full.cover_path!] ?? null); });
         const path = full.audio_path;
         if (!path) throw new Error('song has no audio');
+        if (carry) { setAudioUrl(carry.url); return; }
         const local = await cachedAudioUrl('music', path);
         if (local) objectUrl = local;
         const url = local ?? await songFileUrl(path);
@@ -279,10 +301,21 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
 
   // ── The shared element: listeners and source ──
   // The song ended (with 1曲 on it loops and never ends): hand off to the next.
+  // Start `next` on the element right now, if it's prepared; the next player adopts it.
+  const startPrepared = (next: Song) => {
+    const p = prepared.current;
+    const audio = audioRef.current;
+    if (!p || p.songId !== next.id || !audio) return;
+    carried = p;
+    audio.loop = false;
+    audio.src = p.url;
+    audio.play().catch((e) => console.warn('[song] next song blocked:', e));
+  };
   const onEnded = () => {
     if (!nextSong || !onPlaySong) return;
-    // Screen locked or app in the background: no one sees the handoff, go straight on.
-    if (document.hidden) { onPlaySong(nextSong, false); return; }
+    // Screen locked or app in the background: no one sees the handoff, and the
+    // page is about to be suspended, so start the next song before returning.
+    if (document.hidden) { startPrepared(nextSong); onPlaySong(nextSong, false); return; }
     setHandoff({ next: nextSong, left: HANDOFF_S });
   };
   const handlers = useRef({ onLoadedMetadata, onPlay, tick, onEnded });
@@ -300,6 +333,7 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
     return () => {
       on.forEach(([type, fn]) => audio.removeEventListener(type, fn));
       audio.loop = false;
+      if (carried) return; // the element is already playing the next song
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
@@ -307,8 +341,38 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
   }, []);
 
   useEffect(() => {
-    if (audioUrl) audioRef.current!.src = audioUrl;
+    const audio = audioRef.current!;
+    // An adopted song is already playing from this URL; reassigning would restart it.
+    if (audioUrl && audio.src !== new URL(audioUrl, location.href).href) audio.src = audioUrl;
   }, [audioUrl]);
+
+  // Load the next song while this one plays, so the hand-off needs no network.
+  const nextId = nextSong?.id ?? null;
+  useEffect(() => {
+    if (!nextId || nextId === initial.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const full = await fetchSong(nextId);
+        const path = full.audio_path;
+        if (!path || cancelled) return;
+        const local = await cachedAudioUrl('music', path);
+        const url = local ?? await songFileUrl(path);
+        if (cancelled) { if (local) URL.revokeObjectURL(local); return; }
+        if (!local) saveAudio('music', path, url);
+        prepared.current = { songId: nextId, full, url, blob: !!local };
+      } catch (e) {
+        console.warn('[song] could not prepare the next song:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      const p = prepared.current;
+      prepared.current = null;
+      // Unless the next player adopted it, this player owns the saved copy's URL.
+      if (p?.blob && carried?.url !== p.url) setTimeout(() => URL.revokeObjectURL(p.url), 0);
+    };
+  }, [nextId, initial.id]);
 
   useEffect(() => {
     // 全部 on a queue of one is the same as 1曲.
@@ -316,11 +380,17 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
   }, [repeat, queue.length]);
 
   // Handoff countdown: 3, 2, 1, then the next song.
+  const startPreparedRef = useRef(startPrepared);
+  startPreparedRef.current = startPrepared;
   useEffect(() => {
     if (!handoff) return;
-    if (handoff.left <= 0) { onPlaySong?.(handoff.next, false); return; }
+    const go = () => { startPreparedRef.current(handoff.next); onPlaySong?.(handoff.next, false); };
+    if (handoff.left <= 0) { go(); return; }
     const t = setTimeout(() => setHandoff((h) => (h ? { ...h, left: h.left - 1 } : h)), 1000);
-    return () => clearTimeout(t);
+    // Locked mid-countdown: the timer would be suspended with the page, so go now.
+    const onHide = () => { if (document.hidden) go(); };
+    document.addEventListener('visibilitychange', onHide);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', onHide); };
   }, [handoff, onPlaySong]);
 
   // ── Manual scroll pauses auto-scroll ──
@@ -370,7 +440,7 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
       ['pause', pause],
       ['seekbackward', () => skip(-SKIP_S)],
       ['seekforward', () => skip(SKIP_S)],
-      ...(queue[index + 1] && onPlaySong ? [['nexttrack', () => onPlaySong(queue[index + 1], false)] as [MediaSessionAction, MediaSessionActionHandler]] : []),
+      ...(queue[index + 1] && onPlaySong ? [['nexttrack', () => { startPrepared(queue[index + 1]); onPlaySong(queue[index + 1], false); }] as [MediaSessionAction, MediaSessionActionHandler]] : []),
       ...(queue[index - 1] && onPlaySong ? [['previoustrack', () => onPlaySong(queue[index - 1], false)] as [MediaSessionAction, MediaSessionActionHandler]] : []),
     ];
     for (const [action, handler] of actions) {
