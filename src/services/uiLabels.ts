@@ -29,7 +29,8 @@ interface UiLabel {
 }
 
 export const UI_LABELS: Record<UiLabelId, UiLabel> = {
-  today: { en: 'Today', stages: [{ ja: '今日' }] },
+  // The home tab (was 今日); ホーム is what Japanese apps call it.
+  today: { en: 'Home', stages: [{ ja: 'ホーム' }] },
   read: { en: 'Read', stages: [{ ja: '読む' }] },
   // 聞く's pages: 番組 for podcasts (ポッドキャスト is too long for the title switch).
   shows: { en: 'Shows', stages: [{ ja: '番組' }] },

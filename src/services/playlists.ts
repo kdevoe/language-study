@@ -54,6 +54,20 @@ async function withRollback(write: () => PromiseLike<{ error: unknown }>) {
   }
 }
 
+// ── Last played ──────────────────────────────────────────────────────────────
+// Home's 音楽 block plays the list you last played. Kept per device: it's a
+// shortcut, not a record.
+const LAST_LIST_KEY = 'yugen-last-list';
+/** すべての曲: built on the client from every ready song, never stored. */
+export const ALL_LIST_ID = 'all';
+
+export function markListPlayed(id: string) {
+  try { localStorage.setItem(LAST_LIST_KEY, id); } catch { /* storage blocked */ }
+}
+export function lastPlayedListId(): string | null {
+  try { return localStorage.getItem(LAST_LIST_KEY); } catch { return null; }
+}
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 let inflight: Promise<void> | null = null;
 export function loadPlaylists(): Promise<void> {

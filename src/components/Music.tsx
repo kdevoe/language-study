@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ListPlus, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { PageHeading, type TitleSwitch } from './PageHeading';
-import { AddButton } from './ArchiveList';
+import { CreateButton } from './PodcastSheet';
 import { SongSheet } from './SongSheet';
 import { Song, coverUrls, deleteSongs, fetchSongs, isSongInFlight, retrySong, songErrorMessage } from '../services/songs';
 import { readListCache, writeListCache } from '../services/listCache';
@@ -9,11 +9,12 @@ import { styleLabel } from '../data/songStyles';
 import { AddToListSheet } from './AddToListSheet';
 import { NewListSheet, PlaylistPage, SongPicker } from './PlaylistPage';
 import { Collage, Kicker, MusicToast, coverOf } from './MusicParts';
-import { deletePlaylist, forgetSongInPlaylists, loadPlaylists, usePlaylists, type Playlist } from '../services/playlists';
+import { ALL_LIST_ID, deletePlaylist, forgetSongInPlaylists, loadPlaylists, markListPlayed, usePlaylists, type Playlist } from '../services/playlists';
 
 // 聞く › 音楽 (mockup docs/mockups/music.html, phone 1): a grid of covers, newest
 // first — title (serif 1.05rem, two lines) over the style. In-flight songs show
-// their stage, a failed one offers 再試行. + opens SongSheet. Long-press a
+// their stage, a failed one offers 再試行. The ＋ at the end of the 曲 row (or
+// 曲を作る on the empty page) opens SongSheet (docs/mockups/home-music-polish.html). Long-press a
 // cover and it splits: リストに追加 over 削除; the delete waits 5s behind
 // 元に戻す (undo, not confirm). Tapping a cover plays it, then carries on
 // through the grid.
@@ -28,7 +29,6 @@ import { deletePlaylist, forgetSongInPlaylists, loadPlaylists, usePlaylists, typ
 const POLL_MS = 5000;
 const LONG_PRESS_MS = 500;
 const UNDO_MS = 5000;
-const ALL_LIST_ID = 'all';
 
 interface Props {
   /** Play `song`, then carry on through `queue`; `context` names where it was started (a list). */
@@ -196,7 +196,7 @@ export function Music({ onOpenSong, titleSwitch, listId, onListChange }: Props) 
         songs={songs}
         covers={covers}
         onBack={() => onListChange(null)}
-        onPlay={(song, queue) => onOpenSong(song, queue, openList.name)}
+        onPlay={(song, queue) => { markListPlayed(openList.id); onOpenSong(song, queue, openList.name); }}
         onPick={() => { setPicking(true); window.scrollTo(0, 0); }}
       />
     );
@@ -208,7 +208,7 @@ export function Music({ onOpenSong, titleSwitch, listId, onListChange }: Props) 
 
   return (
     <>
-      <PageHeading id="music" settingsMark={false} titleSwitch={titleSwitch} actions={<AddButton onClick={() => setSheetOpen(true)} label="曲を作る" />} />
+      <PageHeading id="music" settingsMark={false} titleSwitch={titleSwitch} />
 
       {error && (
         <div role="alert" onClick={() => setError(null)} style={{ marginBottom: '1rem', padding: '0.75rem 1.1rem', borderRadius: '14px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-main)', fontSize: '0.85rem', lineHeight: 1.4, cursor: 'pointer', textAlign: 'center' }}>
@@ -224,6 +224,9 @@ export function Music({ onOpenSong, titleSwitch, listId, onListChange }: Props) 
         <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
           <h2 className="serif" style={{ fontSize: '1.4rem', marginBottom: '0.8rem', color: 'var(--text-main)' }}>まだ曲がありません</h2>
           <p style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>1日おきに新しい曲が届きます</p>
+          <div style={{ marginTop: '1.6rem', display: 'flex', justifyContent: 'center' }}>
+            <CreateButton ready busy={false} onClick={() => setSheetOpen(true)} label="曲を作る" />
+          </div>
         </div>
       ) : (
         <>
@@ -272,10 +275,20 @@ export function Music({ onOpenSong, titleSwitch, listId, onListChange }: Props) 
                 <div className="serif" style={{ fontSize: '0.95rem', lineHeight: 1.35, marginTop: '0.5rem', color: 'var(--text-muted)' }}>新しいリスト</div>
               </button>
             </div>
-            <Kicker style={{ marginTop: '2rem' }}>曲</Kicker>
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.6rem 0.9rem', marginTop: showShelf ? 0 : '0.6rem', paddingBottom: '6rem' }}>
+        {/* The ＋ sits on the 曲 row so it reads as "make a song"; lists have their own tile. */}
+        <Kicker style={{ marginTop: showShelf ? '2rem' : '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>曲</span>
+          <button
+            onClick={() => setSheetOpen(true)}
+            aria-label="曲を作る"
+            style={{ width: 40, height: 40, margin: '-10px -10px -10px 0', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Plus size={20} strokeWidth={1.4} />
+          </button>
+        </Kicker>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.6rem 0.9rem', paddingBottom: '6rem' }}>
           {songs.map((song) => {
             const cover = song.cover_path ? covers[song.cover_path] : undefined;
             const working = isSongInFlight(song);

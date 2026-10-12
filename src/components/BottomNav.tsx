@@ -1,4 +1,4 @@
-import { Sun, BookOpen, Headphones, Layers } from 'lucide-react';
+import { House, BookOpen, Headphones, Layers } from 'lucide-react';
 import { AdaptiveLabel } from './AdaptiveLabel';
 
 export type Tab = 'today' | 'read' | 'listen' | 'flashcards' | 'settings';
@@ -11,7 +11,7 @@ interface Props {
 
 export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   const tabs = [
-    { id: 'today', label: 'today', icon: Sun },
+    { id: 'today', label: 'today', icon: House },
     { id: 'read', label: 'read', icon: BookOpen },
     { id: 'listen', label: 'listen', icon: Headphones },
     { id: 'flashcards', label: 'review', icon: Layers },

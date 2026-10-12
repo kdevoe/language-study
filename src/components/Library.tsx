@@ -45,13 +45,13 @@ async function resolveUserId(): Promise<string | null> {
 
 /** Top-right of a work's card: the number of parts inside a ring that fills as the
  *  whole work is read (docs/mockups/progress-ring.html), closed once it's finished. */
-export function PartCount({ work, compact = false }: { work: LongFormWork; compact?: boolean }) {
+export function PartCount({ work }: { work: LongFormWork }) {
   // Only a finished work closes the ring.
   const progress = work.status === 'finished' ? 1 : Math.min(0.97, work.readingPosition?.percent ?? 0);
   const part = work.status === 'finished'
     ? work.partCount
     : Math.min(work.readingPosition?.partIndex ?? 1, work.partCount);
-  return <ProgressRing total={work.partCount} progress={progress} label={`${part} / ${work.partCount}部`} compact={compact} />;
+  return <ProgressRing total={work.partCount} progress={progress} label={`${part} / ${work.partCount}部`} />;
 }
 
 // LIBRARY tab: works in ArchiveList — grouped by month, searchable, swipe to

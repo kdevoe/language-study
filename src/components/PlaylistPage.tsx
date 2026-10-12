@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, Reorder, animate, useDragControls, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { Check, ChevronLeft, GripVertical, Plus, Shuffle } from 'lucide-react';
 import { CreateButton } from './PodcastSheet';
-import { Collage, Grabber, MusicToast, NameField, coverOf, fmtDuration, sheetBackdrop, sheetPanel, sheetSpring, useToast } from './MusicParts';
+import { Collage, Grabber, MusicToast, NameField, PlayCircle, coverOf, fmtDuration, sheetBackdrop, sheetPanel, sheetSpring, useToast } from './MusicParts';
 import { useScrollLock } from '../hooks/useScrollLock';
 import type { Song } from '../services/songs';
 import { styleLabel } from '../data/songStyles';
@@ -24,7 +24,7 @@ export const shuffled = <T,>(xs: T[]) => {
 
 // ── List page ────────────────────────────────────────────────────────────────
 // Collage, name (tap to rename), count and length, then 再生 (the lifted
-// button) with シャッフル beside it. Songs as rows: drag the grip to reorder,
+// play circle, as on Home) with a quiet シャッフル icon beside it. Songs as rows: drag the grip to reorder,
 // swipe left to take one out (元に戻す in the toast). ＋ 曲を追加 opens the picker.
 // `fixed` is the built-in すべての曲 list: every song, newest first, nothing to edit.
 export function PlaylistPage({ list, songs, covers, onBack, onPlay, onPick, fixed = false }: {
@@ -92,9 +92,9 @@ export function PlaylistPage({ list, songs, covers, onBack, onPlay, onPick, fixe
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.6rem', margin: '1.2rem 0 1.6rem' }}>
-            <CreateButton ready busy={false} onClick={() => onPlay(ordered[0], ordered)} label="▶ 再生" />
-            <button onClick={() => { const q = shuffled(ordered); onPlay(q[0], q); }} className="serif" style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.95rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Shuffle size={16} strokeWidth={1.5} /> シャッフル
+            <PlayCircle size={56} onClick={() => onPlay(ordered[0], ordered)} label="再生" />
+            <button onClick={() => { const q = shuffled(ordered); onPlay(q[0], q); }} aria-label="シャッフル" style={{ width: 44, height: 44, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shuffle size={19} strokeWidth={1.5} />
             </button>
           </div>
 

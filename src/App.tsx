@@ -636,6 +636,17 @@ function App() {
     handleTabChange('listen');
     handleOpenEpisode(episode);
   };
+  const showMusic = (listId: string | null = null) => {
+    setListenPage('music');
+    setMusicListId(listId);
+    setListenView('list');
+    handleTabChange('listen');
+  };
+  const handleTodayPlayList = (queue: Song[], context: string) => {
+    setListenPage('music');
+    handleTabChange('listen');
+    handleOpenSong(queue[0], queue, context);
+  };
   const visibleArticles = (articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id));
   // 今日's two news picks, from the last feed while this launch's feed loads
   // (NewsAPI + the ready buffer can take a while on open). Light copies: a
@@ -855,6 +866,9 @@ function App() {
             onShowLibrary={() => showRead('shelf')}
             onShowShows={() => { setListenPage('shows'); handleTabChange('listen'); }}
             onOpenEpisode={handleTodayEpisode}
+            onShowMusic={() => showMusic()}
+            onOpenList={(id) => showMusic(id)}
+            onPlayList={handleTodayPlayList}
             news={todayNews}
           />
         )}

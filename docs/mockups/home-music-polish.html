@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — home + music polish</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+.serif { font-family: var(--font-serif); }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1700px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 380px; height: 760px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── Heading ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.2rem; }
+.row { display: flex; align-items: baseline; gap: 0.95rem; }
+.tt { font-family: var(--font-serif); font-weight: 500; line-height: 1.2; font-size: 1.2rem; opacity: 0.5; }
+.tt.on { font-size: 2rem; opacity: 1; }
+.icon-btn { width: 44px; height: 44px; margin-right: -10px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; border: none; background: none; }
+.icon-btn svg.i { stroke-width: 1.25; }
+
+/* ── 音楽 ── */
+.kick { font-weight: 600; color: var(--text-muted); margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between; }
+.kick .add { width: 40px; height: 40px; margin: -10px -10px -10px 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border: none; background: none; }
+.kick .add svg.i { width: 20px; height: 20px; stroke-width: 1.4; }
+.kick .add.lbl { width: auto; gap: 0.25rem; font-family: var(--font-serif); font-size: 0.9rem; font-weight: 500; padding: 0 0.6rem; }
+.shelf { display: flex; gap: 0.9rem; overflow-x: auto; margin: 0 -1.25rem; padding: 0.2rem 1.25rem 0.6rem; scrollbar-width: none; }
+.tile { flex: none; width: 116px; }
+.collage { width: 116px; height: 116px; border-radius: 16px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; box-shadow: 0 4px 25px rgba(0,0,0,0.06); }
+.tile .nm { font-family: var(--font-serif); font-size: 0.95rem; line-height: 1.35; margin-top: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .ct { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.newtile .collage { background: var(--bg-card); box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6rem 0.9rem; }
+.cover { aspect-ratio: 1; border-radius: 16px; box-shadow: 0 4px 25px rgba(0,0,0,0.06); }
+.song .t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.45; margin-top: 0.6rem; }
+.song .m { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 0.2rem; }
+
+/* ── List page ── */
+.back { display: flex; align-items: center; gap: 0.15rem; color: var(--text-muted); font-family: var(--font-serif); font-size: 0.95rem; margin-bottom: 1.2rem; }
+.lhead { text-align: center; }
+.lhead .collage { width: 180px; height: 180px; margin: 0 auto; border-radius: 22px; }
+.lhead h1 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 500; margin-top: 1.1rem; line-height: 1.35; }
+.lhead .meta { font-size: 0.72rem; font-weight: 500; color: var(--text-muted); margin-top: 0.15rem; }
+.actions { display: flex; align-items: center; justify-content: center; gap: 1.6rem; margin: 1.2rem 0 1.6rem; }
+.shuffle { border: none; background: none; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; }
+.shuffle svg.i { width: 16px; height: 16px; }
+.shuffle.circle { width: 44px; height: 44px; border-radius: 50%; justify-content: center; }
+.shuffle.circle svg.i { width: 19px; height: 19px; }
+.old90 { border: none; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 100px; padding: 0.85rem 2rem; font-family: var(--font-serif); font-size: 1rem; }
+.playc { width: var(--s, 56px); height: var(--s, 56px); border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; border: none; flex: none; }
+.playc svg { width: calc(var(--s, 56px) * 0.38); height: calc(var(--s, 56px) * 0.38); fill: var(--text-main); margin-left: 3px; }
+.playpill { border: none; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 100px; padding: 0.7rem 1.4rem 0.7rem 1.1rem; display: flex; align-items: center; gap: 0.55rem; font-family: var(--font-serif); font-size: 1rem; }
+.playpill svg { width: 15px; height: 15px; fill: var(--text-main); }
+.srow { display: flex; align-items: center; gap: 0.9rem; padding: 0.6rem 0; }
+.srow .art { width: 46px; height: 46px; border-radius: 10px; flex: none; }
+.srow .tx { flex: 1; min-width: 0; }
+.srow .tx div:first-child { font-family: var(--font-serif); font-size: 1rem; }
+.srow .tx div:last-child { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.srow .grip { color: var(--border-light); }
+
+/* ── Home ── */
+.blocks > section + section { margin-top: 2rem; }
+.sec-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; color: var(--text-muted); }
+.sec-h svg.i { width: 19px; height: 19px; stroke-width: 1.8; }
+.sec-h .link { font-family: var(--font-serif); font-size: 0.95rem; display: flex; align-items: center; gap: 0.1rem; margin-right: 1.5rem; }
+.sec-h .link svg.i { width: 15px; height: 15px; stroke-width: 1.5; }
+.hcard { width: 100%; text-align: left; background: var(--bg-card); border-radius: 24px; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); }
+.hcard.white { background: var(--bg-pure); }
+.htitle { font-family: var(--font-serif); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hlabel { font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.ring { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.ring span { position: relative; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.mini { display: grid; grid-template-columns: 1fr 1fr; border-radius: 12px; overflow: hidden; flex: none; }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav span.b { width: 76px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.6rem; line-height: 1rem; letter-spacing: 0.05em; font-weight: 500; margin-top: 2px; }
+.nav .b.on { color: var(--text-main); }
+.nav .b.on .ic { background: var(--accent-primary); }
+.nav .b.on .ic svg.i { stroke-width: 1.9; }
+
+/* ── Notes ── */
+.notes { max-width: 820px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+@media (max-width: 440px) { .phone { height: 700px; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+    <symbol id="news" viewBox="0 0 24 24"><path d="M15 18h-5"/><path d="M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="chevl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="shuffle" viewBox="0 0 24 24"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-7.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></symbol>
+    <symbol id="grip" viewBox="0 0 24 24"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
+    <symbol id="play" viewBox="0 0 24 24"><path d="M6 3.5v17a1 1 0 0 0 1.5.86l14-8.5a1 1 0 0 0 0-1.72l-14-8.5A1 1 0 0 0 6 3.5Z"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION</div>
+  <h1>Home, 音楽 and the list page (BUILT with the default toggles)</h1>
+  <p>Three phones, one per screen you asked about. 音楽: the ＋ moves from the page heading to the 曲 row, and the リスト / 曲 headings grow. List page: the pill “▶ 再生” becomes a play button in the style of 今日's podcast row. Home: 今日 becomes Home with a house icon, the cards' text is larger, and a new block plays the list you last played. The toggles change the options where there's a real choice.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">＋ ON 曲</span><div class="pill-seg" data-ctl="add"><button data-v="icon" class="on">＋ only</button><button data-v="label">＋ 曲を作る</button></div></div>
+    <div class="ctl"><span class="lbl">HEADINGS</span><div class="pill-seg" data-ctl="kick"><button data-v="0.7">Now</button><button data-v="0.82" class="on">Larger</button><button data-v="serif">Serif</button></div></div>
+    <div class="ctl"><span class="lbl">PLAY</span><div class="pill-seg" data-ctl="play"><button data-v="old">Now</button><button data-v="circle" class="on">Circle</button><button data-v="pill">Pill + icon</button></div></div>
+    <div class="ctl"><span class="lbl">HOME TEXT</span><div class="pill-seg" data-ctl="type"><button data-v="now">Now</button><button data-v="up" class="on">Larger</button><button data-v="up2">Largest</button></div></div>
+    <div class="ctl"><span class="lbl">HOME NAME</span><div class="pill-seg" data-ctl="name"><button data-v="en" class="on">Home</button><button data-v="ja">ホーム</button></div></div>
+    <div class="ctl"><span class="lbl">LIST BLOCK</span><div class="pill-seg" data-ctl="lb"><button data-v="row" class="on">Row</button><button data-v="card">Collage card</button></div></div>
+  </div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<div class="notes">
+  <h3>What changes</h3>
+  <ol>
+    <li><span class="n">1</span><div><b>＋ belongs to 曲.</b> The ＋ leaves the page heading (where it sat beside 番組 | 音楽 and read as “add a list” or “add anything”) and sits at the right end of the 曲 row, so it's clearly “make a song”. Lists keep their own ＋ 新しいリスト tile. When there are no songs yet (no shelf, no 曲 row), the empty state gets a 曲を作る button instead.</div></li>
+    <li><span class="n">2</span><div><b>Bigger headings.</b> リスト and 曲 go from 0.7rem to 0.82rem sans. “Serif” tries them as small serif headings (1rem) instead; it's more of a change in character, closer to the page titles.</div></li>
+    <li><span class="n">3</span><div><b>Play like Home.</b> A white lifted circle with a filled triangle, the same as Home's podcast row, scaled up to 56px since it's the page's main action. シャッフル becomes a quiet icon beside it. “Pill + icon” keeps the word 再生 next to a real triangle, if you'd rather keep the text.</div></li>
+    <li><span class="n">4</span><div><b>Home.</b> The tab is Home with a house icon. As a Japanese label it would be ホーム (what Japanese apps use); the adaptive switch would show it once the word is learned. Text on the cards goes from 1.05rem to 1.2rem (titles) and 0.68rem to 0.74rem (labels); the ring grows to match. “Largest” is 1.3rem.</div></li>
+    <li><span class="n">5</span><div><b>Recent list.</b> A new block between the podcast and the news, marked by a music-note icon (which opens 音楽): the list you last played, or the last one you added to if you haven't played one. Tapping the play button plays it from the top; tapping the rest opens the list's page. “Row” matches the podcast row; “Collage card” gives the covers more room.</div></li>
+  </ol>
+</div>
+
+<script>
+const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+const g = { add: 'icon', kick: '0.82', play: 'circle', type: 'up', name: 'en', lb: 'row' };
+// Covers in the house style: off-white paper, mist blue, olive, charcoal.
+const C = ['linear-gradient(160deg,#d4e0e8,#8fb0c4)', 'linear-gradient(160deg,#e8e4d8,#b8b09a)', 'linear-gradient(160deg,#cfd8c4,#7d8c64)', 'linear-gradient(160deg,#e0d8d0,#a89888)', 'linear-gradient(160deg,#3d4448,#6d7a80)', 'linear-gradient(160deg,#f0ece0,#c8c0a8)'];
+const collage = (k, s) => `<div class="collage" ${s ? `style="width:${s}px;height:${s}px"` : ''}>${[0, 1, 2, 3].map((j) => `<div style="background:${C[(k + j) % C.length]}"></div>`).join('')}</div>`;
+const mini = (k, s) => `<div class="mini" style="width:${s}px;height:${s}px">${[0, 1, 2, 3].map((j) => `<div style="background:${C[(k + j) % C.length]}"></div>`).join('')}</div>`;
+const nav = (on, home) => `<nav class="nav">${[[home, home === 'house' ? (g.name === 'en' ? 'HOME' : 'ホーム') : '今日'], ['book', '読む'], ['headphones', '聞く'], ['layers', '復習']].map(([i, l], k) =>
+  `<span class="b ${k === on ? 'on' : ''}"><span class="ic">${ic(i)}</span><span class="lab">${l}</span></span>`).join('')}</nav>`;
+
+function kicker(text, right = '') {
+  const serif = g.kick === 'serif';
+  const style = serif ? 'font-family:var(--font-serif);font-size:1rem;font-weight:500;color:var(--text-main)' : `font-size:${g.kick}rem`;
+  return `<div class="kick" style="${style}"><span>${text}</span>${right}</div>`;
+}
+
+function musicPhone() {
+  const add = g.add === 'icon'
+    ? `<button class="add" aria-label="曲を作る">${ic('plus')}</button>`
+    : `<button class="add lbl">${ic('plus')}曲を作る</button>`;
+  const lists = [['すべての曲', 14, 0], ['夜の散歩', 6, 2], ['朝', 4, 4]];
+  const songs = [['風の強い夜', 'シティポップ · 2:58'], ['駅のホーム', 'アコースティック · 2:10'], ['雨上がり', 'バラード · 3:05'], ['小さな約束', 'ローファイ · 2:30']];
+  return `<div class="scroll">
+    <div class="heading"><div class="row"><span class="tt">番組</span><span class="tt on">音楽</span></div></div>
+    ${kicker('リスト')}
+    <div class="shelf">${lists.map(([n, c, k]) => `<div class="tile">${collage(k)}<div class="nm">${n}</div><div class="ct">${c}曲</div></div>`).join('')}
+      <div class="tile newtile"><div class="collage">${ic('plus')}</div><div class="nm" style="color:var(--text-muted)">新しいリスト</div></div></div>
+    <div style="height:2rem"></div>
+    ${kicker('曲', add)}
+    <div class="grid">${songs.map(([t, m], k) => `<div class="song"><div class="cover" style="background:${C[(k * 2 + 1) % C.length]}"></div><div class="t">${t}</div><div class="m">${m}</div></div>`).join('')}</div>
+  </div>${nav(2, 'house')}`;
+}
+
+function listPhone() {
+  const play = g.play === 'old'
+    ? `<button class="old90">▶ 再生</button><button class="shuffle">${ic('shuffle')} シャッフル</button>`
+    : g.play === 'circle'
+      ? `<button class="playc" style="--s:56px"><svg viewBox="0 0 24 24"><use href="#play"/></svg></button><button class="shuffle circle" aria-label="シャッフル">${ic('shuffle')}</button>`
+      : `<button class="playpill"><svg viewBox="0 0 24 24"><use href="#play"/></svg>再生</button><button class="shuffle">${ic('shuffle')} シャッフル</button>`;
+  const rows = [['風の強い夜', 'シティポップ · 2:58'], ['駅のホーム', 'アコースティック · 2:10'], ['雨上がり', 'バラード · 3:05'], ['小さな約束', 'ローファイ · 2:30'], ['夏の終わり', 'ロック · 2:44'], ['ひとりの朝', 'アコースティック · 2:20']];
+  return `<div class="scroll">
+    <div class="back">${ic('chevl')}音楽</div>
+    <div class="lhead">${collage(2)}<h1>夜の散歩</h1><div class="meta">6曲 · 約16分</div></div>
+    <div class="actions">${play}</div>
+    ${rows.map(([t, m], k) => `<div class="srow"><div class="art" style="background:${C[(k + 2) % C.length]}"></div><div class="tx"><div>${t}</div><div>${m}</div></div><span class="grip">${ic('grip')}</span></div>`).join('')}
+  </div>${nav(2, 'house')}`;
+}
+
+function ring(n, p, d, fs) {
+  const sw = 1.4, r = (d - sw) / 2 - 0.5, c = 2 * Math.PI * r;
+  return `<span class="ring" style="width:${d}px;height:${d}px"><svg width="${d}" height="${d}"><circle cx="${d / 2}" cy="${d / 2}" r="${r}" fill="none" stroke="var(--border-light)" stroke-width="${sw}"/><circle cx="${d / 2}" cy="${d / 2}" r="${r}" fill="none" stroke="var(--text-muted)" stroke-opacity="0.55" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}"/></svg><span style="font-size:${fs}rem">${n}</span></span>`;
+}
+
+function homePhone() {
+  const T = { now: { t: 1.05, l: 0.68, act: 0.95, ring: 22, rf: 0.62, play: 40, mini: 52 }, up: { t: 1.2, l: 0.74, act: 1.02, ring: 26, rf: 0.68, play: 44, mini: 58 }, up2: { t: 1.3, l: 0.78, act: 1.08, ring: 28, rf: 0.72, play: 46, mini: 62 } }[g.type];
+  const title = (s, extra = '') => `<div class="htitle" style="font-size:${T.t}rem;${extra}">${s}</div>`;
+  const label = (s, extra = '') => `<div class="hlabel" style="font-size:${T.l}rem;${extra}">${s}</div>`;
+  const playBtn = `<span class="playc" style="--s:${T.play}px"><svg viewBox="0 0 24 24"><use href="#play"/></svg></span>`;
+  const listBlock = g.lb === 'row'
+    ? `<div class="hcard" style="display:flex;align-items:center;gap:0.9rem;padding:0.9rem 1.2rem 0.9rem 0.9rem">${mini(2, T.mini)}<div style="flex:1;min-width:0">${title('夜の散歩')}${label('6曲 · 約16分')}</div>${playBtn}</div>`
+    : `<div class="hcard" style="padding:1rem;display:flex;gap:1rem;align-items:flex-end">${mini(2, 112)}<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;align-self:stretch">${label('リスト')}<div>${title('夜の散歩')}${label('6曲 · 約16分', 'margin-top:0.15rem')}</div></div>${playBtn}</div>`;
+  const hname = g.name === 'en' ? 'Home' : 'ホーム';
+  return `<div class="scroll">
+    <div class="heading" style="margin-bottom:1.6rem"><div class="row"><span class="tt on">${hname}</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></span></div>
+    <div class="blocks">
+      <section><div class="sec-h">${ic('layers')}</div>
+        <div class="hcard white" style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.4rem"><span class="serif" style="font-size:1.8rem;line-height:1.15">24<span style="font-size:1rem;margin-left:0.15rem">枚</span></span><span class="serif" style="font-size:${T.act}rem;display:flex;align-items:center;gap:0.2rem">始める${ic('chev')}</span></div></section>
+      <section><div class="sec-h">${ic('book')}</div>
+        <div class="hcard" style="padding:1.5rem;position:relative">${title('Quiet Rooms, Long Winters', 'max-width:calc(100% - 3rem)')}<span style="position:absolute;top:1.4rem;right:1.4rem">${ring(4, 0.4, T.ring, T.rf)}</span></div></section>
+      <section><div class="sec-h">${ic('headphones')}</div>
+        <div class="hcard" style="display:flex;align-items:center;gap:0.9rem;padding:1rem 1.2rem"><div style="flex:1;min-width:0">${title('北欧と日本 — 光の住まい')}${label('番組')}</div>${playBtn}</div></section>
+      <section><div class="sec-h">${ic('music')}</div>${listBlock}</section>
+      <section><div class="sec-h">${ic('news')}<span class="link">すべて${ic('chev')}</span></div>
+        <div style="display:flex;flex-direction:column;gap:1.4rem;padding:0.2rem 1.5rem 0">
+          <div>${label('WORLD', 'margin-bottom:0.35rem')}${title('ICJ judge Navi Pillay wins Nobel peace prize for promoting international law')}</div>
+          <div>${label('TECHNOLOGY', 'margin-bottom:0.35rem')}${title('Prime Video unveils Blade Runner 2099 full trailer at NYCC')}</div>
+        </div></section>
+    </div>
+  </div>${nav(0, 'house')}`;
+}
+
+function render() {
+  document.getElementById('stage').innerHTML = [
+    ['1 · 音楽', musicPhone(), 'The ＋ now sits on the 曲 row, where it reads as “make a song”. Headings a step larger.'],
+    ['2 · LIST PAGE', listPhone(), 'Play as a white lifted circle like Home’s podcast row; shuffle as a quiet icon.'],
+    ['3 · HOME', homePhone(), 'House icon and name; larger card text; the last-played list between the podcast and the news.'],
+  ].map(([l, h, n]) => `<div class="phone-wrap"><div class="phone-label">${l}</div><div class="phone">${h}</div><div class="phone-note">${n}</div></div>`).join('');
+}
+document.querySelectorAll('[data-ctl]').forEach((ctl) => ctl.querySelectorAll('button').forEach((b) => b.onclick = () => {
+  g[ctl.dataset.ctl] = b.dataset.v;
+  ctl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  render();
+}));
+render();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { BookOpen, ChevronRight, Headphones, Layers, Newspaper, Play } from 'lucide-react';
+import { BookOpen, ChevronRight, Headphones, Layers, Music, Newspaper } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeading } from './PageHeading';
 import { AdaptiveLabel, useAdaptiveText } from './AdaptiveLabel';
@@ -14,12 +14,17 @@ import { fetchEpisodes } from '../services/podcasts';
 import type { PodcastEpisode } from '../services/podcasts';
 import { supabase } from '../services/supabase';
 import { readListCache } from '../services/listCache';
+import { fetchSongs } from '../services/songs';
+import type { Song } from '../services/songs';
+import { ALL_LIST_ID, lastPlayedListId, loadPlaylists, markListPlayed, usePlaylists } from '../services/playlists';
+import { Collage, PlayCircle, coverOf, useCoverMap } from './MusicParts';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
-// 今日 (docs/mockups/home-today.html): the tab the app opens on. What's waiting
-// today, each block a shortcut into another tab rather than a copy of it:
-// cards due, the work in progress, a new podcast, two news picks. Blocks with nothing to show are left out, so a quiet day is a short
+// Home (docs/mockups/home-today.html, home-music-polish.html): the tab the app
+// opens on. What's waiting today, each block a shortcut into another tab rather
+// than a copy of it: cards due, the work in progress, a new podcast, the list you
+// last played, two news picks. Blocks with nothing to show are left out, so a quiet day is a short
 // page. No stats or streaks — those stay in 進捗. The only settings mark in
 // the app's tab pages sits on this heading.
 
@@ -43,6 +48,20 @@ function pickContinueWork(works: LongFormWork[]): LongFormWork | null {
 /** A ready podcast not yet listened to. */
 const pickEpisode = (eps: PodcastEpisode[]) => eps.find((e) => e.status === 'ready' && !e.listened_at) ?? null;
 
+interface RecentList { id: string; name: string; songs: Song[] }
+/** The list last played here (すべての曲 included), else the last one added to; only lists with a ready song. */
+function pickRecentList(lists: { id: string; name: string; song_ids: string[] }[], songs: Song[]): RecentList | null {
+  const ready = new Map(songs.filter((s) => s.status === 'ready').map((s) => [s.id, s]));
+  const withSongs = (l: { id: string; name: string; song_ids: string[] }): RecentList | null => {
+    const queue = l.song_ids.map((id) => ready.get(id)).filter((s): s is Song => !!s);
+    return queue.length ? { id: l.id, name: l.name, songs: queue } : null;
+  };
+  const lastId = lastPlayedListId();
+  if (lastId === ALL_LIST_ID) return withSongs({ id: ALL_LIST_ID, name: 'すべての曲', song_ids: [...ready.keys()] });
+  const last = lists.find((l) => l.id === lastId);
+  return (last && withSongs(last)) ?? lists.map(withSongs).find((l) => l) ?? null;
+}
+
 interface Props {
   onStartReview: () => void;
   onOpenWork: (work: LongFormWork, article: NewsArticle, resumeBlockIndex?: number) => void;
@@ -53,11 +72,17 @@ interface Props {
   /** 聞く's 番組 page (the 聞く block's icon). */
   onShowShows: () => void;
   onOpenEpisode: (episode: PodcastEpisode) => void;
+  /** 聞く's 音楽 page (the 音楽 block's icon). */
+  onShowMusic: () => void;
+  /** Open a list's page on 音楽. */
+  onOpenList: (listId: string) => void;
+  /** Play `queue` from its first song, in the song player; `context` is the list's name. */
+  onPlayList: (queue: Song[], context: string) => void;
   /** The top of the news feed (undismissed); 今日 shows the first two. */
   news: NewsArticle[];
 }
 
-export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, onShowLibrary, onShowShows, onOpenEpisode, news }: Props) {
+export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, onShowLibrary, onShowShows, onOpenEpisode, onShowMusic, onOpenList, onPlayList, news }: Props) {
   // Cards due, recounted whenever the word database changes (a sync landing).
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const libraryLabel = useAdaptiveText('library');
@@ -86,6 +111,26 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
       .then((eps) => { if (mountedRef.current) setEpisode(pickEpisode(eps)); })
       .catch((e) => console.warn('[today] episodes failed:', e));
   }, []);
+
+  // 音楽: the songs and lists 音楽 last loaded, then refreshed.
+  const [songs, setSongs] = useState<Song[]>(() => readListCache<Song>('songs') ?? []);
+  const { lists } = usePlaylists();
+  useEffect(() => {
+    fetchSongs()
+      .then((list) => { if (mountedRef.current) setSongs(list); })
+      .catch((e) => console.warn('[today] songs failed:', e));
+    loadPlaylists();
+  }, []);
+  const recentList = pickRecentList(lists, songs);
+  const listCovers = useCoverMap(recentList?.songs.slice(0, 4) ?? []);
+  const listMinutes = recentList
+    ? Math.max(1, Math.round(recentList.songs.reduce((n, s) => n + (s.duration_ms ?? s.minutes * 60_000), 0) / 60_000))
+    : 0;
+  const playList = () => {
+    if (!recentList) return;
+    markListPlayed(recentList.id);
+    onPlayList(recentList.songs, recentList.name);
+  };
 
   const openWork = async () => {
     if (!work || openingWork) return;
@@ -117,7 +162,7 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
             <span className="serif" style={{ fontSize: '1.8rem', fontWeight: 500, lineHeight: 1.15 }}>
               {deck.length}<span style={{ fontSize: '1rem', marginLeft: '0.15rem' }}>枚</span>
             </span>
-            <span className="serif" style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <span className="serif" style={{ fontSize: ACTION_SIZE, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
               始める<ChevronRight size={18} strokeWidth={1.5} />
             </span>
           </button>
@@ -135,7 +180,7 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
               card={{
                 status: openingWork
                   ? <CornerText compact>読み込み中</CornerText>
-                  : <PartCount work={work} compact />,
+                  : <PartCount work={work} />,
                 title: work.title,
                 openable: true,
               }}
@@ -151,10 +196,28 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
               <div className="serif" style={{ ...titleStyle, ...twoLines }}>{episode.title}</div>
               <div style={labelStyle}><AdaptiveLabel id="shows" /></div>
             </div>
-            <span style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--bg-pure)', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-              <Play size={16} strokeWidth={0} fill="var(--text-main)" style={{ marginLeft: 2 }} />
-            </span>
+            <PlayCircle label="再生" />
           </button>
+        </Section>
+      )}
+
+      {recentList && (
+        <Section title="音楽" icon={Music} onOpen={onShowMusic}>
+          {/* The row opens the list; the circle plays it from the top. */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpenList(recentList.id)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onOpenList(recentList.id); }}
+            style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.9rem', padding: '0.9rem 1.2rem 0.9rem 0.9rem' }}
+          >
+            <Collage urls={recentList.songs.slice(0, 4).map((s) => coverOf(s, listCovers))} size={58} radius={12} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="serif" style={{ ...titleStyle, ...twoLines }}>{recentList.name}</div>
+              <div style={labelStyle}>{recentList.songs.length}曲 · 約{listMinutes}分</div>
+            </div>
+            <PlayCircle onClick={playList} label={`${recentList.name}を再生`} />
+          </div>
         </Section>
       )}
 
@@ -219,12 +282,14 @@ const cardStyle: CSSProperties = {
   boxShadow: '0 4px 25px rgba(0,0,0,0.03)', cursor: 'pointer',
 };
 const metaStyle: CSSProperties = { fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 };
-const linkStyle: CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.95rem', color: 'var(--text-muted)', padding: 0 };
-// One type system on this page (docs/mockups/today-type.html, phone 2): every
-// item title one serif size at two lines max, one small sans label style, and
-// 0.95rem for actions (始める, すべて). Matches CardBody/CornerText `compact`.
-const titleStyle: CSSProperties = { fontSize: '1.05rem', lineHeight: 1.5 };
-const labelStyle: CSSProperties = { fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' };
+// One type system on this page (docs/mockups/today-type.html, phone 2; sizes
+// raised in home-music-polish.html): every item title one serif size at two
+// lines max, one small sans label style, and one size for actions (始める,
+// すべて). Matches CardBody/CornerText `compact`.
+const ACTION_SIZE = '1.02rem';
+const linkStyle: CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', fontSize: ACTION_SIZE, color: 'var(--text-muted)', padding: 0 };
+const titleStyle: CSSProperties = { fontSize: '1.2rem', lineHeight: 1.5 };
+const labelStyle: CSSProperties = { fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' };
 const twoLines: CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 /** The news list's inset: the cards' text edge (their 1.5rem padding). */
 const NEWS_INSET = '1.5rem';
