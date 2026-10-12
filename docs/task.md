@@ -564,6 +564,7 @@
   - [ ] Verify JMDict entry ids for 今日 / 読む / 番組 / 音楽 and add them to UI_LABELS (matched by surface until then)
   - [x] 音楽 page (music)
   - [x] 音楽 lists: shelf with すべての曲, リストに追加 sheet, list page + picker, queue with auto-advance (database/34_playlists.sql)
+  - [x] Progress ring replaces 本棚's `2 / 5` and 番組's `4 / 12分`: the total inside a hairline ring that fills as you read or listen, soft slate once finished (mockup docs/mockups/progress-ring.html #1, no unit)
 - [x] Podcast freeze at ~5:11 (2026-10-12): long episodes are voiced in ~1,900-char pieces and the MP3s were
       joined byte-for-byte, each with its own ID3 tag and Xing/Info length header. Safari took the first piece's
       length as the episode's, so the element "ended" at ~5 min while audio played on (frozen highlight/clock,

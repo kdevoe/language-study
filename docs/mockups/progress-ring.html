@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — progress ring</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 700px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+input[type=range] { width: 160px; accent-color: var(--text-muted); }
+.play { border: none; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 100px; padding: 0.35rem 1rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1700px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 380px; height: 760px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── Heading ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.6rem; }
+.row { display: flex; align-items: baseline; gap: 0.95rem; }
+.tt { font-family: var(--font-serif); font-weight: 500; line-height: 1.2; font-size: 1.2rem; opacity: 0.5; }
+.tt.on { font-size: 2rem; opacity: 1; }
+.icon-btn { width: 44px; height: 44px; margin-right: -5px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.icon-btn svg.i { stroke-width: 1.25; }
+.search { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border-light); padding: 0.35rem 0 0.55rem; margin-bottom: 1.6rem; color: var(--text-muted); font-size: 1.05rem; }
+.search svg.i { width: 18px; height: 18px; }
+
+/* ── Cards (ArchiveList CardBody) ── */
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.card { background: var(--bg-card); border-radius: 24px; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); padding: 1.5rem; position: relative; overflow: hidden; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 0.6rem; }
+.float { position: absolute; top: 1.2rem; right: 1.2rem; line-height: 1; }
+.tag { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.15em; background: var(--bg-pure); color: var(--text-muted); padding: 0.3rem 0.7rem; border-radius: 8px; }
+.card h3 { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 500; line-height: 1.45; }
+.card.notag h3 { max-width: calc(100% - 3.5rem); }
+.old { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; text-decoration: line-through; opacity: 0.5; }
+
+/* ── The ring ── */
+.ring { position: relative; width: var(--d); height: var(--d); flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.ring svg { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
+.ring circle { fill: none; transition: stroke 0.8s var(--ease), stroke-dashoffset 0.6s var(--ease), opacity 0.8s var(--ease); }
+.ring .num { position: relative; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; letter-spacing: 0; transition: color 0.8s var(--ease); }
+.ring .num small { font-size: 0.5rem; font-weight: 600; margin-left: 0.5px; }
+.ring.big .num small { font-size: 0.7rem; }
+.rw { display: inline-flex; align-items: center; gap: 0.3rem; }
+.rw .unit { font-size: 0.66rem; font-weight: 600; color: var(--text-muted); transition: color 0.8s var(--ease); }
+.rw.big .unit { font-size: 0.95rem; }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav span.b { width: 76px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.6rem; line-height: 1rem; letter-spacing: 0.05em; font-weight: 500; margin-top: 2px; }
+.nav .b.on { color: var(--text-main); }
+.nav .b.on .ic { background: var(--accent-primary); }
+
+/* ── Close-ups ── */
+.zoom { max-width: 1100px; margin: 2.4rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.4rem 1.6rem; display: grid; grid-template-columns: auto repeat(4, 1fr); gap: 1rem 1.2rem; align-items: center; }
+.zoom .h { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.zoom .cell { display: flex; gap: 1.1rem; align-items: center; }
+
+.zoom .cell .ring.big .num { font-size: 1.05rem; }
+
+/* ── Notes ── */
+.notes { max-width: 820px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+@media (max-width: 440px) { .phone { height: 700px; } .zoom { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION</div>
+  <h1>A ring around the length</h1>
+  <p>The corner's “2 / 5” and “4 / 12分” become just the total, 5 or 12, with a thin ring around it that fills clockwise as you read or listen and closes at the end. Once it's finished, the ring shifts shade. Four takes on how quiet the ring is and what “finished” looks like. The top card on each phone follows the slider; press Play to watch it fill and close.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">PAGE</span><div class="pill-seg" data-ctl="page"><button data-v="library" class="on">本棚</button><button data-v="podcasts">番組</button></div></div>
+    <div class="ctl"><span class="lbl">TOP CARD</span><input type="range" id="prog" min="0" max="100" value="40"></div>
+    <button class="play" id="play">Play ▸</button>
+    <div class="ctl"><span class="lbl">UNIT</span><div class="pill-seg" data-ctl="unit"><button data-v="none" class="on">None</button><button data-v="beside">Beside</button><button data-v="inside">Inside</button></div></div>
+    <div class="ctl"><span class="lbl">OLD LABEL</span><div class="pill-seg" data-ctl="old"><button data-v="off" class="on">Hide</button><button data-v="on">Show</button></div></div>
+  </div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<div class="zoom" id="zoom"></div>
+
+<div class="notes">
+  <h3>What the variants try</h3>
+  <ol>
+    <li><span class="n">1</span><div><b>Ink.</b> The arc is the muted ink at half strength over the hairline track, the same weight as the old text. Finished: the ring closes and settles into the soft blue tint, and the number fades back. The quietest change of shade: “done” recedes.</div></li>
+    <li><span class="n">2</span><div><b>Slate.</b> The arc is <code>--accent-progress</code>, the flashcard bar's colour, over the hairline track. Finished: it deepens to the main ink. The clearest progress, but slate on a card is what we pulled back from on the card edge.</div></li>
+    <li><span class="n">3</span><div><b>Mist.</b> A slightly wider band in <code>--accent-primary</code>, the same soft blue as the card's progress edge and the nav pill. Finished: it turns slate. Reads as part of the card's colour family rather than a mark on top.</div></li>
+    <li><span class="n">4</span><div><b>No track.</b> No grey circle before you start: just the number, as today. The arc draws itself in muted ink as you go. Finished: it closes and turns soft blue. A new item looks exactly like the plain number does now.</div></li>
+  </ol>
+  <h3>Details that apply to all four</h3>
+  <ol>
+    <li><span class="n">5</span><div><b>The number is the total, never the position.</b> 本棚: parts (5). 番組: minutes (12). The ring carries where you are: overall progress through the work (the same 0–1 the しおり saves) or the listen position. The UNIT toggle tries the unit three ways: <b>None</b> (just the number), <b>Beside</b> (部 / 分 in small muted type just after the ring, outside it) and <b>Inside</b> (the ring grows from 26 to 32px so “12分” fits inside, the unit smaller than the number).</div></li>
+    <li><span class="n">6</span><div><b>Single-part works get a ring too.</b> Today a one-part work shows nothing in the corner. With a ring, “1” fills as you read it, so every work shows how far along you are. (The card with 1 below shows this.)</div></li>
+    <li><span class="n">7</span><div><b>Same ring on 今日.</b> The continue-reading card on 今日 uses the compact size (22px vs 26px), matching its smaller labels.</div></li>
+    <li><span class="n">8</span><div><b>Motion only when it changes.</b> The ring eases to its new length when you come back from the reader or player, and the shade shift fades in over about 0.8s. No looping or pulsing.</div></li>
+  </ol>
+</div>
+
+<script>
+const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+const g = { page: 'library', old: 'off', top: 0.4, unit: 'none' };
+
+// Each variant: track colour (null = none), arc colour + opacity, stroke width, finished look.
+const V = [
+  { id: 1, name: 'INK (BUILT, NO UNIT)', note: 'Muted ink at half strength. Finished: soft blue, number fades back.',
+    track: 'var(--border-light)', arc: 'var(--text-muted)', arcOp: 0.55, w: 1.5, done: { ring: 'var(--accent-progress)', ringOp: 0.55, num: '#9a9a94' } },
+  { id: 2, name: 'SLATE',    note: 'The flashcard bar’s slate. Finished: deepens to ink.',
+    track: 'var(--border-light)', arc: 'var(--accent-progress)', arcOp: 1, w: 1.5, done: { ring: 'var(--text-main)', ringOp: 0.75, num: 'var(--text-main)' } },
+  { id: 3, name: 'MIST',     note: 'A wider band in the card-edge blue. Finished: turns slate.',
+    track: 'var(--border-light)', arc: '#b9cedb', arcOp: 1, w: 2.25, done: { ring: 'var(--accent-progress)', ringOp: 1, num: 'var(--text-muted)' } },
+  { id: 4, name: 'NO TRACK', note: 'Just the number until you start; the arc draws itself. Finished: soft blue.',
+    track: null, arc: 'var(--text-muted)', arcOp: 0.5, w: 1.5, done: { ring: 'var(--accent-progress)', ringOp: 0.6, num: '#9a9a94' } },
+];
+
+// The unit: 部 on 本棚, 分 on 番組. Inside makes the ring a little larger to fit it.
+function ring(v, total, p, d0 = 26) {
+  const unit = g.page === 'library' ? '部' : '分';
+  const d = g.unit === 'inside' ? Math.round(d0 * 1.25) : d0;
+  const sw = v.w * d / 26;
+  const r = (d - sw) / 2 - 0.5, c = 2 * Math.PI * r;
+  const done = p >= 1;
+  const arcColor = done ? v.done.ring : v.arc;
+  const arcOp = done ? v.done.ringOp : v.arcOp;
+  const track = v.track ? `<circle cx="${d / 2}" cy="${d / 2}" r="${r}" stroke="${v.track}" stroke-width="${sw}" style="opacity:${done ? 0 : 1}"/>` : '';
+  const html = `<span class="ring${d > 40 ? ' big' : ''}" style="--d:${d}px" data-v="${v.id}">
+    <svg width="${d}" height="${d}">${track}<circle class="arc" cx="${d / 2}" cy="${d / 2}" r="${r}" stroke="${arcColor}" stroke-width="${sw}" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.max(0, Math.min(1, p)))}" style="opacity:${p > 0 ? arcOp : 0}"/></svg>
+    <span class="num" style="color:${done ? v.done.num : 'var(--text-muted)'}">${total}${g.unit === 'inside' ? `<small>${unit}</small>` : ''}</span></span>`;
+  return g.unit === 'beside'
+    ? `<span class="rw${d > 40 ? ' big' : ''}">${html}<span class="unit" style="color:${done ? v.done.num : 'var(--text-muted)'}">${unit}</span></span>`
+    : html;
+}
+
+const DATA = {
+  library: [
+    { title: 'Quiet Rooms, Long Winters', total: 4, p: 'top', old: (p) => `${Math.min(4, Math.floor(p * 4) + 1)} / 4` },
+    { title: 'The Long Way to Kyoto', total: 3, p: 0, old: () => '1 / 3' },
+    { title: 'A Field Guide to Moss Gardens', total: 1, p: 0.7, old: () => '' },
+    { title: 'Custom Silicon for Large Language Models', total: 5, p: 1, old: () => '5 / 5' },
+  ],
+  podcasts: [
+    { tag: 'ARTICLE', title: '北欧と日本 — 光の住まい', total: 12, p: 'top', old: (p) => `${Math.floor(p * 12)} / 12分` },
+    { tag: 'TOPIC', title: '京都の秋の祭り', total: 9, p: 0, old: () => '9分' },
+    { tag: 'DIGEST', title: '今日のニュースから', total: 6, p: 0.15, old: () => '0 / 6分' },
+    { tag: 'ARTICLE', title: '深い海の生き物', total: 11, p: 1, old: () => '11 / 11分' },
+  ],
+};
+
+function phoneHTML(v) {
+  const lib = g.page === 'library';
+  const cards = DATA[g.page].map((c) => {
+    const p = c.p === 'top' ? g.top : c.p;
+    const corner = g.old === 'on'
+      ? `<span style="display:inline-flex;gap:0.6rem;align-items:center">${c.old(p) ? `<span class="old">${c.old(p)}</span>` : ''}${ring(v, c.total, p)}</span>`
+      : ring(v, c.total, p);
+    return c.tag
+      ? `<div class="card"><div class="top"><span class="tag">${c.tag}</span>${corner}</div><h3>${c.title}</h3></div>`
+      : `<div class="card notag"><div class="float">${corner}</div><h3>${c.title}</h3></div>`;
+  }).join('');
+  return `<div class="scroll">
+    <div class="heading"><div class="row">${lib ? '<span class="tt">ニュース</span><span class="tt on">本棚</span>' : '<span class="tt on">番組</span><span class="tt">音楽</span>'}</div><span class="icon-btn">${ic('plus')}</span></div>
+    <div class="search">${ic('search')}<span>検索</span></div>
+    <div class="stack">${cards}</div></div>
+    <nav class="nav">${[['sun', '今日'], ['book', '読む'], ['headphones', '聞く'], ['layers', '復習']].map(([i, l]) =>
+      `<span class="b ${(lib ? '読む' : '聞く') === l ? 'on' : ''}"><span class="ic">${ic(i)}</span><span class="lab">${l}</span></span>`).join('')}</nav>`;
+}
+
+function render() {
+  document.getElementById('stage').innerHTML = V.map((v) => `
+    <div class="phone-wrap">
+      <div class="phone-label">${v.id} · ${v.name}</div>
+      <div class="phone">${phoneHTML(v)}</div>
+      <div class="phone-note">${v.note}</div>
+    </div>`).join('');
+  const steps = [['NEW', 0], ['¼', 0.25], ['¾', 0.75], ['DONE', 1]];
+  document.getElementById('zoom').innerHTML =
+    `<span></span>${V.map((v) => `<span class="h">${v.id} · ${v.name}</span>`).join('')}` +
+    steps.map(([lab, p]) => `<span class="h">${lab}</span>${V.map((v) => `<span class="cell">${ring(v, 5, p, 52)}${ring(v, 5, p, 26)}${ring(v, 5, p, 22)}</span>`).join('')}`).join('');
+}
+
+// Update only the top cards' rings in place, so the arcs animate instead of re-rendering.
+function updateTop() {
+  document.querySelectorAll('.phone').forEach((ph, k) => {
+    const v = V[k];
+    const first = ph.querySelector('.card');
+    const c = DATA[g.page][0];
+    const holder = first.querySelector('.top, .float');
+    const fresh = document.createElement('div');
+    fresh.innerHTML = c.tag ? `<div class="top"><span class="tag">${c.tag}</span></div>` : '<div class="float"></div>';
+    const tmp = document.createElement('div');
+    tmp.innerHTML = g.old === 'on'
+      ? `<span style="display:inline-flex;gap:0.6rem;align-items:center"><span class="old">${c.old(g.top)}</span>${ring(v, c.total, g.top)}</span>`
+      : ring(v, c.total, g.top);
+    const oldRing = holder.querySelector('.ring');
+    const newRing = tmp.querySelector('.ring');
+    // Copy attributes so CSS transitions run on the existing nodes.
+    oldRing.querySelectorAll('circle').forEach((el, i) => {
+      const n = newRing.querySelectorAll('circle')[i];
+      ['stroke', 'stroke-dashoffset'].forEach((a) => el.setAttribute(a, n.getAttribute(a)));
+      el.style.opacity = n.style.opacity;
+    });
+    const num = oldRing.querySelector('.num');
+    num.style.color = newRing.querySelector('.num').style.color;
+    const u = holder.querySelector('.unit'), nu = tmp.querySelector('.unit');
+    if (u && nu) u.style.color = nu.style.color;
+    const old = holder.querySelector('.old');
+    if (old) old.textContent = c.old(g.top);
+  });
+}
+
+const slider = document.getElementById('prog');
+slider.oninput = () => { g.top = slider.value / 100; updateTop(); };
+let timer = null;
+document.getElementById('play').onclick = () => {
+  clearInterval(timer);
+  g.top = 0; slider.value = 0; updateTop();
+  let t = 0;
+  timer = setInterval(() => {
+    t = Math.min(100, t + 2);
+    slider.value = t; g.top = t / 100; updateTop();
+    if (t >= 100) clearInterval(timer);
+  }, 90);
+};
+document.querySelectorAll('[data-ctl]').forEach((ctl) => ctl.querySelectorAll('button').forEach((b) => b.onclick = () => {
+  g[ctl.dataset.ctl] = b.dataset.v;
+  ctl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  render();
+}));
+render();
+</script>
+</body>
+</html>

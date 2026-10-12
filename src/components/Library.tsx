@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { ArchiveList, CornerText } from './ArchiveList';
+import { ArchiveList, ProgressRing } from './ArchiveList';
 import type { ArchiveCard } from './ArchiveList';
 import type { TitleSwitch } from './PageHeading';
 import {
@@ -43,14 +43,15 @@ async function resolveUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
-/** Top-right of a work's card: the part being read and the total ("2 / 5").
- *  A single-part work has nothing to count, so it shows nothing. */
+/** Top-right of a work's card: the number of parts inside a ring that fills as the
+ *  whole work is read (docs/mockups/progress-ring.html), closed once it's finished. */
 export function PartCount({ work, compact = false }: { work: LongFormWork; compact?: boolean }) {
-  if (work.partCount <= 1) return null;
-  const current = work.status === 'finished'
+  // Only a finished work closes the ring.
+  const progress = work.status === 'finished' ? 1 : Math.min(0.97, work.readingPosition?.percent ?? 0);
+  const part = work.status === 'finished'
     ? work.partCount
     : Math.min(work.readingPosition?.partIndex ?? 1, work.partCount);
-  return <CornerText compact={compact}>{current} / {work.partCount}</CornerText>;
+  return <ProgressRing total={work.partCount} progress={progress} label={`${part} / ${work.partCount}部`} compact={compact} />;
 }
 
 // LIBRARY tab: works in ArchiveList — grouped by month, searchable, swipe to
