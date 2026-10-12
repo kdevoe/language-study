@@ -565,6 +565,7 @@
   - [x] 音楽 page (music)
   - [x] 音楽 lists: shelf with すべての曲, リストに追加 sheet, list page + picker, queue with auto-advance (database/34_playlists.sql)
   - [x] Progress ring replaces 本棚's `2 / 5` and 番組's `4 / 12分`: the total inside a hairline ring that fills as you read or listen, soft slate once finished (mockup docs/mockups/progress-ring.html #1, no unit)
+  - [x] Home + 音楽 polish (docs/mockups/home-music-polish.html): 今日 → Home (house icon, ホーム), larger card text, a recent-list block; song ＋ moves to the 曲 row, larger kickers; list play is the lifted circle
 - [x] Podcast freeze at ~5:11 (2026-10-12): long episodes are voiced in ~1,900-char pieces and the MP3s were
       joined byte-for-byte, each with its own ID3 tag and Xing/Info length header. Safari took the first piece's
       length as the episode's, so the element "ended" at ~5 min while audio played on (frozen highlight/clock,

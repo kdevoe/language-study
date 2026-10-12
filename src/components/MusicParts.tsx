@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Play } from 'lucide-react';
 import { Song, coverUrls } from '../services/songs';
 import { PLAYLIST_NAME_MAX } from '../services/playlists';
 
@@ -33,9 +34,9 @@ export function Collage({ urls, size, radius = 16, shadow = '0 4px 25px rgba(0,0
   );
 }
 
-/** Section kicker on 音楽 (design-system §6.12: 0.7rem sans 600, muted). */
+/** Section kicker on 音楽 (design-system §6.13: 0.82rem sans 600, muted). */
 export function Kicker({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.8rem', ...style }}>{children}</div>;
+  return <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.8rem', ...style }}>{children}</div>;
 }
 
 /** The app's top toast (§6.6), with an optional serif action such as 元に戻す. */
@@ -122,3 +123,13 @@ export const fmtDuration = (ms: number | null | undefined) => {
   const v = Math.max(0, Math.round((ms ?? 0) / 1000));
   return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
 };
+
+/** The lifted white play circle (Home's podcast row, a list's 再生): a filled
+ *  triangle on --bg-pure with the thumb shadow (design-system §2). */
+export function PlayCircle({ size = 44, onClick, label }: { size?: number; onClick?: () => void; label: string }) {
+  const style: CSSProperties = { width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-pure)', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', border: 'none', padding: 0, cursor: 'pointer' };
+  const icon = <Play size={Math.round(size * 0.38)} strokeWidth={0} fill="var(--text-main)" style={{ marginLeft: Math.round(size / 18) }} aria-hidden />;
+  return onClick
+    ? <button onClick={(e) => { e.stopPropagation(); onClick(); }} aria-label={label} style={style}>{icon}</button>
+    : <span aria-hidden style={style}>{icon}</span>;
+}

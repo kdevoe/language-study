@@ -445,7 +445,7 @@ export function ArchiveList<T extends { id: string }>(props: Props<T>) {
  *  `compact` is 今日's one small label style (also its 番組 line and news kickers). */
 export function CornerText({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
   return (
-    <span style={{ fontSize: compact ? '0.68rem' : '0.7rem', fontWeight: compact ? 700 : 800, color: 'var(--text-muted)', letterSpacing: compact ? '0.06em' : '0.05em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+    <span style={{ fontSize: compact ? '0.74rem' : '0.7rem', fontWeight: compact ? 700 : 800, color: 'var(--text-muted)', letterSpacing: compact ? '0.06em' : '0.05em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
       {children}
     </span>
   );
@@ -454,16 +454,15 @@ export function CornerText({ children, compact = false }: { children: ReactNode;
 /** A card's top-right size mark (mockup docs/mockups/progress-ring.html, 1 · INK): the
  *  total (parts, minutes) inside a hairline ring that fills clockwise in muted ink as
  *  you read or listen. Finished, the ring closes in soft slate and the number fades back. */
-export function ProgressRing({ total, progress, label, compact = false }: {
+export function ProgressRing({ total, progress, label }: {
   total: number;
   /** 0–1 through the whole work or episode. */
   progress: number;
   /** Spoken text, e.g. "4 / 12分". */
   label: string;
-  compact?: boolean;
 }) {
-  const d = compact ? 22 : 26;
-  const sw = compact ? 1.3 : 1.5;
+  const d = 26;
+  const sw = 1.5;
   const r = (d - sw) / 2 - 0.5;
   const c = 2 * Math.PI * r;
   const p = Math.max(0, Math.min(1, progress));
@@ -481,7 +480,7 @@ export function ProgressRing({ total, progress, label, compact = false }: {
           style={{ opacity: p > 0 ? 0.55 : 0, transition: `stroke-dashoffset 0.6s ${ease}, stroke 0.8s ${ease}, opacity 0.8s ${ease}` }}
         />
       </svg>
-      <span aria-hidden style={{ position: 'relative', fontSize: compact ? '0.62rem' : '0.68rem', fontWeight: 700, color: 'var(--text-muted)', opacity: done ? 0.6 : 1, fontVariantNumeric: 'tabular-nums', lineHeight: 1, transition: `opacity 0.8s ${ease}` }}>
+      <span aria-hidden style={{ position: 'relative', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', opacity: done ? 0.6 : 1, fontVariantNumeric: 'tabular-nums', lineHeight: 1, transition: `opacity 0.8s ${ease}` }}>
         {total}
       </span>
     </span>
@@ -540,7 +539,7 @@ export function CardBody({ card, query, snippet, selecting, selected, compact = 
       </div>
 
       <h3 className="serif" style={{
-        ...(compact ? { fontSize: '1.05rem', lineHeight: 1.5, ...twoLines } : { fontSize: '1.35rem', lineHeight: 1.45 }),
+        ...(compact ? { fontSize: '1.2rem', lineHeight: 1.5, ...twoLines } : { fontSize: '1.35rem', lineHeight: 1.45 }),
         color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', maxWidth: card.tag ? '90%' : 'calc(100% - 3.5rem)',
       }}>
         <Highlight text={card.title} query={query} />
