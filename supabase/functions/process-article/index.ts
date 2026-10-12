@@ -133,7 +133,11 @@ async function runRewriteWithRetry(
 // 800 by fetch-raw-news), which stranded ~65% of production articles at
 // `partial` — the audit showed every partial row sat in exactly that band.
 const JINA_READER_URL = 'https://r.jina.ai/';
-const EXTRACT_TIMEOUT_MS = 8000;
+// A cold Jina fetch of a Guardian page took 7.3s (2026-10-11) against the old
+// 8s limit, so most `partial` articles were extractions cut off mid-flight.
+// Allow 20s, then retry once (Jina has usually cached the page by then).
+const EXTRACT_TIMEOUT_MS = 20_000;
+const EXTRACT_RETRY_TIMEOUT_MS = 12_000;
 const MAX_EXTRACT_SOURCES = 4;
 // The LEAD source (index 0 — the story the article is actually about) keeps
 // more of its body than corroborating sources: truncating the lead genuinely
@@ -329,8 +333,15 @@ function classifySourceFullness(chars: number, fullBody: boolean): SourceKind {
 interface SourceBlock { text: string; chars: number; fullBody: boolean; sourceCount: number }
 
 async function extractFullText(url: string, jinaKey: string | undefined): Promise<string> {
+  const first = await extractOnce(url, jinaKey, EXTRACT_TIMEOUT_MS);
+  if (first.length >= FULL_SOURCE_CHARS) return first;
+  const second = await extractOnce(url, jinaKey, EXTRACT_RETRY_TIMEOUT_MS);
+  return second.length > first.length ? second : first;
+}
+
+async function extractOnce(url: string, jinaKey: string | undefined, timeoutMs: number): Promise<string> {
   const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), EXTRACT_TIMEOUT_MS);
+  const to = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const headers: Record<string, string> = { 'User-Agent': 'YugenStudy/1.0', 'Accept': 'text/plain' };
     if (jinaKey) headers['Authorization'] = `Bearer ${jinaKey}`;
@@ -507,6 +518,11 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const { userId, articleId, snippet, sources } = body;
+    // ensure-buffer sets this: an article whose full text couldn't be fetched
+    // is refused (422 thin_source) before any Gemini call, and the buffer takes
+    // another story from the same topic instead. On-tap processing never sets
+    // it — a reader who picked a story gets it, thin or not.
+    const requireFull: boolean = body.requireFull === true;
     let title: string = body.title;
     // Import mode (BYOC): a pasted text arrives as `importText` (a URL as
     // `importUrl`) and becomes a new work; part 1 processes eagerly.
@@ -708,6 +724,14 @@ Deno.serve(async (req) => {
     }
     const sourceKind = classifySourceFullness(sourceChars, fullBody);
     console.log(`[process-article] source fullness: ${sourceKind} (${sourceChars} chars, fullBody=${fullBody})`);
+    const sourceUrls = Array.isArray(sources) ? (sources as SourceRef[]).map((s) => s?.url).filter((u): u is string => !!u).slice(0, MAX_EXTRACT_SOURCES) : [];
+
+    if (requireFull && !isLongform && sourceKind !== 'full') {
+      console.log(JSON.stringify({ fn: 'process-article', skipped: 'thin_source', articleId, sourceKind, sourceChars, sourceUrls }));
+      return new Response(JSON.stringify({ error: 'source too thin', errorKind: 'thin_source', sourceKind, sourceChars }), {
+        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 1. Fetch user preferences
     const { data: prefs } = await supabase
@@ -1160,6 +1184,9 @@ Deno.serve(async (req) => {
         metadata: {
           date: new Date().toISOString(),
           category,
+          // Where the article came from, so a fullness audit can see which
+          // outlets failed extraction (database/20_source_fullness.sql).
+          ...(sourceUrls.length ? { sourceUrls } : {}),
           // Queryable per-article cost telemetry (metadata is jsonb):
           //   select metadata->'usage' from processed_news order by created_at desc;
           usage: {
