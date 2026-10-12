@@ -28,10 +28,10 @@ def render(weight=600, size=S, glyph_scale=0.56, shadow=True):
     gx = (W - (r - l)) / 2 - l
     gy = (W - (b - t)) / 2 - t + W * 0.005
     if shadow:
-        # 影 is "shadow": the glyph casts a faint, soft one down and to the right.
+        # 影 is "shadow": the glyph casts a soft one down and to the right.
         sh = Image.new('L', (W, W), 0)
-        ImageDraw.Draw(sh).text((gx + W * 0.022, gy + W * 0.03), '影', font=font, fill=110)
-        sh = sh.filter(ImageFilter.GaussianBlur(W * 0.018))
+        ImageDraw.Draw(sh).text((gx + W * 0.034, gy + W * 0.045), '影', font=font, fill=170)
+        sh = sh.filter(ImageFilter.GaussianBlur(W * 0.03))
         img = Image.composite(Image.new('RGB', (W, W), SHADOW), img, sh)
     ImageDraw.Draw(img).text((gx, gy), '影', font=font, fill=CREAM)
     return img.resize((size, size), Image.LANCZOS)
