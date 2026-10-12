@@ -295,6 +295,9 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
     }
   };
   const onPlay = () => {
+    // The tap's silent unlock clip plays (and ends) before the real source arrives;
+    // it isn't the song, so it neither counts as a play nor hands off below.
+    if (isUnlockClip(audioRef.current)) return;
     setPlaying(true);
     if (!counted.current && song) { counted.current = true; recordPlay(song); }
   };
@@ -312,7 +315,7 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
     audio.play().catch((e) => console.warn('[song] next song blocked:', e));
   };
   const onEnded = () => {
-    if (!nextSong || !onPlaySong) return;
+    if (isUnlockClip(audioRef.current) || !nextSong || !onPlaySong) return;
     // Screen locked or app in the background: no one sees the handoff, and the
     // page is about to be suspended, so start the next song before returning.
     if (document.hidden) { startPrepared(nextSong); onPlaySong(nextSong, false); return; }
