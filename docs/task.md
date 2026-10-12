@@ -572,3 +572,10 @@
       lock screen −0:00). services/mp3.ts strips tags + header frames: server-side for new renders
       (_shared/elevenlabs.ts), in the audio cache, and as a one-time source swap in the player for stored episodes
   - [ ] Deploy generate-podcast (`supabase functions deploy generate-podcast`) so new episodes are clean at source
+- [x] Long-form import failures (2026-10-12): an import held one request open through the whole Gemini
+      rewrite of part 1, so iOS backgrounding / screen lock or a slow, retried generation failed it. Now the
+      server saves the work and answers 202 at once; part 1 runs through the JIT part path (now accepting
+      partIndex 1) in its own invocation (EdgeRuntime.waitUntil self-call). The Library polls every 5s while a
+      part 1 is preparing; a failed or stalled (>6 min) part 1 shows 失敗 · タップで再試行 and retries in the
+      background (`background: true`).
+  - [ ] Deploy process-article (`supabase functions deploy process-article`) after the web app is live
