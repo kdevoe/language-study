@@ -10,6 +10,8 @@
 // the Cache API can be missing or throw, so a miss always falls back to
 // streaming. Least recently used files are evicted past each kind's cap.
 
+import { cleanJoinedMp3 } from './mp3';
+
 export type AudioKind = 'podcast' | 'music';
 
 const CAPS: Record<AudioKind, { entries: number; bytes: number }> = {
@@ -23,6 +25,14 @@ type Index = Record<string, { bytes: number; usedAt: number }>;
 const INDEX_KEY = '/audio-cache/__index';
 const keyFor = (path: string) => `/audio-cache/${path}`;
 const saving = new Set<string>();
+
+/** Podcast MP3s are joined from several pieces; drop their stale per-piece
+ *  headers (services/mp3.ts). Also repairs copies saved before that fix. */
+export async function cleanPodcastBlob(blob: Blob): Promise<Blob> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const clean = cleanJoinedMp3(bytes);
+  return clean === bytes ? blob : new Blob([clean], { type: 'audio/mpeg' });
+}
 
 async function open(kind: AudioKind): Promise<Cache | null> {
   try {
@@ -53,7 +63,8 @@ export async function cachedAudioUrl(kind: AudioKind, path: string): Promise<str
   try {
     const res = await cache.match(keyFor(path));
     if (!res) return null;
-    const blob = await res.blob();
+    const saved = await res.blob();
+    const blob = kind === 'podcast' ? await cleanPodcastBlob(saved) : saved;
     const index = await readIndex(cache);
     index[path] = { bytes: blob.size, usedAt: Date.now() };
     await writeIndex(cache, index);
@@ -73,7 +84,8 @@ export async function saveAudio(kind: AudioKind, path: string, url: string): Pro
     if (!cache || (await cache.match(keyFor(path)))) return;
     const res = await fetch(url);
     if (!res.ok) return;
-    const blob = await res.blob();
+    const fetched = await res.blob();
+    const blob = kind === 'podcast' ? await cleanPodcastBlob(fetched) : fetched;
     const cap = CAPS[kind];
     if (blob.size > cap.bytes) return;
     await cache.put(keyFor(path), new Response(blob, { headers: { 'Content-Type': blob.type || 'audio/mpeg' } }));

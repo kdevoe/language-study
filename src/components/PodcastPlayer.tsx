@@ -16,7 +16,7 @@ import {
 } from '../services/podcasts';
 import { castMember } from '../data/podcastCast';
 import { isUnlockClip, sharedAudio } from '../services/sharedAudio';
-import { cachedAudioUrl, saveAudio } from '../services/audioCache';
+import { cachedAudioUrl, cleanPodcastBlob, saveAudio } from '../services/audioCache';
 
 // Podcast player (docs/podcast-design.md §6.2, mockup docs/mockups/listen.html):
 // the transcript IS the interface. The playing sentence gets a soft tint, the
@@ -77,6 +77,8 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
   const curSentRef = useRef<HTMLElement | null>(null);
   const autoScrollRef = useRef(true);
   const programmaticScrollUntil = useRef(0);
+  // A cleaned copy swapped in for a mis-headered MP3 (see repairSource).
+  const repair = useRef<{ started: boolean; url: string | null; resume: { t: number; play: boolean } | null }>({ started: false, url: null, resume: null });
   const resumeAfterModal = useRef(false);
   const lastSavedAt = useRef(0);
 
@@ -185,15 +187,44 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
   // ── Listening position (debounced), resume, finish ──
   const persistPosition = useCallback((finished = false) => {
     const audio = audioRef.current;
-    if (!audio || !ep) return;
+    // Mid-swap the element reads 0; the old spot is restored on the next load.
+    if (!audio || !ep || repair.current.resume) return;
     lastSavedAt.current = Date.now();
     saveListenPosition(ep.id, audio.currentTime * 1000, finished);
   }, [ep]);
 
   useEffect(() => () => { persistPosition(); }, [persistPosition]);
+  // After the shared element's cleanup has let go of it (effects unmount in order).
+  useEffect(() => () => {
+    const u = repair.current.url;
+    if (u) setTimeout(() => URL.revokeObjectURL(u), 0);
+  }, []);
 
   const play = useCallback(() => { audioRef.current?.play().catch((e) => console.warn('[player] play blocked:', e)); }, []);
   const pause = useCallback(() => { audioRef.current?.pause(); }, []);
+
+  // Episodes stored before the server cleaned joined MP3s carry each piece's
+  // length header, and Safari takes the first piece's length for the whole
+  // episode: at ~5 minutes the element thinks it has ended while the audio
+  // plays on, freezing the highlight and clock. When the element's duration
+  // falls well short of the episode's, swap in a cleaned copy (services/mp3.ts)
+  // and carry on from the same spot. Once per episode.
+  const repairSource = async (audio: HTMLAudioElement) => {
+    repair.current.started = true;
+    try {
+      const src = audio.currentSrc;
+      const res = await fetch(src);
+      if (!res.ok) return;
+      const blob = await cleanPodcastBlob(await res.blob());
+      if (audio.currentSrc !== src) return; // the player moved on meanwhile
+      const url = URL.createObjectURL(blob);
+      repair.current.url = url;
+      repair.current.resume = { t: audio.currentTime, play: !audio.paused };
+      audio.src = url;
+    } catch (e) {
+      console.warn('[player] audio repair failed:', e);
+    }
+  };
 
   const onLoadedMetadata = () => {
     const audio = audioRef.current;
@@ -202,6 +233,18 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
     if (isUnlockClip(audio)) return;
     if (!audio || !ep) return;
     audio.playbackRate = rate;
+    const resume = repair.current.resume;
+    if (resume) {
+      repair.current.resume = null;
+      audio.currentTime = resume.t;
+      setNow(resume.t);
+      tick();
+      if (resume.play) play();
+      return;
+    }
+    if (!repair.current.started && duration > 0 && Number.isFinite(audio.duration) && audio.duration < duration * 0.9) {
+      repairSource(audio);
+    }
     if (!ep.listened_at && ep.listen_position_ms > 0) {
       audio.currentTime = Math.max(0, ep.listen_position_ms / 1000 - RESUME_REWIND_S);
       setNow(audio.currentTime);
