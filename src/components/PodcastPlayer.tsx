@@ -188,7 +188,8 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
   const persistPosition = useCallback((finished = false) => {
     const audio = audioRef.current;
     // Mid-swap the element reads 0; the old spot is restored on the next load.
-    if (!audio || !ep || repair.current.resume) return;
+    // The tap's silent unlock clip isn't the episode (its end must not mark it heard).
+    if (!audio || !ep || repair.current.resume || isUnlockClip(audio)) return;
     lastSavedAt.current = Date.now();
     saveListenPosition(ep.id, audio.currentTime * 1000, finished);
   }, [ep]);
