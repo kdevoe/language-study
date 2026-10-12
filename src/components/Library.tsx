@@ -95,11 +95,13 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
+  // The list's toast fades; inside the import sheet the message stays until the
+  // next attempt, since the sheet reopening on a failure covers the list.
   useEffect(() => {
-    if (!error) return;
+    if (!error || sheetOpen) return;
     const t = setTimeout(() => setError(null), 6000);
     return () => clearTimeout(t);
-  }, [error]);
+  }, [error, sheetOpen]);
 
   const loadWorks = useCallback(async () => {
     try {
@@ -136,6 +138,7 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
     if (!importable) return;
     const userId = await resolveUserId();
     if (!userId) { setError('サインインが必要です。'); return; }
+    setError(null);
     setIsImporting(true);
     setSheetOpen(false); // the placeholder card below shows progress
     try {
@@ -223,7 +226,7 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
 
   return (
     <>
-      {error && (
+      {error && !sheetOpen && (
         <div
           role="alert"
           onClick={() => setError(null)}
@@ -435,6 +438,22 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
                       : <>記事やブログのURLから本文を取り込みます。取り込めないページもあります — その場合は本文を貼り付けてください。</>}
                   </div>
                 </>
+              )}
+              {error && (
+                <div
+                  role="alert"
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.7rem 1rem',
+                    borderRadius: '14px',
+                    backgroundColor: 'var(--accent-danger)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.82rem',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {error}
+                </div>
               )}
               <button
                 onClick={handleImport}
