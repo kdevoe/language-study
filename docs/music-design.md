@@ -53,3 +53,9 @@ The style comes from the reader's chosen `song_styles` (Settings › 聞く; nul
 ## Storage and caching
 
 Songs go in the private `music` bucket (`database/31_songs.sql`), as `<user>/<id>.mp3` and `.jpg`. The client caches the audio with `audioCache` (kind `music`: 50 songs or 150 MB, LRU). Cover URLs are signed for 7 days and memoised. `audio-cleanup` also sweeps failed songs and orphan files from `music`.
+
+## Lists
+
+`playlists` (id, user_id, name, created_at, touched_at) and `playlist_songs` (playlist_id, song_id, user_id, position, added_at), from `database/34_playlists.sql`. Both have RLS per user and are written by the client directly; deleting a song or a list cascades. `touched_at` moves when a list is made or a song is added to it, and orders the shelf and the リストに追加 sheet (last used first). Before the migration is applied the load fails quietly and the shelf shows only すべての曲, which is built on the client and never stored.
+
+The client keeps one shared store (`services/playlists.ts`, `usePlaylists()`) so the shelf, a list's page and the player's sheet agree. Writes apply locally first and roll back on error. The queue lives in App (`songQueue`): the grid's ready songs, or a list's in order (shuffled for シャッフル). When a song ends, the player hands off to the next one; the handoff and the 次の曲 rows don't play the unlock clip, because the shared element is already playing.

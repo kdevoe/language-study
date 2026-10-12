@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pause, Play } from 'lucide-react';
+import { ListCheck, ListPlus, Pause, Play } from 'lucide-react';
 import { FuriganaText, HitWeight } from './FuriganaText';
 import { WordModal, WordDetails } from './WordModal';
 import { SkipIcon } from './PodcastPlayer';
@@ -12,6 +12,9 @@ import { Song, SongFull, coverUrls, fetchSong, recordPlay, songFileUrl } from '.
 import { styleLabel } from '../data/songStyles';
 import { isUnlockClip, sharedAudio } from '../services/sharedAudio';
 import { cachedAudioUrl, saveAudio } from '../services/audioCache';
+import { AddToListSheet } from './AddToListSheet';
+import { coverOf, useCoverMap } from './MusicParts';
+import { usePlaylists } from '../services/playlists';
 
 // Song player (mockup docs/mockups/lyrics.html, phone B 霧): the whole player
 // sits on soft blue (body.song-mode). Cover, title and style open big; as the
@@ -23,14 +26,28 @@ import { cachedAudioUrl, saveAudio } from '../services/audioCache';
 // times come from ElevenLabs' phrase timestamps (songs.timing); a line with no
 // match stays with the line before it. Plays on the app's shared audio element,
 // which the opening tap unlocked, and keeps a copy on the device (audioCache).
-// The transport is the podcast player's, unchanged.
+// The transport is the podcast player's; リピート cycles off → 1曲 → 全部.
+//
+// Queue (mockups docs/mockups/music-playlists.html, music-lists.html): the song
+// was started from the grid or a list, and when it ends the next one follows
+// after a short handoff (its cover, a 3s ring, 止める to stay). The lyrics end
+// with 次の曲 (the next song, the one after fainter; tap to jump). The back row
+// carries the position (3 / 8) and the リストに追加 icon, which darkens once the
+// song is in a list. Playing from a list, its name replaces the style label.
 
 const SPEEDS = [0.75, 0.9, 1];
+const HANDOFF_S = 3;
+type Repeat = 'off' | 'one' | 'all';
+const REPEAT_LABEL: Record<Repeat, string> = { off: 'リピート', one: '1曲', all: '全部' };
+const NEXT_REPEAT: Record<Repeat, Repeat> = { off: 'one', one: 'all', all: 'off' };
+// The queue's リピート outlives each song's player (each song remounts it).
+let sessionRepeat: Repeat = 'off';
 const SKIP_S = 10;
 const SCROLL_ANCHOR = 0.4;
 const MIST = '#d4e0e8'; // --accent-primary, for the browser chrome (theme-color)
 // Header morph: open (big cover, title under it) → pinned (thumb + title in the back row).
 const THUMB = 40;
+const ROW_ACTIONS_W = 104; // the back row's right end: リストに追加 + position
 const smooth = (k: number) => { const x = Math.min(1, Math.max(0, k)); return x * x * (3 - 2 * x); };
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
@@ -54,7 +71,17 @@ const fmt = (s: number) => {
   return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
 };
 
-export function SongPlayer({ song: initial }: { song: Song }) {
+interface Props {
+  song: Song;
+  /** The songs being played through, in order (includes `song`). */
+  queue?: Song[];
+  /** Where the queue came from (a list's name), shown in place of the style. */
+  context?: string | null;
+  /** Move to another song in the queue; `byTap` when the reader chose it. */
+  onPlaySong?: (song: Song, byTap: boolean) => void;
+}
+
+export function SongPlayer({ song: initial, queue = [initial], context = null, onPlaySong }: Props) {
   const [song, setSong] = useState<SongFull | null>(null);
   const [blocks, setBlocks] = useState<ArticleBlock[] | null>(null);
   const [cover, setCover] = useState<string | null>(null);
@@ -62,7 +89,16 @@ export function SongPlayer({ song: initial }: { song: Song }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
-  const [repeat, setRepeat] = useState(false);
+  const [repeat, setRepeatState] = useState<Repeat>(sessionRepeat);
+  const setRepeat = (r: Repeat) => { sessionRepeat = r; setRepeatState(r); };
+  const [handoff, setHandoff] = useState<{ next: Song; left: number } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const { lists } = usePlaylists();
+  const inList = lists.some((l) => l.song_ids.includes(initial.id));
+  const index = Math.max(0, queue.findIndex((s) => s.id === initial.id));
+  const upNext = [queue[index + 1], queue[index + 2]].filter((s): s is Song => !!s);
+  const nextSong: Song | null = queue[index + 1] ?? (repeat === 'all' && queue.length > 1 ? queue[0] : null);
+  const queueCovers = useCoverMap([initial, ...upNext, ...(nextSong ? [nextSong] : [])]);
   const [now, setNow] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
 
@@ -204,7 +240,7 @@ export function SongPlayer({ song: initial }: { song: Song }) {
         top: `${below ? top + size + 16 : top + (size - th) / 2}px`,
         textAlign: below ? 'center' : 'left',
         opacity: String(fade),
-        maxWidth: below ? `${geo.width}px` : `${Math.max(120, window.innerWidth - (left + size + 12) - 16)}px`,
+        maxWidth: below ? `${geo.width}px` : `${Math.max(120, window.innerWidth - (left + size + 12) - ROW_ACTIONS_W)}px`,
       });
     };
     layout();
@@ -242,15 +278,22 @@ export function SongPlayer({ song: initial }: { song: Song }) {
   };
 
   // ── The shared element: listeners and source ──
-  const handlers = useRef({ onLoadedMetadata, onPlay, tick });
-  handlers.current = { onLoadedMetadata, onPlay, tick };
+  // The song ended (with 1曲 on it loops and never ends): hand off to the next.
+  const onEnded = () => {
+    if (!nextSong || !onPlaySong) return;
+    // Screen locked or app in the background: no one sees the handoff, go straight on.
+    if (document.hidden) { onPlaySong(nextSong, false); return; }
+    setHandoff({ next: nextSong, left: HANDOFF_S });
+  };
+  const handlers = useRef({ onLoadedMetadata, onPlay, tick, onEnded });
+  handlers.current = { onLoadedMetadata, onPlay, tick, onEnded };
   useEffect(() => {
     const audio = audioRef.current!;
     const on: [string, () => void][] = [
       ['loadedmetadata', () => handlers.current.onLoadedMetadata()],
       ['play', () => handlers.current.onPlay()],
       ['pause', () => { setPlaying(false); setNow(audio.currentTime); }],
-      ['ended', () => setPlaying(false)],
+      ['ended', () => { setPlaying(false); handlers.current.onEnded(); }],
       ['seeked', () => handlers.current.tick()],
     ];
     on.forEach(([type, fn]) => audio.addEventListener(type, fn));
@@ -268,8 +311,17 @@ export function SongPlayer({ song: initial }: { song: Song }) {
   }, [audioUrl]);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.loop = repeat;
-  }, [repeat]);
+    // 全部 on a queue of one is the same as 1曲.
+    if (audioRef.current) audioRef.current.loop = repeat === 'one' || (repeat === 'all' && queue.length <= 1);
+  }, [repeat, queue.length]);
+
+  // Handoff countdown: 3, 2, 1, then the next song.
+  useEffect(() => {
+    if (!handoff) return;
+    if (handoff.left <= 0) { onPlaySong?.(handoff.next, false); return; }
+    const t = setTimeout(() => setHandoff((h) => (h ? { ...h, left: h.left - 1 } : h)), 1000);
+    return () => clearTimeout(t);
+  }, [handoff, onPlaySong]);
 
   // ── Manual scroll pauses auto-scroll ──
   useEffect(() => {
@@ -318,6 +370,8 @@ export function SongPlayer({ song: initial }: { song: Song }) {
       ['pause', pause],
       ['seekbackward', () => skip(-SKIP_S)],
       ['seekforward', () => skip(SKIP_S)],
+      ...(queue[index + 1] && onPlaySong ? [['nexttrack', () => onPlaySong(queue[index + 1], false)] as [MediaSessionAction, MediaSessionActionHandler]] : []),
+      ...(queue[index - 1] && onPlaySong ? [['previoustrack', () => onPlaySong(queue[index - 1], false)] as [MediaSessionAction, MediaSessionActionHandler]] : []),
     ];
     for (const [action, handler] of actions) {
       try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* unsupported action */ }
@@ -327,7 +381,7 @@ export function SongPlayer({ song: initial }: { song: Song }) {
         try { navigator.mediaSession.setActionHandler(action, null); } catch { /* unsupported action */ }
       }
     };
-  }, [song, cover, play, pause, skip]);
+  }, [song, cover, play, pause, skip, queue, index, onPlaySong]);
 
   // ── Word taps: pause, look up, resume when the card closes ──
   const pauseForLookup = () => {
@@ -407,7 +461,7 @@ export function SongPlayer({ song: initial }: { song: Song }) {
       <div ref={titleRef} style={{ position: 'fixed', zIndex: 11, pointerEvents: 'none', visibility: geo ? 'visible' : 'hidden' }}>
         <h1 className="serif" style={{ fontSize: 'inherit', fontWeight: 600, lineHeight: 1.35, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</h1>
         <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', marginTop: '0.15rem', whiteSpace: 'nowrap' }}>
-          {styleLabel(song.style_key)}{duration > 0 && <> · {fmt(duration)}</>}
+          {context ?? styleLabel(song.style_key)}{duration > 0 && <> · {fmt(duration)}</>}
         </div>
       </div>
 
@@ -489,16 +543,76 @@ export function SongPlayer({ song: initial }: { song: Song }) {
             </button>
             <button onClick={() => skip(SKIP_S)} aria-label={`${SKIP_S}秒進む`} style={iconBtn}><SkipIcon dir="forward" seconds={SKIP_S} /></button>
             <button
-              onClick={() => setRepeat((v) => !v)}
-              aria-pressed={repeat}
-              style={{ ...pillStyle(repeat), fontFamily: 'var(--font-serif)', fontSize: '0.8rem', letterSpacing: 0 }}
+              onClick={() => setRepeat(NEXT_REPEAT[repeat])}
+              aria-label={`リピート: ${REPEAT_LABEL[repeat]}`}
+              style={{ ...pillStyle(repeat !== 'off'), fontFamily: 'var(--font-serif)', fontSize: '0.8rem', letterSpacing: 0 }}
             >
-              リピート
+              {REPEAT_LABEL[repeat]}
             </button>
           </div>
         </div>
       </div>
 
+      {upNext.length > 0 && (
+        <div style={{ marginTop: '2.6rem' }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>次の曲</div>
+          {upNext.map((s, k) => {
+            const c = coverOf(s, queueCovers);
+            return (
+              <button
+                key={s.id}
+                onClick={() => onPlaySong?.(s, true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.5rem 0', width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', opacity: k ? 0.55 : 1 }}
+              >
+                <span style={{ width: k ? 40 : 52, height: k ? 40 : 52, borderRadius: 10, flex: 'none', backgroundColor: 'var(--bg-card)', backgroundImage: c ? `url("${c}")` : undefined, backgroundSize: 'cover' }} />
+                <span style={{ minWidth: 0 }}>
+                  <span className="serif" style={{ display: 'block', fontSize: k ? '0.95rem' : '1.05rem', fontWeight: k ? 500 : 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</span>
+                  <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{styleLabel(s.style_key)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* The back row's right end: リストに追加, then the position in the queue. */}
+      {geo && (
+        <div style={{ position: 'fixed', zIndex: 11, top: `${geo.top - 62 - 22}px`, right: `max(1.25rem, calc((100vw - 600px) / 2 + 1.25rem))`, height: 44, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            onClick={() => setAddOpen(true)}
+            aria-label={inList ? 'リストに追加済み' : 'リストに追加'}
+            style={{ width: 40, height: 40, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: inList ? 'var(--text-main)' : 'var(--text-muted)', transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}
+          >
+            {inList ? <ListCheck size={21} strokeWidth={1.5} /> : <ListPlus size={21} strokeWidth={1.5} />}
+          </button>
+          {queue.length > 1 && (
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: '2.6rem', textAlign: 'right' }}>{index + 1} / {queue.length}</span>
+          )}
+        </div>
+      )}
+
+      {handoff && (
+        <div className="fade-in" style={{ position: 'fixed', inset: 0, zIndex: 30, backgroundColor: 'var(--accent-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '2rem' }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+            次の曲{context ? ` · ${context}` : ''}
+          </div>
+          {(() => { const c = coverOf(handoff.next, queueCovers); return (
+            <div style={{ width: 'min(210px, 56vw)', aspectRatio: '1', borderRadius: 20, margin: '1rem 0 1.2rem', backgroundColor: 'var(--bg-card)', backgroundImage: c ? `url("${c}")` : undefined, backgroundSize: 'cover', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }} />
+          ); })()}
+          <div className="serif" style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-main)' }}>{handoff.next.title}</div>
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{styleLabel(handoff.next.style_key)}</div>
+          <button onClick={() => onPlaySong?.(handoff.next, true)} aria-label="今すぐ再生" style={{ position: 'relative', width: 46, height: 46, marginTop: '1.6rem', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+            <svg width="46" height="46" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="23" cy="23" r="20" fill="none" stroke="rgba(45,45,45,0.12)" strokeWidth="2.5" />
+              <circle cx="23" cy="23" r="20" fill="none" stroke="var(--text-main)" strokeWidth="2.5" strokeDasharray={125.66} strokeDashoffset={125.66 * (handoff.left / HANDOFF_S)} style={{ transition: 'stroke-dashoffset 1s linear' }} />
+            </svg>
+            <span className="serif" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: 'var(--text-main)' }}>{Math.max(1, handoff.left)}</span>
+          </button>
+          <button onClick={() => setHandoff(null)} className="serif" style={{ marginTop: '1rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-muted)' }}>止める</button>
+        </div>
+      )}
+
+      <AddToListSheet song={addOpen ? initial : null} cover={cover ?? undefined} onClose={() => setAddOpen(false)} toastTop="calc(5.6rem + max(1.5rem, env(safe-area-inset-top)))" />
       <WordModal {...lookup.modalProps} />
     </div>
   );
