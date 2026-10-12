@@ -14,6 +14,7 @@ import {
   importErrorMessage,
   importFromUrl,
   importPastedText,
+  retryWorkPartInBackground,
 } from '../services/api';
 import { supabase } from '../services/supabase';
 import { readListCache, writeListCache } from '../services/listCache';
@@ -28,6 +29,20 @@ const IMPORT_SOFT_WARN_CHARS = 20_000;
 // Mirrors the server's PART_TARGET_CHARS for the live part estimate.
 const PART_TARGET_CHARS = 10_000;
 const estimateParts = (chars: number) => Math.max(1, Math.ceil(chars / PART_TARGET_CHARS));
+// Part 1 is prepared in the background after an import; the list polls while
+// one is on the way. A part 1 still missing or pending this long after the
+// import (or retry) was handed off is treated as failed: a generation takes
+// under a minute or two, and the server frees a stuck claim after 5 minutes.
+const POLL_MS = 5000;
+const PART_ONE_STALE_MS = 6 * 60_000;
+
+type PartOneState = 'ready' | 'preparing' | 'failed';
+function partOneState(work: LongFormWork, startedAt: number): PartOneState {
+  if (work.partReady) return 'ready';
+  const first = work.parts?.find((p) => p.index === 1);
+  if (first?.status === 'failed') return 'failed';
+  return Date.now() - startedAt > PART_ONE_STALE_MS ? 'failed' : 'preparing';
+}
 
 interface Props {
   /** Open a ready work in the Reader. The article is the processed part content;
@@ -69,6 +84,13 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
   const [urlText, setUrlText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  // Retries started this session: work id → when, so a retried work counts as
+  // preparing again instead of stale by its original import time.
+  const [retriedAt, setRetriedAt] = useState<Record<string, number>>({});
+  const stateOf = useCallback(
+    (w: LongFormWork) => partOneState(w, Math.max(new Date(w.createdAt).getTime(), retriedAt[w.id] ?? 0)),
+    [retriedAt],
+  );
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -93,6 +115,13 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
   }, []);
 
   useEffect(() => { loadWorks(); }, [loadWorks]);
+  // Poll while any work's part 1 is on the way, so it turns ready (or failed) on its own.
+  const anyPreparing = works.some((w) => stateOf(w) === 'preparing');
+  useEffect(() => {
+    if (!anyPreparing) return;
+    const t = setInterval(loadWorks, POLL_MS);
+    return () => clearInterval(t);
+  }, [anyPreparing, loadWorks]);
   // Imports and deletes change the list locally; keep the cache in step.
   useEffect(() => { if (!isLoading) writeListCache('works', works); }, [works, isLoading]);
 
@@ -113,13 +142,17 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
       const { work, article } = importTab === 'paste'
         ? await importPastedText(userId, pasteText.trim())
         : await importFromUrl(userId, trimmedUrl);
-      if (!mountedRef.current) return; // finished server-side; next visit shows it READY
+      if (!mountedRef.current) return; // saved server-side; next visit shows it
       setPasteText('');
       setUrlText('');
-      setWorks(prev => [{ ...work, partArticleId: article.id, partReady: true }, ...prev]);
-      // The CTA is インポートして読む — the user has been watching this prepare,
-      // so take them straight into the Reader.
-      onOpenWork(work, article);
+      if (article) {
+        // A server that still prepares part 1 inline: open it straight away.
+        setWorks(prev => [{ ...work, partArticleId: article.id, partReady: true }, ...prev]);
+        onOpenWork(work, article);
+      } else {
+        // Part 1 is being prepared in the background; its card polls to ready.
+        setWorks(prev => [work, ...prev]);
+      }
     } catch (e) {
       console.error('[library] import failed:', e);
       if (!mountedRef.current) return;
@@ -130,7 +163,24 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
     }
   };
 
+  const retryPartOne = async (work: LongFormWork) => {
+    const userId = await resolveUserId();
+    if (!userId) { setError('サインインが必要です。'); return; }
+    setRetriedAt(prev => ({ ...prev, [work.id]: Date.now() }));
+    // Drop the failed part from the local copy so the card reads 準備中 until the next poll.
+    setWorks(prev => prev.map(w => (w.id === work.id ? { ...w, parts: (w.parts ?? []).filter(p => p.index !== 1) } : w)));
+    try {
+      await retryWorkPartInBackground(userId, work.id, 1);
+    } catch (e) {
+      console.error('[library] retry failed:', e);
+      if (!mountedRef.current) return;
+      setRetriedAt(prev => ({ ...prev, [work.id]: 0 }));
+      setError(importErrorMessage(e));
+    }
+  };
+
   const handleOpen = async (work: LongFormWork) => {
+    if (stateOf(work) === 'failed') { retryPartOne(work); return; }
     if (!work.partReady || !work.partArticleId || openingId) return;
     const userId = await resolveUserId();
     if (!userId) { setError('サインインが必要です。'); return; }
@@ -155,15 +205,21 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
     return fetchWorkSearchText(userId);
   }, []);
 
-  const card = useCallback((work: LongFormWork): ArchiveCard => ({
-    status: openingId === work.id
-      ? <span style={statusStyle}>{spinner()} 読み込み中</span>
-      : work.partReady
-        ? <PartCount work={work} />
-        : <span style={statusStyle}>{spinner()} 準備中</span>,
-    title: work.title,
-    openable: !!work.partReady,
-  }), [openingId]);
+  const card = useCallback((work: LongFormWork): ArchiveCard => {
+    const state = stateOf(work);
+    return {
+      status: openingId === work.id
+        ? <span style={statusStyle}>{spinner()} 読み込み中</span>
+        : state === 'ready'
+          ? <PartCount work={work} />
+          : state === 'failed'
+            ? <span style={statusStyle}>失敗 · タップで再試行</span>
+            : <span style={statusStyle}>{spinner()} 準備中</span>,
+      title: work.title,
+      // A failed card is tappable: the tap retries part 1.
+      openable: state !== 'preparing',
+    };
+  }, [openingId, stateOf]);
 
   return (
     <>

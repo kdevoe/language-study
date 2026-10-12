@@ -518,31 +518,36 @@ export async function saveWorkReadingPosition(
 }
 
 /** Import pasted text as a new work (BYOC). The server validates length
- *  (300–40,000 chars), enforces the daily guards, chunks anything over ~10k
- *  chars into parts, processes part 1 through the standard personalization
- *  engine (later parts JIT while reading), and returns the created work plus
- *  the ready-to-read part-1 article. Slow (~10-30s): one full Gemini
- *  generation — same wait as tapping an unprepared feed card. */
-export async function importPastedText(userId: string, text: string): Promise<{ work: LongFormWork; article: NewsArticle }> {
+ *  (300–40,000 chars), enforces the daily guards, saves the work and answers
+ *  at once; part 1 is prepared in the background and the Library polls until
+ *  it's ready (later parts JIT while reading). `article` is set only by a
+ *  server from before that change, which still prepared part 1 inline. */
+export async function importPastedText(userId: string, text: string): Promise<{ work: LongFormWork; article: NewsArticle | null }> {
   return runImport(userId, { importText: text });
 }
 
 /** Import a URL as a new work: the server fetches the page's full text (Jina)
  *  and then follows the exact paste path. */
-export async function importFromUrl(userId: string, url: string): Promise<{ work: LongFormWork; article: NewsArticle }> {
+export async function importFromUrl(userId: string, url: string): Promise<{ work: LongFormWork; article: NewsArticle | null }> {
   return runImport(userId, { importUrl: url });
 }
 
 async function runImport(
   userId: string,
   input: { importText?: string; importUrl?: string },
-): Promise<{ work: LongFormWork; article: NewsArticle }> {
-  const res = await invokeEdgeFn<{ success: boolean; work: WorkRow; article: NewsArticle }>(
+): Promise<{ work: LongFormWork; article: NewsArticle | null }> {
+  const res = await invokeEdgeFn<{ success: boolean; work: WorkRow; article?: NewsArticle }>(
     'process-article',
     { userId, ...input },
   );
-  if (!res?.work || !res?.article) throw new Error('Import returned no work');
-  return { work: rowToWork(res.work), article: res.article };
+  if (!res?.work) throw new Error('Import returned no work');
+  return { work: rowToWork(res.work), article: res.article ?? null };
+}
+
+/** Prepare a part again in the background (a failed or stalled part 1). The
+ *  server answers at once; the Library polls the work until it's ready. */
+export async function retryWorkPartInBackground(userId: string, workId: string, partIndex: number): Promise<void> {
+  await invokeEdgeFn('process-article', { userId, workId, partIndex, background: true });
 }
 
 /** Human-readable message for a failed import, classified by HTTP status. */

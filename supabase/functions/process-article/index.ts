@@ -5,6 +5,8 @@ import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, ty
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
 import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon } from '../_shared/readerVocab.ts';
 
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -558,6 +560,32 @@ Deno.serve(async (req) => {
         status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
+    // Prepare one part in a fresh invocation (its own wall-clock budget) and
+    // don't wait for it: the caller answers at once and the Library polls.
+    // Imports hand part 1 over this way, and a failed part 1 is retried this way.
+    const prepareInBackground = (workId: string, partIndex: number) => {
+      const run = fetch(`${supabaseUrl}/functions/v1/process-article`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, workId, partIndex }),
+      })
+        .then(async (res) => { if (!res.ok) console.warn(`[process-article] part ${partIndex} of ${workId} returned ${res.status}: ${(await res.text()).slice(0, 200)}`); })
+        .catch((e) => console.error(`[process-article] part ${partIndex} of ${workId} failed to start:`, e));
+      if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(run);
+    };
+    const accepted = (payload: Record<string, unknown>) =>
+      new Response(JSON.stringify({ success: true, pending: true, ...payload }), {
+        status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
+    if (isPartJit && body.background === true) {
+      const { data: owned } = await supabase
+        .from('long_form_works').select('id').eq('id', jitWorkId).eq('user_id', userId).maybeSingle();
+      if (!owned) return jsonError(404, 'Work not found', 'work_not_found');
+      prepareInBackground(jitWorkId, jitPartIndex);
+      return accepted({ workId: jitWorkId, partIndex: jitPartIndex });
+    }
+
     // ── Long-form state, resolved by the import / JIT branches below ─────────
     let partIndexNum = 1;
     let partCountNum = 1;
@@ -622,8 +650,38 @@ Deno.serve(async (req) => {
         return jsonError(429, `Daily import limit reached (${IMPORT_DAILY_CAP}/day). Try again tomorrow.`, 'import_limit');
       }
       title = deriveImportTitle(importText, title);
-      importChunks = chunkSourceText(importText);
-      partCountNum = importChunks.length;
+      const partCount = chunkSourceText(importText).length;
+
+      // Save the work now and prepare part 1 in the background, like a podcast:
+      // the phone gets an answer in a second instead of holding one request
+      // open through the whole Gemini rewrite. iOS drops that request when the
+      // app is backgrounded or the screen locks, and a slow or retried
+      // generation could outlast it, so imports failed even when the server
+      // was fine. The Library polls until part 1 is ready (or failed → retry).
+      const { data: workRow, error: workErr } = await supabase
+        .from('long_form_works')
+        .insert({
+          user_id: userId,
+          title,
+          source_type: 'import',
+          origin_url: importUrl || null,
+          // The FULL unchunked original — part processing re-chunks it.
+          raw_text: importText,
+          char_count: importText.length,
+          part_count: partCount,
+        })
+        // No raw_text in the echo: don't send up to 40k chars back down.
+        .select('id, user_id, title, source_type, origin_url, char_count, part_count, status, created_at')
+        .single();
+      if (workErr || !workRow) {
+        console.error('[process-article] Work insert error:', workErr);
+        return jsonError(500, workErr?.message ?? 'work insert failed', 'server_error');
+      }
+      // Part 1 goes through the same JIT path as every later part (pending
+      // claim, failed on error, idempotent).
+      prepareInBackground(workRow.id, 1);
+      console.log(`[process-article] import ${workRow.id}: ${importText.length} chars, ${partCount} part(s); part 1 preparing`);
+      return accepted({ work: workRow });
     }
 
     if (isPartJit) {
@@ -637,8 +695,9 @@ Deno.serve(async (req) => {
       // Re-chunk raw_text — chunkSourceText is deterministic, so boundaries
       // match the ones part_count was computed from at import time.
       const chunks = chunkSourceText(workRow.raw_text ?? '');
-      if (jitPartIndex < 2 || jitPartIndex > chunks.length) {
-        return jsonError(400, `partIndex must be 2–${chunks.length} for this work`, 'part_out_of_range');
+      // Part 1 arrives here too: an import hands it over in the background.
+      if (jitPartIndex < 1 || jitPartIndex > chunks.length) {
+        return jsonError(400, `partIndex must be 1–${chunks.length} for this work`, 'part_out_of_range');
       }
       const partId = partArticleId(workRow.id, jitPartIndex);
       const { data: existing } = await supabase
@@ -701,7 +760,8 @@ Deno.serve(async (req) => {
       continuity = (prevText ? await extractContinuity(ai, prevText, stored) : null) ?? stored;
     }
 
-    const isLongform = isImport || isPartJit;
+    // An import returned above once part 1 was handed off, so long-form here is a part.
+    const isLongform = isPartJit;
 
     // Opportunistically upgrade thin teasers to full article text. Falls back
     // to the merged teaser block (snippet) when no sources / extraction fails.
@@ -1111,40 +1171,14 @@ Deno.serve(async (req) => {
     // blocks keep Gemini's keyword/reading/description (that path is reliable).
     const processedBlocks = rawBlocks;
 
-    // 4. Save. Import mode first creates the work row (generation succeeded, so
-    // no orphan works from failed imports), then saves part 1 as a regular
-    // processed_news row grouped under it — a part IS an article (design §1).
-    // JIT mode already claimed its part row; the upsert below flips it ready.
-    let work: { id: string } | null = null;
+    // 4. Save. An import's work row already exists (created before part 1 was
+    // handed off); a part IS an article (design §1), saved as a processed_news
+    // row grouped under its work. JIT mode already claimed its part row; the
+    // upsert below flips it ready.
     let finalArticleId = articleId || `${Date.now()}-${userId.slice(0, 8)}`;
-    if (isImport) {
-      const { data: workRow, error: workErr } = await supabase
-        .from('long_form_works')
-        .insert({
-          user_id: userId,
-          title,
-          source_type: 'import',
-          origin_url: importUrl || null,
-          // The FULL unchunked original — JIT part processing re-chunks it.
-          raw_text: importText,
-          char_count: importText.length,
-          part_count: partCountNum,
-        })
-        // No raw_text in the echo: don't send up to 40k chars back down.
-        .select('id, user_id, title, source_type, origin_url, char_count, part_count, status, created_at')
-        .single();
-      if (workErr || !workRow) {
-        console.error('[process-article] Work insert error:', workErr);
-        return new Response(JSON.stringify({ error: workErr?.message ?? 'work insert failed' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      work = workRow;
-      finalArticleId = partArticleId(workRow.id, 1);
-    }
     if (isPartJit && jitWork) finalArticleId = partArticleId(jitWork.id, partIndexNum);
 
-    const workRef = work ?? jitWork;
+    const workRef = jitWork;
     const category = isLongform
       ? (jitWork?.source_type === 'magazine' ? '雑誌' : 'インポート')
       : 'Recent News';
@@ -1203,10 +1237,7 @@ Deno.serve(async (req) => {
 
     if (saveError) {
       console.error('[process-article] Save error:', saveError);
-      // Don't strand a partless work: the Library would show it stuck "preparing"
-      // forever. Removing it lets the user simply re-import.
-      if (work) await supabase.from('long_form_works').delete().eq('id', work.id);
-      // A JIT part's pending claim flips to failed so the retry affordance works.
+      // The part's pending claim flips to failed so the retry affordance works.
       if (failClaim) await failClaim().catch(() => {});
       return new Response(JSON.stringify({ error: saveError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
