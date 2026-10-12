@@ -309,6 +309,9 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
       title: ep.title,
       artist: `${host.name} × ${guest.name}`,
       album: '幽玄 · 聴く',
+      // Full-bleed so the lock screen's own rounding doesn't show a white edge
+      // (without artwork iOS fell back to the old, pre-rounded touch icon).
+      artwork: [{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
     });
     const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
       ['play', play],
