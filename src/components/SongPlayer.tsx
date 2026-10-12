@@ -356,11 +356,18 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
         const full = await fetchSong(nextId);
         const path = full.audio_path;
         if (!path || cancelled) return;
-        const local = await cachedAudioUrl('music', path);
-        const url = local ?? await songFileUrl(path);
+        // Save the whole file on the device first, so the next song starts from
+        // memory instead of buffering over the network at the hand-off.
+        let local = await cachedAudioUrl('music', path);
+        let url = local;
+        if (!local) {
+          url = await songFileUrl(path);
+          await saveAudio('music', path, url);
+          if (!cancelled) local = await cachedAudioUrl('music', path);
+          url = local ?? url;
+        }
         if (cancelled) { if (local) URL.revokeObjectURL(local); return; }
-        if (!local) saveAudio('music', path, url);
-        prepared.current = { songId: nextId, full, url, blob: !!local };
+        prepared.current = { songId: nextId, full, url: url!, blob: !!local };
       } catch (e) {
         console.warn('[song] could not prepare the next song:', e);
       }
