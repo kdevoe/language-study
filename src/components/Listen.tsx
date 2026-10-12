@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCw } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
-import { ArchiveList, CornerText } from './ArchiveList';
+import { ArchiveList, ProgressRing } from './ArchiveList';
 import type { TitleSwitch } from './PageHeading';
 import type { ArchiveCard } from './ArchiveList';
 import {
@@ -211,12 +211,14 @@ function statusCorner(ep: PodcastEpisode, onRetry: (ep: PodcastEpisode) => void)
       </button>
     );
   }
-  // Ready: where you are and the total, in minutes ("4 / 12分"); just the
-  // length before you start, and the full length once it's been heard.
+  // Ready: the length in minutes inside a ring that fills as you listen
+  // (docs/mockups/progress-ring.html), closed once it's been heard.
   const total = totalMinutes(ep);
   const state = stateOf(ep);
-  const label = state === 'partial'
-    ? `${Math.min(total, Math.floor(ep.listen_position_ms / 60_000))} / ${total}分`
-    : state === 'done' ? `${total} / ${total}分` : `${total}分`;
-  return <CornerText>{label}</CornerText>;
+  const progress = state === 'done' ? 1
+    // Only a finished episode closes the ring.
+    : state === 'partial' ? Math.min(0.97, ep.listen_position_ms / (ep.duration_ms || total * 60_000))
+    : 0;
+  const heard = state === 'done' ? total : Math.min(total, Math.floor(ep.listen_position_ms / 60_000));
+  return <ProgressRing total={total} progress={progress} label={state === 'new' ? `${total}分` : `${heard} / ${total}分`} />;
 }

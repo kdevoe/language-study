@@ -451,6 +451,43 @@ export function CornerText({ children, compact = false }: { children: ReactNode;
   );
 }
 
+/** A card's top-right size mark (mockup docs/mockups/progress-ring.html, 1 · INK): the
+ *  total (parts, minutes) inside a hairline ring that fills clockwise in muted ink as
+ *  you read or listen. Finished, the ring closes in soft slate and the number fades back. */
+export function ProgressRing({ total, progress, label, compact = false }: {
+  total: number;
+  /** 0–1 through the whole work or episode. */
+  progress: number;
+  /** Spoken text, e.g. "4 / 12分". */
+  label: string;
+  compact?: boolean;
+}) {
+  const d = compact ? 22 : 26;
+  const sw = compact ? 1.3 : 1.5;
+  const r = (d - sw) / 2 - 0.5;
+  const c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(1, progress));
+  const done = p >= 1;
+  const ease = `cubic-bezier(${EASE.join(',')})`;
+  return (
+    <span role="img" aria-label={label} style={{ position: 'relative', width: d, height: d, flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width={d} height={d} aria-hidden style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)', overflow: 'visible' }}>
+        <circle cx={d / 2} cy={d / 2} r={r} fill="none" stroke="var(--border-light)" strokeWidth={sw} style={{ opacity: done ? 0 : 1, transition: `opacity 0.8s ${ease}` }} />
+        <circle
+          cx={d / 2} cy={d / 2} r={r} fill="none" strokeWidth={sw} strokeLinecap="round"
+          stroke={done ? 'var(--accent-progress)' : 'var(--text-muted)'}
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - p)}
+          style={{ opacity: p > 0 ? 0.55 : 0, transition: `stroke-dashoffset 0.6s ${ease}, stroke 0.8s ${ease}, opacity 0.8s ${ease}` }}
+        />
+      </svg>
+      <span aria-hidden style={{ position: 'relative', fontSize: compact ? '0.62rem' : '0.68rem', fontWeight: 700, color: 'var(--text-muted)', opacity: done ? 0.6 : 1, fontVariantNumeric: 'tabular-nums', lineHeight: 1, transition: `opacity 0.8s ${ease}` }}>
+        {total}
+      </span>
+    </span>
+  );
+}
+
 export function CardBody({ card, query, snippet, selecting, selected, compact = false }: {
   card: ArchiveCard; query: string; snippet?: Snippet; selecting: boolean; selected: boolean;
   /** 今日's card: the page's one title size, two lines at most. */
