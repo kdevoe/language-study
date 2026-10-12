@@ -227,15 +227,23 @@ Source of truth: `src/components/Today.tsx`, mockup `docs/mockups/home-today.htm
 - No date beside the title.
 
 ### 6.13 音楽 (songs)
-Source of truth: `src/components/Music.tsx`, `SongSheet.tsx`, `SongPlayer.tsx`; mockup `docs/mockups/music.html`.
+Source of truth: `src/components/Music.tsx`, `SongSheet.tsx`, `SongPlayer.tsx`, `PlaylistPage.tsx`, `AddToListSheet.tsx`; mockups `docs/mockups/music.html`, `music-playlists.html` (option 3), `music-lists.html`.
 
 - **Grid:** two columns of square covers (16px radius, the card shadow), newest first. Under each: the title, serif 1.05rem at two lines max, over the style label in the small-label style (sans 0.68rem 700, 0.06em). An in-flight song shows its stage (作詞中… / 作曲中…) with the olive spinner; a failed one shows 再試行. Empty state: まだ曲がありません, one hint line.
   
-- **Delete:** long-press a tile for a full-tile 削除; the delete waits 5s behind a 元に戻す toast (undo, never confirm).
+- **Long-press a tile** and it splits: リストに追加 (white) over 削除 (`--accent-danger` tint). The delete waits 5s behind a 元に戻す toast (undo, never confirm). Tapping a cover plays it, then carries on through the grid.
+  
+- **Lists (リスト):** a shelf above the grid (kicker リスト; the grid's kicker is 曲). Each list is a 116px 2×2 collage of its first four covers, the name (serif 0.95rem) and a count, scrolling sideways. It opens with the built-in **すべての曲** (every song, newest first; can't be edited or deleted) and ends with a `--bg-card` ＋ 新しいリスト tile. User lists come last used first. Long-press a list for 削除 (undo toast).
+  
+- **リストに追加 sheet** (§6.2): every add goes through it, whether from the player's back row or a long-pressed cover. The song, then the lists as pick rows (white + check = in it; transparent at 50% = not), in the order they had when the sheet opened. Tapping a list adds the song: the row lifts, the sheet closes after about half a second, and a toast names the list with 元に戻す. Tapping a white row removes the song and the sheet stays. ＋ 新しいリスト swaps in place for the hero name field, with the song's theme and style as suggestions; 作る makes the list with the song in it.
+  
+- **A list's page:** back chevron, 168px collage, name (tap to rename in place), `n曲 · 約m分`, then the lifted ▶ 再生 with a quiet シャッフル. Songs as rows (48px cover, title, style, length, grip): drag the grip to reorder, swipe left to take one out (外す, undo toast). ＋ 曲を追加 opens the **picker**: the covers with §6.8 check circles (picked ones lift), and an action bar over the nav with the count and 追加. A new list from the shelf is a name sheet, then the picker.
   
 - **New-song sheet:** the §6.2 sheet with PodcastSheet's three groups: スタイル | 自分で slider, then the style chips (serif 0.92rem; the picked one lifts like the slider thumb) or a description box, in one fixed-height pane so switching never moves the sheet; ＋ テーマ swaps for its field in the same slot; 1/2/3分 slider + 作る.
   
-- **Player** (mockup `docs/mockups/lyrics.html`, phone B): the whole page turns soft blue (`--accent-primary`, via `body.song-mode`, which also tints the back row and the browser's theme colour). Cover, title and style open big; as the page scrolls they shrink into the back row beside the chevron and pin there. Lyrics are bold serif (700, 1.5rem) in two colours: sung so far in `--text-main`, still to come in pale ink `#728997` (`--accent-progress` with 30% `--text-main`, 2.7:1 on the blue; white was too faint, see `docs/mockups/lyrics-contrast.html`); ♪ marks the gap between sections. The page scrolls itself to keep the sung line about 40% down. Words are tappable like the reader (the song pauses). Controls are the podcast player's, unchanged: speed, ⟲10 / ⟳10, play, リピート.
+- **Player** (mockup `docs/mockups/lyrics.html`, phone B): the whole page turns soft blue (`--accent-primary`, via `body.song-mode`, which also tints the back row and the browser's theme colour). Cover, title and style open big; as the page scrolls they shrink into the back row beside the chevron and pin there. Lyrics are bold serif (700, 1.5rem) in two colours: sung so far in `--text-main`, still to come in pale ink `#728997` (`--accent-progress` with 30% `--text-main`, 2.7:1 on the blue; white was too faint, see `docs/mockups/lyrics-contrast.html`); ♪ marks the gap between sections. The page scrolls itself to keep the sung line about 40% down. Words are tappable like the reader (the song pauses). Controls are the podcast player's: speed, ⟲10 / ⟳10, play, and リピート, which cycles リピート → 1曲 → 全部 (off, this song, the whole queue).
+  
+- **Queue:** the player plays through whatever the song was started from (the grid or a list). The pinned back row's right end holds the リストに追加 icon (Lucide `list-plus`, muted; `list-check` in `--text-main` once the song is in a list) and the position `3 / 8`. Playing from a list, its name replaces the style under the title. After the lyrics and words comes **次の曲**: the next song as a row, the one after smaller and at 55%; tap one to jump. When a song ends, a soft-blue handoff shows the next cover and title with a 3-second ring (tap it to go now) and 止める to stay. With the screen locked it goes straight on. Lock-screen next and previous follow the queue.
 
 ### 6.14 Settings
 Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.html`.

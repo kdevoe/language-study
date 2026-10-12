@@ -16,6 +16,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { supabase } from './services/supabase'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
+import { resetPlaylists } from './services/playlists'
 import { unlockSharedAudio } from './services/sharedAudio'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
@@ -63,6 +64,10 @@ function App() {
   const [listenView, setListenView] = useState<'list' | 'player'>('list');
   const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null);
   const [activeSong, setActiveSong] = useState<Song | null>(null);
+  // 音楽: the songs being played through (grid or a list), the list's name, and
+  // the list page that's open, so leaving the player lands back on it.
+  const [songQueue, setSongQueue] = useState<{ songs: Song[]; context: string | null }>({ songs: [], context: null });
+  const [musicListId, setMusicListId] = useState<string | null>(null);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReplenishing, setIsReplenishing] = useState(false);
@@ -328,7 +333,7 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (event === 'SIGNED_OUT') clearListCaches();
+      if (event === 'SIGNED_OUT') { clearListCaches(); resetPlaylists(); }
       // IMPORTANT: this callback runs while GoTrue still holds its navigator
       // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
       // inside it would re-enter the lock and deadlock — hanging every later
@@ -579,12 +584,21 @@ function App() {
     window.scrollTo(0, 0);
   }, []);
 
-  const handleOpenSong = useCallback((song: Song) => {
+  const handleOpenSong = useCallback((song: Song, queue: Song[] = [song], context: string | null = null) => {
     unlockSharedAudio(); // inside the tap, as for episodes
     setActiveEpisode(null);
+    setSongQueue({ songs: queue, context });
     setActiveSong(song);
     setListenView('player');
     setShowNav(true);
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Next in the queue: the song ended (no tap, and the element is already
+  // unlocked and playing, so no unlock clip), or the reader tapped 次の曲.
+  const handlePlayQueued = useCallback((song: Song, byTap: boolean) => {
+    if (byTap) unlockSharedAudio();
+    setActiveSong(song);
     window.scrollTo(0, 0);
   }, []);
 
@@ -884,13 +898,13 @@ function App() {
         )}
         {activeTab === 'listen' && (
           listenView === 'player' && listenPage === 'music' && activeSong ? (
-            <SongPlayer key={activeSong.id} song={activeSong} />
+            <SongPlayer key={activeSong.id} song={activeSong} queue={songQueue.songs} context={songQueue.context} onPlaySong={handlePlayQueued} />
           ) : listenView === 'player' && activeEpisode ? (
             <PodcastPlayer key={activeEpisode.id} episode={activeEpisode} />
           ) : listenPage === 'shows' ? (
             <Listen onOpenEpisode={handleOpenEpisode} titleSwitch={listenTitleSwitch} />
           ) : (
-            <Music onOpenSong={handleOpenSong} titleSwitch={listenTitleSwitch} />
+            <Music onOpenSong={handleOpenSong} titleSwitch={listenTitleSwitch} listId={musicListId} onListChange={setMusicListId} />
           )
         )}
         {activeTab === 'flashcards' && (

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — 音楽 playlists</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700;800&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0; --bg-pure: #ffffff; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-primary: #d4e0e8; --accent-progress: #8fb0c4; --accent-danger: #fde2da; --border-light: #e0e0d8; --olive: #4a5d23;
+  --pale-ink: #728997; --mist-meta: #55636c;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+button { font: inherit; color: inherit; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 740px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1760px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; min-height: 4.8em; }
+.phone { width: 380px; height: 760px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.phone.mist { background: var(--accent-primary); }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2.4rem 1.25rem 2rem; scrollbar-width: none; position: relative; }
+.scroll::-webkit-scrollbar { display: none; }
+.view { animation: fade 0.3s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+/* ── Heading (title switch) ── */
+.heading { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; margin-bottom: 1.6rem; }
+.titles { display: flex; align-items: baseline; gap: 0.95rem; }
+.titles .on { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.titles .off { font-family: var(--font-serif); font-size: 1.2rem; opacity: 0.5; }
+.icon-btn { width: 44px; height: 44px; margin-right: -5px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border: none; background: none; cursor: pointer; }
+
+/* ── Play row: the one new control on the grid ── */
+.playrow { display: flex; align-items: center; justify-content: space-between; margin: -0.6rem 0 1.3rem; }
+.playall { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-main); border: none; background: none; cursor: pointer; padding: 0.3rem 0; }
+.playall .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
+.playall .dot b { width: 0; height: 0; border-left: 8px solid var(--text-main); border-top: 5px solid transparent; border-bottom: 5px solid transparent; margin-left: 2px; }
+.quiet { font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); border: none; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; }
+.quiet svg.i { width: 16px; height: 16px; }
+
+/* ── Slider toggle (§6.1) ── */
+.slider { position: relative; display: flex; background: var(--border-light); border-radius: 100px; padding: 4px; height: 40px; cursor: pointer; }
+.slider span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); position: relative; z-index: 1; transition: color 0.4s var(--ease); }
+.slider span.on { color: var(--text-main); font-weight: 700; }
+.slider .thumb { position: absolute; top: 4px; bottom: 4px; background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.4s var(--ease); }
+
+/* ── Text chips (smart lists) ── */
+.chips { display: flex; gap: 0.3rem; overflow-x: auto; scrollbar-width: none; margin: -0.6rem -1.25rem 1rem; padding: 0.2rem 1.25rem 0.4rem; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted); padding: 0.3rem 0.8rem; border-radius: 100px; border: none; background: none; cursor: pointer; transition: all 0.4s var(--ease); }
+.chips button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 600; }
+
+/* ── Song grid (§6.13) ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6rem 0.9rem; }
+.tile { cursor: pointer; }
+.tile .cover { aspect-ratio: 1; border-radius: 16px; box-shadow: 0 4px 25px rgba(0,0,0,0.06); position: relative; overflow: hidden; background-size: cover; }
+.tile .t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.45; margin-top: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tile .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 0.2rem; }
+.tile .heart { position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center; color: var(--text-main); }
+.tile .heart svg.i { width: 14px; height: 14px; fill: currentColor; }
+/* long-press: a split tile (V2) or full-tile delete (V1, unchanged) */
+.armed { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.armed > div { flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.35rem; font-family: var(--font-serif); font-size: 1rem; }
+.armed .fav { background: rgba(255,255,255,0.92); color: var(--text-main); }
+.armed .del { background: var(--accent-danger); color: #a8553f; }
+.armed svg.i { width: 16px; height: 16px; }
+.kick { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin: 2rem 0 0.8rem; }
+.kick:first-child { margin-top: 0; }
+
+/* ── Shelves (V3) ── */
+.shelf { display: flex; gap: 0.9rem; overflow-x: auto; scrollbar-width: none; margin: 0 -1.25rem; padding: 0.2rem 1.25rem 0.6rem; }
+.shelf::-webkit-scrollbar { display: none; }
+.pl { flex: none; width: 116px; cursor: pointer; border: none; background: none; text-align: left; }
+.collage { width: 116px; height: 116px; border-radius: 16px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; box-shadow: 0 4px 25px rgba(0,0,0,0.06); }
+.collage i { background-size: cover; }
+.pl .t { font-family: var(--font-serif); font-size: 0.95rem; margin-top: 0.5rem; line-height: 1.35; }
+.pl .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.pl.add .collage { background: var(--bg-card); box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+
+/* ── Playlist page (V3) ── */
+.back { height: 44px; display: flex; align-items: center; color: var(--text-muted); margin: -1rem 0 0.6rem -0.4rem; border: none; background: none; cursor: pointer; }
+.pl-head { text-align: center; }
+.pl-head .collage { width: 168px; height: 168px; margin: 0 auto; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+.pl-head h2 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 500; margin-top: 1.1rem; }
+.pl-head .meta { font-size: 0.72rem; font-weight: 500; color: var(--text-muted); }
+.pl-go { display: flex; align-items: center; justify-content: center; gap: 1.6rem; margin: 1.2rem 0 1.6rem; }
+.lift { height: 45px; padding: 0 1.8rem; border-radius: 100px; font-family: var(--font-serif); font-size: 1.05rem; letter-spacing: 0.08em; font-weight: 700; background: var(--bg-pure); box-shadow: 0 4px 14px rgba(0,0,0,0.1); display: inline-flex; align-items: center; gap: 0.5rem; border: none; cursor: pointer; transform: translateY(-1px); }
+.lift b { width: 0; height: 0; border-left: 9px solid var(--text-main); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.rows .r { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0; }
+.rows .r .c { width: 48px; height: 48px; border-radius: 10px; background-size: cover; flex: none; }
+.rows .r .tx { flex: 1; min-width: 0; }
+.rows .r .tx div:first-child { font-family: var(--font-serif); font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rows .r .tx div:last-child { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.rows .r .d { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rows .r .grip { color: var(--border-light); margin-left: 0.2rem; }
+.rows .r .grip svg.i { width: 18px; height: 18px; }
+
+/* ── Sheet (§6.2) ── */
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); z-index: 5; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--bg-color); border-radius: 28px 28px 0 0; padding: 1.5rem 1.5rem 2.2rem; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); animation: up 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes up { from { transform: translateY(40px); opacity: 0; } }
+.grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1.2rem; }
+.sheet-song { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.3rem; }
+.sheet-song .c { width: 44px; height: 44px; border-radius: 10px; background-size: cover; }
+.sheet-song .t { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 600; }
+.sheet-song .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.pick { display: flex; flex-direction: column; gap: 0.45rem; }
+.pick button { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 16px; border: none; background: transparent; opacity: 0.5; cursor: pointer; font-family: var(--font-serif); font-size: 1rem; text-align: left; transition: all 0.4s var(--ease); }
+.pick button small { font-family: var(--font-sans); font-size: 0.72rem; color: var(--text-muted); }
+.pick button.on { background: var(--bg-pure); opacity: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.newlist { margin-top: 1rem; height: 2.4rem; display: flex; align-items: center; justify-content: space-between; }
+.newlist .q { font-size: 0.8rem; letter-spacing: 0.04em; color: var(--text-muted); }
+.del-link { font-family: var(--font-serif); font-size: 0.95rem; color: #a8553f; }
+
+/* ── Toast (§6.6) ── */
+.toast { position: absolute; top: 0.7rem; left: 50%; transform: translateX(-50%); z-index: 7; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 14px; box-shadow: 0 6px 30px rgba(0,0,0,0.12); font-size: 0.85rem; padding: 0.55rem 1rem; white-space: nowrap; }
+
+/* ── Player (mist, §6.13) ── */
+.p-head { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding: 1.4rem 1rem 0.8rem 0.6rem; display: flex; align-items: center; gap: 0.7rem; background: var(--accent-primary); }
+.p-head .chev { color: var(--mist-meta); width: 32px; display: flex; justify-content: center; }
+.p-head .c { width: 46px; height: 46px; border-radius: 8px; background-size: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: none; }
+.p-head .tx { flex: 1; min-width: 0; }
+.p-head .tx .t { font-family: var(--font-serif); font-weight: 600; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-head .tx .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--mist-meta); }
+.p-head .pos { font-size: 0.72rem; font-weight: 600; color: var(--mist-meta); font-variant-numeric: tabular-nums; }
+.p-head .hrt { color: var(--text-main); display: flex; border: none; background: none; cursor: pointer; padding: 6px; }
+.p-head .hrt.off { color: var(--mist-meta); }
+.p-head .hrt.on svg.i { fill: currentColor; }
+.p-head .fade { position: absolute; left: 0; right: 0; bottom: -24px; height: 24px; background: linear-gradient(var(--accent-primary), transparent); }
+.p-body { padding: 6.2rem 1.5rem 11rem; }
+.line { font-family: var(--font-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.45; letter-spacing: 0.02em; margin-bottom: 1.05rem; color: var(--pale-ink); }
+.line.sung { color: var(--text-main); }
+.gap { font-family: var(--font-serif); font-size: 1.3rem; color: var(--text-main); margin: 0.4rem 0 1.4rem; }
+.next { margin-top: 2.4rem; }
+.next .k { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--mist-meta); margin-bottom: 0.6rem; }
+.next .r { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem 0; }
+.next .r .c { width: 52px; height: 52px; border-radius: 10px; background-size: cover; flex: none; }
+.next .r .t { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 600; }
+.next .r .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--mist-meta); }
+.next .r.later { opacity: 0.55; }
+.next .r.later .c { width: 40px; height: 40px; }
+.next .r.later .t { font-size: 0.95rem; font-weight: 500; }
+.p-ctrls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; padding: 2.4rem 1.4rem 1.5rem; background: linear-gradient(transparent, var(--accent-primary) 26%); }
+.bar { height: 4px; border-radius: 2px; background: rgba(45,45,45,0.15); position: relative; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 82%; border-radius: 2px; background: var(--text-main); }
+.times { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--mist-meta); margin-top: 0.4rem; font-variant-numeric: tabular-nums; }
+.crow { display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; }
+.crow .pill { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; color: var(--mist-meta); border: 1px solid rgba(45,45,45,0.15); border-radius: 100px; padding: 0.35rem 0.6rem; min-width: 60px; text-align: center; background: none; cursor: pointer; }
+.crow .pill.serif { font-family: var(--font-serif); font-size: 0.8rem; font-weight: 500; letter-spacing: 0; }
+.crow .pill.on { color: var(--text-main); border-color: var(--text-main); }
+.crow .sk { color: var(--mist-meta); display: flex; }
+.crow .pb { width: 58px; height: 58px; border-radius: 50%; background: var(--bg-pure); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.crow .pb i { width: 16px; height: 18px; background: linear-gradient(90deg, var(--text-main) 0 35%, transparent 35% 65%, var(--text-main) 65%); }
+/* end-of-song handoff (V1 リスト state) */
+.handoff { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: var(--accent-primary); padding: 2rem; }
+.handoff .k { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--mist-meta); }
+.handoff .c { width: 210px; height: 210px; border-radius: 20px; background-size: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.12); margin: 1rem 0 1.2rem; position: relative; }
+.handoff .t { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 600; }
+.handoff .s { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--mist-meta); }
+.ring { width: 46px; height: 46px; margin-top: 1.6rem; position: relative; }
+.ring svg { transform: rotate(-90deg); }
+.ring span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 1rem; }
+.handoff .stop { margin-top: 1rem; font-family: var(--font-serif); font-size: 0.9rem; color: var(--mist-meta); }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); position: relative; z-index: 4; }
+.nav span.b { width: 76px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.78rem; line-height: 1rem; font-weight: 500; margin-top: 2px; }
+.nav .b.on { color: var(--text-main); }
+.nav .b.on .ic { background: var(--accent-primary); }
+.nav .b.on .ic svg.i { stroke-width: 1.9; }
+
+/* ── Notes ── */
+.notes { max-width: 820px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+.notes table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.notes th, .notes td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+.notes th { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); }
+@media (max-width: 440px) { .phone { height: 700px; } }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION · 聞く › 音楽</div>
+  <h1>Playlists, kept simple</h1>
+  <p>Four ways to add playlists, from no lists at all to named lists you make yourself. All four share one player change: when a song ends, the next one starts, and the lyrics end with what's coming next. The STATE toggle moves every phone through the same four moments. Phones also respond to taps: the お気に入り slider, the list shelves, the chips and the pick rows.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">STATE</span><div class="pill-seg" data-ctl="state">
+      <button data-v="grid" class="on">1 · 音楽</button><button data-v="list">2 · List</button><button data-v="add">3 · Add</button><button data-v="play">4 · Player</button>
+    </div></div>
+  </div>
+</header>
+
+<div class="stage" id="stage"></div>
+
+<div class="notes">
+  <h3>What's the same in all four</h3>
+  <ol>
+    <li><span class="n">1</span><div><b>The player keeps going.</b> Today a song stops at its end. With a queue, the next song starts after a short handoff (cover, title, a 3-second ring, and 止める to stay put). The lyrics end with ♪ and then <b>次の曲</b>: the next song as a row, and the one after it fainter. Tap a row to jump to it.</div></li>
+    <li><span class="n">2</span><div><b>The position sits where a card's status goes:</b> <code>3 / 8</code> at the right of the pinned back row (§6.5's "where you are, nothing more"). The context (お気に入り, 夜のドライブ, シティポップ) is the small label under the title, where the style is now.</div></li>
+    <li><span class="n">3</span><div><b>No new transport buttons.</b> ⟳10 stays ⟳10. Skipping a song = tap 次の曲 at the end of the lyrics. リピート cycles <b>リピート → 1曲 → 全部</b>: off, loop this song, loop the whole queue.</div></li>
+    <li><span class="n">4</span><div><b>One way to start a queue:</b> <b>▶ 通して聴く</b> (white dot, serif label) plays what's on screen, in order. <b>シャッフル</b> beside it is a quiet text link. Tapping a single cover still plays that one song, then carries on through the rest of the view, like any music app.</div></li>
+    <li><span class="n">5</span><div><b>Open question: leaving the player.</b> Today leaving the player pauses the song, because there's no mini player. A queue makes background listening more tempting (cooking, a walk). That's a separate change: a slim now-playing row above the nav. I'd keep it out of this round unless you want it.</div></li>
+  </ol>
+
+  <h3>The four options</h3>
+  <table>
+    <tr><th>OPTION</th><th>YOU MANAGE</th><th>NEW UI</th><th>DATA</th></tr>
+    <tr><td><b>1 · 通して聴く</b></td><td>Nothing</td><td>One play row</td><td>None (client queue)</td></tr>
+    <tr><td><b>2 · お気に入り</b></td><td>One list, by ♡</td><td>Play row, small slider, ♡ in player</td><td><code>songs.favorited_at</code></td></tr>
+    <tr><td><b>3 · リスト</b></td><td>Named lists</td><td>Shelf, list page, add sheet</td><td><code>playlists</code> + <code>playlist_songs</code> (with order)</td></tr>
+    <tr><td><b>4 · 自動</b></td><td>Nothing (lists build themselves)</td><td>Chip row, play row</td><td>Play counts (already logged for style weighting)</td></tr>
+  </table>
+
+  <h3>Recommendation</h3>
+  <ol>
+    <li><span class="n">→</span><div><b>Option 2, with option 1's player.</b> One list you build with a tap is all most people need for a personal library of generated songs, especially while it's still a few dozen songs. It adds one compact slider and one ♡, and nothing to name or organise. If it later outgrows that, option 3's shelf can sit above the grid with お気に入り as its first list, so nothing built for 2 is thrown away.</div></li>
+    <li><span class="n">→</span><div><b>Option 4's style chips</b> are a cheap add-on to any of them if the grid gets long. I'd hold them until the grid passes about 20 songs, since with few songs most chips would hold one or two.</div></li>
+  </ol>
+</div>
+
+<script>
+// ── Covers: small risograph-style scenes in the app palette ──
+const P = { paper: '#f3efe4', mist: '#c9d6de', olive: '#5d6b3a', ink: '#2f3437', amber: '#e9b25c', rose: '#d9a08b', slate: '#8fb0c4' };
+const SCENES = [
+  `<rect width="100" height="100" fill="${P.paper}"/><rect y="62" width="100" height="38" fill="${P.ink}"/><path d="M0 78 Q50 66 100 80 L100 100 L0 100Z" fill="${P.mist}"/><rect x="66" y="22" width="16" height="44" fill="${P.ink}"/><rect x="71" y="30" width="5" height="5" fill="${P.amber}"/><rect x="84" y="34" width="12" height="32" fill="${P.mist}"/><path d="M14 64 Q10 40 26 30 Q22 48 30 62Z" fill="${P.olive}"/>`,
+  `<rect width="100" height="100" fill="${P.mist}"/><circle cx="70" cy="34" r="16" fill="${P.paper}"/><path d="M0 70 L30 44 L52 64 L74 40 L100 66 L100 100 L0 100Z" fill="${P.ink}"/><path d="M0 84 Q50 74 100 86 L100 100 L0 100Z" fill="${P.olive}"/>`,
+  `<rect width="100" height="100" fill="${P.paper}"/><rect x="22" y="40" width="40" height="40" rx="4" fill="${P.rose}"/><rect x="62" y="48" width="10" height="20" rx="5" fill="none" stroke="${P.rose}" stroke-width="5"/><path d="M30 30 Q34 22 30 14 M42 30 Q46 22 42 14" stroke="${P.slate}" stroke-width="3" fill="none"/><path d="M0 86 L100 86" stroke="${P.ink}" stroke-width="3"/><g stroke="${P.slate}" stroke-width="2">${[8, 20, 76, 88].map((x) => `<line x1="${x}" y1="0" x2="${x - 6}" y2="20"/>`).join('')}</g>`,
+  `<rect width="100" height="100" fill="${P.ink}"/><circle cx="24" cy="24" r="9" fill="${P.paper}"/><path d="M0 64 L100 54 L100 100 L0 100Z" fill="#3d4447"/><path d="M0 80 L100 64" stroke="${P.amber}" stroke-width="2" stroke-dasharray="6 6"/><circle cx="72" cy="66" r="3" fill="${P.amber}"/><circle cx="80" cy="64" r="3" fill="${P.amber}"/><rect x="40" y="30" width="8" height="30" fill="${P.slate}"/><rect x="52" y="22" width="10" height="38" fill="${P.slate}"/>`,
+  `<rect width="100" height="100" fill="${P.paper}"/><circle cx="50" cy="60" r="26" fill="${P.olive}"/><circle cx="40" cy="50" r="6" fill="${P.paper}"/><circle cx="60" cy="50" r="6" fill="${P.paper}"/><circle cx="40" cy="50" r="2.5" fill="${P.ink}"/><circle cx="60" cy="50" r="2.5" fill="${P.ink}"/><path d="M0 88 L100 88 L100 100 L0 100Z" fill="${P.mist}"/><path d="M78 20 Q86 30 78 40" stroke="${P.slate}" stroke-width="3" fill="none"/>`,
+  `<rect width="100" height="100" fill="${P.slate}"/><rect x="0" y="70" width="100" height="30" fill="${P.ink}"/><rect x="18" y="40" width="64" height="8" fill="${P.ink}"/><rect x="24" y="48" width="4" height="22" fill="${P.ink}"/><rect x="72" y="48" width="4" height="22" fill="${P.ink}"/><circle cx="50" cy="26" r="5" fill="${P.paper}" opacity="0.7"/>`,
+  `<rect width="100" height="100" fill="${P.rose}"/><rect x="18" y="20" width="64" height="44" rx="4" fill="${P.paper}"/><rect x="24" y="26" width="52" height="32" fill="${P.mist}"/><circle cx="62" cy="38" r="7" fill="${P.amber}"/><rect x="10" y="64" width="80" height="8" fill="${P.ink}"/><path d="M30 86 Q50 78 70 86" stroke="${P.ink}" stroke-width="3" fill="none"/>`,
+  `<rect width="100" height="100" fill="${P.paper}"/><path d="M0 58 Q25 50 50 58 T100 58 L100 100 L0 100Z" fill="${P.slate}"/><path d="M0 72 Q25 64 50 72 T100 72 L100 100 L0 100Z" fill="${P.mist}"/><rect x="66" y="30" width="3" height="30" fill="${P.ink}"/><rect x="58" y="26" width="20" height="8" rx="2" fill="${P.olive}"/><circle cx="24" cy="26" r="12" fill="${P.amber}"/>`,
+];
+const COVERS = SCENES.map((s) => `url('data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${s}</svg>`).replace(/'/g, '%27')}')`);
+const bg = (i) => `background-image:${COVERS[i]}`;
+
+const SONGS = [
+  { t: '風の強い夜', s: 'シティポップ', d: '2:00', fav: true, plays: 12 },
+  { t: '時を駆けて', s: 'アニメ主題歌', d: '2:48', plays: 4 },
+  { t: '朝のコーヒーと雨の音', s: 'アコースティック', d: '1:52', fav: true, plays: 7 },
+  { t: '夜の高速、君の声', s: 'シティポップ', d: '2:30', fav: true, plays: 9 },
+  { t: 'にわのかえる', s: '童謡', d: '1:05', plays: 1 },
+  { t: '灯りの消えた駅', s: 'バラード', d: '2:55', fav: true, plays: 5 },
+  { t: '月曜日のローファイ', s: 'ローファイ', d: '2:10', plays: 3 },
+  { t: '海辺のバス停', s: 'シティポップ', d: '2:20', plays: 2 },
+].map((x, i) => ({ ...x, i }));
+const LISTS = [
+  { name: 'お気に入り', ids: [0, 2, 3, 5] },
+  { name: '夜のドライブ', ids: [3, 0, 7, 5] },
+  { name: '朝の勉強', ids: [2, 6, 1] },
+];
+
+// ── Icons ──
+const IC = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  back: '<path d="m15 18-6-6 6-6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  shuffle: '<path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.97a4 4 0 0 0 3.3-1.7l5.45-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.97a4 4 0 0 1 3.3 1.7l.4.6"/><path d="M22 18h-6.04a4 4 0 0 1-3.3-1.8l-.36-.58"/>',
+  grip: '<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  headphones: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+  layers: '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+};
+const ic = (n) => `<svg class="i" viewBox="0 0 24 24">${IC[n]}</svg>`;
+const skip = (back) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${back
+  ? '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'
+  : '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'}<text x="12" y="15.4" text-anchor="middle" fill="currentColor" stroke="none" style="font-family:Inter;font-size:7.6px;font-weight:600">10</text></svg>`;
+
+// ── Shared pieces ──
+const heading = () => `<div class="heading"><div class="titles"><span class="off">番組</span><span class="on">音楽</span></div><button class="icon-btn">${ic('plus')}</button></div>`;
+const playRow = (shuffle = true) => `<div class="playrow"><button class="playall"><span class="dot"><b></b></span>通して聴く</button>${shuffle ? `<button class="quiet">${ic('shuffle')}シャッフル</button>` : ''}</div>`;
+const tile = (s, extra = '', label = s.s) => `<div class="tile"><div class="cover" style="${bg(s.i)}">${extra}</div><div class="t">${s.t}</div><div class="s">${label}</div></div>`;
+const grid = (songs, fn = (s) => tile(s)) => `<div class="grid">${songs.map(fn).join('')}</div>`;
+const nav = () => `<nav class="nav">${[['sun', '今日'], ['book', '読む'], ['headphones', '聞く'], ['layers', '復習']].map(([i, l]) => `<span class="b ${l === '聞く' ? 'on' : ''}"><span class="ic">${ic(i)}</span><span class="lab">${l}</span></span>`).join('')}</nav>`;
+const slider = (opts, on, w) => `<div class="slider" data-act="slider" style="width:${w}"><div class="thumb" style="left:calc(4px + ${on} * (100% - 8px) / ${opts.length});width:calc((100% - 8px) / ${opts.length})"></div>${opts.map((o, j) => `<span class="${j === on ? 'on' : ''}">${o}</span>`).join('')}</div>`;
+
+const LYRICS = [['君の声が 遠くなる', '赤い光 揺れている'], ['風が 強い 夜だから', '君に 会いに 行くよ', '雨の 音も 歌になる']];
+function player({ song, ctx, pos, queue, heart }) {
+  const s = SONGS[song];
+  let n = 0;
+  const lines = LYRICS.map((sec, k) => (k ? '<div class="gap">♪</div>' : '') + sec.map((l) => `<div class="line ${n++ < 4 ? 'sung' : ''}">${l.split(' ').join('　')}</div>`).join('')).join('');
+  const next = queue.length ? `<div class="gap">♪</div><div class="next"><div class="k">次の曲</div>${queue.map((q, j) => `<div class="r ${j ? 'later' : ''}"><div class="c" style="${bg(q)}"></div><div><div class="t">${SONGS[q].t}</div><div class="s">${SONGS[q].s}</div></div></div>`).join('')}</div>` : '';
+  const hrt = heart === undefined ? '' : `<button class="hrt ${heart ? 'on' : 'off'}" data-act="heart">${ic('heart')}</button>`;
+  return `<div class="p-head"><span class="chev">${ic('down')}</span><div class="c" style="${bg(song)}"></div><div class="tx"><div class="t">${s.t}</div><div class="s">${ctx}</div></div>${hrt}<span class="pos">${pos}</span><div class="fade"></div></div>
+    <div class="scroll"><div class="p-body">${lines}${next}</div></div>
+    <div class="p-ctrls"><div class="bar"><i></i></div><div class="times"><span>1:38</span><span>-0:22</span></div>
+      <div class="crow"><span class="pill">1.0×</span><span class="sk">${skip(true)}</span><span class="pb"><i></i></span><span class="sk">${skip(false)}</span><button class="pill serif on" data-act="repeat">${['リピート', '1曲', '全部'][ph.repeat ?? 2]}</button></div></div>`;
+}
+let ph; // the phone state being rendered (for the repeat label)
+
+function handoff(next, ctx) {
+  const s = SONGS[next];
+  return `<div class="handoff"><div class="k">次の曲 · ${ctx}</div><div class="c" style="${bg(next)}"></div><div class="t">${s.t}</div><div class="s">${s.s}</div>
+    <div class="ring"><svg width="46" height="46"><circle cx="23" cy="23" r="20" fill="none" stroke="rgba(45,45,45,0.12)" stroke-width="2.5"/><circle cx="23" cy="23" r="20" fill="none" stroke="#2d2d2d" stroke-width="2.5" stroke-dasharray="125.6" stroke-dashoffset="42"/></svg><span>2</span></div>
+    <div class="stop">止める</div></div>`;
+}
+
+// ── The four options ──
+const OPTIONS = [
+  {
+    label: '1 · 通して聴く', name: 'PLAY-THROUGH, NO LISTS',
+    notes: {
+      grid: 'No lists at all. The grid gains one row: ▶ 通して聴く plays every song newest-first, シャッフル mixes them. Tapping a cover plays it and carries on down the grid.',
+      list: 'There is no list page. What the queue adds is the handoff at the end of each song: the next cover, a 3-second ring, and 止める to stay on this song.',
+      add: 'Nothing to add. Long-press stays as it is: one full-tile 削除. New songs join the top of the grid, so the newest is always first in the queue.',
+      play: 'The player is the shipped one plus the queue: 3 / 8 at the right of the back row, and 次の曲 after the last lyric line.',
+    },
+    render(st) {
+      if (st.state === 'list') return { mist: true, html: player({ song: 0, ctx: 'シティポップ', pos: '1 / 8', queue: [1, 2] }) + handoff(1, '2 / 8') };
+      if (st.state === 'play') return { mist: true, html: player({ song: 2, ctx: 'アコースティック', pos: '3 / 8', queue: [3, 4] }) };
+      const armed = st.state === 'add';
+      return { html: `${heading()}${playRow()}${grid(SONGS, (s) => tile(s, armed && s.i === 1 ? `<div class="armed"><div class="del">${ic('trash')}削除</div></div>` : ''))}` };
+    },
+  },
+  {
+    label: '2 · お気に入り', name: 'ONE LIST: FAVOURITES',
+    notes: {
+      grid: 'One list, built with ♡. A compact すべて | ♡ slider (§6.1, secondary width) sits beside the play row. Favourites get no badge in すべて: the grid stays clean.',
+      list: 'The slider on ♡ shows only favourites, still newest-first. ▶ 通して聴く now plays just these. Tap the slider to switch.',
+      add: 'Two ways to ♡: in the player\'s back row (tap the heart, shown on phone 4), or long-press a cover, which now splits into ♡ お気に入り over 削除. A short toast confirms.',
+      play: 'In the player, ♡ sits in the pinned back row beside the position. Playing from ♡, the label under the title reads お気に入り instead of the style.',
+    },
+    render(st) {
+      if (st.state === 'play') return { mist: true, html: player({ song: 3, ctx: 'お気に入り', pos: '2 / 4', queue: [5, 0], heart: st.heart ?? true }) };
+      const favOnly = st.fav ?? (st.state === 'list');
+      const songs = favOnly ? SONGS.filter((s) => s.fav) : SONGS;
+      const armed = st.state === 'add';
+      return { html: `${heading()}<div class="playrow"><button class="playall"><span class="dot"><b></b></span>通して聴く</button>${slider(['すべて', '♡'], favOnly ? 1 : 0, '128px')}</div>${grid(songs, (s) => tile(s, armed && s.i === 1 ? `<div class="armed"><div class="fav">${ic('heart')}お気に入り</div><div class="del">${ic('trash')}削除</div></div>` : ''))}${armed ? '<div class="toast">お気に入りに追加</div>' : ''}` };
+    },
+  },
+  {
+    label: '3 · リスト', name: 'NAMED LISTS ON A SHELF (CHOSEN)',
+    notes: {
+      grid: 'Your lists sit on a shelf above the grid: a 2×2 collage of their covers, the name and a count, scrolling sideways. ＋ at the end makes one. Tap a list to open it.',
+      list: 'A list\'s page: collage, name, count and length, then ▶ 再生 (the lifted button) with シャッフル beside it. Songs as rows; drag the grip to reorder, swipe left to take one out.',
+      add: 'Long-press a cover (or ＋ in the player) opens a short sheet: the song, then your lists as pick rows. White = in that list. Tap to add or remove, no confirm. ＋ 新しいリスト makes one in place.',
+      play: 'Playing a list, the label under the title names it (夜のドライブ) and 次の曲 follows the list\'s own order.',
+    },
+    render(st) {
+      if (st.state === 'play') return { mist: true, html: player({ song: 0, ctx: '夜のドライブ', pos: '2 / 4', queue: [7, 5] }) };
+      const collage = (ids) => `<div class="collage">${[0, 1, 2, 3].map((k) => `<i style="${bg(ids[k % ids.length])}"></i>`).join('')}</div>`;
+      if (st.state === 'list') {
+        const L = LISTS[st.open ?? 1];
+        return { html: `<button class="back" data-act="close">${ic('back')}</button><div class="pl-head">${collage(L.ids)}<h2>${L.name}</h2><div class="meta">${L.ids.length}曲 · 約${L.ids.length * 2 + 1}分</div></div>
+          <div class="pl-go"><button class="lift"><b></b>再生</button><button class="quiet">${ic('shuffle')}シャッフル</button></div>
+          <div class="rows">${L.ids.map((id) => `<div class="r"><div class="c" style="${bg(id)}"></div><div class="tx"><div>${SONGS[id].t}</div><div>${SONGS[id].s}</div></div><span class="d">${SONGS[id].d}</span><span class="grip">${ic('grip')}</span></div>`).join('')}</div>` };
+      }
+      const shelf = `<div class="kick">リスト</div><div class="shelf">${LISTS.map((L, k) => `<button class="pl" data-act="open" data-k="${k}">${collage(L.ids)}<div class="t">${L.name}</div><div class="s">${L.ids.length}曲</div></button>`).join('')}<button class="pl add"><div class="collage">${ic('plus')}</div><div class="t" style="color:var(--text-muted)">新しいリスト</div></button></div><div class="kick">すべての曲</div>`;
+      const base = `${heading()}${shelf}${grid(SONGS)}`;
+      if (st.state !== 'add') return { html: base };
+      const inLists = st.picks ?? [true, true, false];
+      return { html: base, overlay: `<div class="backdrop"></div><div class="sheet"><div class="grabber"></div>
+        <div class="sheet-song"><div class="c" style="${bg(7)}"></div><div><div class="t">海辺のバス停</div><div class="s">シティポップ</div></div></div>
+        <div class="pick">${LISTS.map((L, k) => `<button class="${inLists[k] ? 'on' : ''}" data-act="pick" data-k="${k}"><span>${L.name}</span><small>${L.ids.length + (inLists[k] && k !== 0 ? 1 : 0)}曲</small></button>`).join('')}</div>
+        <div class="newlist"><span class="q">＋ 新しいリスト</span><span class="del-link">削除</span></div></div>` };
+    },
+  },
+  {
+    label: '4 · 自動', name: 'LISTS THAT BUILD THEMSELVES',
+    notes: {
+      grid: 'Nothing to manage: a row of serif chips filters the grid by what you already have. すべて, よく聴く (most played), then each style you own songs in. ▶ 通して聴く plays the chip you\'re on.',
+      list: 'A style chip is a ready-made list: シティポップ holds your three city-pop songs. Chips for styles you have no songs in never appear. Tap any chip.',
+      add: 'There\'s nothing to add, because lists come from plays and styles. よく聴く orders by plays and shows the count where the style usually goes.',
+      play: 'Playing from a chip, its name is the label under the title. The queue is that chip\'s order: newest-first, or most-played for よく聴く.',
+    },
+    render(st) {
+      if (st.state === 'play') return { mist: true, html: player({ song: 3, ctx: 'シティポップ', pos: '2 / 3', queue: [7] }) };
+      const styles = [...new Set(SONGS.map((s) => s.s))];
+      const chips = ['すべて', 'よく聴く', ...styles];
+      const on = st.chip ?? ({ grid: 'すべて', list: 'シティポップ', add: 'よく聴く' })[st.state];
+      let songs = SONGS, fn = (s) => tile(s);
+      if (on === 'よく聴く') { songs = [...SONGS].sort((a, b) => b.plays - a.plays).slice(0, 6); fn = (s) => tile(s, '', `${s.plays}回`); }
+      else if (on !== 'すべて') songs = SONGS.filter((s) => s.s === on);
+      return { html: `${heading()}<div class="chips">${chips.map((c) => `<button class="${c === on ? 'on' : ''}" data-act="chip" data-v="${c}">${c}</button>`).join('')}</div>${playRow()}${grid(songs, fn)}` };
+    },
+  },
+];
+
+// ── Rendering ──
+const G = { state: 'grid' };
+const phones = OPTIONS.map(() => ({}));
+const stage = document.getElementById('stage');
+stage.innerHTML = OPTIONS.map((o, k) => `<div class="phone-wrap"><div class="phone-label">${o.label} · ${o.name}</div><div class="phone" data-p="${k}"></div><div class="phone-note" data-note="${k}"></div></div>`).join('');
+
+function render(k) {
+  const o = OPTIONS[k], state = phones[k].own ?? G.state, st = { ...phones[k], state };
+  ph = st;
+  const out = o.render(st);
+  const el = stage.querySelector(`[data-p="${k}"]`);
+  el.classList.toggle('mist', !!out.mist);
+  el.innerHTML = out.mist ? out.html : `<div class="scroll"><div class="view">${out.html}</div></div>${out.overlay ?? ''}${nav()}`;
+  stage.querySelector(`[data-note="${k}"]`).textContent = o.notes[state];
+  // players open scrolled to the song's end, where 次の曲 sits
+  if (out.mist) { const sc = el.querySelector('.scroll'); sc.scrollTop = sc.scrollHeight; }
+  el.querySelectorAll('[data-act]').forEach((b) => b.onclick = () => act(k, b));
+}
+// Taps inside a phone change only that phone; the STATE toggle resets them all.
+function act(k, b) {
+  const st = phones[k], state = st.own ?? G.state;
+  switch (b.dataset.act) {
+    case 'slider': st.fav = !(st.fav ?? state === 'list'); break;
+    case 'heart': st.heart = !(st.heart ?? true); break;
+    case 'repeat': st.repeat = ((st.repeat ?? 2) + 1) % 3; break;
+    case 'open': st.open = Number(b.dataset.k); st.own = 'list'; break;
+    case 'close': st.own = 'grid'; break;
+    case 'pick': { const p = st.picks ?? [true, true, false]; p[b.dataset.k] = !p[b.dataset.k]; st.picks = p; break; }
+    case 'chip': st.chip = b.dataset.v; break;
+  }
+  render(k);
+}
+document.querySelectorAll('[data-ctl="state"] button').forEach((b) => b.onclick = () => {
+  G.state = b.dataset.v;
+  document.querySelectorAll('[data-ctl="state"] button').forEach((x) => x.classList.toggle('on', x === b));
+  phones.forEach((p, k) => { Object.keys(p).forEach((key) => delete p[key]); render(k); });
+});
+OPTIONS.forEach((_, k) => render(k));
+</script>
+</body>
+</html>

@@ -562,7 +562,8 @@
   - [x] 聞く gets the same switch: 番組 (podcasts) | 音楽 (近日公開 placeholder)
   - [x] 今日 hides the review card when nothing is due
   - [ ] Verify JMDict entry ids for 今日 / 読む / 番組 / 音楽 and add them to UI_LABELS (matched by surface until then)
-  - [ ] 音楽 page (music)
+  - [x] 音楽 page (music)
+  - [x] 音楽 lists: shelf with すべての曲, リストに追加 sheet, list page + picker, queue with auto-advance (database/34_playlists.sql)
 - [x] Podcast freeze at ~5:11 (2026-10-12): long episodes are voiced in ~1,900-char pieces and the MP3s were
       joined byte-for-byte, each with its own ID3 tag and Xing/Info length header. Safari took the first piece's
       length as the episode's, so the element "ended" at ~5 min while audio played on (frozen highlight/clock,
