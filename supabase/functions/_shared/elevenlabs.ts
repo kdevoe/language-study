@@ -4,6 +4,7 @@
 // Japanese — so the player highlights straight off the stored script.
 
 import { ELEVEN_DIALOGUE_MODEL } from './models.ts';
+import { cleanJoinedMp3 } from './mp3.ts';
 
 const XI_URL = 'https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps';
 /** Endpoint guidance: keep each request ≤ 2,000 chars or output may cut short. */
@@ -90,7 +91,8 @@ async function callDialogue(apiKey: string, lines: DialogueLine[], previousReque
 
 /** Voice a dialogue. Lines longer than one request are rendered in turn-boundary
  *  chunks, stitched with previous_request_ids for prosody continuity, and their
- *  MP3 frames concatenated (offsetting each chunk's timings). */
+ *  MP3 frames concatenated (offsetting each chunk's timings) and cleaned of
+ *  per-piece tags and length headers. */
 export async function renderDialogue(apiKey: string, lines: DialogueLine[]): Promise<DialogueRender> {
   const audio: Uint8Array[] = [];
   const alignment: TurnAlignment[] = [];
@@ -128,7 +130,9 @@ export async function renderDialogue(apiKey: string, lines: DialogueLine[]): Pro
     at += a.length;
   }
   return {
-    mp3,
+    // Each piece's own ID3 tag and Xing/Info header would make Safari read the
+    // first piece's length as the episode's (see mp3.ts).
+    mp3: cleanJoinedMp3(mp3),
     alignment,
     durationSec: +offset.toFixed(2),
     chars: lines.reduce((n, l) => n + l.text.length, 0),

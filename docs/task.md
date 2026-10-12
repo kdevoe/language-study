@@ -563,3 +563,9 @@
   - [x] 今日 hides the review card when nothing is due
   - [ ] Verify JMDict entry ids for 今日 / 読む / 番組 / 音楽 and add them to UI_LABELS (matched by surface until then)
   - [ ] 音楽 page (music)
+- [x] Podcast freeze at ~5:11 (2026-10-12): long episodes are voiced in ~1,900-char pieces and the MP3s were
+      joined byte-for-byte, each with its own ID3 tag and Xing/Info length header. Safari took the first piece's
+      length as the episode's, so the element "ended" at ~5 min while audio played on (frozen highlight/clock,
+      lock screen −0:00). services/mp3.ts strips tags + header frames: server-side for new renders
+      (_shared/elevenlabs.ts), in the audio cache, and as a one-time source swap in the player for stored episodes
+  - [ ] Deploy generate-podcast (`supabase functions deploy generate-podcast`) so new episodes are clean at source
