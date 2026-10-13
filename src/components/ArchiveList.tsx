@@ -83,8 +83,6 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
-const twoLines: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
-
 const markStyle = { backgroundColor: 'var(--accent-primary)', color: 'var(--text-main)', borderRadius: '3px', padding: '0 2px' };
 
 export function ArchiveList<T extends { id: string }>(props: Props<T>) {
@@ -489,9 +487,25 @@ export function ProgressRing({ total, progress, label }: {
 
 export function CardBody({ card, query, snippet, selecting, selected, compact = false }: {
   card: ArchiveCard; query: string; snippet?: Snippet; selecting: boolean; selected: boolean;
-  /** 今日's card: the page's one title size, two lines at most. */
+  /** Home's card: the page's one title size, two lines at most. */
   compact?: boolean;
 }) {
+  const corner = selecting ? (
+    <span
+      aria-hidden
+      style={{
+        width: 22, height: 22, borderRadius: '50%', flex: 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: `1.5px solid ${selected ? 'var(--text-main)' : 'var(--border-light)'}`,
+        backgroundColor: selected ? 'var(--text-main)' : 'transparent',
+        color: 'var(--bg-pure)',
+        transition: `all 0.3s cubic-bezier(${EASE.join(',')})`,
+      }}
+    >
+      {selected && <Check size={13} strokeWidth={3} />}
+    </span>
+  ) : card.status;
+
   return (
     <div
       style={{
@@ -506,11 +520,11 @@ export function CardBody({ card, query, snippet, selecting, selected, compact = 
         transition: `background-color 0.4s cubic-bezier(${EASE.join(',')}), box-shadow 0.4s cubic-bezier(${EASE.join(',')})`,
       }}
     >
-      {/* Without a tag the corner floats beside the title instead of taking a row. */}
-      <div style={card.tag
-        ? { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', gap: '0.6rem' }
-        : { position: 'absolute', top: '1.5rem', right: '1.5rem', lineHeight: 1 }}>
-        {card.tag ? (
+      {/* With a tag, the tag and the corner share a row above the title. Without
+          one, the corner floats at the title's top right and the text wraps
+          around it, so only the first line gives up room (docs/design-system.md §6.5). */}
+      {card.tag && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', gap: '0.6rem' }}>
           <span style={{
             fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em',
             backgroundColor: 'var(--bg-pure)',
@@ -520,29 +534,24 @@ export function CardBody({ card, query, snippet, selecting, selected, compact = 
           }}>
             <Highlight text={card.tag} query={query} />
           </span>
-        ) : null}
-        {selecting ? (
-          <span
-            aria-hidden
-            style={{
-              width: 22, height: 22, borderRadius: '50%', flex: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `1.5px solid ${selected ? 'var(--text-main)' : 'var(--border-light)'}`,
-              backgroundColor: selected ? 'var(--text-main)' : 'transparent',
-              color: 'var(--bg-pure)',
-              transition: `all 0.3s cubic-bezier(${EASE.join(',')})`,
-            }}
-          >
-            {selected && <Check size={13} strokeWidth={3} />}
-          </span>
-        ) : card.status}
-      </div>
+          {corner}
+        </div>
+      )}
 
+      {/* At most three lines (two on Home), then an ellipsis. The clamp sits on the
+          heading and the text in a block inside it: WebKit ignores a float that is
+          a direct child of a clamped box. */}
       <h3 className="serif" style={{
-        ...(compact ? { fontSize: '1.2rem', lineHeight: 1.5, ...twoLines } : { fontSize: '1.35rem', lineHeight: 1.45 }),
-        color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', maxWidth: card.tag ? '90%' : 'calc(100% - 3.5rem)',
+        ...(compact ? { fontSize: '1.2rem', lineHeight: 1.5 } : { fontSize: '1.35rem', lineHeight: 1.45 }),
+        display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        color: card.titleMuted ? 'var(--text-muted)' : 'var(--text-main)', maxWidth: card.tag ? '90%' : undefined,
       }}>
-        <Highlight text={card.title} query={query} />
+        <span style={{ display: 'block' }}>
+          {!card.tag && (
+            <span style={{ float: 'right', display: 'flex', marginLeft: '0.9rem', marginTop: '0.15rem', lineHeight: 1, fontFamily: 'var(--font-sans)', fontWeight: 400 }}>{corner}</span>
+          )}
+          <Highlight text={card.title} query={query} />
+        </span>
       </h3>
 
       {snippet && (
