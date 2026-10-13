@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useAppStore } from '../services/store';
+import { GRAMMAR_POINTS } from '../services/grammar/catalogue';
+import type { GrammarHit } from '../services/grammar/reader';
 import { canonicalWordKey } from '../services/wordKey';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
@@ -21,11 +23,36 @@ export interface WordDetails {
   freqRank?: number | null;
 }
 
+/** An open grammar panel (#43): the point, and the sentence it was met in (absent
+ *  when opened from a formal/casual partner link). */
+export interface GrammarView {
+  id: string;
+  hit?: GrammarHit;
+  /** AI insight about the point in this sentence. */
+  insight?: string;
+  /** The word under the tapped piece, for "As a word". */
+  asWord?: string;
+}
+
+const OLIVE = '#4a5d23';
+const MARK_BG = 'linear-gradient(transparent 60%, var(--accent-primary) 60%, var(--accent-primary) 94%, transparent 94%)';
+
+/** Text with [start, end) marked, as in the catalogue examples (【】) and この文では. */
+function Marked({ text, start, end }: { text: string; start: number; end: number }) {
+  return (
+    <>
+      {text.slice(0, start)}
+      <span style={{ background: MARK_BG }}>{text.slice(start, end)}</span>
+      {text.slice(end)}
+    </>
+  );
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onDismissStart?: () => void; 
-  mode: 'word' | 'sentence';
+  mode: 'word' | 'sentence' | 'grammar';
   wordData: WordDetails | null;
   sentenceText?: string;
   sentenceTranslation?: string;
@@ -33,14 +60,24 @@ interface Props {
   onSetMastery?: (level: 'hard' | 'medium' | 'easy') => void;
   isLoading?: boolean;
   targetRect?: DOMRect | null;
+  /** Grammar (#43). `grammar` is the open point (mode 'grammar'); `patterns` the
+   *  word's points (PATTERNS rows); `sentencePoints` the 。 sentence's points. */
+  grammar?: (GrammarView & { backLabel?: string }) | null;
+  patterns?: GrammarHit[];
+  sentencePoints?: GrammarHit[];
+  onOpenPoint?: (id: string, hit?: GrammarHit) => void;
+  onGrammarBack?: () => void;
+  onAsWord?: () => void;
 }
 
 export function WordModal({ 
   isOpen, onClose, onDismissStart, mode, wordData, 
   sentenceText, sentenceTranslation, 
-  anchor, onSetMastery, isLoading, targetRect
+  anchor, onSetMastery, isLoading, targetRect,
+  grammar, patterns = [], sentencePoints = [], onOpenPoint, onGrammarBack, onAsWord,
 }: Props) {
   const wordDatabase = useAppStore(state => state.wordDatabase);
+  const grammarProgress = useAppStore(state => state.grammarProgress);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const SYNC_DURATION = 1.05;
@@ -72,7 +109,143 @@ export function WordModal({
     }} />
   );
 
+  const renderSlider = (active: string) => {
+    const levels = ['easy', 'medium', 'hard'] as const;
+    const activeIndex = Math.max(0, levels.indexOf(active as typeof levels[number]));
+    return (
+      <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '42px', position: 'relative' }}>
+        <motion.div 
+          initial={false}
+          animate={{ left: `calc(4px + ${activeIndex} * (100% - 8px) / 3)` }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          style={{
+            position: 'absolute', top: '4px', bottom: '4px',
+            width: `calc((100% - 8px) / 3)`,
+            backgroundColor: 'var(--bg-pure)', borderRadius: '100px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            zIndex: 0
+          }} 
+        />
+        {levels.map(level => (
+          <button key={level} onClick={() => onSetMastery?.(level)} style={{ flex: 1, borderRadius: '100px', backgroundColor: 'transparent', color: active === level ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: active === level ? 800 : 700, border: 'none', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, textTransform: 'uppercase' }}>
+            {level}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const kickerStyle: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 900, color: OLIVE, display: 'flex', alignItems: 'center', gap: '0.5rem', letterSpacing: '0.05em' };
+  const subKickerStyle: React.CSSProperties = { fontSize: '0.66rem', fontWeight: 800, letterSpacing: '0.1em', color: 'var(--text-muted)', margin: '1.1rem 0 0.35rem' };
+
+  /** One grammar point as a tappable row (PATTERNS, the sentence's list). The dot
+   *  is filled until the point is marked EASY. */
+  const renderPointRows = (hits: GrammarHit[]) => {
+    const seen = new Set<string>();
+    return hits.filter(h => GRAMMAR_POINTS[h.id] && !seen.has(h.id) && seen.add(h.id)).map((h, i) => {
+      const p = GRAMMAR_POINTS[h.id];
+      const known = grammarProgress[h.id]?.mastery === 'easy';
+      return (
+        <div key={h.id} onClick={() => onOpenPoint?.(h.id, h)} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0', cursor: 'pointer', borderTop: i ? '1px solid var(--border-light)' : undefined }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', flex: 'none', backgroundColor: known ? 'transparent' : 'var(--accent-progress)', border: known ? '1px solid var(--border-light)' : undefined }} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="serif" style={{ fontSize: '1.12rem', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{p.pattern}</span>
+            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: OLIVE, marginLeft: '0.45rem' }}>N{p.level}</span>
+            <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>{p.meaning}</span>
+          </span>
+          <ChevronRight size={16} color="var(--text-muted)" />
+        </div>
+      );
+    });
+  };
+
+  const renderGrammar = () => {
+    const p = grammar && GRAMMAR_POINTS[grammar.id];
+    if (!grammar || !p) return null;
+    const hit = grammar.hit;
+    const partner = p.partner && GRAMMAR_POINTS[p.partner];
+    const linkStyle: React.CSSProperties = { marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', background: 'none', border: 'none', padding: 0 };
+    const sections = [
+      <div key="head" style={{ marginBottom: '0.9rem' }}>
+        {grammar.backLabel && (
+          <button onClick={onGrammarBack} style={{ ...linkStyle, marginTop: 0, marginBottom: '0.4rem', gap: '0.1rem', fontSize: '0.78rem' }}>
+            <ChevronLeft size={15} /> {grammar.backLabel}
+          </button>
+        )}
+        <div style={kickerStyle}><BookOpen size={13} /> GRAMMAR</div>
+        <div className="serif" style={{ fontSize: '2.1rem', fontWeight: 500, lineHeight: 1.2, margin: '0.2rem 0 0.5rem', color: 'var(--text-main)' }}>{p.pattern}</div>
+        <p className="serif" style={{ fontSize: '1.15rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
+          <span className="sans" style={{ fontSize: '0.85rem', fontWeight: 800, color: OLIVE, marginRight: '0.6rem', opacity: 0.8 }}>N{p.level}</span>
+          {p.meaning}
+        </p>
+      </div>,
+      <div key="mastery" style={{ marginBottom: '1.3rem' }}>{renderSlider(grammarProgress[p.id]?.mastery ?? 'medium')}</div>,
+      hit && (
+        <div key="insight" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: `5px solid ${OLIVE}`, marginBottom: '0.3rem' }}>
+          <div style={{ ...kickerStyle, marginBottom: '0.55rem' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
+          {grammar.insight ? (
+            <motion.p key={grammar.insight} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="serif" style={{ color: 'var(--text-main)', fontSize: '1.05rem', lineHeight: 1.6 }}>{grammar.insight}</motion.p>
+          ) : (
+            <><Skeleton width="100%" height="1rem" /><Skeleton width="70%" height="1rem" /></>
+          )}
+        </div>
+      ),
+      hit && (
+        <div key="sentence">
+          <div style={subKickerStyle}>この文では</div>
+          <p className="serif" style={{ fontSize: '1.05rem', lineHeight: 1.7, color: 'var(--text-main)' }}><Marked text={hit.sentence} start={hit.start} end={hit.end} /></p>
+        </div>
+      ),
+      <div key="built">
+        <div style={subKickerStyle}>HOW IT'S BUILT</div>
+        <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '0.6rem 0.8rem', display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {p.formation.map((x, k) => k === 0 || x.startsWith('（') ? (
+            <span key={k} className="sans" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', backgroundColor: 'var(--bg-pure)', borderRadius: '6px', padding: '0.15rem 0.45rem' }}>{x}</span>
+          ) : (
+            <span key={k} className="serif" style={{ fontSize: '1rem', color: 'var(--text-main)' }}>{x}</span>
+          ))}
+        </div>
+      </div>,
+      <div key="usage">
+        <div style={subKickerStyle}>使い方</div>
+        <p style={{ fontSize: '0.86rem', lineHeight: 1.6, color: 'var(--text-main)' }}>{p.note}</p>
+      </div>,
+      <div key="examples">
+        <div style={subKickerStyle}>例</div>
+        {p.examples.map((ex, k) => {
+          const [before, mark = '', after = ''] = ex.ja.split(/[【】]/);
+          return (
+            <div key={k} style={{ marginTop: '0.25rem' }}>
+              <p className="serif" style={{ fontSize: '1.05rem', lineHeight: 1.7, color: 'var(--text-main)' }}><Marked text={before + mark + after} start={before.length} end={before.length + mark.length} /></p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ex.en}</p>
+            </div>
+          );
+        })}
+      </div>,
+      (partner || grammar.asWord) && (
+        <div key="links" style={{ marginBottom: '1.5rem' }}>
+          {partner && (
+            <button onClick={() => onOpenPoint?.(partner.id)} style={linkStyle}>
+              {p.casual ? 'Formal:' : partner.casual ? 'In speech:' : 'Compare:'} <span className="serif" style={{ fontSize: '1rem', color: 'var(--text-main)' }}>{partner.pattern}</span><ChevronRight size={15} />
+            </button>
+          )}
+          {grammar.asWord && (
+            <button onClick={onAsWord} style={linkStyle}>
+              As a word: <span className="serif" style={{ fontSize: '1rem', color: 'var(--text-main)' }}>{grammar.asWord}</span><ChevronRight size={15} />
+            </button>
+          )}
+        </div>
+      ),
+    ];
+    return (
+      <div style={{ display: 'flex', flexDirection: anchor === 'bottom' ? 'column' : 'column-reverse', paddingBottom: anchor === 'bottom' ? '1rem' : 0 }}>
+        {sections}
+      </div>
+    );
+  };
+
   const renderContent = () => {
+    if (mode === 'grammar') return renderGrammar();
     if (mode === 'sentence') {
       return (
         <div style={{ padding: '0.1rem 0' }}>
@@ -99,6 +272,12 @@ export function WordModal({
             >
               {sentenceTranslation}
             </motion.p>
+          )}
+          {sentencePoints.length > 0 && (
+            <div style={{ backgroundColor: 'var(--bg-card)', padding: '0.9rem 1rem', borderRadius: '14px', borderLeft: `5px solid ${OLIVE}`, margin: '1.2rem 0 1rem' }}>
+              <div style={{ ...kickerStyle, marginBottom: '0.3rem' }}><BookOpen size={13} /> GRAMMAR · {new Set(sentencePoints.map(h => h.id)).size} IN THIS SENTENCE</div>
+              {renderPointRows(sentencePoints)}
+            </div>
           )}
         </div>
       );
@@ -142,6 +321,14 @@ export function WordModal({
     };
 
     const segments = getTrackedSegments();
+
+    // The grammar points this word takes part in, under its insight.
+    const patternRows = patterns.length > 0 && (
+      <>
+        <div style={{ borderTop: '1px solid var(--border-light)', margin: '0.8rem 0 0.1rem', paddingTop: '0.6rem', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.1em', color: 'var(--text-muted)' }}>PATTERNS</div>
+        {renderPointRows(patterns)}
+      </>
+    );
 
     const sections = {
       header: (
@@ -241,40 +428,15 @@ export function WordModal({
       ),
       mastery: (
         <div key="mastery" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', backgroundColor: 'var(--border-light)', borderRadius: '100px', padding: '4px', height: '42px', position: 'relative' }}>
-            {(() => {
-              const levels = ['easy', 'medium', 'hard'] as const;
-              const activeIndex = levels.indexOf((activeMastery || 'medium') as any);
-              return (
-                <>
-                  <motion.div 
-                    initial={false}
-                    animate={{ left: `calc(4px + ${activeIndex} * (100% - 8px) / 3)` }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    style={{
-                      position: 'absolute', top: '4px', bottom: '4px',
-                      width: `calc((100% - 8px) / 3)`,
-                      backgroundColor: 'var(--bg-pure)', borderRadius: '100px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      zIndex: 0
-                    }} 
-                  />
-                  {levels.map(level => (
-                    <button key={level} onClick={() => onSetMastery?.(level)} style={{ flex: 1, borderRadius: '100px', backgroundColor: 'transparent', color: activeMastery === level ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: activeMastery === level ? 800 : 700, border: 'none', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, textTransform: 'uppercase' }}>
-                      {level}
-                    </button>
-                  ))}
-                </>
-              );
-            })()}
-          </div>
+          {renderSlider(activeMastery || 'medium')}
         </div>
       ),
       grammar: (!wordData.grammarNote) ? (
         <div key="grammar" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}>
-           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
+           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> INSIGHT</div>
            <Skeleton width="100%" height="1rem" />
            <Skeleton width="70%" height="1rem" />
+           {patternRows}
         </div>
       ) : (
         <motion.div 
@@ -284,8 +446,9 @@ export function WordModal({
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}
         >
-          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> INSIGHT</div>
           <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
+          {patternRows}
         </motion.div>
       ),
       status: stats && stats.timesSeen > 0 && (
@@ -331,14 +494,23 @@ export function WordModal({
   };
 
   // COLLISION AVOIDANCE: Logic to stop drawer before it covers the word
+  // Taller (70%) when there's grammar to show: an open point, PATTERNS rows, or a
+  // sentence's points (#43). The collision rule below still applies.
   const getDynamicMaxHeight = () => {
-    const vh52 = window.innerHeight * 0.52;
+    const hasGrammar = mode === 'grammar' || (mode === 'word' && patterns.length > 0) || (mode === 'sentence' && sentencePoints.length > 0);
+    const cap = window.innerHeight * (hasGrammar ? 0.70 : 0.52);
     if (anchor === 'top' && targetRect) {
       // Gap of 2rem (32px) from the word
       const available = targetRect.top - 32;
-      return Math.min(vh52, Math.max(120, available)); 
+      return Math.min(cap, Math.max(120, available));
     }
-    return vh52;
+    if (anchor === 'bottom' && targetRect && hasGrammar) {
+      // The taller cap could reach a word in the upper screen: stop short of it,
+      // but never below the usual 52%.
+      const available = window.innerHeight - targetRect.bottom - 32;
+      return Math.min(cap, Math.max(window.innerHeight * 0.52, available));
+    }
+    return cap;
   };
 
   const dynamicMaxHeight = getDynamicMaxHeight();

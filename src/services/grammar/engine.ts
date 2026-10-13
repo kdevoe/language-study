@@ -61,6 +61,9 @@ export interface GrammarMatch {
   /** Token range of the whole match (context included), end exclusive. */
   tokenStart: number;
   tokenEnd: number;
+  /** Character range of the whole match, context included (直さ in 直さなければ). */
+  ctxStart: number;
+  ctxEnd: number;
 }
 
 const has = (want: OneOrMany | undefined, value: string, prefix = false) => {
@@ -149,7 +152,7 @@ export function findGrammar(tokens: GrammarToken[], rules: GrammarRule[]): Gramm
       const best = paths.reduce((a, b) => (b.end > a.end ? b : a));
       const first = Math.min(...best.marked);
       const last = Math.max(...best.marked);
-      found.push({ id: rule.id, start: offs[first], end: offs[last + 1], tokenStart: ti, tokenEnd: best.end });
+      found.push({ id: rule.id, start: offs[first], end: offs[last + 1], tokenStart: ti, tokenEnd: best.end, ctxStart: offs[ti], ctxEnd: offs[best.end] });
       ti = Math.max(best.end, ti + 1);
     }
   }

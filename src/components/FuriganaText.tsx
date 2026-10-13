@@ -21,10 +21,12 @@ interface Props {
   mode?: FuriganaMode;
   isSelected?: boolean;
   hitWeight?: HitWeight;
+  /** The part of the word inside an open grammar point's span, lit up (#43). */
+  lit?: [number, number];
   onClick?: (e: any) => void;
 }
 
-export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', onClick }: Props) {
+export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', lit, onClick }: Props) {
   const [isPeeking, setIsPeeking] = useState(false);
   const [peekPos, setPeekPos] = useState({ top: 0, left: 0 });
   const timerRef = useRef<number | null>(null);
@@ -112,7 +114,7 @@ export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', on
           ...(isSelected ? {} : HIT_STYLE[hitWeight]),
         }}
       >
-        {word}
+        {lit ? <>{word.slice(0, lit[0])}<span className="grammar-lit">{word.slice(lit[0], lit[1])}</span>{word.slice(lit[1])}</> : word}
       </span>
 
       {isPeeking && furigana && createPortal(
