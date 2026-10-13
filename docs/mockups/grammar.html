@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — grammar</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-success: #dee5d5;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 920px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 740px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+/* ── The tap problem ── */
+.problem { max-width: 1100px; margin: 0 auto 2.4rem; background: var(--bg-color); border-radius: 24px; padding: 1.6rem; }
+.problem h2 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 500; margin-bottom: 0.4rem; }
+.problem > p { font-size: 0.88rem; color: var(--text-muted); max-width: 820px; }
+.strip { margin: 1.1rem 0 0.4rem; display: flex; flex-wrap: wrap; gap: 0.3rem; font-family: var(--font-serif); font-size: 1.25rem; align-items: flex-end; }
+.strip .tk { background: var(--bg-pure); border-radius: 8px; padding: 0.15rem 0.5rem; position: relative; }
+.strip .tk i { font-style: normal; background: linear-gradient(transparent 62%, var(--accent-primary) 62%, var(--accent-primary) 92%, transparent 92%); }
+.strip-cap { font-size: 0.74rem; color: var(--text-muted); }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.9rem; margin-top: 1.3rem; }
+.opt { background: var(--bg-pure); border-radius: 18px; padding: 1rem 1.1rem 1.1rem; font-size: 0.84rem; line-height: 1.55; }
+.opt .tag { display: inline-block; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em; padding: 0.15rem 0.5rem; border-radius: 6px; margin-bottom: 0.5rem; background: var(--border-light); color: var(--text-muted); }
+.opt.rec .tag { background: var(--accent-success); color: var(--olive); }
+.opt h4 { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 500; margin-bottom: 0.3rem; }
+.opt.no { opacity: 0.7; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1760px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 380px; height: 780px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 1.3rem 1.1rem 2rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+[data-reader="2"], [data-reader="3"] { padding-bottom: 520px; }
+
+/* ── Reader (matches Reader.tsx: plain serif, no inline furigana) ── */
+.rhead { display: flex; align-items: center; justify-content: space-between; color: var(--text-main); margin-bottom: 2.2rem; }
+.meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; color: var(--text-muted); }
+.meta .cat { font-family: var(--font-serif); font-size: 0.72rem; background: var(--bg-card); padding: 0.3rem 0.55rem; border-radius: 4px; margin-right: 0.7rem; }
+.meta .min { font-family: var(--font-serif); font-size: 0.72rem; }
+.meta svg.i { width: 18px; height: 18px; }
+.rtitle { font-family: var(--font-serif); font-size: 1.75rem; font-weight: 500; line-height: 1.3; margin-bottom: 1.4rem; }
+.rule { width: 32px; height: 1px; background: var(--text-muted); opacity: 0.5; margin-bottom: 2rem; }
+.para { font-family: var(--font-serif); font-size: 1.05rem; line-height: 2.05; margin-bottom: 1.9rem; letter-spacing: 0.02em; }
+.t { cursor: pointer; position: relative; border-radius: 4px; }
+.t:hover { background: rgba(0,0,0,0.035); }
+.stop { cursor: pointer; padding: 0 0.2em; margin: 0 -0.1em; }
+/* The tapped token: the app's frosted focus pill. */
+.t.sel { background: var(--bg-pure); box-shadow: 0 0 0 4px var(--bg-pure), 0 4px 15px rgba(0,0,0,0.12); border-radius: 4px; position: relative; z-index: 2; }
+/* The open grammar point's whole span, across tokens. */
+.gs.lit { background: var(--accent-primary); border-radius: 3px; }
+.mark-first .gs.fresh { text-decoration: underline dotted; text-decoration-color: var(--accent-progress); text-decoration-thickness: 1.5px; text-underline-offset: 5px; }
+.sentence-on { background: rgba(74, 93, 35, 0.04); border-radius: 8px; }
+
+/* ── Bottom panel (matches WordModal.tsx) ── */
+.dim { position: absolute; inset: 0; background: rgba(245,245,240,0.35); z-index: 3; }
+.panel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; background: var(--bg-pure); border-radius: 24px 24px 0 0; padding: 0.7rem 1.4rem 1.4rem; box-shadow: 0 -10px 40px rgba(0,0,0,0.08); max-height: 52%; transition: max-height 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.panel.tall { max-height: 70%; overflow-y: auto; scrollbar-width: none; }
+.panel::-webkit-scrollbar { display: none; }
+.grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1rem; }
+.back { font-size: 0.78rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.1rem; margin-bottom: 0.4rem; cursor: pointer; }
+.back svg.i { width: 15px; height: 15px; }
+.whead { display: flex; gap: 0.9rem; align-items: flex-end; margin-bottom: 0.9rem; }
+.kch { display: flex; flex-direction: column; align-items: center; }
+.kch .kana { font-size: 0.6rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.1em; height: 0.9rem; }
+.kch .k { font-family: var(--font-serif); font-size: 2.8rem; line-height: 1; font-weight: 500; }
+.kch .kw { height: 0.8rem; font-size: 0.55rem; color: var(--olive); text-transform: uppercase; margin-top: 0.15rem; font-weight: 800; letter-spacing: 0.04em; }
+.mrow { display: flex; gap: 0.5rem; align-items: baseline; margin-bottom: 1.2rem; }
+.mrow .lv { font-size: 0.7rem; font-weight: 800; color: var(--olive); }
+.mrow .m { font-family: var(--font-serif); font-size: 1.15rem; line-height: 1.45; }
+.gpat { font-family: var(--font-serif); font-size: 2.1rem; font-weight: 500; line-height: 1.2; margin: 0.2rem 0 0.5rem; }
+.slider { display: flex; background: var(--border-light); border-radius: 100px; padding: 4px; height: 42px; margin-bottom: 1.3rem; }
+.slider span { flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 100px; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.02em; }
+.slider span.on { background: var(--bg-pure); color: var(--text-main); font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.gbox { background: var(--bg-card); padding: 0.9rem 1rem; border-radius: 14px; border-left: 5px solid var(--olive); margin-bottom: 1.3rem; }
+.gk { font-size: 0.68rem; font-weight: 900; color: var(--olive); display: flex; align-items: center; gap: 0.45rem; letter-spacing: 0.05em; margin-bottom: 0.55rem; }
+.gins { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.6; }
+.gdiv { border-top: 1px solid var(--border-light); margin: 0.8rem 0 0.3rem; padding-top: 0.6rem; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-muted); }
+.formbox { background: var(--bg-card); border-radius: 12px; padding: 0.6rem 0.8rem; }
+.gk svg.i { width: 13px; height: 13px; stroke-width: 2; }
+.grow { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0; cursor: pointer; }
+.grow + .grow { border-top: 1px solid var(--border-light); }
+.grow .p { font-family: var(--font-serif); font-size: 1.12rem; white-space: nowrap; }
+.grow .lv { font-size: 0.62rem; font-weight: 800; color: var(--olive); margin-left: 0.45rem; }
+.grow .gt { flex: 1; min-width: 0; }
+.grow .gm { display: block; font-size: 0.8rem; color: var(--text-muted); line-height: 1.35; }
+.grow svg.i { width: 16px; height: 16px; color: var(--text-muted); }
+.grow .st { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-progress); flex: none; }
+.grow .st.known { background: transparent; border: 1px solid var(--border-light); }
+.form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; font-family: var(--font-serif); font-size: 1rem; }
+.form .slot { font-family: var(--font-sans); font-size: 0.7rem; font-weight: 700; color: var(--text-muted); background: var(--bg-pure); border-radius: 6px; padding: 0.15rem 0.45rem; }
+.kick { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-muted); margin: 1.1rem 0 0.35rem; }
+.ex { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.7; }
+.ex b { font-weight: 500; background: linear-gradient(transparent 60%, var(--accent-primary) 60%, var(--accent-primary) 94%, transparent 94%); }
+.exen { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.05rem; }
+.note { font-size: 0.86rem; line-height: 1.6; }
+.stats { display: flex; gap: 0.6rem; padding: 0.6rem; background: var(--bg-card); opacity: 0.65; border: 1px solid var(--border-light); border-radius: 10px; margin-top: 1.3rem; }
+.stats div { flex: 1; text-align: center; }
+.stats small { display: block; font-size: 0.5rem; color: var(--text-muted); font-weight: 700; }
+.stats b { font-size: 0.95rem; font-weight: 900; }
+.wordlink { margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.wordlink .serif { font-family: var(--font-serif); font-size: 1rem; color: var(--text-main); }
+.wordlink svg.i { width: 15px; height: 15px; }
+/* Sentence panel (matches WordModal sentence mode) */
+.sk { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem; font-size: 0.68rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.1em; }
+.sk svg.i { width: 13px; height: 13px; }
+.sbox { font-family: var(--font-serif); font-size: 1.15rem; line-height: 1.5; background: var(--bg-card); padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 0.75rem; }
+.sen { font-size: 1rem; line-height: 1.45; padding-left: 0.6rem; border-left: 4px solid var(--olive); margin-bottom: 1.2rem; }
+
+/* Review card (Flashcards.tsx grade pills) */
+.rv-top { display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; margin-bottom: 1.2rem; }
+.bar { height: 3px; background: var(--border-light); border-radius: 3px; margin-bottom: 1.6rem; overflow: hidden; }
+.bar div { height: 100%; width: 35%; background: var(--accent-progress); }
+.fcard { background: var(--bg-pure); border-radius: 28px; box-shadow: 0 6px 30px rgba(0,0,0,0.06); padding: 1.8rem 1.4rem; min-height: 380px; display: flex; flex-direction: column; cursor: pointer; }
+.fkind { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); }
+.cloze { font-family: var(--font-serif); font-size: 1.35rem; line-height: 2; margin-top: 1.4rem; }
+.blank { display: inline-block; min-width: 6.2em; border-bottom: 1.5px solid var(--text-muted); text-align: center; }
+.blank.ans { border-bottom-color: var(--accent-progress); background: linear-gradient(transparent 62%, var(--accent-primary) 62%, var(--accent-primary) 92%, transparent 92%); }
+.hint { font-size: 0.86rem; color: var(--text-muted); margin-top: 0.8rem; }
+.ftail { margin-top: auto; text-align: center; font-size: 0.75rem; color: var(--text-muted); }
+.grade { display: flex; gap: 0.5rem; margin-top: 1.4rem; }
+.grade span { flex: 1; text-align: center; font-size: 0.85rem; font-weight: 600; padding: 0.75rem 0; border-radius: 100px; background: var(--bg-pure); }
+
+/* ── BottomNav ── */
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 0.5rem 1.1rem; border-top: 1px solid var(--border-light); background: var(--bg-pure); }
+.nav span.b { width: 76px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; color: var(--text-muted); }
+.nav .ic { padding: 0.4rem 1rem; border-radius: 100px; display: flex; }
+.nav .ic svg.i { width: 28px; height: 28px; }
+.nav .lab { display: block; height: 1rem; font-size: 0.6rem; line-height: 1rem; letter-spacing: 0.05em; font-weight: 500; margin-top: 2px; }
+.nav .b.on { color: var(--text-main); }
+.nav .b.on .ic { background: var(--accent-primary); }
+
+/* ── Notes ── */
+.notes { max-width: 840px; margin: 2.6rem auto 0; background: var(--bg-color); border-radius: 24px; padding: 1.6rem 1.6rem 1.4rem; }
+.notes h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; margin: 1.3rem 0 0.8rem; }
+.notes h3:first-child { margin-top: 0; }
+.notes ol { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.notes li { display: flex; gap: 0.8rem; font-size: 0.86rem; line-height: 1.6; }
+.notes .n { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-primary); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0.1rem; }
+@media (max-width: 440px) { .phone { height: 720px; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="chevl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+    <symbol id="bookopen" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  </defs>
+</svg>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION · REVISED</div>
+  <h1>Grammar in the reader</h1>
+  <p>Revised to match the real reader: plain text with no furigana on the page (long-press still peeks the reading), the word panel at the bottom with EASY / MEDIUM / HARD, and 。 for the sentence. The new question is how a tap on a word differs from a tap on grammar. Tap anything in phone 1: phone 2 shows what opens. Tap a 。 to see that sentence in phone 3.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">FIRST-MEET MARK</span><div class="pill-seg" data-ctl="mark"><button data-v="first" class="on">On</button><button data-v="none">Off</button></div></div>
+  </div>
+</div>
+
+<div class="problem">
+  <h2>The tap problem</h2>
+  <p>The reader already cuts every sentence into tap targets, and a grammar point doesn't line up with them. Here is how the app really cuts 「…住む前に直さなければなりません」, with 〜なければならない shaded:</p>
+  <div class="strip">
+    <span class="tk">住む</span><span class="tk">前</span><span class="tk">に</span><span class="tk">直さ<i>なけれ</i></span><span class="tk"><i>ば</i></span><span class="tk"><i>なりません</i></span><span class="tk">。</span>
+  </div>
+  <div class="strip-cap">The point spans three taps, and it starts inside the word 直さなけれ. 住み始めています is worse: 住み | 始めて | います, with 〜始める and 〜ている overlapping inside 始めて.</div>
+  <div class="opts">
+    <div class="opt rec"><span class="tag">RECOMMENDED</span><h4>A · The tap decides</h4>Keep one tap and one panel, and let what you tapped decide what leads. A word (直さなけれ, 住み) opens the word as now, with its grammar underneath it. A grammar piece (ば, なりません, ので, ながら, そう) opens the grammar point first. Every piece is already tappable, so there's nothing new to aim at. <b>Phone 2.</b></div>
+    <div class="opt rec"><span class="tag">RECOMMENDED · WITH A</span><h4>B · The sentence lists it</h4>Tap 。 as now: below the translation, the sheet lists every grammar point in the sentence. One place to see it all, and a sure way to reach a point whose pieces are small or awkward to hit. <b>Phone 3.</b></div>
+    <div class="opt no"><span class="tag">NO</span><h4>C · Separate grammar targets</h4>The first mockup: grammar gets its own underlined tap target. It doesn't fit the real text. We'd have to re-cut words (直さなけれ → 直さ + なければ…) and two targets would compete in the same few millimetres.</div>
+    <div class="opt"><span class="tag">MAYBE LATER</span><h4>D · A 文法 lens</h4>A switch in the reader header: while on, taps go to grammar and words dim. It's clean, but it's a mode you have to remember and you'd be flipping it all the time. Worth another look if A feels crowded.</div>
+  </div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<div class="notes">
+  <h3>How A + B work</h3>
+  <ol>
+    <li><span class="n">1</span><div><b>Every piece already opens something.</b> Today a word tap opens the word and a particle tap looks the particle up in the dictionary. Grammar slots into the same tap. If the piece is a word, the panel is the word panel as now; its AI insight stays as now (relabelled INSIGHT, since it's about the word as much as the grammar), and below it a PATTERNS list shows the catalogue points that word takes part in (直す → 〜なければならない). If the piece is grammar (ば, なりません, ので, います, そう, です), the panel leads with the grammar point.</div></li>
+    <li><span class="n">2</span><div><b>The whole point lights up.</b> When a grammar point is open, its full span gets a soft band in the text, across tokens (直さ<u>なければなりません</u>). That way you see what the point covers even though you tapped one piece.</div></li>
+    <li><span class="n">3</span><div><b>Grammar and word, one step apart.</b> Each grammar row in a word panel opens the point; ‹ goes back to the word. A grammar panel opened from a piece that is also a word (なりません is なる) has a quiet link to that word at the bottom.</div></li>
+    <li><span class="n">4</span><div><b>Same mastery as words, but looking isn't grading.</b> EASY / MEDIUM / HARD, the same slider. Grammar rows shown in a word panel count for nothing. A grammar panel counts as a lookup only when opened from a row, or when it stays open for about 2 seconds after a tap on a grammar piece, so an accidental tap next to a word logs nothing. A lookup only makes the point a MEDIUM review candidate; only the slider sets EASY or HARD.</div></li>
+    <li><span class="n">5</span><div><b>Marks only on a first meeting.</b> The page stays plain. Taps don't depend on marks, and the 。 sheet shows what a sentence holds. The one exception is a point you've never seen before: it gets a faint dotted underline the first time it appears, as a quiet “this is new”, and is never marked again. Most days that's zero to two marks per article. Toggle FIRST-MEET MARK off to see the fully plain page.</div></li>
+    <li><span class="n">6</span><div><b>AI for this sentence, catalogue for the pattern.</b> The AI GRAMMAR INSIGHT keeps doing what it does well: explaining this word in this sentence of this article. The grammar panel gets one too, about the point in this sentence, and it leads. The catalogue supplies what should stay the same every time: the name, level, how it's built, and examples. When a sentence matches a catalogue point, the insight prompt is told the point, so the AI names the same pattern the rows show and doesn't contradict them. Words with no match (京都, 庭) get the insight alone, as now.</div></li>
+    <li><span class="n">7</span><div><b>Taller when there's grammar.</b> The panel sizes to its content but stops at 52% of the screen today. When the word has PATTERNS rows, or a grammar point is open, the cap rises to about 70%, so the insight and the rows show without scrolling. A plain word (京都, 庭) opens at the usual height. The existing collision rule still applies: the panel opens from the far side and never covers the word you tapped, so near the top of the screen it gets whatever room is left.</div></li>
+  </ol>
+</div>
+
+<script>
+const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+const g = { mark: 'first', show: 'new', tok: '1-11', stack: null, sent: 1, flip: false };
+
+// Grammar catalogue entries this article uses. lvl: easy | medium | hard (same as words).
+const GP = {
+  hajimeru: { p: '〜始める', lv: 4, m: 'to start doing', f: ['動詞 ます形', '＋ 始める'], s: '若い人たちが住み<b>始め</b>ています。', se: 'Young people have started living there.', n: 'Attaches to the ます-stem. Often with 〜ている for a change that is under way.', ex: [['雨が降り<b>始めた</b>。', 'It started to rain.'], ['日本語を習い<b>始めました</b>。', 'I started learning Japanese.']], lvl: 'medium' },
+  teiru: { p: '〜ている', lv: 5, m: 'ongoing action, or a state that continues', f: ['動詞 て形', '＋ いる'], s: '若い人たちが住み始め<b>ています</b>。', se: 'Young people have started living there.', n: 'With verbs of change (住む, 結婚する) it describes the resulting state, not an action in progress.', ex: [['今、本を読ん<b>でいます</b>。', 'I am reading a book now.'], ['兄は東京に住ん<b>でいる</b>。', 'My brother lives in Tokyo.']], lvl: 'easy' },
+  node: { p: '〜ので', lv: 4, m: 'because, so (softer and more objective than から)', f: ['普通形', '＋ ので', '（な形容詞・名詞 ＋ な）'], s: '古い家は冬が寒い<b>ので</b>、…', se: 'Old houses are cold in winter, so…', n: 'Sounds polite and explanatory; common in news and requests.', ex: [['雨な<b>ので</b>、行きません。', 'It is raining, so I won\'t go.'], ['疲れた<b>ので</b>、早く寝た。', 'I was tired, so I went to bed early.']], lvl: 'medium' },
+  mae: { p: '〜前に', lv: 5, m: 'before doing', f: ['動詞 辞書形', '＋ 前に'], s: '住む<b>前に</b>直さなければなりません。', se: 'They have to fix it before living there.', n: 'The verb stays in dictionary form even when the sentence is in the past.', ex: [['寝る<b>前に</b>歯をみがく。', 'I brush my teeth before bed.'], ['食べる<b>前に</b>手を洗いました。', 'I washed my hands before eating.']], lvl: 'easy' },
+  nakereba: { p: '〜なければならない', lv: 4, m: 'must, have to', fresh: true, f: ['動詞 ない形', '－ ない', '＋ なければならない'], s: '住む前に直さ<b>なければなりません</b>。', se: 'They have to fix it before living there.', n: 'Formal and a little stiff. In speech it shrinks to 〜なきゃ or 〜ないと.', ex: [['明日は早く起き<b>なければならない</b>。', 'I have to get up early tomorrow.'], ['薬を飲ま<b>なければなりません</b>。', 'You must take the medicine.']], lvl: 'hard' },
+  tai: { p: '〜たい', lv: 5, m: 'want to do', f: ['動詞 ます形', '＋ たい'], s: '静かな暮らしをし<b>たい</b>と言っています。', se: 'They say they want a quiet life.', n: 'For your own wishes. For someone else\'s, use 〜たがる or quote it, as here (〜たいと言う).', ex: [['京都に行き<b>たい</b>。', 'I want to go to Kyoto.'], ['何が食べ<b>たい</b>ですか。', 'What do you want to eat?']], lvl: 'easy' },
+  nagara: { p: '〜ながら', lv: 4, m: 'while doing (two actions at once, same person)', f: ['動詞 ます形', '＋ ながら'], s: '庭を見<b>ながら</b>お茶を飲む…', se: 'drink tea while looking at the garden…', n: 'The main action comes last; the ながら action is the background one.', ex: [['音楽を聞き<b>ながら</b>勉強する。', 'I study while listening to music.'], ['歩き<b>ながら</b>話しましょう。', 'Let\'s talk while we walk.']], lvl: 'medium' },
+  koto: { p: '〜ことができる', lv: 4, m: 'can, be able to', f: ['動詞 辞書形', '＋ ことができる'], s: 'お茶を飲む<b>ことができる</b>から…', se: 'because she can drink tea…', n: 'A fuller, more formal way to say the potential form (飲める).', ex: [['ここで写真を撮る<b>ことができます</b>。', 'You can take photos here.'], ['漢字を読む<b>ことができる</b>。', 'I can read kanji.']], lvl: 'medium' },
+  kara: { p: '〜から', lv: 5, m: 'because (the speaker\'s own reason)', f: ['普通形・丁寧形', '＋ から'], s: '…飲むことができる<b>から</b>、この家を選んだ…', se: '…because she can drink tea, she chose this house…', n: 'More personal and direct than ので.', ex: [['暑い<b>から</b>、窓を開けて。', 'It\'s hot, so open the window.'], ['時間がない<b>から</b>、急ごう。', 'We have no time, so let\'s hurry.']], lvl: 'easy' },
+  souda: { p: '〜そうだ（伝聞）', lv: 4, m: 'I hear that, apparently (reported)', fresh: true, f: ['普通形', '＋ そうだ'], s: 'この家を選んだ<b>そうです</b>。', se: 'Apparently she chose this house.', n: 'Not 〜そうだ “looks like”, which attaches to the ます-stem (降りそうだ). The rule tells them apart from the form before そう.', ex: [['明日は雨が降る<b>そうだ</b>。', 'I hear it will rain tomorrow.'], ['彼は先生だ<b>そうです</b>。', 'Apparently he is a teacher.']], lvl: 'hard' },
+};
+
+// AI GRAMMAR INSIGHT samples (as today: one sentence, this word in this sentence).
+// With a catalogue match the prompt is told the point, so it names the same pattern the rows show.
+const INS_W = {
+  直す: '直さ is the ない-stem of 直す; with なければなりません it turns “fix” into an obligation: the old houses must be repaired before anyone moves in.',
+  住む: '住み is the ます-stem of 住む, joined to 始める and then ている: young people have started living there, and still are.',
+  寒い: '寒い gives the reason, and ので makes it a calm, factual one: the houses are cold in winter, so the repairs follow.',
+  見る: '見 is the ます-stem of 見る before ながら: looking at the garden is the background to drinking tea, done at the same time.',
+  飲む: '飲む stays in dictionary form before ことができる, the fuller way to say 飲める: she is able to drink tea there.',
+  選ぶ: '選んだ is the past of 選ぶ, and そうです after it marks the whole fact as something reported: apparently she chose this house.',
+  する: 'し is the ます-stem of する, with たい for wanting: they want to live (do) a quiet life, quoted by と言っています.',
+  言う: '言って with います describes an ongoing state: many people are saying this, not one moment of speech.',
+  前: '前 after the dictionary-form 住む means “before moving in”, setting the deadline for the repairs.',
+  できる: 'できる closes 〜ことができる after 飲む: “is able to drink”, a more formal 飲める.',
+};
+const INS_G = {
+  nakereba: 'Here なければなりません makes 直す a duty: the old houses have to be repaired before anyone can live in them. The polite ません ending suits a news report.',
+  hajimeru: '始め after 住み marks the start of a change: young people have begun moving in, which is the news.',
+  teiru: 'ています after 始め shows the change is under way: they started moving in and the trend continues.',
+  node: 'ので gives the cold as an objective reason, which is why the repairs are needed; から would sound more personal.',
+  mae: '前に after 住む sets the order: the repairs come before moving in.',
+  tai: 'たい marks a wish, and と言っています reports it, since it is other people’s wish, not the writer’s.',
+  nagara: 'ながら joins two things she does at once: looking at the garden while drinking tea.',
+  koto: 'ことができる after 飲む says she is able to drink tea in the garden view, a reason she gives for her choice.',
+  kara: 'から gives her own reason for choosing the house, which fits a personal story.',
+  souda: 'そうです after the past 選んだ marks the sentence as reported: the writer heard she chose the house. It is not the “looks like” そうだ, which would follow a stem.',
+};
+
+// Words: [kana, [[kanji, keyword]...], level, meaning, okurigana]
+const W = {
+  京都: ['きょうと', [['京', 'capital'], ['都', 'metropolis']], '', 'Kyoto'],
+  町家: ['まちや', [['町', 'town'], ['家', 'house']], '', 'traditional townhouse (machiya)'],
+  若い: ['わかい', [['若', 'young']], 'N5', 'young', 'い'],
+  人: ['ひと', [['人', 'person']], 'N5', 'person, people'],
+  住む: ['すむ', [['住', 'dwell']], 'N5', 'to live, to reside', 'む'],
+  古い: ['ふるい', [['古', 'old']], 'N5', 'old (of things)', 'い'],
+  家: ['いえ', [['家', 'house']], 'N5', 'house, home'],
+  冬: ['ふゆ', [['冬', 'winter']], 'N5', 'winter'],
+  寒い: ['さむい', [['寒', 'cold']], 'N5', 'cold (e.g. weather)', 'い'],
+  前: ['まえ', [['前', 'in front']], 'N5', 'before; in front'],
+  直す: ['なおす', [['直', 'straightaway']], 'N4', 'to fix, to repair; to correct', 'す'],
+  多く: ['おおく', [['多', 'many']], 'N4', 'many, much; mostly', 'く'],
+  静か: ['しずか', [['静', 'quiet']], 'N5', 'quiet, calm', 'か'],
+  暮らし: ['くらし', [['暮', 'livelihood']], 'N3', 'life, way of living', 'らし'],
+  する: ['する', [], 'N5', 'to do'],
+  言う: ['いう', [['言', 'say']], 'N5', 'to say', 'う'],
+  女性: ['じょせい', [['女', 'woman'], ['性', 'sex']], 'N4', 'woman'],
+  庭: ['にわ', [['庭', 'courtyard']], 'N5', 'garden, yard'],
+  見る: ['みる', [['見', 'see']], 'N5', 'to see, to look at', 'る'],
+  お茶: ['おちゃ', [['茶', 'tea']], 'N5', 'tea', '', 'お'],
+  飲む: ['のむ', [['飲', 'drink']], 'N5', 'to drink', 'む'],
+  できる: ['できる', [], 'N5', 'to be able to, can'],
+  選ぶ: ['えらぶ', [['選', 'elect']], 'N4', 'to choose, to select', 'ぶ'],
+  なる: ['なる', [], 'N5', 'to become'],
+  こと: ['こと', [], 'N4', 'thing, matter; (nominalizer)'],
+};
+const PARTICLE = { の: 'possessive / linking particle', に: 'particle: at, in, to', が: 'particle: marks the subject', は: 'particle: marks the topic', を: 'particle: marks the object', と: 'particle: quoting (that…)', たち: 'plural suffix for people', な: 'な-adjective connector', ある: 'a certain…', この: 'this', それでも: 'even so, still' };
+
+// Tokens exactly as the app's tokenizer cuts them. Each: [surface parts, word lemma or null, grammar ids touched]
+// A part is 'text' or ['text', grammarId] for the shaded span.
+const S = [
+  [[['京都'], '京都'], [['の']], [['町家'], '町家'], [['に']], '、', [['若い'], '若い'], [['人'], '人'], [['たち']], [['が']], [['住み'], '住む', ['hajimeru', 'teiru']], [[['始め', 'hajimeru'], ['て', 'teiru']], null, ['hajimeru', 'teiru']], [[['います', 'teiru']], null, ['teiru']], '。'],
+  [[['古い'], '古い'], [['家'], '家'], [['は']], [['冬'], '冬'], [['が']], [['寒い'], '寒い', ['node']], [[['ので', 'node']], null, ['node']], '、', [['住む'], '住む', ['mae']], [[['前', 'mae']], '前', ['mae']], [[['に', 'mae']], null, ['mae']], [['直さ', ['なけれ', 'nakereba']], '直す', ['nakereba']], [[['ば', 'nakereba']], null, ['nakereba']], [[['なりません', 'nakereba']], null, ['nakereba'], 'なる'], '。'],
+  [[['それでも']], '、', [['多く'], '多く'], [['の']], [['人'], '人'], [['が']], [['静か'], '静か'], [['な']], [['暮らし'], '暮らし'], [['を']], [['し', ['たい', 'tai']], 'する', ['tai']], [['と']], [['言っ', ['て', 'teiru']], '言う', ['teiru']], [[['います', 'teiru']], null, ['teiru']], '。'],
+  [[['ある']], [['女性'], '女性'], [['は']], '、', [['庭'], '庭'], [['を']], [['見'], '見る', ['nagara']], [[['ながら', 'nagara']], null, ['nagara']], [['お茶'], 'お茶'], [['を']], [['飲む'], '飲む', ['koto']], [[['こと', 'koto']], null, ['koto'], 'こと'], [[['が', 'koto']], null, ['koto']], [[['できる', 'koto']], 'できる', ['koto']], [[['から', 'kara']], null, ['kara']], '、', [['この']], [['家'], '家'], [['を']], [['選んだ'], '選ぶ', ['souda']], [[['そう', 'souda']], null, ['souda']], [[['です', 'souda']], null, ['souda']], '。'],
+];
+
+const tok = (id) => { const [s, t] = id.split('-').map(Number); return S[s][t]; };
+const isNew = (gid) => g.show === 'all' || GP[gid].lvl !== 'easy';
+const sentGrammar = (s) => [...new Set(S[s].flatMap((t) => (typeof t === 'string' ? [] : t[2] || [])))];
+
+// What a tap on this token opens: the grammar point (grammar-first) or the word.
+function openFor(id) {
+  if (g.stack) return { kind: 'gram', gid: g.stack, from: id };
+  const t = tok(id);
+  const [, lemma, gids = []] = t;
+  if (!lemma && gids.length) return { kind: 'gram', gid: gids[0], alsoWord: t[3] };
+  if (lemma && W[lemma] && !gids.every((x) => t[0].every((p) => typeof p !== 'string' && p[1] === x))) return { kind: 'word', lemma, gids };
+  if (lemma && gids.length) return { kind: 'gram', gid: gids[0], alsoWord: lemma };
+  return { kind: 'word', lemma: lemma || t[0].map((p) => (typeof p === 'string' ? p : p[0])).join(''), gids };
+}
+
+const nav = (on) => `<nav class="nav">${[['house', 'ホーム'], ['book', '読む'], ['headphones', '聞く'], ['layers', '復習']].map(([i, l], k) =>
+  `<span class="b ${k === on ? 'on' : ''}"><span class="ic">${ic(i)}</span><span class="lab">${l}</span></span>`).join('')}</nav>`;
+
+function readerHTML(phone, lit, selTok, selSent) {
+  const paras = [[0, 1], [2, 3]];
+  const body = paras.map((ss) => `<p class="para">${ss.map((s) => {
+    const inner = S[s].map((t, j) => {
+      if (typeof t === 'string') {
+        if (t === '。') return `<span class="stop ${sentGrammar(s).some(isNew) ? 'has' : ''}" data-sent="${s}">。</span>`;
+        return t;
+      }
+      const id = `${s}-${j}`;
+      const parts = t[0].map((p) => typeof p === 'string' ? p
+        : `<span class="gs ${GP[p[1]].fresh && phone === 1 ? 'fresh' : ''} ${lit === p[1] && (selSent == null || selSent === s) && (selTok == null || selTok.split('-')[0] == s) ? 'lit' : ''}">${p[0]}</span>`).join('');
+      return `<span class="t ${selTok === id ? 'sel' : ''}" data-tok="${id}">${parts}</span>`;
+    }).join('');
+    return `<span class="${selSent === s ? 'sentence-on' : ''}">${inner}</span>`;
+  }).join('')}</p>`).join('');
+  return `<div class="scroll mark-${g.mark}" data-reader="${phone}">
+    <div class="rhead">${ic('chevl')}</div>
+    <div class="meta"><span><span class="cat">Culture</span><span class="min">3 min read</span></span>${ic('headphones')}</div>
+    <h1 class="rtitle">Young people move into Kyoto's old townhouses</h1>
+    <div class="rule"></div>
+    ${body}
+  </div>`;
+}
+
+const slider = (lvl) => `<div class="slider">${['easy', 'medium', 'hard'].map((l) => `<span class="${l === lvl ? 'on' : ''}">${l.toUpperCase()}</span>`).join('')}</div>`;
+const stats = (seen, streak, rank) => `<div class="stats"><div><small>SEEN</small><b>${seen}</b> x</div><div><small>STREAK</small><b>${streak}</b></div><div><small>RANK</small><b>${rank}</b></div></div>`;
+const growRow = (gid) => { const e = GP[gid]; return `<div class="grow" data-gram="${gid}"><span class="st ${e.lvl === 'easy' ? 'known' : ''}"></span><span class="gt"><span class="p">${e.p}</span><span class="lv">N${e.lv}</span><span class="gm">${e.m}</span></span>${ic('chev')}</div>`; };
+
+function wordPanel(o) {
+  const w = W[o.lemma];
+  if (!w) {
+    return `<div class="grab"></div><div class="gpat" style="font-size:2.4rem">${o.lemma}</div>
+      <div class="mrow"><span class="m">${PARTICLE[o.lemma] || ''}</span></div>${slider('easy')}${stats(41, 9, 'Easy')}`;
+  }
+  const [kana, ks, lv, m, oku = '', pre = ''] = w;
+  const head = ks.length ? `<div class="whead">${pre ? `<div class="kch"><span class="kana"></span><span class="k" style="font-size:2rem">${pre}</span><span class="kw"></span></div>` : ''}${ks.map(([k, kw], i) => `<div class="kch"><span class="kana">${i === 0 ? kana.replace(/^お/, '').slice(0, oku ? -oku.length || undefined : undefined) : ''}</span><span class="k">${k}</span><span class="kw">${kw}</span></div>`).join('')}${oku ? `<div class="kch"><span class="kana"></span><span class="k" style="font-size:2rem">${oku}</span><span class="kw"></span></div>` : ''}</div>`
+    : `<div class="gpat" style="font-size:2.4rem">${o.lemma}</div>`;
+  const ins = INS_W[o.lemma] || (o.lemma === '京都' ? '京都 is the place here; の links it to 町家: Kyoto’s townhouses.' : 'An AI note on how this word works in this sentence, as now.');
+  const gram = `<div class="gbox"><div class="gk">${ic('bookopen')} INSIGHT</div><div class="gins">${ins}</div>${o.gids.length ? `<div class="gdiv">PATTERNS</div>${o.gids.map(growRow).join('')}` : ''}</div>`;
+  return `<div class="grab"></div>${head}
+    <div class="mrow">${lv ? `<span class="lv">${lv}</span>` : ''}<span class="m">${m}</span></div>
+    ${slider('medium')}${gram}${stats(3, 1, 'Medium')}`;
+}
+
+function gramPanel(o) {
+  const e = GP[o.gid];
+  const back = o.from ? `<div class="back" data-back="1">${ic('chevl')}${tok(o.from)[1]}</div>` : '';
+  return `<div class="grab"></div>${back}
+    <div class="gk">${ic('bookopen')} GRAMMAR</div>
+    <div class="gpat">${e.p}</div>
+    <div class="mrow"><span class="lv">N${e.lv}</span><span class="m">${e.m}</span></div>
+    ${slider(e.lvl)}
+    <div class="gbox"><div class="gk">${ic('bookopen')} GRAMMAR INSIGHT</div><div class="gins">${INS_G[o.gid]}</div></div>
+    <div class="kick">この文では</div><div class="ex">${e.s}</div><div class="exen">${e.se}</div>
+    <div class="kick">HOW IT'S BUILT</div><div class="formbox"><div class="form">${e.f.map((x, k) => k === 0 || x.startsWith('（') ? `<span class="slot">${x}</span>` : `<span>${x}</span>`).join('')}</div></div>
+    <div class="kick">使い方</div><div class="note">${e.n}</div>
+    <div class="kick">例</div>
+    ${e.ex.map(([j, en]) => `<div class="ex" style="margin-top:0.25rem">${j}</div><div class="exen">${en}</div>`).join('')}
+    ${stats(5, 0, e.lvl[0].toUpperCase() + e.lvl.slice(1))}
+    ${o.alsoWord ? `<div class="wordlink">As a word: <span class="serif">${o.alsoWord}</span>${ic('chev')}</div>` : ''}`;
+}
+
+function sentencePanel(s) {
+  const text = S[s].map((t) => (typeof t === 'string' ? t : t[0].map((p) => (typeof p === 'string' ? p : p[0])).join(''))).join('');
+  const en = ['Young people have started moving into Kyoto’s townhouses.', 'Old houses are cold in winter, so they must be repaired before anyone can move in.', 'Even so, many people say they want a quiet life.', 'One woman says she chose this house because she can drink tea while looking at the garden.'][s];
+  const gl = sentGrammar(s);
+  return `<div class="grab"></div>
+    <div class="sk">${ic('sparkles')} AI SENTENCE ANALYSIS</div>
+    <div class="sbox">${text}</div>
+    <div class="sen">${en}</div>
+    <div class="gbox"><div class="gk">${ic('bookopen')} GRAMMAR · ${gl.length} IN THIS SENTENCE</div>${gl.map(growRow).join('')}</div>`;
+}
+
+function reviewHTML() {
+  return `<div class="scroll">
+    <div class="rv-top"><span>${ic('chevl')}</span><span>12 / 34</span><span></span></div>
+    <div class="bar"><div></div></div>
+    <div class="fcard">
+      <div class="fkind">GRAMMAR</div>
+      <div class="cloze">古い家は、住む前に直さ<span class="blank ${g.flip ? 'ans' : ''}">${g.flip ? 'なければなりません' : '　'}</span>。</div>
+      <div class="hint">${g.flip ? '〜なければならない · must, have to' : 'must, have to'}</div>
+      ${g.flip ? '<div class="exen" style="margin-top:0.6rem">They have to fix it before living there.<br>From “Young people move into Kyoto’s old townhouses”</div>' : ''}
+      <div class="ftail">${g.flip ? '' : 'Tap to show the answer'}</div>
+    </div>
+    ${g.flip ? '<div class="grade"><span style="box-shadow:0 3px 10px rgba(207,125,107,0.3)">Again</span><span style="box-shadow:0 3px 10px rgba(194,160,88,0.3)">Hard</span><span style="box-shadow:0 3px 10px rgba(143,176,196,0.35)">Good</span><span style="box-shadow:0 3px 10px rgba(143,170,116,0.32)">Easy</span></div>' : ''}
+  </div>${nav(3)}`;
+}
+
+function render() {
+  const o = openFor(g.tok);
+  const lit = o.kind === 'gram' ? o.gid : null;
+  const sentGl = sentGrammar(g.sent);
+  const stage = document.getElementById('stage');
+  stage.innerHTML = [
+    ['1 · READER', `<div class="phone" data-phone="1">${readerHTML(1, null, null, null)}${nav(1)}</div>`, 'As the real reader: plain text, no furigana. The only marks are on points you’ve never met before (here 〜なければならない and 〜そうだ); each one shows once, then never again. Tap any piece or a 。.'],
+    ['2 · WHAT THE TAP OPENS', `<div class="phone" data-phone="2">${readerHTML(2, lit, g.tok, null)}<div class="dim"></div><div class="panel ${o.kind === 'gram' || o.gids.length ? 'tall' : ''}">${o.kind === 'gram' ? gramPanel(o) : wordPanel(o)}</div></div>`, 'A word leads with the word, its grammar listed underneath (tap a row). A grammar piece (ば, なりません, ので, そう) leads with the grammar point, and its whole span lights up in the text. With grammar to show, the panel opens taller (70% instead of 52%): compare 直さなけれ with 京都.'],
+    ['3 · SENTENCE (TAP 。)', `<div class="phone" data-phone="3">${readerHTML(3, null, null, g.sent)}<div class="dim"></div><div class="panel ${sentGrammar(g.sent).length ? 'tall' : ''}">${sentencePanel(g.sent)}</div></div>`, 'The existing translation sheet, plus every grammar point in the sentence. Dot = not EASY yet.'],
+    ['4 · 復習 CARD', `<div class="phone" data-phone="4" id="rv">${reviewHTML()}</div>`, 'A cloze from a sentence you read, graded like word cards. Tap the card to flip.'],
+  ].map(([l, h, n]) => `<div class="phone-wrap"><div class="phone-label">${l}</div>${h}<div class="phone-note">${n}</div></div>`).join('');
+
+  stage.querySelectorAll('[data-tok]').forEach((el) => el.onclick = () => { g.tok = el.dataset.tok; g.stack = null; render(); });
+  stage.querySelectorAll('[data-sent]').forEach((el) => el.onclick = () => { g.sent = Number(el.dataset.sent); render(); });
+  stage.querySelectorAll('[data-phone="2"] [data-gram]').forEach((el) => el.onclick = () => { g.stack = el.dataset.gram; render(); });
+  stage.querySelectorAll('[data-phone="3"] [data-gram]').forEach((el) => el.onclick = () => {
+    const gid = el.dataset.gram; const j = S[g.sent].findIndex((t) => typeof t !== 'string' && !t[1] && (t[2] || []).includes(gid));
+    g.tok = `${g.sent}-${j >= 0 ? j : S[g.sent].findIndex((t) => typeof t !== 'string' && (t[2] || []).includes(gid))}`; g.stack = null; render();
+  });
+  const b = stage.querySelector('[data-back]'); if (b) b.onclick = () => { g.stack = null; render(); };
+  // Scroll phones 2 and 3 so the text sits above the panel.
+  [['2', g.tok.split('-')[0]], ['3', g.sent]].forEach(([ph, s]) => {
+    const r = stage.querySelector(`[data-reader="${ph}"]`);
+    const para = r.querySelectorAll('.para')[Number(s) < 2 ? 0 : 1];
+    r.scrollTop = para.getBoundingClientRect().top - r.getBoundingClientRect().top - 28;
+  });
+  stage.querySelector('#rv .fcard').onclick = () => { g.flip = !g.flip; render(); };
+}
+document.querySelectorAll('[data-ctl]').forEach((ctl) => ctl.querySelectorAll('button').forEach((b) => b.onclick = () => {
+  g[ctl.dataset.ctl] = b.dataset.v;
+  ctl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  render();
+}));
+render();
+</script>
+</body>
+</html>
