@@ -325,7 +325,8 @@ interface WorkRow {
 function rowToWork(row: WorkRow): LongFormWork {
   return {
     id: row.id,
-    title: row.title,
+    // A pasted Markdown import can carry its heading marks into the title ("# Quiet Rooms…").
+    title: row.title.replace(/^#+\s*/, ''),
     sourceType: row.source_type,
     originUrl: row.origin_url ?? null,
     charCount: row.char_count ?? 0,
