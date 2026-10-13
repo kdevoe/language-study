@@ -584,3 +584,8 @@
       finished. SongPlayer now prepares the next song while one plays and, on 'ended' (hidden page),
       lock-screen ⏭, a countdown end, or locking mid-countdown, swaps the source and plays inside the event;
       the next player adopts the element without resetting it
+- [/] Grammar as a first-class study item (#43, plan: docs/grammar-plan.md)
+  - [x] Plan, mockup (docs/mockups/grammar.html), sources research
+  - [x] JLPT checklist N3–N1 (docs/grammar/jlpt-checklist.tsv) matched to NINJAL (docs/grammar/ninjal-match.tsv)
+  - [x] Phase 0: rule engine + 21 starter rules + test harness (docs/grammar/phase0-report.md)
+  - [ ] Phase 1: catalogue of about 100 N5–N4 points; tap → grammar panel in the reader
