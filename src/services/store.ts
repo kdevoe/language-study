@@ -249,6 +249,10 @@ interface AppState {
   readArticleIds: string[];
   readerFontSize: number;
   readerFontWeight: number;
+  // Grammar points (#43): the EASY/MEDIUM/HARD set in the grammar panel, by
+  // point id. Local only in phase 1; seen counts and sync come in phase 2.
+  grammarProgress: Record<string, { mastery: 'hard' | 'medium' | 'easy' }>;
+  setGrammarMastery: (id: string, level: 'hard' | 'medium' | 'easy') => void;
   // Adaptive UI labels (docs/design-system.md §6.10): English by default, a label
   // switches to Japanese once the reader learns its word. `labelStages` keeps the
   // stage each label has switched to (0 English, 1.. Japanese) — sticky, so a
@@ -370,6 +374,7 @@ export const useAppStore = create<AppState>()(
       readArticleIds: [],
       readerFontSize: 18,
       readerFontWeight: 500,
+      grammarProgress: {},
       uiLanguage: 'adaptive',
       labelStages: {},
 
@@ -516,6 +521,9 @@ export const useAppStore = create<AppState>()(
       }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
+      setGrammarMastery: (id, level) => set((state) => ({
+        grammarProgress: { ...state.grammarProgress, [id]: { mastery: level } },
+      })),
       setUiLanguage: (lang) => set({ uiLanguage: lang }),
       setLabelStage: (id, stage) => set((state) =>
         (state.labelStages[id] ?? 0) >= stage ? {} : { labelStages: { ...state.labelStages, [id]: stage } }),
@@ -1902,6 +1910,7 @@ export const useAppStore = create<AppState>()(
         readArticleIds: capIds(state.readArticleIds),
         readerFontSize: state.readerFontSize,
         readerFontWeight: state.readerFontWeight,
+        grammarProgress: state.grammarProgress,
         uiLanguage: state.uiLanguage,
         labelStages: state.labelStages,
       }),

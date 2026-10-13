@@ -264,6 +264,21 @@ Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.ht
   
 - **詳細** (serif, muted, centred, chevron) at the bottom holds the one-off maintenance tools, the sandbox switch and the danger zone, unchanged.
 
+### 6.15 Grammar in the reader
+Source of truth: `src/components/WordModal.tsx` (grammar mode), `src/services/grammar/`, mockup `docs/mockups/grammar.html`.
+
+- **No marks on the page.** Grammar is found by tapping, as words are. The piece you tap decides the panel: a word opens the word panel; a grammar piece (ば, なりません, ので, います), or a word wholly inside a point (前 in 〜前に), opens the grammar panel, with "As a word: …" when the piece is also a word.
+  
+- **While a point is open** its whole span is lit in the text (`.grammar-lit`, `--accent-primary`, radius 3px), across token boundaries.
+  
+- **Word panel:** the AI box is labelled INSIGHT; below its text, a PATTERNS divider lists the points the word takes part in.
+  
+- **Point rows** (PATTERNS, the 。 sheet's "GRAMMAR · n IN THIS SENTENCE"): 6px `--accent-progress` dot (hollow once EASY), serif pattern, olive N-level, muted one-line meaning, chevron. A row opens the point on top, with ‹ back.
+  
+- **Grammar panel order:** GRAMMAR kicker, serif pattern (2.1rem), N-level + meaning, the EASY / MEDIUM / HARD slider, GRAMMAR INSIGHT (AI, about this sentence), この文では (the sentence with the span marked), HOW IT'S BUILT (slots as small white chips), 使い方, 例 (marked like この文では), then the formal/casual partner and As a word links. Reversed when the panel drops from the top, like the word panel.
+  
+- **Height:** the panel's cap rises from 52% to 70% when it shows grammar (an open point, PATTERNS rows, or a sentence's points), and still never covers the tapped word.
+  
 ## 7. Copy
 - Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.
   

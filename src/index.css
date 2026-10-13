@@ -207,6 +207,12 @@ ruby.peek-furigana rt {
   pointer-events: none;
 }
 
+/* The open grammar point's whole span, across tokens (#43). */
+.grammar-lit {
+  background-color: var(--accent-primary);
+  border-radius: 3px;
+}
+
 .sentence-highlight {
   background-color: rgba(74, 93, 35, 0.04) !important;
   border-radius: 8px;

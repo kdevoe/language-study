@@ -19,6 +19,8 @@ import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
 import { useWordLookup } from '../hooks/useWordLookup';
+import { grammarForTexts, pointOf, pointsTouching, toHit } from '../services/grammar/reader';
+import type { GrammarMatch } from '../services/grammar/engine';
 import { Bookmark, ChevronDown, Headphones } from 'lucide-react';
 import { PodcastSheet } from './PodcastSheet';
 import { PartsSheet } from './PartsSheet';
@@ -493,6 +495,23 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
     };
   }, [currentArticle]);
 
+  // ── Grammar points (#43) ──────────────────────────────────────────────────
+  // Matched per paragraph at open, over the block's text (its items joined), so a
+  // display piece's own offsets say which points it belongs to. Not stored with
+  // the article: the rules change faster than articles get re-enriched.
+  const [grammarByBlock, setGrammarByBlock] = useState<GrammarMatch[][]>([]);
+  useEffect(() => {
+    if (!currentArticle) return;
+    let cancelled = false;
+    const texts = currentArticle.blocks.map((b) =>
+      b.type === 'paragraph' ? (b.content?.map((c) => c.text).join('') ?? b.text ?? null) : null,
+    );
+    grammarForTexts(texts)
+      .then((m) => { if (!cancelled) setGrammarByBlock(m); })
+      .catch((e) => console.warn('[grammar] matching failed; reading without it:', e));
+    return () => { cancelled = true; };
+  }, [currentArticle]);
+
   // Whole-article text handed to the sentence translator for context.
   const articleContext = currentArticle?.blocks.map(b => b.content?.map(c => c.text).join('')).join('\n') || '';
 
@@ -501,10 +520,17 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
     // it as one segment so the text (and sentence-tap) work during the brief flash.
     const content: any[] = block.content ?? (block.text ? [{ text: block.text }] : []);
 
-    // 1. Group tokens into sentences
+    // 1. Group tokens into sentences, noting each token's offset in the block text
+    // (where grammar matches are measured).
+    const matches = grammarByBlock[blockIdx] ?? [];
+    const lit = lookup.litSpan?.block === blockIdx ? lookup.litSpan : null;
+    const offsetOf = new Map<object, number>();
     const sentences: any[][] = [];
     let currentSent: any[] = [];
+    let off = 0;
     content.forEach((seg: any) => {
+      offsetOf.set(seg, off);
+      off += seg.text.length;
       currentSent.push(seg);
       if (seg.text.match(/[。！？\n]/)) {
         sentences.push(currentSent);
@@ -516,6 +542,18 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
     return sentences.map((sentTokens, sIdx) => {
       const sentText = sentTokens.map(t => t.text).join('');
       const sentenceId = `${blockIdx}-${sIdx}`;
+      const sentStart = offsetOf.get(sentTokens[0]) ?? 0;
+      const hitFor = (m: GrammarMatch) => toHit(m, blockIdx, sentText, sentStart);
+      const sentPoints = matches.filter(m => m.start >= sentStart && m.start < sentStart + sentText.length).map(hitFor);
+      // The part of the piece at [start, start + length) inside the open point's span.
+      const litRange = (start: number, length: number): [number, number] | undefined => {
+        if (!lit || lit.end <= start || start + length <= lit.start) return undefined;
+        return [Math.max(lit.start, start) - start, Math.min(lit.end, start + length) - start];
+      };
+      const withLit = (text: string, start: number) => {
+        const r = litRange(start, text.length);
+        return r ? <>{text.slice(0, r[0])}<span className="grammar-lit">{text.slice(r[0], r[1])}</span>{text.slice(r[1])}</> : text;
+      };
 
       // Render a run of non-interactive text, turning sentence-ending marks
       // (。！？) into tap targets that translate the whole sentence. Single-tap on
@@ -526,7 +564,7 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
           /[。！？]/.test(part) ? (
             <span
               key={`${keyBase}-p${idx}`}
-              onClick={(e) => lookup.translateSentence(sentText, sentenceId, e, articleContext)}
+              onClick={(e) => lookup.translateSentence(sentText, sentenceId, e, articleContext, sentPoints)}
               style={{ cursor: 'pointer', padding: '0 0.25em', margin: '0 -0.1em' }}
             >
               {part}
@@ -540,7 +578,7 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
         <span 
           key={sentenceId} 
           className={lookup.activeHighlightId === sentenceId ? 'sentence-highlight' : ''}
-          onDoubleClick={(e) => lookup.translateSentence(sentText, sentenceId, e, articleContext)}
+          onDoubleClick={(e) => lookup.translateSentence(sentText, sentenceId, e, articleContext, sentPoints)}
         >
           {sentTokens.map((segment, j) => {
             if (segment.furigana || segment.isInteractive) {
@@ -556,11 +594,20 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
                     furigana={segment.furigana}
                     hitWeight={hitWeightFor(segment.text, segment.furigana, wordDatabase[gradeKey]?.mastery)}
                     isSelected={lookup.activeHighlightId === `${sentenceId}-${j}`}
+                    lit={litRange(offsetOf.get(segment) ?? 0, segment.text.length)}
                     onClick={(e) => {
                       const tid = `${sentenceId}-${j}`;
-                      if (segment.details) lookup.openWord(segment.details as WordDetails, sentText, e, tid);
+                      const start = offsetOf.get(segment) ?? 0;
+                      const end = start + segment.text.length;
+                      const patterns = pointsTouching(matches, start, end).map(hitFor);
                       // Look up by lemma (鎮める) when we have it, not the surface form (鎮めて).
-                      else lookup.lookupWord(segment.lemma ?? segment.text, sentText, e, tid, segment.jmdict_entry_id);
+                      const word = segment.lemma ?? segment.text;
+                      // A word wholly inside a point (なりません, 前 in 〜前に) opens the
+                      // point first, with the word one tap away.
+                      const point = pointOf(matches, start, end);
+                      if (point) lookup.openGrammar(hitFor(point), e, tid, { word: segment.details?.word ?? word, details: segment.details, jmdictEntryId: segment.jmdict_entry_id, sentText, patterns });
+                      else if (segment.details) lookup.openWord(segment.details as WordDetails, sentText, e, tid, patterns);
+                      else lookup.lookupWord(word, sentText, e, tid, segment.jmdict_entry_id, patterns);
                     }}
                   />
                 </span>
@@ -568,14 +615,24 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
             }
             if (segmenter) {
               const words = Array.from((segmenter as any).segment(segment.text));
+              const segStart = offsetOf.get(segment) ?? 0;
               return words.map((w: any, index: number) => {
                 if (!w.isWordLike) return <span key={`${sentenceId}-${j}-${index}`}>{renderText(w.segment, `${sentenceId}-${j}-${index}`)}</span>;
                 const isWide = [...w.segment].length > 2;
+                const start = segStart + w.index;
+                const end = start + w.segment.length;
+                const tid = `${sentenceId}-${j}-${index}`;
                 return (
                   <span
-                    key={`${sentenceId}-${j}-${index}`}
-                    className={lookup.activeHighlightId === `${sentenceId}-${j}-${index}` ? 'word-highlight' : ''}
-                    onClick={(e) => lookup.lookupWord(w.segment, sentText, e, `${sentenceId}-${j}-${index}`)}
+                    key={tid}
+                    className={lookup.activeHighlightId === tid ? 'word-highlight' : ''}
+                    onClick={(e) => {
+                      // Grammar glue (ば, ので, います) opens its point; anything else
+                      // looks the piece up as before.
+                      const point = pointOf(matches, start, end);
+                      if (point) lookup.openGrammar(hitFor(point), e, tid);
+                      else lookup.lookupWord(w.segment, sentText, e, tid, undefined, pointsTouching(matches, start, end).map(hitFor));
+                    }}
                     style={{
                       cursor: 'pointer',
                       position: 'relative',
@@ -584,7 +641,7 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
                         : { zIndex: 1 }),
                     }}
                   >
-                    {w.segment}
+                    {withLit(w.segment, start)}
                   </span>
                 );
               });

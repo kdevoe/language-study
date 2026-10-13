@@ -666,15 +666,34 @@ export async function fetchHeteronymReadings(
   }
 }
 
-export async function fetchWordGrammarInsight(word: string, contextSentence: string): Promise<string> {
+/** A grammar point named to the insight prompt (#43): the catalogue's pattern and meaning. */
+export interface InsightPoint { pattern: string; meaning: string }
+
+/** `points`: the grammar points this word takes part in, so the AI names them the
+ *  same way the panel's PATTERNS rows do. */
+export async function fetchWordGrammarInsight(word: string, contextSentence: string, points?: InsightPoint[]): Promise<string> {
   try {
     console.log(`🌐 Edge Fn (dictionary-lookup grammar) for "${word}"`);
     const { insight } = await invokeEdgeFn<{ insight: string }>('dictionary-lookup', {
-      word, contextSentence, type: 'grammar',
+      word, contextSentence, type: 'grammar', ...(points?.length ? { points } : {}),
     }, 12000);
     return insight || 'Grammar analysis unavailable.';
   } catch (e) {
     console.error('Grammar insight Edge Fn failed:', e);
+    return 'Grammar analysis unavailable.';
+  }
+}
+
+/** The grammar panel's insight (#43): what `point` does in this sentence. `span`
+ *  is the matched text (なければなりません). */
+export async function fetchGrammarPointInsight(span: string, contextSentence: string, point: InsightPoint): Promise<string> {
+  try {
+    const { insight } = await invokeEdgeFn<{ insight: string }>('dictionary-lookup', {
+      word: span, contextSentence, type: 'grammar', point,
+    }, 12000);
+    return insight || 'Grammar analysis unavailable.';
+  } catch (e) {
+    console.error('Grammar point insight Edge Fn failed:', e);
     return 'Grammar analysis unavailable.';
   }
 }

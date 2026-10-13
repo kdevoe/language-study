@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { word, contextSentence, jmdictEntryId, type, items } = await req.json();
+    const { word, contextSentence, jmdictEntryId, type, items, points, point } = await req.json();
 
     // Batched heteronym reading disambiguation. The client sends words whose
     // surface has more than one common reading (今日, 市場, 上手, 日本…) with the
@@ -154,9 +154,22 @@ ${lines}`;
       // fraction of the cost, and plain-text output (Gemini wrapped terms in
       // *markdown* that WordModal renders literally). Haiku occasionally invented
       // romanized readings, hence the no-romaji line.
-      const prompt = `Analyze the word "${word}" in this sentence: "${contextSentence}".
+      // Grammar points (#43) come from the reader's catalogue: `point` asks about
+      // one point in this sentence (the grammar panel); `points` names the points
+      // a word takes part in, so the word insight uses the same names as the
+      // panel's rows and doesn't contradict them.
+      const clip = (v: unknown) => String(v ?? '').slice(0, 80);
+      const named = (p: { pattern?: unknown; meaning?: unknown }) => `${clip(p.pattern)} (${clip(p.meaning)})`;
+      const prompt = point
+        ? `In this Japanese sentence: "${contextSentence}", the part "${word}" is the grammar pattern ${named(point)}.
+MANDATORY: In 1-2 brief sentences of English, explain what this pattern does in this particular sentence: what it attaches to here and what it adds to the meaning.
+Be concise. Write plain text (no markdown) and do not include romanized readings.`
+        : `Analyze the word "${word}" in this sentence: "${contextSentence}".
 MANDATORY: Provide ONLY 1 SINGLE brief sentence in English explaining its specific usage or grammar in this context.
-Be extremely concise. Write plain text (no markdown) and do not include romanized readings.`;
+Be extremely concise. Write plain text (no markdown) and do not include romanized readings.${
+          Array.isArray(points) && points.length
+            ? `\nThe word is part of this grammar pattern: ${points.slice(0, 4).map(named).join('; ')}. If you mention it, use that name.`
+            : ''}`;
 
       const message = await anthropic.messages.create({
         model: CLAUDE_HAIKU,

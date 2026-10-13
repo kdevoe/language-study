@@ -588,4 +588,9 @@
   - [x] Plan, mockup (docs/mockups/grammar.html), sources research
   - [x] JLPT checklist N3–N1 (docs/grammar/jlpt-checklist.tsv) matched to NINJAL (docs/grammar/ninjal-match.tsv)
   - [x] Phase 0: rule engine + 21 starter rules + test harness (docs/grammar/phase0-report.md)
-  - [ ] Phase 1: catalogue of about 100 N5–N4 points; tap → grammar panel in the reader
+  - [/] Phase 1: tap → grammar panel in the reader
+    - [x] Catalogue of 95 points: 81 N5–N4, 8 N3 news staples (によると, について…), 6 casual forms; one rule + entry each (harness checks every example; NINJAL recall 95%, report in docs/grammar/phase1-report.md)
+    - [x] Reader matching at open, grammar-first taps, PATTERNS rows, 。 sheet list, lit span, taller panel, local EASY/MEDIUM/HARD
+    - [x] dictionary-lookup: grammar-point insight + point names in the word insight (needs deploy)
+    - [ ] Not rule-able from tokens alone (left out): particle senses (に place/time/target, と "and"/quote), 〜がる and 〜方 (tokenized as one word)
+    - [ ] NINJAL (CC BY 4.0) attribution in the app (no credits screen yet)
