@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — app icons, round 2</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700;800&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.layout { display: flex; gap: 2.5rem; max-width: 1500px; margin: 0 auto; align-items: flex-start; }
+.grid-col { flex: 1; min-width: 0; }
+.group-title { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); margin: 2rem 0 0.8rem; text-transform: uppercase; }
+.group-title:first-child { margin-top: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+
+.card { background: var(--bg-color); border-radius: 24px; padding: 1.2rem; box-shadow: 0 4px 25px rgba(0,0,0,0.03); cursor: pointer; transition: transform 0.1s; position: relative; outline: 2px solid transparent; }
+.card:active { transform: scale(0.98); }
+.card.sel { outline-color: var(--text-main); }
+.card .row { display: flex; gap: 1rem; align-items: flex-end; }
+.card .sizes { display: flex; flex-direction: column; gap: 0.6rem; align-items: center; }
+.icon { display: block; border-radius: 22.37%; overflow: hidden; flex: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.icon svg { display: block; width: 100%; height: 100%; isolation: isolate; }
+.card .name { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 500; margin-top: 0.9rem; display: flex; gap: 0.5rem; align-items: baseline; }
+.card .name .id { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); }
+.card .concept { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+.star { position: absolute; top: 0.8rem; right: 0.9rem; border: none; background: none; cursor: pointer; font-size: 1.1rem; color: #b8b8ae; line-height: 1; padding: 0.3rem; }
+.star.on { color: var(--text-main); }
+body.starred-only .card:not(.starred) { display: none; }
+body.starred-only .group-title { display: none; }
+
+/* Home-screen preview */
+.phone-col { position: sticky; top: 1.5rem; flex: none; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone { width: 300px; height: 620px; border-radius: 44px; padding: 52px 20px 20px; position: relative; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15); transition: background 0.4s; }
+.phone.light { background: linear-gradient(170deg, #dfe6e4 0%, #e9e4d8 55%, #d9d3c4 100%); }
+.phone.dark { background: linear-gradient(170deg, #1d2226 0%, #23282a 55%, #2c2a26 100%); }
+.phone.photo { background: linear-gradient(180deg, #9db4c2 0%, #c7cfc8 45%, #6d7a5c 46%, #4c573e 100%); }
+.home { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 0; justify-items: center; }
+.app { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 60px; }
+.app .ph { width: 56px; height: 56px; border-radius: 22.37%; }
+.app span { font-size: 10px; font-weight: 500; white-space: nowrap; }
+.phone.light .app span { color: #222; }
+.phone.dark .app span, .phone.photo .app span { color: #fff; }
+.dock { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 84px; border-radius: 32px; display: flex; justify-content: space-around; align-items: center; background: rgba(255,255,255,0.28); backdrop-filter: blur(20px); }
+.phone.dark .dock { background: rgba(255,255,255,0.1); }
+.phone-cap { font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 300px; }
+.phone-cap b { font-family: var(--font-serif); font-weight: 500; color: var(--text-main); font-size: 1rem; display: block; }
+.tiny-row { display: flex; gap: 0.8rem; align-items: center; background: var(--bg-pure); border-radius: 16px; padding: 0.7rem 1rem; }
+.tiny-row .tab { display: flex; gap: 6px; align-items: center; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-card); padding: 4px 10px 4px 6px; border-radius: 8px; }
+.tiny-row .tab .icon { border-radius: 3px; box-shadow: none; }
+
+@media (max-width: 900px) {
+  .layout { flex-direction: column-reverse; }
+  .phone-col { position: static; align-self: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- Shared ink, grain and mist filters. Not display:none, or the filters stop resolving. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Riso ink: rough edges + speckled coverage -->
+    <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="11" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3.2 0 0 0 -0.5" result="ga"/>
+      <feComposite in="d" in2="ga" operator="in"/>
+    </filter>
+    <!-- Paper grain overlay -->
+    <filter id="grain" x="0" y="0" width="100%" height="100%" filterUnits="userSpaceOnUse">
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="5" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.18  0 0 0 0 0.15  1.3 0 0 0 -0.52"/>
+    </filter>
+    <!-- Streaky, wind-blown mist edges -->
+    <filter id="wisp" x="-10%" y="-60%" width="120%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.004 0.05" numOctaves="3" seed="8" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="40" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Stipple a gradient mask into dots, like ink thinning on a riso drum -->
+    <filter id="dither" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse">
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1" result="nn"/>
+      <feComposite in="SourceGraphic" in2="nn" operator="arithmetic" k2="1" k3="0.8" k4="-0.42" result="m"/>
+      <feComponentTransfer in="m">
+        <feFuncR type="discrete" tableValues="0 1"/><feFuncG type="discrete" tableValues="0 1"/><feFuncB type="discrete" tableValues="0 1"/>
+      </feComponentTransfer>
+    </filter>
+
+    <linearGradient id="fogV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#efe9dc" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#efe9dc" stop-opacity="0.94"/>
+      <stop offset="1" stop-color="#efe9dc" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fogOlive" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#46522f" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#46522f" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#46522f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fogNight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a8c0cd" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#a8c0cd" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#a8c0cd" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Frame strokes that fade upward -->
+    <linearGradient id="fadeUp" gradientUnits="userSpaceOnUse" x1="0" y1="400" x2="0" y2="120">
+      <stop offset="0" stop-color="#a8c0cd" stop-opacity="1"/>
+      <stop offset="1" stop-color="#a8c0cd" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fadeUpShort" gradientUnits="userSpaceOnUse" x1="0" y1="400" x2="0" y2="320">
+      <stop offset="0" stop-color="#a8c0cd" stop-opacity="1"/>
+      <stop offset="1" stop-color="#a8c0cd" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="riseG" gradientUnits="userSpaceOnUse" x1="0" y1="410" x2="0" y2="110">
+      <stop offset="0.05" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <mask id="riseMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#riseG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="halfMaskG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.45" stop-color="#fff"/>
+      <stop offset="0.95" stop-color="#000"/>
+    </linearGradient>
+    <mask id="halfMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#halfMaskG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="edgeFadeG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.3" stop-color="#fff"/>
+      <stop offset="0.7" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <mask id="edgeFade" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#edgeFadeG)" filter="url(#dither)"/>
+    </mask>
+    <radialGradient id="centerFadeG" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.25" stop-color="#000"/>
+      <stop offset="1" stop-color="#fff"/>
+    </radialGradient>
+    <mask id="centerFade" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#centerFadeG)" filter="url(#dither)"/>
+    </mask>
+    <radialGradient id="spotG" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.5" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </radialGradient>
+    <mask id="spot" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#spotG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="ensoG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.45" stop-color="#fff"/>
+    </linearGradient>
+    <mask id="ensoMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#ensoG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="horizonG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.3" stop-color="#fff"/>
+      <stop offset="0.7" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <mask id="horizonMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#horizonG)" filter="url(#dither)"/>
+    </mask>
+  </defs>
+</svg>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · APP ICON · ROUND 2</div>
+  <h1>アイコン案 二</h1>
+  <p>Variations on the two picks from round 1: <b>A2</b> (the 山 frame fades and the 幺 stay) and <b>C1</b> (mountains in mist), plus two that combine them. Round 1 is in <a href="app-icons.html">app-icons.html</a>. Click a card to see it on a home screen. Use ☆ to mark favourites, then "Starred" to compare just those.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">WALLPAPER</span>
+      <div class="pill-seg" id="wp"><button class="on" data-v="light">Light</button><button data-v="dark">Dark</button><button data-v="photo">Photo</button></div>
+    </div>
+    <div class="ctl"><span class="lbl">SHOW</span>
+      <div class="pill-seg" id="show"><button class="on" data-v="all">All</button><button data-v="starred">Starred</button></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="grid-col" id="groups"></div>
+  <aside class="phone-col">
+    <div class="phone light" id="phone">
+      <div class="home" id="home"></div>
+      <div class="dock" id="dock"></div>
+    </div>
+    <div class="tiny-row"><div class="tab"><span id="fav"></span>Yūgen</div><div class="tab"><span class="icon" style="width:16px;height:16px;background:#c9c9c0"></span>Inbox</div></div>
+    <div class="phone-cap" id="cap"></div>
+  </aside>
+</div>
+
+<script>
+const C = {
+  paper: '#efe9dc', mist: '#a8c0cd', mistPale: '#cad8df', olive: '#55613a',
+  oliveDeep: '#3f4a2b', char: '#2e2d2a', warm: '#cf6a4a',
+};
+const SERIF = "'Shippori Mincho', serif";
+
+// One ink layer: rough edges, speckle, multiplies over what is beneath.
+const ink = (content, extra = '') => `<g filter="url(#ink)" style="mix-blend-mode:multiply" ${extra}>${content}</g>`;
+const glyph = (ch, { x = 256, y = 256, size = 320, fill = C.char, weight = 600, extra = '' } = {}) =>
+  `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central" font-family="${SERIF}" font-weight="${weight}" fill="${fill}" ${extra}>${ch}</text>`;
+const fog = (y, h, grad = 'fogV', op = 1) =>
+  `<rect x="-40" y="${y}" width="592" height="${h}" fill="url(#${grad})" opacity="${op}" filter="url(#wisp)"/>`;
+const lines = (x, y, widths, { h = 14, gap = 32, fill = C.char } = {}) =>
+  widths.map((w, i) => `<rect x="${x}" y="${y + i * gap}" width="${w}" height="${h}" rx="${h / 2}" fill="${fill}"/>`).join('');
+const frame = (inner, bg = C.paper) =>
+  `<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="${bg}"/>${inner}<rect width="512" height="512" filter="url(#grain)" opacity="0.3" style="mix-blend-mode:multiply"/></svg>`;
+
+const FRAME = { c: 'M256 118 V398', l: 'M128 222 V398', r: 'M384 222 V398', b: 'M128 398 H384' };
+const framePaths = (vert, base, w = 24) =>
+  `<g fill="none" stroke-linecap="round" stroke-width="${w}">
+    <path d="${FRAME.c}" stroke="${vert}"/><path d="${FRAME.l}" stroke="${vert}"/><path d="${FRAME.r}" stroke="${vert}"/>
+    <path d="${FRAME.b}" stroke="${base}"/></g>`;
+// The font's 幺 is wide; narrow it so the pair sits between the frame strokes like the real 幽.
+const yao = (fill = C.char, size = 200, y = 270) => [192, 320].map(x =>
+  `<g transform="translate(${x} 0) scale(0.7 1) translate(${-x} 0)">${glyph('幺', { x, y, size, weight: 800, fill })}</g>`).join('');
+// 幺 built from strokes, matching the frame's monoline weight
+const yaoDrawn = (x, y, color, w = 18) => `<g transform="translate(${x} ${y}) scale(1.3)" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 0 L-24 42 L18 54"/><path d="M22 44 L-30 104 L44 94"/><path d="M28 70 L46 96"/></g>`;
+const ridges = {
+  back: 'M0 300 Q60 268 110 280 Q170 230 240 196 Q290 236 330 248 Q390 214 440 228 Q480 250 512 262 V512 H0Z',
+  mid: 'M0 368 Q80 322 160 346 Q230 312 300 334 Q390 296 512 348 V512 H0Z',
+  front: 'M0 440 Q120 404 236 428 Q360 400 512 420 V512 H0Z',
+};
+
+const ICONS = [
+  // ── A2, the frame fades ──
+  { id: 'F1', group: 'A2 · the frame fades', name: '基本', en: 'Refined',
+    concept: 'A2 tightened: heavier 幺, and a frame that fades upward from a solid base.',
+    svg: () => frame(`<g filter="url(#ink)" style="mix-blend-mode:multiply">${framePaths('url(#fadeUp)', C.mist)}</g>` + ink(yao())) },
+  { id: 'F2', group: 'A2 · the frame fades', name: '散る', en: 'Dissolving',
+    concept: 'The frame breaks up into riso dots as it rises instead of fading smoothly, like ink running out.',
+    svg: () => frame(`<g mask="url(#riseMask)">` + ink(framePaths(C.mist, C.mist)) + `</g>` + ink(yao())) },
+  { id: 'F3', group: 'A2 · the frame fades', name: '地', en: 'Base only',
+    concept: 'Almost all of the frame is gone. The 幺 stand on a single line of ground.',
+    svg: () => frame(`<g filter="url(#ink)" style="mix-blend-mode:multiply">${framePaths('url(#fadeUpShort)', C.mist)}</g>` + ink(yao())) },
+  { id: 'F4', group: 'A2 · the frame fades', name: '深緑', en: 'On olive',
+    concept: 'The same idea on deep olive: paper-white 幺, with the frame fading into the green.',
+    svg: () => frame(`<g filter="url(#ink)">${framePaths('url(#fadeUp)', C.mist)}</g>` + `<g filter="url(#ink)">${yao(C.paper)}</g>`, C.oliveDeep) },
+  { id: 'F5', group: 'A2 · the frame fades', name: '日の出', en: 'Sunrise',
+    concept: 'The centre stroke fades up into a small vermilion sun, borrowed from C1.',
+    svg: () => frame(ink(`<circle cx="256" cy="104" r="30" fill="${C.warm}"/>`) +
+      `<g filter="url(#ink)" style="mix-blend-mode:multiply">${framePaths('url(#fadeUp)', C.mist)}</g>` + ink(yao(C.char, 190, 278))) },
+  { id: 'F6', group: 'A2 · the frame fades', name: '霧の枠', en: 'Fog over the frame',
+    concept: 'Mist crosses the frame but not the 幺. The container is fogged over and the content stays sharp.',
+    svg: () => frame(ink(framePaths(C.mist, C.mist)) + fog(196, 56) + fog(290, 60) + fog(372, 34, 'fogV', 0.7) + ink(yao())) },
+  { id: 'F7', group: 'A2 · the frame fades', name: '線', en: 'Drawn monoline',
+    concept: 'The 幺 drawn with the same pen as the frame. Plainer and more icon-like, less like a font.',
+    svg: () => frame(`<g filter="url(#ink)" style="mix-blend-mode:multiply">${framePaths('url(#fadeUp)', C.mist, 22)}</g>` +
+      ink(yaoDrawn(190, 190, C.char) + yaoDrawn(322, 190, C.char))) },
+  { id: 'F8', group: 'A2 · the frame fades', name: '背景になる', en: 'Becomes the background',
+    concept: 'The frame is printed in the background colour, so it really does fade into the background. Only the 幺 show.',
+    svg: () => frame(`<g filter="url(#ink)">${framePaths(C.paper, C.paper)}</g>` + ink(yao()), C.mistPale) },
+  { id: 'F9', group: 'A2 · the frame fades', name: 'ずれ', en: 'Off-register',
+    concept: 'Two inks printed slightly out of line: a mist frame and olive 幺, each with a mist shadow.',
+    svg: () => frame(`<g filter="url(#ink)" style="mix-blend-mode:multiply" transform="translate(-6 5)">${framePaths('url(#fadeUp)', C.mist)}</g>` +
+      ink(yao(C.mist), 'transform="translate(9 7)"') + ink(yao(C.olive))) },
+
+  // ── C1, mountains in mist ──
+  { id: 'M1', group: 'C1 · mountains in mist', name: '基本', en: 'Refined',
+    concept: 'C1 as it was: three ridges, two bands of mist, and a small sun.',
+    svg: () => frame(ink(`<circle cx="350" cy="168" r="38" fill="${C.warm}"/>`) + ink(`<path d="${ridges.back}" fill="${C.mistPale}"/>`) + fog(268, 70) +
+      ink(`<path d="${ridges.mid}" fill="${C.mist}"/>`) + fog(350, 70) + ink(`<path d="${ridges.front}" fill="${C.oliveDeep}"/>`)) },
+  { id: 'M2', group: 'C1 · mountains in mist', name: '一峰', en: 'One peak',
+    concept: 'A single peak rising out of the cloud. The simplest shape, and the one that reads best at small sizes.',
+    svg: () => frame(ink(`<circle cx="372" cy="150" r="30" fill="${C.warm}"/>`) +
+      ink(`<path d="M30 430 C140 340 214 178 256 172 C298 178 372 340 482 430 Z" fill="${C.mist}"/>`) +
+      fog(300, 90) + fog(360, 60, 'fogV', 0.8) +
+      ink(`<path d="M0 452 Q140 420 260 440 Q380 420 512 446 V512 H0Z" fill="${C.oliveDeep}"/>`)) },
+  { id: 'M3', group: 'C1 · mountains in mist', name: '夜', en: 'Night',
+    concept: 'The same ridges at night: a deep olive sky, a paper moon, and pale mist in the valleys.',
+    svg: () => frame(`<g filter="url(#ink)"><circle cx="352" cy="160" r="36" fill="${C.paper}"/></g>` +
+      `<g filter="url(#ink)"><path d="${ridges.back}" fill="${C.mist}" opacity="0.35"/></g>` + fog(268, 70, 'fogNight', 0.8) +
+      `<g filter="url(#ink)"><path d="${ridges.mid}" fill="${C.mist}" opacity="0.6"/></g>` + fog(350, 70, 'fogNight', 0.7) +
+      `<g filter="url(#ink)"><path d="${ridges.front}" fill="#2c3520"/></g>`, C.oliveDeep) },
+  { id: 'M4', group: 'C1 · mountains in mist', name: '重なり', en: 'Many layers',
+    concept: 'Five ridges, each paler than the one in front. No sun; only the depth of the mist.',
+    svg: () => frame([
+      ['M0 220 Q90 180 170 200 Q260 150 340 190 Q420 160 512 196 V512 H0Z', C.mistPale, 0.7],
+      ['M0 270 Q110 230 200 256 Q300 214 380 246 Q450 226 512 244 V512 H0Z', C.mistPale, 1],
+      ['M0 320 Q80 290 170 308 Q270 270 350 300 Q440 280 512 300 V512 H0Z', C.mist, 1],
+      ['M0 378 Q120 340 230 364 Q330 336 420 356 Q470 348 512 360 V512 H0Z', C.olive, 0.8],
+      ['M0 440 Q130 408 250 430 Q380 404 512 424 V512 H0Z', C.oliveDeep, 1],
+    ].map(([d, f, o], i) => ink(`<path d="${d}" fill="${f}" opacity="${o}"/>`) + (i < 4 ? fog(240 + i * 54, 46, 'fogV', 0.85) : '')).join('')) },
+  { id: 'M5', group: 'C1 · mountains in mist', name: '円窓', en: 'Round window',
+    concept: 'The landscape seen through a round window (丸窓). A strong, simple silhouette that holds up on any wallpaper.',
+    svg: () => frame(`<clipPath id="disc"><circle cx="256" cy="256" r="176"/></clipPath><g clip-path="url(#disc)">` +
+      ink(`<rect width="512" height="512" fill="${C.mistPale}" opacity="0.55"/>`) + ink(`<circle cx="330" cy="180" r="30" fill="${C.warm}"/>`) +
+      ink(`<path d="${ridges.back}" fill="${C.mistPale}"/>`) + fog(268, 70) + ink(`<path d="${ridges.mid}" fill="${C.mist}"/>`) + fog(350, 70) +
+      ink(`<path d="${ridges.front}" fill="${C.oliveDeep}" transform="translate(0 -20)"/>`) + `</g>`) },
+  { id: 'M6', group: 'C1 · mountains in mist', name: '霧の空', en: 'Mist-blue sky',
+    concept: 'A full mist-blue sky behind paper-white fog. More colour, so it is easy to find on the home screen.',
+    svg: () => frame(ink(`<circle cx="350" cy="160" r="36" fill="${C.warm}"/>`) + fog(220, 60) +
+      ink(`<path d="${ridges.mid}" fill="${C.mist}" transform="translate(0 -40)"/>`) + fog(320, 80) +
+      ink(`<path d="${ridges.front}" fill="${C.oliveDeep}"/>`), C.mistPale) },
+  { id: 'M7', group: 'C1 · mountains in mist', name: '大きな日', en: 'Large sun',
+    concept: 'A large vermilion sun sitting behind the ridges, with mist drawn across it.',
+    svg: () => frame(ink(`<circle cx="256" cy="230" r="112" fill="${C.warm}" opacity="0.9"/>`) + fog(200, 40, 'fogV', 0.8) +
+      ink(`<path d="${ridges.back}" fill="${C.mistPale}" transform="translate(0 20)"/>`) + fog(288, 60) +
+      ink(`<path d="${ridges.mid}" fill="${C.mist}"/>`) + fog(356, 60) + ink(`<path d="${ridges.front}" fill="${C.oliveDeep}"/>`)) },
+  { id: 'M8', group: 'C1 · mountains in mist', name: '山', en: 'Three peaks',
+    concept: 'Three peaks with the middle one tallest, so the range is also the kanji 山, the outer part of 幽.',
+    svg: () => frame(ink(`<circle cx="256" cy="96" r="26" fill="${C.warm}"/>`) +
+      ink(`<path d="M40 420 L136 236 L196 330 L256 150 L316 330 L376 236 L472 420Z" fill="${C.mist}" stroke="${C.mist}" stroke-width="18" stroke-linejoin="round"/>`) +
+      fog(280, 80) + fog(350, 60, 'fogV', 0.8) + ink(`<path d="M0 446 Q140 418 260 436 Q380 418 512 440 V512 H0Z" fill="${C.oliveDeep}"/>`)) },
+  { id: 'M9', group: 'C1 · mountains in mist', name: '朝焼け', en: 'Dawn',
+    concept: 'A thin warm haze along the horizon at first light, with the sun just clearing the back ridge.',
+    svg: () => frame(ink(`<rect x="0" y="180" width="512" height="140" fill="${C.warm}" opacity="0.16"/>`) +
+      ink(`<circle cx="180" cy="236" r="34" fill="${C.warm}"/>`) + ink(`<path d="${ridges.back}" fill="${C.mistPale}" transform="translate(0 10)"/>`) + fog(276, 70) +
+      ink(`<path d="${ridges.mid}" fill="${C.mist}"/>`) + fog(352, 70) + ink(`<path d="${ridges.front}" fill="${C.olive}"/>`)) },
+
+  // ── Both ──
+  { id: 'H1', group: 'Both together', name: '山中の幺', en: '幺 in the mountains',
+    concept: 'The 幺 printed sharp in front of a misty range: your content in front, the setting behind it.',
+    svg: () => frame(ink(`<circle cx="256" cy="96" r="24" fill="${C.warm}"/>`) +
+      ink(`<path d="${ridges.back}" fill="${C.mistPale}" transform="translate(0 30)"/>`) + fog(296, 70) +
+      ink(`<path d="${ridges.mid}" fill="${C.mist}" transform="translate(0 20)"/>`) + fog(372, 60) + ink(yao(C.char, 200, 270))) },
+  { id: 'H2', group: 'Both together', name: '稜線', en: 'Ridge as the base',
+    concept: 'The frame’s base becomes a mountain ridge that fades out at both ends. The 幺 stand on the ridgeline.',
+    svg: () => frame(`<g mask="url(#horizonMask)">` + ink(`<path d="M30 410 Q100 380 150 392 Q200 360 256 352 Q312 360 362 392 Q412 380 482 410 V512 H30Z" fill="${C.mist}"/>`) + `</g>` +
+      fog(400, 60, 'fogV', 0.7) + ink(yao(C.char, 190, 250))) },
+];
+
+// ── Render ──
+let starred = new Set();
+try { starred = new Set(JSON.parse(localStorage.getItem('icon-stars-2') || '[]')); } catch {}
+const saveStars = () => { try { localStorage.setItem('icon-stars-2', JSON.stringify([...starred])); } catch {} };
+
+const groupsEl = document.getElementById('groups');
+let lastGroup = null, grid;
+const svgCache = {};
+ICONS.forEach(ic => {
+  svgCache[ic.id] = ic.svg();
+  if (ic.group !== lastGroup) {
+    lastGroup = ic.group;
+    groupsEl.insertAdjacentHTML('beforeend', `<div class="group-title">${ic.group}</div><div class="grid"></div>`);
+    grid = groupsEl.lastElementChild;
+  }
+  const card = document.createElement('div');
+  card.className = 'card' + (starred.has(ic.id) ? ' starred' : '');
+  card.dataset.id = ic.id;
+  card.innerHTML = `
+    <button class="star ${starred.has(ic.id) ? 'on' : ''}" title="Star">${starred.has(ic.id) ? '★' : '☆'}</button>
+    <div class="row">
+      <span class="icon" style="width:160px;height:160px">${svgCache[ic.id]}</span>
+      <div class="sizes">
+        <span class="icon" style="width:60px;height:60px">${svgCache[ic.id]}</span>
+        <span class="icon" style="width:29px;height:29px;border-radius:7px">${svgCache[ic.id]}</span>
+      </div>
+    </div>
+    <div class="name">${ic.name}<span class="id">${ic.id} · ${ic.en.toUpperCase()}</span></div>
+    <div class="concept">${ic.concept}</div>`;
+  card.querySelector('.star').addEventListener('click', e => {
+    e.stopPropagation();
+    starred.has(ic.id) ? starred.delete(ic.id) : starred.add(ic.id);
+    saveStars();
+    const on = starred.has(ic.id);
+    e.currentTarget.classList.toggle('on', on);
+    e.currentTarget.textContent = on ? '★' : '☆';
+    card.classList.toggle('starred', on);
+  });
+  card.addEventListener('click', () => select(ic.id));
+  grid.appendChild(card);
+});
+
+// Placeholder neighbours: muted, flat squircles so the candidate is judged in context.
+const NEIGHBOURS = [
+  ['#e4e1d9', 'Calendar'], ['#9fb7a0', 'Maps'], ['#f0c27a', 'Notes'], ['#c5ccd6', 'Settings'],
+  ['#2f3a4a', 'Books'], ['#e9a28c', 'Photos'], ['#8aa9c8', 'Weather'], ['#3b3b3b', 'Camera'],
+  null, ['#d7d0c2', 'Files'], ['#6d8f78', 'Duo'], ['#b9b0d6', 'Podcasts'],
+];
+const DOCK = ['#5f9d6b', '#4b86d6', '#f2f2f2', '#e85a4f'];
+function select(id) {
+  const ic = ICONS.find(i => i.id === id);
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('sel', c.dataset.id === id));
+  document.getElementById('home').innerHTML = NEIGHBOURS.map(n => n
+    ? `<div class="app"><div class="ph" style="background:${n[0]}"></div><span>${n[1]}</span></div>`
+    : `<div class="app"><span class="icon" style="width:56px;height:56px">${svgCache[id]}</span><span>Yūgen</span></div>`).join('');
+  document.getElementById('dock').innerHTML = DOCK.map(c => `<div class="ph" style="width:56px;height:56px;border-radius:22.37%;background:${c}"></div>`).join('');
+  document.getElementById('fav').innerHTML = `<span class="icon" style="width:16px;height:16px">${svgCache[id]}</span>`;
+  document.getElementById('cap').innerHTML = `<b>${ic.id} · ${ic.name}</b>${ic.en}`;
+}
+select('F1');
+
+document.querySelectorAll('#wp button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#wp button').forEach(x => x.classList.toggle('on', x === b));
+  document.getElementById('phone').className = 'phone ' + b.dataset.v;
+}));
+document.querySelectorAll('#show button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#show button').forEach(x => x.classList.toggle('on', x === b));
+  document.body.classList.toggle('starred-only', b.dataset.v === 'starred');
+}));
+</script>
+</body>
+</html>

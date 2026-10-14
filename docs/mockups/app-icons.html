@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — app icons</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700;800&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem 1.4rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { border: none; background: transparent; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.layout { display: flex; gap: 2.5rem; max-width: 1500px; margin: 0 auto; align-items: flex-start; }
+.grid-col { flex: 1; min-width: 0; }
+.group-title { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); margin: 2rem 0 0.8rem; text-transform: uppercase; }
+.group-title:first-child { margin-top: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+
+.card { background: var(--bg-color); border-radius: 24px; padding: 1.2rem; box-shadow: 0 4px 25px rgba(0,0,0,0.03); cursor: pointer; transition: transform 0.1s; position: relative; outline: 2px solid transparent; }
+.card:active { transform: scale(0.98); }
+.card.sel { outline-color: var(--text-main); }
+.card .row { display: flex; gap: 1rem; align-items: flex-end; }
+.card .sizes { display: flex; flex-direction: column; gap: 0.6rem; align-items: center; }
+.icon { display: block; border-radius: 22.37%; overflow: hidden; flex: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.icon svg { display: block; width: 100%; height: 100%; isolation: isolate; }
+.card .name { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 500; margin-top: 0.9rem; display: flex; gap: 0.5rem; align-items: baseline; }
+.card .name .id { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); }
+.card .concept { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+.star { position: absolute; top: 0.8rem; right: 0.9rem; border: none; background: none; cursor: pointer; font-size: 1.1rem; color: #b8b8ae; line-height: 1; padding: 0.3rem; }
+.star.on { color: var(--text-main); }
+body.starred-only .card:not(.starred) { display: none; }
+body.starred-only .group-title { display: none; }
+
+/* Home-screen preview */
+.phone-col { position: sticky; top: 1.5rem; flex: none; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone { width: 300px; height: 620px; border-radius: 44px; padding: 52px 20px 20px; position: relative; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15); transition: background 0.4s; }
+.phone.light { background: linear-gradient(170deg, #dfe6e4 0%, #e9e4d8 55%, #d9d3c4 100%); }
+.phone.dark { background: linear-gradient(170deg, #1d2226 0%, #23282a 55%, #2c2a26 100%); }
+.phone.photo { background: linear-gradient(180deg, #9db4c2 0%, #c7cfc8 45%, #6d7a5c 46%, #4c573e 100%); }
+.home { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 0; justify-items: center; }
+.app { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 60px; }
+.app .ph { width: 56px; height: 56px; border-radius: 22.37%; }
+.app span { font-size: 10px; font-weight: 500; white-space: nowrap; }
+.phone.light .app span { color: #222; }
+.phone.dark .app span, .phone.photo .app span { color: #fff; }
+.dock { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 84px; border-radius: 32px; display: flex; justify-content: space-around; align-items: center; background: rgba(255,255,255,0.28); backdrop-filter: blur(20px); }
+.phone.dark .dock { background: rgba(255,255,255,0.1); }
+.phone-cap { font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 300px; }
+.phone-cap b { font-family: var(--font-serif); font-weight: 500; color: var(--text-main); font-size: 1rem; display: block; }
+.tiny-row { display: flex; gap: 0.8rem; align-items: center; background: var(--bg-pure); border-radius: 16px; padding: 0.7rem 1rem; }
+.tiny-row .tab { display: flex; gap: 6px; align-items: center; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-card); padding: 4px 10px 4px 6px; border-radius: 8px; }
+.tiny-row .tab .icon { border-radius: 3px; box-shadow: none; }
+
+@media (max-width: 900px) {
+  .layout { flex-direction: column-reverse; }
+  .phone-col { position: static; align-self: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- Shared ink, grain and mist filters. Not display:none, or the filters stop resolving. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Riso ink: rough edges + speckled coverage -->
+    <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="11" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3.2 0 0 0 -0.5" result="ga"/>
+      <feComposite in="d" in2="ga" operator="in"/>
+    </filter>
+    <!-- Paper grain overlay -->
+    <filter id="grain" x="0" y="0" width="100%" height="100%" filterUnits="userSpaceOnUse">
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="5" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.18  0 0 0 0 0.15  1.3 0 0 0 -0.52"/>
+    </filter>
+    <!-- Streaky, wind-blown mist edges -->
+    <filter id="wisp" x="-10%" y="-60%" width="120%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.004 0.05" numOctaves="3" seed="8" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="40" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Stipple a gradient mask into dots, like ink thinning on a riso drum -->
+    <filter id="dither" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse">
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1" result="nn"/>
+      <feComposite in="SourceGraphic" in2="nn" operator="arithmetic" k2="1" k3="0.8" k4="-0.42" result="m"/>
+      <feComponentTransfer in="m">
+        <feFuncR type="discrete" tableValues="0 1"/><feFuncG type="discrete" tableValues="0 1"/><feFuncB type="discrete" tableValues="0 1"/>
+      </feComponentTransfer>
+    </filter>
+
+    <linearGradient id="fogV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#efe9dc" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#efe9dc" stop-opacity="0.94"/>
+      <stop offset="1" stop-color="#efe9dc" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fogOlive" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#46522f" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#46522f" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#46522f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fogNight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a8c0cd" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#a8c0cd" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#a8c0cd" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Frame strokes that fade upward -->
+    <linearGradient id="fadeUp" gradientUnits="userSpaceOnUse" x1="0" y1="400" x2="0" y2="120">
+      <stop offset="0" stop-color="#a8c0cd" stop-opacity="1"/>
+      <stop offset="1" stop-color="#a8c0cd" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="halfMaskG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.45" stop-color="#fff"/>
+      <stop offset="0.95" stop-color="#000"/>
+    </linearGradient>
+    <mask id="halfMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#halfMaskG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="edgeFadeG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.3" stop-color="#fff"/>
+      <stop offset="0.7" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <mask id="edgeFade" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#edgeFadeG)" filter="url(#dither)"/>
+    </mask>
+    <radialGradient id="centerFadeG" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.25" stop-color="#000"/>
+      <stop offset="1" stop-color="#fff"/>
+    </radialGradient>
+    <mask id="centerFade" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#centerFadeG)" filter="url(#dither)"/>
+    </mask>
+    <radialGradient id="spotG" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.5" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </radialGradient>
+    <mask id="spot" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#spotG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="ensoG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.45" stop-color="#fff"/>
+    </linearGradient>
+    <mask id="ensoMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#ensoG)" filter="url(#dither)"/>
+    </mask>
+    <linearGradient id="horizonG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.3" stop-color="#fff"/>
+      <stop offset="0.7" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <mask id="horizonMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#horizonG)" filter="url(#dither)"/>
+    </mask>
+  </defs>
+</svg>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · APP ICON</div>
+  <h1>アイコン案</h1>
+  <p>These use the song-cover style: flat risograph print, warm paper, mist blue, deep olive, charcoal and at most one warm accent. Each one tries to show the same idea, that the app steps back and leaves you with your reading. Click a card to see it on a home screen. Use ☆ to mark favourites, then "Starred" to compare just those.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">WALLPAPER</span>
+      <div class="pill-seg" id="wp"><button class="on" data-v="light">Light</button><button data-v="dark">Dark</button><button data-v="photo">Photo</button></div>
+    </div>
+    <div class="ctl"><span class="lbl">SHOW</span>
+      <div class="pill-seg" id="show"><button class="on" data-v="all">All</button><button data-v="starred">Starred</button></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="grid-col" id="groups"></div>
+  <aside class="phone-col">
+    <div class="phone light" id="phone">
+      <div class="home" id="home"></div>
+      <div class="dock" id="dock"></div>
+    </div>
+    <div class="tiny-row"><div class="tab"><span id="fav"></span>Yūgen</div><div class="tab"><span class="icon" style="width:16px;height:16px;background:#c9c9c0"></span>Inbox</div></div>
+    <div class="phone-cap" id="cap"></div>
+  </aside>
+</div>
+
+<script>
+const C = {
+  paper: '#efe9dc', mist: '#a8c0cd', mistPale: '#cad8df', olive: '#55613a',
+  oliveDeep: '#3f4a2b', char: '#2e2d2a', warm: '#cf6a4a',
+};
+const SERIF = "'Shippori Mincho', serif";
+
+// One ink layer: rough edges, speckle, multiplies over what is beneath.
+const ink = (content, extra = '') => `<g filter="url(#ink)" style="mix-blend-mode:multiply" ${extra}>${content}</g>`;
+const glyph = (ch, { x = 256, y = 256, size = 320, fill = C.char, weight = 600, extra = '' } = {}) =>
+  `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central" font-family="${SERIF}" font-weight="${weight}" fill="${fill}" ${extra}>${ch}</text>`;
+const fog = (y, h, grad = 'fogV', op = 1) =>
+  `<rect x="-40" y="${y}" width="592" height="${h}" fill="url(#${grad})" opacity="${op}" filter="url(#wisp)"/>`;
+const lines = (x, y, widths, { h = 14, gap = 32, fill = C.char } = {}) =>
+  widths.map((w, i) => `<rect x="${x}" y="${y + i * gap}" width="${w}" height="${h}" rx="${h / 2}" fill="${fill}"/>`).join('');
+const frame = (inner, bg = C.paper) =>
+  `<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="${bg}"/>${inner}<rect width="512" height="512" filter="url(#grain)" opacity="0.3" style="mix-blend-mode:multiply"/></svg>`;
+
+const ICONS = [
+  // ── 幽, from 幽玄 ──
+  { id: 'A1', group: '幽 · from 幽玄', name: '霧の幽', en: 'Veiled',
+    concept: '幽 sinks into drifting mist. The brand is there, but the fog takes it.',
+    svg: () => frame(
+      ink(`<rect x="0" y="300" width="512" height="150" fill="${C.mistPale}"/>`) +
+      ink(glyph('幽', { size: 330, y: 250 })) +
+      fog(268, 60) + fog(350, 80) + fog(190, 34, 'fogV', 0.7)) },
+  { id: 'A2', group: '幽 · from 幽玄', name: '枠が消える', en: 'Frame fades',
+    concept: '幽 rebuilt: the 山 frame (the container) fades away, the two 幺 (the content) stay in ink.',
+    svg: () => frame(
+      `<g fill="none" stroke-linecap="round" stroke-width="24" filter="url(#ink)" style="mix-blend-mode:multiply">
+        <path d="M256 118 V398" stroke="url(#fadeUp)"/>
+        <path d="M128 222 V398" stroke="url(#fadeUp)"/>
+        <path d="M384 222 V398" stroke="url(#fadeUp)"/>
+        <path d="M128 398 H384" stroke="${C.mist}"/>
+      </g>` +
+      ink(glyph('幺', { x: 190, y: 270, size: 190, weight: 800 }) + glyph('幺', { x: 322, y: 270, size: 190, weight: 800 }))) },
+  { id: 'A3', group: '幽 · from 幽玄', name: '刷り減り', en: 'Ink thinning',
+    concept: 'Fully printed at the top, breaking into stipple and then paper at the bottom.',
+    svg: () => frame(ink(glyph('幽', { size: 340, extra: 'mask="url(#halfMask)"' }))) },
+  { id: 'A4', group: '幽 · from 幽玄', name: '透かし', en: 'Watermark',
+    concept: 'The brand becomes a pale watermark running off the edge, with your text printed over it.',
+    svg: () => frame(
+      ink(glyph('幽', { x: 300, y: 270, size: 560, fill: C.mistPale, weight: 500 })) +
+      ink(lines(96, 250, [250, 300, 210, 280, 150], { h: 16, gap: 36 }))) },
+  { id: 'A5', group: '幽 · from 幽玄', name: 'ふりがな', en: 'Furigana',
+    concept: 'The app is the little reading above the kanji: quiet help that you stop needing.',
+    svg: () => frame(
+      ink(glyph('ゆう', { y: 108, size: 62, fill: C.mist, weight: 600, extra: 'letter-spacing="10"' })) +
+      ink(glyph('幽', { y: 300, size: 300 }))) },
+  { id: 'A6', group: '幽 · from 幽玄', name: '深緑の幽', en: 'Veiled, olive',
+    concept: 'A1 in reverse on deep olive, to stay close to the current green icon.',
+    svg: () => frame(
+      `<rect x="0" y="290" width="512" height="160" fill="${C.mist}" opacity="0.35"/>` +
+      `<g filter="url(#ink)">${glyph('幽', { size: 330, y: 250, fill: C.paper })}</g>` +
+      fog(272, 50, 'fogOlive', 0.75) + fog(352, 70, 'fogOlive', 0.85) + fog(196, 30, 'fogOlive', 0.5), C.oliveDeep) },
+  { id: 'A7', group: '幽 · from 幽玄', name: '落款', en: 'Seal',
+    concept: 'Just a small vermilion seal on a wide sheet of paper. The page belongs to you; the app only signs it.',
+    svg: () => frame(ink(
+      `<rect x="176" y="176" width="160" height="160" rx="14" fill="${C.warm}"/>` +
+      glyph('幽', { size: 124, fill: C.paper, weight: 700, y: 258 })).replace('mix-blend-mode:multiply', '')) },
+
+  // ── Kana and other characters ──
+  { id: 'B1', group: 'Kana and other characters', name: 'ゆ', en: 'Yu, in kana',
+    concept: 'Yū as a single soft kana. Readable on day one, and gentler than kanji.',
+    svg: () => frame(
+      ink(`<circle cx="330" cy="200" r="96" fill="${C.mist}"/>`) +
+      ink(glyph('ゆ', { size: 330, weight: 500, y: 262 }))) },
+  { id: 'B2', group: 'Kana and other characters', name: '間', en: 'Ma, the space between',
+    concept: 'Light through a gate: the 門 is barely there, and the sun inside it is the point.',
+    svg: () => frame(
+      `<g fill="none" stroke="${C.mistPale}" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" filter="url(#ink)" style="mix-blend-mode:multiply">
+        <path d="M232 124 H140 V406"/><path d="M140 162 H232"/><path d="M140 200 H232 V124"/>
+        <path d="M280 124 H372 V384 Q372 406 348 406"/><path d="M280 162 H372"/><path d="M280 200 H372"/><path d="M280 124 V200"/>
+      </g>` +
+      ink(`<circle cx="256" cy="316" r="50" fill="${C.warm}"/>`)) },
+  { id: 'B3', group: 'Kana and other characters', name: '影', en: 'Kage, reprinted',
+    concept: 'The current kanji reprinted: olive ink, with its own shadow as a slipped mist-blue layer.',
+    svg: () => frame(
+      ink(glyph('影', { x: 270, y: 270, size: 320, fill: C.mist })) +
+      ink(glyph('影', { size: 320, fill: C.olive }))) },
+
+  // ── Scenes, no characters ──
+  { id: 'C1', group: 'Scenes, no characters', name: '霧の山', en: 'Mountains in mist',
+    concept: 'The image yūgen is named for: ridges fading into mist behind one another, and a small sun.',
+    svg: () => frame(
+      ink(`<circle cx="350" cy="168" r="38" fill="${C.warm}"/>`) +
+      ink(`<path d="M0 300 Q60 268 110 280 Q170 230 240 196 Q290 236 330 248 Q390 214 440 228 Q480 250 512 262 V512 H0Z" fill="${C.mistPale}"/>`) +
+      fog(268, 70) +
+      ink(`<path d="M0 368 Q80 322 160 346 Q230 312 300 334 Q390 296 512 348 V512 H0Z" fill="${C.mist}"/>`) +
+      fog(350, 70) +
+      ink(`<path d="M0 440 Q120 404 236 428 Q360 400 512 420 V512 H0Z" fill="${C.oliveDeep}"/>`)) },
+  { id: 'C2', group: 'Scenes, no characters', name: '朧月', en: 'Hazy moon',
+    concept: 'A moon behind thin cloud over still water. A quiet, late-night reading mood.',
+    svg: () => frame(
+      `<g filter="url(#ink)"><circle cx="256" cy="220" r="118" fill="${C.paper}"/></g>` +
+      fog(200, 46, 'fogNight') + fog(262, 56, 'fogNight', 0.8) +
+      `<g filter="url(#ink)" fill="${C.paper}" opacity="0.85">${lines(186, 392, [140], { h: 10 })}${lines(206, 414, [100], { h: 9 })}${lines(226, 434, [60], { h: 8 })}</g>`, C.oliveDeep) },
+  { id: 'C3', group: 'Scenes, no characters', name: '障子の影', en: 'Shoji shadow',
+    concept: 'A branch’s shadow on a paper screen. The lattice fades out; what you see through it is what matters.',
+    svg: () => frame(
+      `<g mask="url(#centerFade)">` + ink(`<g stroke="${C.mist}" stroke-width="7">
+        ${[102, 205, 307, 410].map(x => `<line x1="${x}" y1="0" x2="${x}" y2="512"/>`).join('')}
+        ${[128, 256, 384].map(y => `<line x1="0" y1="${y}" x2="512" y2="${y}"/>`).join('')}</g>`) + `</g>` +
+      ink(`<path d="M520 120 C430 150 360 190 300 260 C260 306 220 330 160 350" stroke="${C.char}" stroke-width="13" fill="none" stroke-linecap="round"/>
+           <path d="M360 196 C350 160 360 130 384 108" stroke="${C.char}" stroke-width="9" fill="none" stroke-linecap="round"/>
+           <path d="M250 312 C250 352 236 382 214 404" stroke="${C.char}" stroke-width="8" fill="none" stroke-linecap="round"/>`) +
+      ink(`${[[384, 104, 16], [300, 254, 14], [212, 404, 13], [160, 350, 15], [420, 150, 12]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${C.warm}"/>`).join('')}`)) },
+  { id: 'C4', group: 'Scenes, no characters', name: '地平線', en: 'Horizon',
+    concept: 'Almost nothing: a horizon line that fades at both ends, and a sun half set behind it.',
+    svg: () => frame(
+      `<clipPath id="above"><rect width="512" height="300"/></clipPath>` +
+      ink(`<circle cx="256" cy="300" r="78" fill="${C.warm}" clip-path="url(#above)"/>`) +
+      `<g mask="url(#horizonMask)">` + ink(`<rect x="40" y="296" width="432" height="10" fill="${C.char}"/>`) + `</g>` +
+      `<g mask="url(#horizonMask)">` + ink(`<rect x="140" y="336" width="232" height="6" fill="${C.mist}"/><rect x="196" y="362" width="120" height="5" fill="${C.mist}"/>`) + `</g>`) },
+  { id: 'C5', group: 'Scenes, no characters', name: '円相', en: 'Ensō',
+    concept: 'One brush circle that thins away and never closes. Unfinished, like a reading habit.',
+    svg: () => frame(`<g mask="url(#ensoMask)">` + ink(
+      `<path d="M330 108 A156 156 0 1 0 410 230" fill="none" stroke="${C.olive}" stroke-width="40" stroke-linecap="round"/>`) + `</g>`) },
+
+  // ── The page itself, no characters ──
+  { id: 'D1', group: 'The page itself, no characters', name: '栞', en: 'Open book, bookmark',
+    concept: 'An open book whose edges you can barely see. One page of text, one empty page, and a red しおり ribbon.',
+    svg: () => frame(
+      ink(`<path d="M256 150 Q180 126 92 140 V384 Q180 370 256 394 Q332 370 420 384 V140 Q332 126 256 150Z M256 150 V394" fill="none" stroke="${C.mistPale}" stroke-width="8" stroke-linejoin="round"/>`) +
+      ink(lines(282, 190, [110, 104, 112, 92, 108, 70], { h: 11, gap: 28 })) +
+      ink(`<path d="M300 116 V214 L316 200 L332 214 V116Z" fill="${C.warm}"/>`)) },
+  { id: 'D2', group: 'The page itself, no characters', name: '縦書き', en: 'Vertical text',
+    concept: 'Just columns of type read right to left. The oldest column is already fading into the paper.',
+    svg: () => frame(
+      ink(`<text x="352" y="96" font-size="66" font-family="${SERIF}" font-weight="600" fill="${C.char}" style="writing-mode:vertical-rl">静かに読む</text>`) +
+      ink(`<text x="262" y="96" font-size="66" font-family="${SERIF}" font-weight="600" fill="${C.char}" opacity="0.8" style="writing-mode:vertical-rl">言葉だけが</text>`) +
+      ink(`<text x="172" y="96" font-size="66" font-family="${SERIF}" font-weight="600" fill="${C.mist}" style="writing-mode:vertical-rl">残る</text>`) +
+      ink(`<rect x="96" y="394" width="40" height="40" rx="5" fill="${C.warm}"/>`)) },
+  { id: 'D3', group: 'The page itself, no characters', name: '画面が消える', en: 'Chrome fades',
+    concept: 'Like the reader screen: the top bar and tab bar fade out, and only the article is left.',
+    svg: () => frame(
+      `<g mask="url(#edgeFade)">` +
+        ink(`<rect x="80" y="62" width="352" height="30" rx="15" fill="${C.mistPale}"/>`) +
+        ink(`<g fill="${C.mistPale}"><circle cx="156" cy="444" r="18"/><circle cx="256" cy="444" r="18"/><circle cx="356" cy="444" r="18"/></g>`) +
+      `</g>` +
+      ink(`<rect x="104" y="166" width="230" height="30" rx="8" fill="${C.char}"/>` + lines(104, 230, [304, 280, 300, 220], { h: 13, gap: 34 }))) },
+  { id: 'D4', group: 'The page itself, no characters', name: '灯り', en: 'Lamplight',
+    concept: 'A page under one warm light. The text you are reading is sharp, and everything around it falls away.',
+    svg: () => frame(
+      ink(`<circle cx="256" cy="256" r="150" fill="${C.warm}" opacity="0.16"/>`) +
+      `<g mask="url(#spot)">` + ink(lines(60, 150, [392, 360, 392, 330, 392, 300, 380], { h: 14, gap: 34 })) + `</g>`) },
+];
+
+// ── Render ──
+let starred = new Set();
+try { starred = new Set(JSON.parse(localStorage.getItem('icon-stars') || '[]')); } catch {}
+const saveStars = () => { try { localStorage.setItem('icon-stars', JSON.stringify([...starred])); } catch {} };
+
+const groupsEl = document.getElementById('groups');
+let lastGroup = null, grid;
+const svgCache = {};
+ICONS.forEach(ic => {
+  svgCache[ic.id] = ic.svg();
+  if (ic.group !== lastGroup) {
+    lastGroup = ic.group;
+    groupsEl.insertAdjacentHTML('beforeend', `<div class="group-title">${ic.group}</div><div class="grid"></div>`);
+    grid = groupsEl.lastElementChild;
+  }
+  const card = document.createElement('div');
+  card.className = 'card' + (starred.has(ic.id) ? ' starred' : '');
+  card.dataset.id = ic.id;
+  card.innerHTML = `
+    <button class="star ${starred.has(ic.id) ? 'on' : ''}" title="Star">${starred.has(ic.id) ? '★' : '☆'}</button>
+    <div class="row">
+      <span class="icon" style="width:160px;height:160px">${svgCache[ic.id]}</span>
+      <div class="sizes">
+        <span class="icon" style="width:60px;height:60px">${svgCache[ic.id]}</span>
+        <span class="icon" style="width:29px;height:29px;border-radius:7px">${svgCache[ic.id]}</span>
+      </div>
+    </div>
+    <div class="name">${ic.name}<span class="id">${ic.id} · ${ic.en.toUpperCase()}</span></div>
+    <div class="concept">${ic.concept}</div>`;
+  card.querySelector('.star').addEventListener('click', e => {
+    e.stopPropagation();
+    starred.has(ic.id) ? starred.delete(ic.id) : starred.add(ic.id);
+    saveStars();
+    const on = starred.has(ic.id);
+    e.currentTarget.classList.toggle('on', on);
+    e.currentTarget.textContent = on ? '★' : '☆';
+    card.classList.toggle('starred', on);
+  });
+  card.addEventListener('click', () => select(ic.id));
+  grid.appendChild(card);
+});
+
+// Placeholder neighbours: muted, flat squircles so the candidate is judged in context.
+const NEIGHBOURS = [
+  ['#e4e1d9', 'Calendar'], ['#9fb7a0', 'Maps'], ['#f0c27a', 'Notes'], ['#c5ccd6', 'Settings'],
+  ['#2f3a4a', 'Books'], ['#e9a28c', 'Photos'], ['#8aa9c8', 'Weather'], ['#3b3b3b', 'Camera'],
+  null, ['#d7d0c2', 'Files'], ['#6d8f78', 'Duo'], ['#b9b0d6', 'Podcasts'],
+];
+const DOCK = ['#5f9d6b', '#4b86d6', '#f2f2f2', '#e85a4f'];
+function select(id) {
+  const ic = ICONS.find(i => i.id === id);
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('sel', c.dataset.id === id));
+  document.getElementById('home').innerHTML = NEIGHBOURS.map(n => n
+    ? `<div class="app"><div class="ph" style="background:${n[0]}"></div><span>${n[1]}</span></div>`
+    : `<div class="app"><span class="icon" style="width:56px;height:56px">${svgCache[id]}</span><span>Yūgen</span></div>`).join('');
+  document.getElementById('dock').innerHTML = DOCK.map(c => `<div class="ph" style="width:56px;height:56px;border-radius:22.37%;background:${c}"></div>`).join('');
+  document.getElementById('fav').innerHTML = `<span class="icon" style="width:16px;height:16px">${svgCache[id]}</span>`;
+  document.getElementById('cap').innerHTML = `<b>${ic.id} · ${ic.name}</b>${ic.en}`;
+}
+select('A2');
+
+document.querySelectorAll('#wp button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#wp button').forEach(x => x.classList.toggle('on', x === b));
+  document.getElementById('phone').className = 'phone ' + b.dataset.v;
+}));
+document.querySelectorAll('#show button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#show button').forEach(x => x.classList.toggle('on', x === b));
+  document.body.classList.toggle('starred-only', b.dataset.v === 'starred');
+}));
+</script>
+</body>
+</html>
