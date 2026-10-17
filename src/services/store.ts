@@ -297,6 +297,8 @@ interface AppState {
   recordWordSeen: (word: string, withoutLookup?: boolean) => void;
   applyDifficultyEvent: (word: string, event: 'skip' | 'click', jlptLevel?: number | null) => void;
   reviewWord: (word: string, rating: Rating, now: number) => void;
+  /** Count a review from another deck (the RTK kanji deck) in reviewsByDay. */
+  recordReview: (now: number) => void;
   resetStudyPacing: () => Promise<{ keptActive: number; requeued: number }>;
   realignFurigana: () => Promise<{ updated: number; scanned: number }>;
   setWordMastery: (word: string, level: MasteryLevel) => void;
@@ -1087,6 +1089,11 @@ export const useAppStore = create<AppState>()(
             reviewsByDay: bumpReviewDay(state.reviewsByDay, today),
           };
         }),
+
+      recordReview: (now: number) =>
+        set((state) => (state.sandboxMode ? {} : {
+          reviewsByDay: bumpReviewDay(state.reviewsByDay, new Date(now).toISOString().split('T')[0]),
+        })),
 
       // One-time study-pacing reset (the flood fix). Reclassifies the whole active
       // back-catalog under Policy F (see services/pacing.ts + docs/study-pacing-flood-fix.md):

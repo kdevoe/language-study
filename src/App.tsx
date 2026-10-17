@@ -14,6 +14,7 @@ import type { Song } from './services/songs'
 import type { PodcastEpisode } from './services/podcasts'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
+import { useKanjiStore, hasKanjiDeck } from './services/kanjiStore'
 import { supabase } from './services/supabase'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
 import { resetPlaylists } from './services/playlists'
@@ -382,7 +383,9 @@ function App() {
   const loadedCacheForUser = useRef<string | null>(null);
   useEffect(() => {
     if (isOnboarded && session) {
-      checkDailyKanji();
+      // With an RTK kanji deck, the RTK level follows the deck (kanjiStore); the old
+      // blind +3/day only runs for users without one.
+      if (!hasKanjiDeck()) checkDailyKanji();
       checkMidnightReset();
       // This effect re-runs on every `session` change (token refresh / tab
       // refocus produce a new session object with the same user id). Only the
@@ -395,9 +398,16 @@ function App() {
       }
       // Sync first (hydrates remote progress + the new-words/day preference), then run
       // the daily intake promotion (#68) so it sees the up-to-date queue + cap.
-      useAppStore.getState().syncSrsWithSupabase(session.user.id)
+      // Then the kanji deck: pull its rows and add today's new kanji. It runs after the
+      // SRS sync because that sync's preference pull sets rtkLevel, and the deck's
+      // level has to win.
+      const uid = session.user.id;
+      useAppStore.getState().syncSrsWithSupabase(uid)
         .then(() => useAppStore.getState().promoteIntakeQueue(Date.now()))
-        .catch((e) => console.warn('[app] SRS sync / intake promotion failed:', e));
+        .catch((e) => console.warn('[app] SRS sync / intake promotion failed:', e))
+        .then(() => useKanjiStore.getState().sync(uid))
+        .then(() => useKanjiStore.getState().introduceDaily(uid, Date.now()))
+        .catch((e) => console.warn('[app] kanji sync failed:', e));
     }
   }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
 

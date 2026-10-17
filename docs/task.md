@@ -594,3 +594,12 @@
     - [x] dictionary-lookup: grammar-point insight + point names in the word insight (needs deploy)
     - [ ] Not rule-able from tokens alone (left out): particle senses (に place/time/target, と "and"/quote), 〜がる and 〜方 (tokenized as one word)
     - [ ] NINJAL (CC BY 4.0) attribution in the app (no credits screen yet)
+- [/] RTK kanji deck: a second study deck imported from Anki (plan: docs/rtk-kanji-deck-plan.md, mockup: docs/mockups/kanji-deck.html)
+  - [x] Anki data audit (726 kanji since the Feb 2026 restart, 3,506 reviews) + FSRS replay test (import keeps Anki's schedule)
+  - [x] Decisions: 復習 opens on two deck rows (B); card back = kanji, keyword, readings, components, known words with furigana; grading = slider set from thinking time, tap the card to move on (both decks)
+  - [x] Phase 1: migration (database/35, applied), kanjiDeck.ts + scripts/test-kanji-deck.mjs (25 checks), scripts/import-anki-rtk.mjs (imported: 726 kanji, 3,506 reviews, due dates match Anki)
+  - [x] Phase 2: deck rows, kanji session (card back from src/data/rtkKanjiInfo.ts), grade slider from thinking time + tap to move on (both decks), daily new-kanji drip, rtkLevel from the deck, New kanji / day in Settings
+  - [x] Phase 3: Home 復習 card with both counts
+  - [ ] Components miss primitives that aren't kanji (掛 shows "finger · soil", not "finger · ivy")
+  - [ ] New kanji / day is per device (kanji store), not synced to user_preferences
+- [ ] Tutorial mode: first-run hints for non-obvious gestures (tap the card to move on, the thinking-time default, swipe to dismiss in the feed)

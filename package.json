@@ -12,7 +12,8 @@
     "test:intake": "node scripts/test-intake.mjs",
     "test:deck": "node scripts/test-deck.mjs",
     "test:furigana": "node scripts/test-furigana-map.mjs",
-    "test:wordpriority": "node scripts/test-wordpriority.mjs"
+    "test:wordpriority": "node scripts/test-wordpriority.mjs",
+    "test:kanji": "node scripts/test-kanji-deck.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

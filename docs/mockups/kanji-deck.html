@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — kanji deck</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+.serif { font-family: var(--font-serif); }
+
+.mock-header { max-width: 900px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 700px; margin: 0 auto; }
+.section-title { max-width: 1300px; margin: 3rem auto 1.2rem; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); text-align: center; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 380px; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 360px; }
+.phone-note b { color: var(--text-main); font-weight: 600; }
+.phone { width: 380px; height: 780px; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; flex-shrink: 0; }
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 2.6rem 1.25rem 6rem; }
+
+/* Page heading + segment (PageHeading + Segment) */
+.page-h { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; min-height: 2.75rem; display: flex; align-items: center; margin-bottom: 1rem; gap: 0.6rem; }
+.page-h .back { font-size: 1.2rem; opacity: 0.5; cursor: pointer; border: none; background: none; font-family: var(--font-serif); }
+.seg-row { height: 4.4rem; display: flex; align-items: flex-start; justify-content: space-between; flex: none; }
+.seg { display: inline-flex; background: var(--bg-card); border-radius: 100px; padding: 3px; }
+.seg button { border: none; border-radius: 100px; padding: 0.3rem 0.95rem; font-family: var(--font-serif); font-size: 0.95rem; font-weight: 500; cursor: pointer; color: var(--text-muted); background: transparent; display: flex; align-items: center; gap: 0.4rem; transition: color 0.2s, background-color 0.2s; }
+.seg button.on { font-weight: 700; color: var(--text-main); background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.badge { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 700; background: var(--accent-primary); color: var(--text-main); border-radius: 100px; padding: 0.05rem 0.45rem; }
+.hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.95rem; font-variant-numeric: tabular-nums; }
+
+/* Session progress row */
+.prog { margin-bottom: 0.4rem; flex: none; }
+.prog .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.4rem; }
+.prog .k { font-size: 0.7rem; letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase; }
+.prog .n { font-size: 0.75rem; color: var(--text-muted); }
+.track { height: 3px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent-progress); transition: width 0.35s var(--ease); }
+
+/* Flip card (FlipSurface + CardFace) */
+.card-area { flex: 1; display: flex; align-items: center; justify-content: center; perspective: 1600px; padding: 0.6rem 0.2rem; }
+.card { width: 100%; max-width: 330px; height: 440px; position: relative; transform-style: preserve-3d; transition: transform 0.55s var(--ease); cursor: pointer; }
+.card.flipped { transform: rotateY(180deg); cursor: default; }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--bg-pure); border: 1px solid var(--border-light); border-radius: 24px; box-shadow: 0 4px 25px rgba(0,0,0,0.03); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.8rem 1.5rem 5.5rem; text-align: center; }
+.face.front { padding-bottom: 1.8rem; }
+.face.back { transform: rotateY(180deg); justify-content: flex-start; padding-top: 2.2rem; }
+.chev { position: absolute; bottom: 1.5rem; color: var(--text-muted); opacity: 0.35; font-size: 1.1rem; }
+.heisig { position: absolute; top: 1.2rem; left: 0; right: 0; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); opacity: 0.8; }
+.keyword { font-family: var(--font-serif); font-size: 2.1rem; font-weight: 500; line-height: 1.25; max-width: 12ch; }
+.kanji-big { font-family: var(--font-serif); font-size: 6.5rem; line-height: 1; font-weight: 500; margin-top: 0.4rem; }
+.kw-small { font-family: var(--font-serif); font-size: 1.2rem; margin-top: 0.7rem; }
+.facts { display: flex; gap: 0.9rem; justify-content: center; margin-top: 0.9rem; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; }
+.facts b { color: var(--text-main); font-weight: 600; font-family: var(--font-serif); font-size: 0.85rem; }
+.parts { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+/* Words you know: no rule, no kicker, just the words */
+.known { margin-top: 1.6rem; display: flex; justify-content: center; gap: 1.3rem; flex-wrap: wrap; }
+.known .w { font-family: var(--font-serif); font-size: 1.15rem; line-height: 1.2; }
+.known rt { font-family: var(--font-sans); font-size: 0.55rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.02em; }
+.known .w small { display: block; font-family: var(--font-sans); font-size: 0.62rem; color: var(--text-muted); line-height: 1.2; }
+.known .none { font-size: 0.75rem; color: var(--text-muted); }
+.grades { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 1rem 1.1rem; display: flex; gap: 8px; }
+.grades button { flex: 1; border-radius: 999px; background: var(--bg-pure); border: 1px solid var(--border-light); padding: 0.5rem 0 0.55rem; display: flex; flex-direction: column; align-items: center; cursor: pointer; line-height: 1.25; }
+.grades b { font-size: 0.78rem; font-weight: 600; }
+.grades span { font-size: 0.66rem; color: var(--text-muted); }
+.g1 { box-shadow: 0 3px 10px rgba(207,125,107,0.30); } .g2 { box-shadow: 0 3px 10px rgba(194,160,88,0.30); }
+.g3 { box-shadow: 0 3px 10px rgba(143,176,196,0.35); } .g4 { box-shadow: 0 3px 10px rgba(143,170,116,0.32); }
+
+/* B: deck chooser */
+.decks { display: flex; flex-direction: column; gap: 0.9rem; margin-top: 0.4rem; }
+.deck { background: var(--bg-pure); border: 1px solid var(--border-light); border-radius: 24px; padding: 1.3rem 1.4rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 25px rgba(0,0,0,0.03); transition: transform 0.1s; }
+.deck:active { transform: scale(0.98); }
+.deck .t { font-family: var(--font-serif); font-size: 1.4rem; font-weight: 500; }
+.deck .s { font-size: 0.75rem; color: var(--text-muted); }
+.deck .c { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; text-align: right; line-height: 1; }
+.deck .c small { display: block; font-family: var(--font-sans); font-size: 0.62rem; color: var(--text-muted); letter-spacing: 0.08em; margin-top: 0.3rem; }
+.deck-foot { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.6rem; }
+
+/* C: pause card */
+.pause .big { font-family: var(--font-serif); font-size: 2.6rem; font-weight: 500; }
+.pause .sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem; }
+.pause .go { margin-top: 2rem; border: none; background: var(--bg-pure); border-radius: 100px; padding: 0.7rem 1.6rem; font-family: var(--font-serif); font-size: 1rem; box-shadow: 0 4px 14px rgba(0,0,0,0.1); cursor: pointer; }
+.pause .skip { margin-top: 0.9rem; font-size: 0.78rem; color: var(--text-muted); background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Vocab card front (as today) */
+.vocab-word { font-family: var(--font-serif); font-size: 3rem; line-height: 1.1; }
+
+/* Bottom nav */
+.nav { position: absolute; bottom: 0; left: 0; right: 0; background: var(--bg-pure); border-top: 1px solid var(--border-light); display: flex; justify-content: space-around; padding: 0.8rem 0.6rem 1.3rem; }
+.nav div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.58rem; letter-spacing: 0.05em; color: var(--text-muted); text-transform: uppercase; }
+.nav i { width: 46px; height: 28px; border-radius: 100px; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 0.95rem; }
+.nav .on { color: var(--text-main); font-weight: 600; }
+.nav .on i { background: var(--accent-primary); }
+
+/* Home card + Progress line */
+.mini { width: 380px; background: var(--bg-color); border-radius: 28px; padding: 1.4rem 1.3rem; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+.mini .kicker { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 0.7rem; }
+.home-card { background: var(--bg-pure); border-radius: 24px; padding: 1.2rem 1.3rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 25px rgba(0,0,0,0.03); }
+.home-card .lbl { font-size: 0.75rem; color: var(--text-muted); }
+.home-card .counts { display: flex; gap: 1.1rem; align-items: baseline; margin-top: 0.15rem; }
+.home-card .counts span { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; line-height: 1.1; }
+.home-card .counts small { font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-muted); margin-left: 0.25rem; }
+.home-card .start { border: none; background: var(--bg-pure); border-radius: 100px; padding: 0.55rem 1.1rem; font-family: var(--font-serif); box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+
+
+/* ── Grading alternatives ── */
+.ggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 2rem 1.6rem; max-width: 1150px; margin: 0 auto; justify-items: center; }
+.gwrap { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 340px; }
+.gcard { width: 330px; height: 510px; position: relative; background: var(--bg-pure); border: 1px solid var(--border-light); border-radius: 24px; box-shadow: 0 4px 25px rgba(0,0,0,0.03); display: flex; flex-direction: column; align-items: center; padding: 2.2rem 1.4rem 0; text-align: center; overflow: hidden; touch-action: none; user-select: none; }
+.gcard .body { transition: opacity 0.25s; display: flex; flex-direction: column; align-items: center; }
+.gcard.done .body, .gcard.done .gctl { opacity: 0.15; }
+.gctl { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 1rem 1.1rem; transition: opacity 0.25s; }
+.toast { position: absolute; left: 0; right: 0; top: 42%; text-align: center; font-family: var(--font-serif); font-size: 1.5rem; opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+.toast small { display: block; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+.gcard.done .toast { opacity: 1; }
+
+/* G2/G3 slider toggle (design-system §6.1) */
+.stog { position: relative; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; display: flex; }
+.stog .thumb { position: absolute; top: 4px; bottom: 4px; width: calc((100% - 8px) / 4); left: calc(4px + var(--i, 1.5) * (100% - 8px) / 4); background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4,0,0.2,1); opacity: 0; }
+.stog.picked .thumb { opacity: 1; }
+.stog button { position: relative; z-index: 1; flex: 1; border: none; background: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); transition: color 0.4s cubic-bezier(0.4,0,0.2,1); line-height: 1.1; }
+.stog button.on { color: var(--text-main); font-weight: 700; }
+.stog.serif-l button { font-family: var(--font-serif); font-size: 0.9rem; }
+.stog button small { display: block; font-family: var(--font-sans); font-size: 0.6rem; font-weight: 500; color: var(--text-muted); margin-top: 1px; }
+.under { display: flex; margin-top: 0.4rem; }
+.under span { flex: 1; font-size: 0.66rem; color: var(--text-muted); }
+
+/* G4 type only */
+.trow { display: flex; justify-content: space-around; padding-bottom: 0.3rem; }
+.trow button { border: none; background: none; cursor: pointer; font-family: var(--font-serif); font-size: 1.05rem; color: var(--text-main); padding: 0.4rem 0.3rem; line-height: 1.2; border-radius: 12px; transition: background-color 0.2s; }
+.trow button:hover { background: var(--bg-card); }
+.trow button small { display: block; font-family: var(--font-sans); font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; }
+
+/* G5 swipe */
+.swipe-hint { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; font-size: 0.68rem; color: var(--text-muted); padding: 0 0.4rem 0.2rem; }
+.swipe-hint .mid { text-align: center; line-height: 1.5; }
+.swipe-hint .l { text-align: left; } .swipe-hint .r { text-align: right; }
+.gcard.swipe { cursor: grab; transition: transform 0.3s var(--ease); }
+.gcard.swipe.dragging { transition: none; cursor: grabbing; }
+.edge { position: absolute; font-family: var(--font-serif); font-size: 1.2rem; opacity: 0; transition: opacity 0.15s; pointer-events: none; background: var(--bg-pure); padding: 0.2rem 0.8rem; border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.edge.show { opacity: 1; }
+.edge.l { left: 1rem; top: 45%; } .edge.r { right: 1rem; top: 45%; } .edge.u { top: 1rem; left: 50%; transform: translateX(-50%); } .edge.d { bottom: 4.5rem; left: 50%; transform: translateX(-50%); }
+
+/* G6 scrub */
+.scrub-label { font-family: var(--font-serif); font-size: 1.1rem; min-height: 1.6rem; color: var(--text-main); }
+.scrub-label small { font-family: var(--font-sans); font-size: 0.7rem; color: var(--text-muted); margin-left: 0.4rem; }
+.scrub-label.idle { color: var(--text-muted); font-size: 0.85rem; font-family: var(--font-sans); }
+.scrub { -webkit-appearance: none; appearance: none; width: 100%; height: 45px; background: var(--border-light); border-radius: 100px; outline: none; margin-top: 0.4rem; padding: 0 4px; cursor: pointer; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 37px; height: 37px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.scrub::-moz-range-thumb { width: 37px; height: 37px; border: none; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.ticks { display: flex; justify-content: space-between; padding: 0.35rem 0.9rem 0; font-size: 0.6rem; color: var(--text-muted); }
+
+
+/* Grading v2: flip from the keyword, slider + a separate way on */
+.gcard .front-k { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: var(--bg-pure); transition: opacity 0.25s; z-index: 3; }
+.gcard .front-k .keyword { font-size: 2.1rem; }
+.gcard .front-k .tap { position: absolute; bottom: 1.5rem; font-size: 0.7rem; color: var(--text-muted); opacity: 0.6; }
+.gcard.revealed .front-k { opacity: 0; pointer-events: none; }
+.stog .thumb.static { opacity: 1; }
+.next { display: block; margin: 0.75rem auto 0; border: none; background: var(--bg-pure); border-radius: 100px; padding: 0.55rem 1.8rem; font-family: var(--font-serif); font-size: 1rem; color: var(--text-main); box-shadow: 0 4px 14px rgba(0,0,0,0.1); cursor: pointer; transition: box-shadow 0.2s, transform 0.1s; }
+.next:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+.next:active { transform: scale(0.98); }
+.meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.66rem; color: var(--text-muted); margin-top: 0.45rem; padding: 0 0.3rem; }
+.timer { height: 2px; background: var(--border-light); border-radius: 2px; margin: 0.7rem 0.4rem 0; overflow: hidden; }
+.timer i { display: block; height: 100%; width: 0; background: var(--accent-progress); }
+.timer.run i { width: 100%; transition: width 1.6s linear; }
+.gcard.tapnext .body { cursor: pointer; }
+
+@media (max-width: 860px) { .phone-wrap, .phone, .mini { width: 340px; } }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · KANJI DECK</div>
+  <h1>漢字の復習</h1>
+  <p>Option B, chosen: 復習 opens on two deck rows. The phones are clickable: pick a deck, tap a card to flip it, and grade to move on. Sample cards are real (宣 #200 and 海 #500 as reviews, 掛 #727 as the next new kanji); the words under each kanji are illustrative.</p>
+</header>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone-label">復習 · PICK A DECK</div>
+    <div class="phone"><div class="screen" id="B"></div></div>
+    <div class="phone-note"><b>復習 opens on two deck rows.</b> Tap 漢字 to start the kanji session; ‹ goes back to the decks. Finishing kanji offers 単語へ.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">漢字 · CARD BACK</div>
+    <div class="phone"><div class="screen" id="B2"></div></div>
+    <div class="phone-note"><b>The back of a card.</b> Kanji, keyword, readings and components, then the words you know with furigana. Tap a grade to see the next card.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">HOME · 今日</div>
+    <div class="mini" style="width:100%">
+      <div class="kicker">HOME · 今日</div>
+      <div class="home-card">
+        <div><div class="lbl">復習</div><div class="counts"><span>12<small>単語</small></span><span>3<small>漢字</small></span></div></div>
+        <button class="start">始める</button>
+      </div>
+    </div>
+    <div class="phone-note"><b>Home's 復習 card</b> shows both counts. 始める opens the deck rows.</div>
+  </div>
+</div>
+
+<div class="section-title" style="margin-top:4rem">GRADING · SET HOW IT WENT, THEN MOVE ON</div>
+<p style="max-width:740px;margin:-0.4rem auto 1.8rem;text-align:center;color:var(--text-muted);font-size:0.88rem">The slider is a setting, not a button. It starts on a sensible grade, you nudge it only when the card went differently, and a separate action moves you on. Most cards are one tap, and a mis-tap is easy to fix. All four keep もう一度 · 難しい · 正解 · 簡単. Tap a card to flip it, set the slider, then move on.</p>
+<div class="ggrid" id="ggrid"></div>
+
+<script>
+// Sample data. Kanji facts from reference_files/heisig-kanjis.csv; "words you know" are illustrative.
+const KANJI = [
+  { k: '宣', kw: 'proclaim', n: 200, strokes: 9, on: 'セン', kun: 'のたまう', parts: 'house · span', known: [['宣伝', 'せんでん', 'advertising']], kind: 'Review', iv: ['10m', '3d', '2mo', '5mo'] },
+  { k: '海', kw: 'sea', n: 500, strokes: 9, on: 'カイ', kun: 'うみ', parts: 'water · every', known: [['海', 'うみ', 'sea'], ['海外', 'かいがい', 'overseas'], ['日本海', 'にほんかい', 'Sea of Japan']], kind: 'Review', iv: ['10m', '12d', '3mo', '7mo'] },
+  { k: '掛', kw: 'hang', n: 727, strokes: 11, on: 'カイ · ケイ', kun: 'かける · かかる', parts: 'finger · ivy', known: [['掛ける', 'かける', 'to hang; to call']], kind: 'New', iv: ['1d', '2d', '4d', '15d'] },
+];
+const VOCAB = [{ w: '経済', r: 'けいざい', m: 'economy' }, { w: '影響', r: 'えいきょう', m: 'influence' }];
+
+const kanjiFront = c => `<div class="face front"><div class="keyword">${c.kw}</div><div class="chev">⌄</div></div>`;
+const kanjiBack = c => `<div class="face back">
+  <div class="kanji-big">${c.k}</div>
+  <div class="kw-small">${c.kw}</div>
+  <div class="facts"><span>音 <b>${c.on}</b></span><span>訓 <b>${c.kun}</b></span></div>
+  <div class="parts">${c.parts}</div>
+  <div class="known">${c.known.map(([w, r, m]) => `<span class="w"><ruby>${w}<rt>${r}</rt></ruby><small>${m}</small></span>`).join('')}</div>
+  <div class="grades">${['Again', 'Hard', 'Good', 'Easy'].map((g, i) => `<button class="g${i + 1}" data-grade><b>${g}</b><span>${c.iv[i]}</span></button>`).join('')}</div>
+</div>`;
+const vocabFront = v => `<div class="face front"><div class="vocab-word">${v.w}</div><div class="chev">⌄</div></div>`;
+const vocabBack = v => `<div class="face back" style="padding-top:5rem"><div style="font-weight:700;color:var(--text-muted)">${v.r}</div><div class="vocab-word">${v.w}</div><div style="font-size:1.1rem;margin-top:1.5rem">${v.m}</div>
+  <div class="grades">${['Again', 'Hard', 'Good', 'Easy'].map((g, i) => `<button class="g${i + 1}" data-grade><b>${g}</b><span>${['10m', '2d', '6d', '14d'][i]}</span></button>`).join('')}</div></div>`;
+
+const nav = `<div class="nav">${[['⌂', 'today'], ['▤', 'read'], ['♫', 'listen'], ['❐', 'review', 1], ['⚙', 'settings']].map(([i, l, on]) => `<div class="${on ? 'on' : ''}"><i>${i}</i>${l}</div>`).join('')}</div>`;
+const progRow = (kind, i, total, label) => `<div class="prog"><div class="top"><span class="k">${label ? label + ' · ' : ''}${kind}</span><span class="n">${Math.min(i + 1, total)} / ${total}</span></div><div class="track"><i style="width:${(i / total) * 100}%"></i></div></div>`;
+const cardHtml = (front, back) => `<div class="card-area"><div class="card">${front}${back}</div></div>`;
+
+// Wire flip + grade inside a screen; `next` is called after a grade.
+function wire(el, next) {
+  const card = el.querySelector('.card');
+  if (!card) return;
+  card.addEventListener('click', e => {
+    if (e.target.closest('[data-grade]')) { next(); return; }
+    card.classList.add('flipped');
+  });
+}
+
+// ── B: deck rows ──
+const B = { deck: null, i: 0 };
+function renderB() {
+  const el = document.getElementById('B');
+  let body;
+  if (!B.deck) {
+    body = `<div class="decks">
+      <div class="deck" data-deck="vocab"><div><div class="t">単語</div><div class="s">vocabulary · 3 new today</div></div><div class="c">12<small>DUE</small></div></div>
+      <div class="deck" data-deck="kanji"><div><div class="t">漢字</div><div class="s">RTK · #727–729 new today</div></div><div class="c">${KANJI.length}<small>DUE</small></div></div>
+    </div><div class="deck-foot">今日 18 回</div>`;
+  } else if (B.deck === 'kanji') {
+    body = B.i < KANJI.length ? progRow(KANJI[B.i].kind, B.i, KANJI.length, '漢字') + cardHtml(kanjiFront(KANJI[B.i]), kanjiBack(KANJI[B.i])) : `<div class="card-area"><div class="pause" style="text-align:center"><div class="big">完了</div><div class="sub">漢字 done for today</div><button class="go" data-back>単語へ</button></div></div>`;
+  } else {
+    const v = VOCAB[B.i % VOCAB.length];
+    body = progRow('Review', B.i, 12, '単語') + cardHtml(vocabFront(v), vocabBack(v));
+  }
+  const heading = B.deck ? `<div class="page-h"><button class="back" data-back>‹</button>${B.deck === 'kanji' ? '漢字' : '単語'}</div>` : `<div class="page-h">復習</div>`;
+  const segRow = B.deck ? '' : `<div class="seg-row"><div class="seg"><button class="on">復習<span class="badge">${12 + KANJI.length}</span></button><button>進捗</button></div><span class="hint"></span></div>`;
+  el.innerHTML = heading + segRow + body + nav;
+  el.querySelectorAll('[data-deck]').forEach(d => d.addEventListener('click', () => { B.deck = d.dataset.deck; B.i = 0; renderB(); }));
+  el.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); B.deck = b.classList.contains('go') ? 'vocab' : null; B.i = 0; renderB(); }));
+  wire(el, () => { B.i++; renderB(); });
+}
+
+renderB();
+// Second phone: the kanji session already open, card flipped.
+{
+  const el = document.getElementById('B2');
+  let i = 1;
+  const draw = () => {
+    const c = KANJI[i % KANJI.length];
+    el.innerHTML = `<div class="page-h"><button class="back">‹</button>漢字</div>` + progRow(c.kind, i % KANJI.length, KANJI.length, '漢字') + cardHtml(kanjiFront(c), kanjiBack(c)) + nav;
+    el.querySelector('.card').classList.add('flipped');
+    el.querySelector('.card').addEventListener('click', e => { if (e.target.closest('[data-grade]')) { i++; draw(); } });
+  };
+  draw();
+}
+// ── Grading alternatives (v2) ──
+{
+  const c = KANJI[1]; // 海
+  const G = [['もう一度', 'Again', '10分'], ['難しい', 'Hard', '12日'], ['正解', 'Good', '3ヶ月'], ['簡単', 'Easy', '7ヶ月']];
+  const body = `<div class="body"><div class="kanji-big">${c.k}</div><div class="kw-small">${c.kw}</div>
+    <div class="facts"><span>音 <b>${c.on}</b></span><span>訓 <b>${c.kun}</b></span></div><div class="parts">${c.parts}</div>
+    <div class="known">${c.known.map(([w, r, m]) => `<span class="w"><ruby>${w}<rt>${r}</rt></ruby><small>${m}</small></span>`).join('')}</div></div>`;
+  const slider = `<div class="stog serif-l"><div class="thumb static"></div>${G.map(([j], i) => `<button data-g="${i}">${j}</button>`).join('')}</div>`;
+  const VARIANTS = [
+    { id: 'S1', name: '次へ', en: 'Slider + 次へ', mode: 'button', note: 'Starts on 正解. Nudge the slider if it went differently, then 次へ. A known-it-cold card is a single tap on 次へ.',
+      ctl: () => slider + `<div class="meta-row"><span data-iv></span><span></span></div><button class="next" data-next>次へ</button>` },
+    { id: 'S2', name: '考えた時間', en: 'Starts from your thinking time', mode: 'button', timed: true, note: 'Yūgen picks the starting grade from how long you looked at the keyword before flipping: under 3 seconds 簡単, under 10 正解, longer 難しい. It never pre-picks もう一度, so that one is always yours. You only touch the slider when its guess is wrong. Try a quick flip and a slow one.',
+      ctl: () => slider + `<div class="meta-row"><span data-iv></span><span data-think></span></div><button class="next" data-next>次へ</button>` },
+    { id: 'S3', name: 'カードで次へ', en: 'Tap the card to move on', mode: 'card', note: 'No extra button: the slider sets the grade, and tapping the card itself moves on, the same gesture that flipped it. The cleanest card, but the "move on" action is invisible until learned.',
+      ctl: () => slider + `<div class="meta-row"><span data-iv></span><span>タップで次へ</span></div>` },
+    { id: 'S4', name: '少し待つ', en: 'Short pause, then on', mode: 'timer', note: 'Nothing is pre-picked. Tapping a grade starts a quiet line; when it fills, the next card comes. Tap another grade during the line to change it. Closest to today, but with time to fix a mis-tap.',
+      ctl: () => slider + `<div class="timer"><i></i></div><div class="meta-row"><span data-iv></span><span></span></div>` },
+  ];
+  const grid = document.getElementById('ggrid');
+  VARIANTS.forEach(v => {
+    const wrap = document.createElement('div');
+    wrap.className = 'gwrap';
+    wrap.innerHTML = `<div class="phone-label">${v.id} · ${v.en.toUpperCase()}</div>
+      <div class="gcard${v.mode === 'card' ? ' tapnext' : ''}">
+        <div class="front-k"><div class="keyword">${c.kw}</div><div class="tap">tap to reveal</div></div>
+        ${body}<div class="gctl">${v.ctl()}</div><div class="toast"></div></div>
+      <div class="phone-note"><b>${v.name}.</b> ${v.note}</div>`;
+    grid.appendChild(wrap);
+    const card = wrap.querySelector('.gcard');
+    const tog = card.querySelector('.stog');
+    const thumb = tog.querySelector('.thumb');
+    const iv = card.querySelector('[data-iv]');
+    const think = card.querySelector('[data-think]');
+    const timer = card.querySelector('.timer');
+    let shownAt = Date.now(), pick = null, tId = null;
+
+    const setPick = (i) => {
+      pick = i;
+      tog.classList.toggle('picked', i != null);
+      thumb.style.opacity = i == null ? 0 : 1;
+      if (i != null) tog.style.setProperty('--i', i);
+      tog.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === i));
+      iv.textContent = i == null ? '' : `次は ${G[i][2]}`;
+    };
+    const reset = () => {
+      card.classList.remove('done', 'revealed');
+      clearTimeout(tId); if (timer) timer.classList.remove('run');
+      setPick(v.mode === 'timer' ? null : 2);
+      if (think) think.textContent = '';
+      shownAt = Date.now();
+    };
+    const commit = () => {
+      if (pick == null) return;
+      clearTimeout(tId);
+      card.querySelector('.toast').innerHTML = `${G[pick][0]}<small>next in ${G[pick][2]}</small>`;
+      card.classList.add('done');
+      setTimeout(reset, 1200);
+    };
+    card.querySelector('.front-k').addEventListener('click', () => {
+      card.classList.add('revealed');
+      if (v.timed) {
+        const secs = (Date.now() - shownAt) / 1000;
+        setPick(secs < 3 ? 3 : secs < 10 ? 2 : 1);
+        think.textContent = `考えた時間 ${secs.toFixed(0)}秒`;
+      }
+    });
+    tog.querySelectorAll('button').forEach((b, i) => b.addEventListener('click', e => {
+      e.stopPropagation();
+      setPick(i);
+      if (v.mode === 'timer') {
+        clearTimeout(tId);
+        timer.classList.remove('run'); void timer.offsetWidth; timer.classList.add('run');
+        tId = setTimeout(commit, 1600);
+      }
+    }));
+    card.querySelector('[data-next]')?.addEventListener('click', e => { e.stopPropagation(); commit(); });
+    if (v.mode === 'card') card.querySelector('.body').addEventListener('click', () => { if (card.classList.contains('revealed')) commit(); });
+    reset();
+  });
+}
+</script>
+</body>
+</html>
