@@ -632,6 +632,10 @@
   - [ ] Rollout: `supabase secrets set CRON_SECRET=<random>`; Vault `cron_secret` (same value); apply
         database/38_cron_secret.sql; deploy ensure-buffer, learner-dream, audio-cleanup, process-article,
         dictionary-lookup, fetch-raw-news, daily-feed; remove VITE_GROQ_API_KEY from Vercel and rotate the Groq key
+  - [x] Groq dropped (Oct 17): translation, readings, disambiguation, definition fallback and process-article's
+        concept extraction moved to Haiku with thinking off (`quickHaiku` in _shared/claude.ts)
+  - [ ] After deploying dictionary-lookup + process-article: revoke the Groq key (no rotation needed), then
+        `supabase secrets unset GROQ_API_KEY`; remove VITE_GROQ_API_KEY from Vercel and local .env
   - [x] Security posture written into CLAUDE.md › Security (secrets, caller auth, RLS, cost caps, prompt injection)
   - [x] Prompt injection (2026-10-17): `_shared/untrusted.ts` fence + data rule in the rewrite, continuity, concepts,
         editor, podcast, song, dream, tutor (screen notes, get_text / search_history results, recap) and dictionary

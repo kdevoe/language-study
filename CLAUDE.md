@@ -25,7 +25,7 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 
 ## Architecture
 
-**Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 3.8-flash (article rewriting), Claude Haiku 5.5 (grammar insights), Groq (dictionary fallback). Model identifiers are centralized in `supabase/functions/_shared/models.ts` (single bump point per model).
+**Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 3.8-flash (article rewriting), Claude Haiku 5.5 (grammar insights, translation, readings, dictionary fallback, article concepts). Model identifiers are centralized in `supabase/functions/_shared/models.ts` (single bump point per model).
 
 ### Frontend (`src/`)
 
@@ -44,7 +44,7 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 Four Supabase Edge Functions:
 - **fetch-raw-news**: Fetches English articles from NewsAPI with multi-query fallback
 - **process-article**: Rewrites articles to Japanese via Gemini, personalized to user's JLPT/RTK/vocab targets. Returns structured `ArticleBlock[]` with furigana, grammar boxes, and word tokens
-- **dictionary-lookup**: Word definitions (Groq), grammar analysis (Claude Haiku), and sentence translation (Groq)
+- **dictionary-lookup**: Word definitions (JMDict, Haiku fallback), grammar analysis, sentence translation and reading disambiguation (all Claude Haiku)
 - **daily-feed**: Scheduled pre-processing of articles
 
 ### Database
@@ -68,7 +68,7 @@ Keep these in mind on every change. A change that weakens one needs a stated rea
 
 ### Secrets and the client
 - Anything prefixed `VITE_` is built into the public JavaScript bundle. Only the Supabase URL, the anon key, the Sentry DSN and flags belong there.
-- Provider keys (Gemini, Groq, Anthropic, ElevenLabs, NewsAPI, Jina) live only in the edge functions' secrets. The client never calls a paid provider directly; it goes through an edge function.
+- Provider keys (Gemini, Anthropic, ElevenLabs, NewsAPI, Jina) live only in the edge functions' secrets. The client never calls a paid provider directly; it goes through an edge function.
 - Never commit keys. Vault holds what SQL needs (`jit_anon_key`, `cron_secret`, `song_cron_secret`).
 
 ### Edge functions: who is calling

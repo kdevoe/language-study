@@ -1,7 +1,8 @@
 // Small Claude helpers shared by the memory jobs (learner-dream), the news editor
-// (fetch-raw-news) and the tutor (tutor-chat).
+// (fetch-raw-news), the tutor (tutor-chat), and the quick lookups in
+// dictionary-lookup and process-article.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
-import { CLAUDE_PRICES } from './models.ts';
+import { CLAUDE_HAIKU, CLAUDE_PRICES } from './models.ts';
 
 export const anthropic = new Anthropic();
 
@@ -98,4 +99,24 @@ export async function complete(opts: { model: string; prompt: string; maxTokens:
   });
   addUsage(opts.usage, msg.usage);
   return textOf(msg);
+}
+
+/**
+ * One short Haiku call with thinking off, for the quick, latency-sensitive jobs
+ * Groq used to do (index picks, readings, translation, small JSON). Haiku 5.5
+ * thinks at medium effort by default; disabling it is allowed at effort high or
+ * below. Returns the reply text; throws on a refusal or an empty reply.
+ */
+export async function quickHaiku(prompt: string, maxTokens = 1024): Promise<string> {
+  const msg = await anthropic.messages.create({
+    model: CLAUDE_HAIKU,
+    max_tokens: maxTokens,
+    thinking: { type: 'disabled' },
+    messages: [{ role: 'user', content: prompt }],
+  // deno-lint-ignore no-explicit-any
+  } as any);
+  if (msg.stop_reason === 'refusal') throw new Error('declined by model');
+  const text = textOf(msg);
+  if (!text) throw new Error('empty reply');
+  return text;
 }

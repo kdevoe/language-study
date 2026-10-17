@@ -1,6 +1,7 @@
 import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { CLAUDE_HAIKU, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
+import { CLAUDE_HAIKU } from '../_shared/models.ts';
+import { parseJsonObject, quickHaiku } from '../_shared/claude.ts';
 import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
 import { resolveCaller } from '../_shared/auth.ts';
 import { dataRule, fenceInline } from '../_shared/untrusted.ts';
@@ -16,8 +17,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // --- JMDict lookup helpers (server-side, mirrors client jmdict.ts) ---
 
@@ -84,33 +83,13 @@ async function lookupJMDict(word: string): Promise<JMDictDefinition | null> {
   };
 }
 
-async function groqComplete(prompt: string, jsonMode = false): Promise<string> {
-  const apiKey = Deno.env.get('GROQ_API_KEY')!;
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      response_format: jsonMode ? { type: 'json_object' } : undefined,
-    }),
-  });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(`Groq error: ${err.error?.message || response.statusText}`);
-  }
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Signed-in users only (_shared/auth.ts): every call spends Groq / Claude credits.
+    // Signed-in users only (_shared/auth.ts): every call spends Claude credits.
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const caller = await resolveCaller(req, createClient(Deno.env.get('SUPABASE_URL')!, serviceKey), serviceKey);
     if (!caller) {
@@ -124,12 +103,12 @@ Deno.serve(async (req) => {
 
     // Batched heteronym reading disambiguation. The client sends words whose
     // surface has more than one common reading (今日, 市場, 上手, 日本…) with the
-    // sentence they appear in and the candidate readings; Groq picks the right
+    // sentence they appear in and the candidate readings; Haiku picks the right
     // one per item in a single call. This is the narrow, constrained task an LLM
     // is actually good at — the deterministic tokenizer (kuromoji) does the rest.
     // Which JMDict entry a word means in its sentence (several entries share a
     // surface). Moved here from the client, which called Groq with a key that
-    // shipped in the web bundle. Returns the candidate's index, 0 when unsure.
+    // shipped in the web bundle; now Haiku. Returns the candidate's index, 0 when unsure.
     if (type === 'disambiguate') {
       const list: string[] = Array.isArray(body.candidates) ? body.candidates.slice(0, 10).map(String) : [];
       let index = 0;
@@ -144,7 +123,7 @@ ${list.map((c, i) => `[${i}] ${c}`).join('\n')}
 
 Answer (just the number):`;
         try {
-          const n = parseInt((await groqComplete(prompt)).trim(), 10);
+          const n = parseInt((await quickHaiku(prompt, 16)).trim(), 10);
           if (!isNaN(n) && n >= 0 && n < list.length) index = n;
         } catch (e) {
           console.warn('[dictionary-lookup] disambiguate failed:', e instanceof Error ? e.message : e);
@@ -175,9 +154,8 @@ ${lines}`;
 
       let readings: string[] = [];
       try {
-        const text = await groqComplete(prompt, true);
-        const parsed = JSON.parse(text);
-        const arr = Array.isArray(parsed) ? parsed : (parsed.readings ?? parsed.results ?? []);
+        const parsed = parseJsonObject<{ readings?: unknown; results?: unknown }>(await quickHaiku(prompt, 1024));
+        const arr = parsed.readings ?? parsed.results ?? [];
         if (Array.isArray(arr)) readings = arr.map((r: unknown) => String(r ?? '').trim());
       } catch (e) {
         console.warn('[dictionary-lookup] readings disambiguation failed:', e);
@@ -236,18 +214,18 @@ Be extremely concise. Write plain text (no markdown) and do not include romanize
     }
 
     if (type === 'translation') {
-      // Sentence translation using Groq
+      // Sentence translation (Haiku, thinking off)
       const prompt = `Translate this Japanese sentence into natural, elegant English: ${fenceInline('text', String(word ?? ''))}
 Context: ${sentence((contextSentence || '').substring(0, 300))}
 Just provide the English translation, no other text.
 ${RULE}`;
-      const translation = await groqComplete(prompt);
+      const translation = await quickHaiku(prompt, 1024);
       return new Response(JSON.stringify({ translation }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Default: word definition — try JMDict first for consistent furigana, fall back to Groq
+    // Default: word definition — try JMDict first for consistent furigana, fall back to Haiku
     const jmdictResult = await lookupJMDict(word).catch(() => null);
     if (jmdictResult) {
       console.log(`[dictionary-lookup] JMDict HIT for "${word}"`);
@@ -256,7 +234,7 @@ ${RULE}`;
       });
     }
 
-    console.log(`[dictionary-lookup] JMDict MISS for "${word}", falling back to Groq`);
+    console.log(`[dictionary-lookup] JMDict MISS for "${word}", falling back to Haiku`);
     const prompt = `Define "${word}" for context: ${sentence(contextSentence)}.
 ${RULE}
 CRITICAL: The "furiganaMap" MUST account for EVERY character in "${word}". Break it down 1:1.
@@ -268,8 +246,7 @@ Output JSON:
   "furiganaMap": [ { "kanji": "...", "kana": "..." }, ... ]
 }`;
 
-    const text = await groqComplete(prompt, true);
-    const definition = JSON.parse(text);
+    const definition = parseJsonObject(await quickHaiku(prompt, 1024));
 
     return new Response(JSON.stringify(definition), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
