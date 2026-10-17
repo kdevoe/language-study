@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useAppStore, type SongFrequency } from '../services/store';
+import { useKanjiStore } from '../services/kanjiStore';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { FEED_TOPICS, DEFAULT_FEED_TOPICS } from '../data/feedTopics';
 import { COVER_STYLE_MAX_CHARS, DEFAULT_COVER_STYLE, SONG_STYLES } from '../data/songStyles';
@@ -205,6 +206,9 @@ export function Settings() {
     lastStudyPacingResetTs,
     lastFuriganaRealignTs
   } = useAppStore();
+  const hasKanjiDeck = useKanjiStore((st) => Object.keys(st.progress).length > 0);
+  const newKanjiPerDay = useKanjiStore((st) => st.newKanjiPerDay);
+  const setNewKanjiPerDay = useKanjiStore((st) => st.setNewKanjiPerDay);
   const [editingHost, setEditingHost] = useState<string | null>(null);
   const [editingCover, setEditingCover] = useState(false);
 
@@ -256,13 +260,24 @@ export function Settings() {
           </div>
           <div style={hintStyle}>Easiest first. 0 pauses new words.</div>
         </div>
-        <div style={settingStyle}>
-          <div style={rowStyle}>
-            <div style={{ ...labelStyle, margin: 0 }}>RTK kanji <small style={smallStyle}>&nbsp;of {rtkKanjiList.length.toLocaleString()}</small></div>
-            <Stepper value={rtkLevel || 1} min={1} max={rtkKanjiList.length} onChange={setRtkLevel} label="RTK kanji" editable />
+        {hasKanjiDeck ? (
+          // With a kanji deck the RTK level follows the deck; what's set here is its pace.
+          <div style={settingStyle}>
+            <div style={rowStyle}>
+              <div style={{ ...labelStyle, margin: 0 }}>New kanji / day</div>
+              <Stepper value={newKanjiPerDay} min={0} max={20} onChange={setNewKanjiPerDay} label="new kanji per day" />
+            </div>
+            <div style={hintStyle}>In RTK order, now at {(rtkLevel || 0).toLocaleString()} of {rtkKanjiList.length.toLocaleString()}. 0 pauses new kanji.</div>
           </div>
-          <div style={hintStyle}>Goes up 3 a day.</div>
-        </div>
+        ) : (
+          <div style={settingStyle}>
+            <div style={rowStyle}>
+              <div style={{ ...labelStyle, margin: 0 }}>RTK kanji <small style={smallStyle}>&nbsp;of {rtkKanjiList.length.toLocaleString()}</small></div>
+              <Stepper value={rtkLevel || 1} min={1} max={rtkKanjiList.length} onChange={setRtkLevel} label="RTK kanji" editable />
+            </div>
+            <div style={hintStyle}>Goes up 3 a day.</div>
+          </div>
+        )}
       </section>
 
       {/* ── 読む ── */}

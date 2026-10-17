@@ -36,6 +36,13 @@ import {
 /** Target probability of recall at review time. Lower = longer intervals, smaller deck. */
 export const REQUEST_RETENTION = 0.85;
 
+/**
+ * Retention for the RTK kanji deck. Higher than vocab: recalling a kanji from its
+ * keyword gets no extra reviews from reading, and at 0.9 an FSRS interval equals the
+ * card's stability, which keeps imported Anki intervals on the same footing.
+ */
+export const KANJI_REQUEST_RETENTION = 0.9;
+
 /** 1=Again, 2=Hard, 3=Good, 4=Easy — aligned 1:1 with FSRS's grade values. */
 export type Rating = 1 | 2 | 3 | 4;
 
@@ -68,6 +75,15 @@ const DAY_MS = 86_400_000;
 const scheduler: FSRS = fsrs(
   generatorParameters({
     request_retention: REQUEST_RETENTION,
+    enable_fuzz: false,
+    enable_short_term: false,
+  }),
+);
+
+// The kanji deck's scheduler: same settings, its own retention target.
+const kanjiScheduler: FSRS = fsrs(
+  generatorParameters({
+    request_retention: KANJI_REQUEST_RETENTION,
     enable_fuzz: false,
     enable_short_term: false,
   }),
@@ -115,8 +131,17 @@ function fromCard(card: Card, now: number): Scheduled {
  * is a ms epoch and is the only "clock" — the function itself is pure.
  */
 export function schedule(state: SrsState | null, rating: Rating, now: number): Scheduled {
+  return scheduleWith(scheduler, state, rating, now);
+}
+
+/** `schedule` for the RTK kanji deck (KANJI_REQUEST_RETENTION). */
+export function scheduleKanji(state: SrsState | null, rating: Rating, now: number): Scheduled {
+  return scheduleWith(kanjiScheduler, state, rating, now);
+}
+
+function scheduleWith(f: FSRS, state: SrsState | null, rating: Rating, now: number): Scheduled {
   const card = state ? toCard(state) : createEmptyCard(new Date(now));
-  const { card: next } = scheduler.next(card, new Date(now), rating as unknown as Grade);
+  const { card: next } = f.next(card, new Date(now), rating as unknown as Grade);
   return fromCard(next, now);
 }
 

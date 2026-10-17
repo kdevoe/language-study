@@ -8,6 +8,7 @@ import { CardBody, CornerText } from './ArchiveList';
 import { PartCount } from './Library';
 import { useAppStore } from '../services/store';
 import { buildDeck } from '../services/dueDeck';
+import { buildKanjiDeck, useKanjiStore } from '../services/kanjiStore';
 import { fetchWorkResumeArticle, fetchWorks } from '../services/api';
 import type { LongFormWork, NewsArticle } from '../services/api';
 import { fetchEpisodes } from '../services/podcasts';
@@ -87,6 +88,10 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const libraryLabel = useAdaptiveText('library');
   const deck = useMemo(() => buildDeck(), [wordDatabase]); // eslint-disable-line react-hooks/exhaustive-deps
+  // With an RTK kanji deck the card shows both counts (12 単語 · 3 漢字).
+  const kanjiProgress = useKanjiStore((s) => s.progress);
+  const hasKanji = Object.keys(kanjiProgress).length > 0;
+  const kanjiDue = useMemo(() => buildKanjiDeck().length, [kanjiProgress]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const mountedRef = useRef(true);
@@ -156,12 +161,19 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
       <div className="today-blocks">
       {/* 復習 leads: the one time-sensitive thing, so it's the featured white card;
           with nothing due it's left out like any other empty block. */}
-      {deck.length > 0 && (
+      {deck.length + kanjiDue > 0 && (
         <Section title="復習" icon={Layers} onOpen={onStartReview}>
           <button onClick={onStartReview} style={{ ...cardStyle, backgroundColor: 'var(--bg-pure)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1.1rem 1.4rem' }}>
-            <span className="serif" style={{ fontSize: '1.8rem', fontWeight: 500, lineHeight: 1.15 }}>
-              {deck.length}<span style={{ fontSize: '1rem', marginLeft: '0.15rem' }}>枚</span>
-            </span>
+            {hasKanji ? (
+              <span className="serif" style={{ display: 'flex', alignItems: 'baseline', gap: '1.1rem', fontSize: '1.8rem', fontWeight: 500, lineHeight: 1.15 }}>
+                <span>{deck.length}<span style={{ fontSize: '0.85rem', marginLeft: '0.25rem', color: 'var(--text-muted)' }}>単語</span></span>
+                <span>{kanjiDue}<span style={{ fontSize: '0.85rem', marginLeft: '0.25rem', color: 'var(--text-muted)' }}>漢字</span></span>
+              </span>
+            ) : (
+              <span className="serif" style={{ fontSize: '1.8rem', fontWeight: 500, lineHeight: 1.15 }}>
+                {deck.length}<span style={{ fontSize: '1rem', marginLeft: '0.15rem' }}>枚</span>
+              </span>
+            )}
             <span className="serif" style={{ fontSize: ACTION_SIZE, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
               始める<ChevronRight size={18} strokeWidth={1.5} />
             </span>

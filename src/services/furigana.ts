@@ -6,6 +6,8 @@
  * compounds like 副大統領).
  */
 
+import type { WordData } from './store';
+
 export const isKana = (c: string) => /[぀-ゟ゠-ヿ]/.test(c);
 export const hasKanji = (s: string) => /[一-龯㐀-䶿]/.test(s);
 
@@ -199,4 +201,27 @@ export function alignReading(
   // Keep kana surface chars as themselves (no furigana over them); kanji take the
   // matched reading.
   return chars.map((c, i) => (isKana(c) ? { kanji: c, kana: c } : { kanji: c, kana: found[0][i] }));
+}
+
+// Furigana segments for the card face. Prefers the word's `furiganaMap` (per-kanji
+// readings from enrichment), heals a map that doesn't cover the whole surface, and
+// falls back to one reading over the whole word — mirroring WordModal so the deck
+// and the lookup modal position furigana the same way.
+export function furiganaSegments(w: WordData): { kanji: string; kana: string }[] {
+  const surface = w.surface || w.reading || '';
+  let segments = w.furiganaMap ?? [];
+  // Heal only a PARTIAL map. An empty map must fall through to the whole-word
+  // fallback below — healing it would fabricate per-char identity segments
+  // (kana === kanji), which the renderer treats as "nothing to annotate", so a
+  // map-less word (e.g. a Discover candidate) would never show its reading.
+  if (segments.length > 0) {
+    const mapped = segments.map((s) => s.kanji).join('');
+    if (mapped !== surface && surface.startsWith(mapped)) {
+      const tail = Array.from(surface.slice(mapped.length)).map((c) => ({ kanji: c, kana: c }));
+      segments = [...segments, ...tail];
+    }
+    return segments;
+  }
+  // No map: one reading over the whole surface (kana shown above the run).
+  return [{ kanji: surface, kana: w.reading || surface }];
 }

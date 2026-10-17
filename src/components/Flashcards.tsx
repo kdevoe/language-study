@@ -1,34 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, X } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { buildDeck, type Card } from '../services/dueDeck';
 import { schedule, seedSrsFromDifficulty, type Rating, type SrsState } from '../services/srs';
 import { fetchIntakeCandidates } from '../services/jmdict';
-import { alignReading } from '../services/furigana';
+import { alignReading, furiganaSegments } from '../services/furigana';
 import type { IntakeCandidate } from '../services/intake';
 import { seedDemoDeck } from '../services/devSeed';
+import { GradeSlider } from './GradeSlider';
+import { GRADES, formatIntervalJa } from '../services/grades';
+import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 // Flashcard study UI (#70) — the deck view for the Word Mastery Loop. Reads the due
-// deck from the store (selectDeck), shows a zen front/reveal card, and each
-// Again/Hard/Good/Easy grade calls store.reviewWord → advances the FSRS schedule
+// deck from the store (selectDeck), shows a zen front/reveal card, and each grade
+// (GradeSlider, then a tap on the card) calls store.reviewWord → advances the FSRS schedule
 // (#67) and writes a `flashcard` review-log row. The deck is SNAPSHOTTED at mount
 // (tab open) so grading a card doesn't reshuffle the pile underfoot.
 // Once the deck is done, Discover mode (#113) offers a triage pass over unseen
 // foundation words — same card surface, Hard/Medium/Easy pills.
 
-// Grade color is carried entirely by a soft tinted shadow under each white pill —
-// no dot, no fill, no colored border — so the buttons keep the card's hairline
-// aesthetic while the red→green traffic-light cue glows quietly beneath them.
-// Tones are the same muted palette family the dots used.
-const RATINGS: { rating: Rating; label: string; shadow: string }[] = [
-  { rating: 1, label: 'Again', shadow: '0 3px 10px rgba(207, 125, 107, 0.30)' },
-  { rating: 2, label: 'Hard', shadow: '0 3px 10px rgba(194, 160, 88, 0.30)' },
-  { rating: 3, label: 'Good', shadow: '0 3px 10px rgba(143, 176, 196, 0.35)' },
-  { rating: 4, label: 'Easy', shadow: '0 3px 10px rgba(143, 170, 116, 0.32)' },
-];
 
 
 // ── Discover mode (#113) ─────────────────────────────────────────────────────
@@ -86,16 +79,6 @@ function priorSrsFor(w: WordData, now: number): SrsState {
 }
 
 
-// Human-friendly interval label, Anki-style ("10m" / "3d" / "2mo" / "1.4y").
-function formatInterval(days: number): string {
-  if (days < 1) {
-    const mins = Math.max(1, Math.round(days * 24 * 60));
-    return mins < 60 ? `${mins}m` : `${Math.round(days * 24)}h`;
-  }
-  if (days < 30) return `${Math.round(days)}d`;
-  if (days < 365) return `${Math.round(days / 30)}mo`;
-  return `${(days / 365).toFixed(1)}y`;
-}
 
 export function Flashcards({
   onFocusChange,
@@ -119,6 +102,11 @@ export function Flashcards({
 
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  // The grade slider's position, and how long the front was looked at before the
+  // flip: the slider starts on a grade guessed from that time (thinkTime.ts).
+  const [pick, setPick] = useState<Rating>(3);
+  const thinkMs = useRef<number | null>(null);
+  const shownAt = useRef(Date.now());
 
   // Focus mode: the first tap into a card hides the bottom nav (reported up via
   // onFocusChange) and the card grows into the reclaimed space. Sticky across
@@ -233,12 +221,26 @@ export function Flashcards({
     const neverStudied = card.word.promotedTs != null && (card.word.reps ?? 0) === 0;
     const prior = neverStudied ? null : priorSrsFor(card.word, now);
     const out = {} as Record<Rating, string>;
-    for (const { rating } of RATINGS) out[rating] = formatInterval(schedule(prior, rating, now).intervalDays);
+    for (const { rating } of GRADES) out[rating] = formatIntervalJa(schedule(prior, rating, now).intervalDays);
     return out;
   }, [card]);
 
+  // Each new card starts its thinking clock when it appears.
+  useEffect(() => {
+    shownAt.current = Date.now();
+    thinkMs.current = null;
+  }, [card?.key]);
+
+  function reveal() {
+    const t = Date.now() - shownAt.current;
+    thinkMs.current = t;
+    setPick(defaultGrade(t, thinkHistory('vocab')));
+    setRevealed(true);
+  }
+
   function grade(rating: Rating) {
     if (!card) return;
+    if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
     reviewWord(card.key, rating, Date.now());
     setRevealed(false);
     setIndex((i) => i + 1);
@@ -472,34 +474,9 @@ export function Flashcards({
         revealed={revealed}
         tall={focusActive}
         onTap={() => setFocused(true)}
-        onReveal={() => setRevealed(true)}
-        footer={
-          <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
-            {RATINGS.map(({ rating, label, shadow }) => (
-              <button
-                key={rating}
-                onClick={() => grade(rating)}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '2px',
-                  padding: '0.55rem 0 0.6rem',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '999px',
-                  backgroundColor: 'var(--bg-pure)',
-                  boxShadow: shadow,
-                  color: 'var(--text-main)',
-                  cursor: 'pointer',
-                }}
-              >
-                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{label}</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{previews[rating]}</span>
-              </button>
-            ))}
-          </div>
-        }
+        onReveal={reveal}
+        onAdvance={() => grade(pick)}
+        footer={<GradeSlider value={pick} onChange={setPick} intervals={previews} />        }
       />
     </div>
   );
@@ -508,7 +485,7 @@ export function Flashcards({
 // Focus mode's explicit way out (tapping beside the card also works, but the
 // card fills nearly the whole screen). Sits after the count in the progress row;
 // the negative margins give it a thumb-sized target without moving the row.
-function ExitFocusButton({ onClick }: { onClick: () => void }) {
+export function ExitFocusButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
@@ -553,11 +530,12 @@ function ExitDiscoverButton({ onClick }: { onClick: () => void }) {
 // The grade buttons live INSIDE the back face (passed as `footer`), as a strip
 // along its bottom edge — so flipping never changes the card's height or shifts
 // the layout, and the buttons arrive with the flip itself (no second animation).
-function FlipSurface({ cardKey, word, revealed, onReveal, onTap, footer, tall = false }: {
+function FlipSurface({ cardKey, word, revealed, onReveal, onAdvance, onTap, footer, tall = false }: {
   cardKey: string;
   word: WordData;
   revealed: boolean;
   onReveal: () => void;
+  onAdvance?: () => void; // a tap on the revealed card: grade with the slider's value and move on
   onTap?: () => void; // fires on ANY in-card tap (even revealed) — re-enters focus
   footer: React.ReactNode;
   tall?: boolean; // focus mode: grow into the space the hidden nav frees up
@@ -582,6 +560,7 @@ function FlipSurface({ cardKey, word, revealed, onReveal, onTap, footer, tall = 
               e.stopPropagation();
               onTap?.();
               if (!revealed) onReveal();
+              else onAdvance?.();
             }}
             initial={false}
             animate={{ rotateY: revealed ? 180 : 0 }}
@@ -594,7 +573,7 @@ function FlipSurface({ cardKey, word, revealed, onReveal, onTap, footer, tall = 
               height: tall ? 'min(660px, 74vh)' : 'min(540px, 62vh)',
               transition: 'height 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
               transformStyle: 'preserve-3d',
-              cursor: revealed ? 'default' : 'pointer',
+              cursor: revealed && !onAdvance ? 'default' : 'pointer',
             }}
           >
             {/* FRONT — the word to recall (furigana hidden), with a subtle flip hint. */}
@@ -606,7 +585,7 @@ function FlipSurface({ cardKey, word, revealed, onReveal, onTap, footer, tall = 
             </CardFace>
 
             {/* BACK — reading (furigana) + meaning + grammar note + JLPT level,
-                with the grade pills floating along the bottom edge. */}
+                with the grade slider along the bottom edge. */}
             <CardFace back footer={footer}>
               <FuriganaWord word={word} reveal={true} />
               <div style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginTop: '1.5rem', lineHeight: 1.6, maxWidth: '28ch' }}>
@@ -618,7 +597,7 @@ function FlipSurface({ cardKey, word, revealed, onReveal, onTap, footer, tall = 
                 </div>
               )}
               {/* Plain text (no pill chrome) — a pill here would read as an extra
-                  button now that the grade pills share the card. */}
+                  button now that the grade slider shares the card. */}
               {word.jlptLevel != null && (
                 <span
                   className="sans"
@@ -763,29 +742,6 @@ function FinishCard({ sessionCount, onDiscover }: { sessionCount: number; onDisc
   );
 }
 
-// Furigana segments for the card face. Prefers the word's `furiganaMap` (per-kanji
-// readings from enrichment), heals a map that doesn't cover the whole surface, and
-// falls back to one reading over the whole word — mirroring WordModal so the deck
-// and the lookup modal position furigana the same way.
-function furiganaSegments(w: WordData): { kanji: string; kana: string }[] {
-  const surface = w.surface || w.reading || '';
-  let segments = w.furiganaMap ?? [];
-  // Heal only a PARTIAL map. An empty map must fall through to the whole-word
-  // fallback below — healing it would fabricate per-char identity segments
-  // (kana === kanji), which the renderer treats as "nothing to annotate", so a
-  // map-less word (e.g. a Discover candidate) would never show its reading.
-  if (segments.length > 0) {
-    const mapped = segments.map((s) => s.kanji).join('');
-    if (mapped !== surface && surface.startsWith(mapped)) {
-      const tail = Array.from(surface.slice(mapped.length)).map((c) => ({ kanji: c, kana: c }));
-      segments = [...segments, ...tail];
-    }
-    return segments;
-  }
-  // No map: one reading over the whole surface (kana shown above the run).
-  return [{ kanji: surface, kana: w.reading || surface }];
-}
-
 // Renders the word with furigana positioned above each kanji (like the lookup
 // modal). The ruby row's height is reserved even when hidden, so revealing the
 // reading doesn't shift the kanji — it just fades in above them.
@@ -827,7 +783,7 @@ function FuriganaWord({ word, reveal }: { word: WordData; reveal: boolean }) {
 // so it reads correctly once the card flips. `backface-visibility: hidden` hides
 // whichever face currently points away from the viewer. `footer` renders flush
 // against the face's bottom edge, outside the content padding (the grade strip).
-function CardFace({ children, back = false, footer }: { children: React.ReactNode; back?: boolean; footer?: React.ReactNode }) {
+export function CardFace({ children, back = false, footer }: { children: React.ReactNode; back?: boolean; footer?: React.ReactNode }) {
   return (
     <div
       style={{
@@ -866,7 +822,7 @@ function CardFace({ children, back = false, footer }: { children: React.ReactNod
 }
 
 // Shared centered layout for the empty / complete states.
-function Centered({ children }: { children: React.ReactNode }) {
+export function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '60vh' }}>
       {children}
