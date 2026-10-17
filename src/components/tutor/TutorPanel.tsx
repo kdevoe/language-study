@@ -84,7 +84,8 @@ export function TutorPanel() {
   }, [open, openSeq]);
 
   // Keep the newest line in view, including when the keyboard shrinks the panel.
-  const keyboard = useKeyboardViewport();
+  const [typing, setTyping] = useState(false);
+  const keyboard = useKeyboardViewport(typing);
   const keyboardHeight = keyboard?.height;
   useEffect(() => {
     const el = threadRef.current;
@@ -122,10 +123,11 @@ export function TutorPanel() {
           setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, text: l.text || e.error } : l)));
         }
       }, ac.signal);
-    } catch {
+    } catch (err) {
       if (!ac.signal.aborted) {
+        const code = String(err instanceof Error ? err.message : err).match(/\d{3}/)?.[0];
         setLines((prev) => prev.map((l) => (l.key === pendingKey
-          ? { ...l, text: l.text || '接続できませんでした。もう一度どうぞ。' } : l)));
+          ? { ...l, text: l.text || `接続できませんでした。もう一度どうぞ。${code ? `（${code}）` : ''}` } : l)));
       }
     } finally {
       setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, pending: false } : l)).filter((l) => l.text));
@@ -263,6 +265,8 @@ export function TutorPanel() {
                 value={draft}
                 placeholder="ハルカに話しかける…"
                 enterKeyHint="send"
+                onFocus={() => setTyping(true)}
+                onBlur={() => setTyping(false)}
                 autoComplete="off"
                 onChange={(e) => {
                   setDraft(e.target.value);
@@ -379,15 +383,18 @@ function Recap({ recap, added, onAdd, onDone }: {
 /** The visible area while the on-screen keyboard is up, else null. iOS pans the
  *  page to keep a focused input above the keys; pinning the panel to the visual
  *  viewport keeps its header and the latest reply on screen instead. */
-function useKeyboardViewport() {
+function useKeyboardViewport(typing: boolean) {
   const [box, setBox] = useState<{ top: number; height: number } | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
-    const check = () => setBox(window.innerHeight - vv.height > 120 ? { top: vv.offsetTop, height: vv.height } : null);
+    if (!typing || !vv) { setBox(null); return; }
+    // Keyed on focus, not on size: iOS may shrink the layout viewport with the
+    // keyboard too, so comparing heights can miss it.
+    const check = () => setBox({ top: vv.offsetTop, height: vv.height });
+    check();
     vv.addEventListener('resize', check);
     vv.addEventListener('scroll', check);
     return () => { vv.removeEventListener('resize', check); vv.removeEventListener('scroll', check); };
-  }, []);
+  }, [typing]);
   return box;
 }
