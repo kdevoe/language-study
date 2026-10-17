@@ -29,14 +29,18 @@ const DEPTH = [
 ];
 /** Room the pile needs under the card. */
 export const PILE_SPACE = '22px';
+/** The card keeps the mockup's proportions (296 × 470), so a tall phone doesn't
+ *  stretch it into a column of white space; it only shrinks when the screen is short. */
+const ASPECT = '296 / 470';
 
-export function StudyCard({ cardKey, index, total, revealed, height, onClick, cursor = 'pointer', front, back }: {
+export function StudyCard({ cardKey, index, total, revealed, maxHeight, onClick, cursor = 'pointer', front, back }: {
   cardKey: string;
   /** Position in the session and its length: the pile shows what's left. */
   index: number;
   total: number;
   revealed: boolean;
-  height: string;
+  /** Cap for short screens; otherwise the height follows the width. */
+  maxHeight: string;
   onClick: (e: React.MouseEvent) => void;
   cursor?: string;
   front: React.ReactNode;
@@ -65,7 +69,7 @@ export function StudyCard({ cardKey, index, total, revealed, height, onClick, cu
   const release = () => setPressed(false);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height, transition: 'height 0.4s cubic-bezier(0.22, 1, 0.36, 1)' }}>
+    <div style={{ position: 'relative', width: '100%', aspectRatio: ASPECT, maxHeight, transition: 'max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1)' }}>
       {pile.map((k) => (
         <motion.div
           key={k}
