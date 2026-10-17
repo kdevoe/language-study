@@ -29,13 +29,22 @@ An early sketch split it into a "partner" (Japanese conversation) and a "tutor" 
 
 | Gesture | Problem |
 | --- | --- |
-| Swipe in from the left or right edge | Safari / iOS back and forward |
+| Swipe in from the left or right edge | In a Safari tab: back and forward. In the installed PWA: probably free, see below |
 | Swipe up from the bottom | Home indicator |
 | Long-press | Already used: word lookup, select mode in archive lists, song tiles |
 | Shake | Needs the DeviceMotion permission prompt on iOS, and gets triggered by accident |
 
+**Edge swipes in the installed PWA.** The app installs as a standalone PWA (`public/manifest.json`: `"display": "standalone"`). Standalone iOS web apps have no browser chrome and, as far as we know, **no system back/forward edge swipe** (a long-standing PWA complaint). The page would then receive edge touches itself. Behaviour has varied across iOS versions, so **confirm on a device**. Things to watch even when it works:
+1. **The left edge means "back"** to anyone used to native iOS apps. The app has no swipe-back today and would benefit from one on reading surfaces, so keep the left edge for that.
+2. **The app already uses horizontal swipes:** dismissing news cards, and swipe-left to delete in 本棚 and 聞く lists. An edge zone needs a strict rule (the touch must *start* within about 16px of the edge) so swipes on cards aren't ambiguous.
+3. **Safari-tab users** (the app not installed) lose edges to the browser, so a non-edge fallback is required.
+4. **Accidental triggers** from a one-handed grip: use a distance threshold and commit only after the finger has moved clearly inward.
+
+**The right edge is the strongest candidate:** there's no "forward" habit in native apps, it doesn't collide with a future swipe-back, and it's where a right-handed thumb rests.
+
 **Proposal:**
-- **Drag up on the bottom nav** (`BottomNav.tsx`), as if it were a sheet handle. The nav is on every tab page, and an upward drag on it means nothing today. The tutor rises as a **half-height bottom sheet** (design-system §6.2) so the screen stays visible behind it.
+- **Swipe in from the right edge** (installed PWA): opens the tutor sheet. The main gesture.
+- **Drag up on the bottom nav** (`BottomNav.tsx`), as if it were a sheet handle. The fallback, and how it works in a Safari tab. The nav is on every tab page, and an upward drag on it means nothing today. The tutor rises as a **half-height bottom sheet** (design-system §6.2) so the screen stays visible behind it.
 - **Reading surfaces** (Reader, podcast player, song player), where the nav is hidden: a small quiet icon in the back row, or a drag down on it.
 - **Targeted entry:** long-press a sentence in the Reader → **聞く** ("ask"). This opens the same tutor focused on that sentence.
 - A **visible hint**, at least at first (a small grabber line on the nav). Gestures nobody can see don't get found.
@@ -135,7 +144,7 @@ Track usage per user from day one (turns, voice minutes), the same as podcasts a
 
 * * *
 ## 11. Open questions
-1. **Gesture:** is dragging up on the nav discoverable and comfortable enough? Try it in a mockup on a phone before building.
+1. **Gesture:** does iOS hand right-edge swipes to the installed PWA, and does it feel natural? **Prototype first:** a right-edge swipe detector on one screen, deployed and tried on a phone, alongside the nav drag. Also decide whether the left edge becomes swipe-back on reading surfaces.
 2. **Persona choice:** a fixed default (ハルカ?) or chosen in onboarding? Allow switching?
 3. **Explanation language** default: English, or easy Japanese from N4 up?
 4. **Correction default:** recast only, or recast plus asides for repeated errors?
@@ -147,7 +156,7 @@ Track usage per user from day one (turns, voice minutes), the same as podcasts a
 ## 12. Build order
 Each step ships on its own.
 
-1. **Ask your tutor about this.** The context registry, the sheet, the nav drag and Reader long-press → 聞く. Text only. Asides and explanations, no free conversation yet.
+1. **Ask your tutor about this.** The context registry, the sheet, the right-edge swipe (after the prototype in §11 Q1) with the nav drag as fallback, and Reader long-press → 聞く. Text only. Asides and explanations, no free conversation yet.
 2. **Conversation.** Japanese chat at the learner's level, with recasts and asides, tappable words, and the end-of-chat recap feeding SRS.
 3. **Memory and persona.** Learner and relationship notes, a podcast cast member as the tutor, notes feeding article topics and review selection.
 4. **Context everywhere.** Flashcards (no spoilers), podcast and song players, 進捗.
