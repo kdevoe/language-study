@@ -27,18 +27,6 @@ interface Line {
 
 const COMMIT_PX = 70;
 
-/** Starter lines by screen (things you'd say, not modes). */
-function suggestionsFor(ctx: ScreenContext | null, asked: boolean): string[] {
-  if (asked) return ['どういう意味？', '例文をもっと', 'もっと簡単に'];
-  switch (ctx?.screen) {
-    case 'reader': return ['この記事について話そう', 'この段落が分からない', '単語クイズ'];
-    case 'flashcard': return ['ヒントちょうだい', '漢字のヒント'];
-    case 'podcast': return ['今のところが分からない', '例文', 'この話について話そう'];
-    case 'song': return ['この歌詞の意味は？', 'この歌について話そう'];
-    default: return ['今日の記事について', '単語クイズ', 'ただ話そう'];
-  }
-}
-
 export function TutorPanel() {
   const { open, drag, options, openSeq, closeTutor, snapshot } = useTutor();
   const hand = useAppStore((s) => s.tutorHand);
@@ -254,30 +242,26 @@ export function TutorPanel() {
                   onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
               ))}
             </div>
-            <div className="tutor-suggest">
-              {suggestionsFor(ctx, !!options.ask).map((s) => (
-                <button key={s} onClick={() => sendText(s)} disabled={busy !== null}>{s}</button>
-              ))}
-            </div>
             <div className="tutor-input">
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={draft}
-                placeholder="ハルカに話しかける…"
-                enterKeyHint="send"
-                onFocus={() => setTyping(true)}
-                onBlur={() => setTyping(false)}
-                autoComplete="off"
-                onChange={(e) => {
-                  setDraft(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = `${e.target.scrollHeight}px`;
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendText(draft); }
-                }}
-              />
+              {/* The wrapper's ::after holds a hidden copy of the draft and sizes the
+                  textarea to it; with the keyboard up that also fits its width, so the
+                  draft reads as the outgoing bubble forming at the end of the thread. */}
+              <div className="tutor-draft" data-value={draft || 'ハルカに話しかける…'}>
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={draft}
+                  placeholder="ハルカに話しかける…"
+                  enterKeyHint="send"
+                  onFocus={() => setTyping(true)}
+                  onBlur={() => setTyping(false)}
+                  autoComplete="off"
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendText(draft); }
+                  }}
+                />
+              </div>
               <button onClick={() => sendText(draft)} disabled={!draft.trim() || busy !== null} aria-label="送る">
                 <ArrowUp size={21} strokeWidth={1.6} />
               </button>
@@ -301,9 +285,12 @@ const TOOL_LABEL: Record<string, string> = {
 /** ハルカ's turn: Japanese lines with tappable words, asides set apart. */
 function AssistantLine({ text, pending, lookup }: { text: string; pending?: boolean; lookup: ReturnType<typeof useWordLookup> }) {
   if (pending && !text) return <div className="tutor-typing" role="status" aria-label="ハルカが考えています"><span /><span /><span /></div>;
-  return <>{splitAsides(text).map((part, i) => part.aside
-    ? <div key={i} className="tutor-a">{part.text}</div>
-    : <div key={i} className="tutor-t"><TutorText text={part.text} streaming={pending} lookup={lookup} /></div>)}</>;
+  // A blank line in her turn is a paragraph: each gets its own line, set close
+  // together (the gap between speakers is wider; see .tutor-thread).
+  return <>{splitAsides(text).flatMap((part, i) => part.aside
+    ? [<div key={i} className="tutor-a">{part.text}</div>]
+    : part.text.split(/\n\s*\n/).filter((t) => t.trim()).map((t, j) =>
+      <div key={`${i}-${j}`} className="tutor-t"><TutorText text={t.trim()} streaming={pending} lookup={lookup} /></div>))}</>;
 }
 
 /** <aside>…</aside> blocks come apart from the Japanese; an unclosed one (still

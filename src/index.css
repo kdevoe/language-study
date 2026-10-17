@@ -428,10 +428,15 @@ body.song-mode {
 .tutor-chip { align-self: flex-start; margin: 0.3rem 1.4rem 0.2rem; display: inline-flex; align-items: center; gap: 0.4rem; background: var(--bg-card); border-radius: 100px; padding: 0.3rem 0.5rem 0.3rem 0.75rem; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); max-width: calc(100% - 2.8rem); }
 .tutor-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tutor-chip button { display: flex; background: none; border: none; padding: 0 0.15rem; color: var(--text-muted); cursor: pointer; }
-.tutor-thread { flex: 1; overflow-y: auto; padding: 0.9rem 1.4rem 1rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-width: none; overscroll-behavior: contain; }
+.tutor-thread { flex: 1; overflow-y: auto; padding: 0.9rem 1.4rem 1rem; display: flex; flex-direction: column; scrollbar-width: none; overscroll-behavior: contain; }
 .tutor-thread::-webkit-scrollbar { display: none; }
 /* Messages sit on the input like a chat, so the reply you're answering stays just above it. */
 .tutor-thread > :first-child { margin-top: auto; }
+/* 間: a full pause between speakers, a short one between the lines of one turn. */
+.tutor-thread > * + * { margin-top: 2.2rem; }
+.tutor-thread > .tutor-t + .tutor-t, .tutor-thread > .tutor-t + .tutor-a { margin-top: 0.55rem; }
+.tutor-thread > .tutor-a + .tutor-t, .tutor-thread > .tutor-a + .tutor-a { margin-top: 0.9rem; }
+.tutor-thread > .tutor-ctx + *, .tutor-thread > * + .tutor-busy { margin-top: 1rem; }
 .tutor-t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.95; max-width: 94%; color: var(--text-main); white-space: pre-wrap; }
 .tutor-t .fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; border: none; margin: 0; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tutor-t .fix:disabled { cursor: default; }
@@ -448,12 +453,22 @@ body.song-mode {
 .tutor-typing span:nth-child(2) { animation-delay: 0.18s; }
 .tutor-typing span:nth-child(3) { animation-delay: 0.36s; }
 @keyframes tutor-typing { 0%, 70%, 100% { opacity: 0.25; transform: none; } 35% { opacity: 0.7; transform: translateY(-2px); } }
-.tutor-suggest { flex: none; display: flex; gap: 1.2rem; padding: 0.2rem 1.4rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
-.tutor-suggest::-webkit-scrollbar { display: none; }
-.tutor-suggest button { background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted); white-space: nowrap; padding: 0.2rem 0; }
 .tutor-input { flex: none; display: flex; align-items: flex-end; gap: 0.8rem; margin: 0 1.4rem; padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
-.tutor-input textarea { flex: 1; resize: none; border: none; outline: none; background: transparent; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.5; color: var(--text-main); max-height: 7.5rem; padding: 0; }
-.tutor-input textarea::placeholder { color: var(--text-muted); opacity: 0.7; }
+/* The textarea and a hidden copy of its text share one grid cell, so the field
+   grows with the draft without measuring it. */
+.tutor-draft { flex: 1; min-width: 0; display: grid; }
+.tutor-draft::after { content: attr(data-value) ' '; visibility: hidden; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 7.5rem; overflow: hidden; }
+.tutor-draft::after, .tutor-draft textarea { grid-area: 1 / 1 / 2 / 2; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.5; padding: 0; }
+.tutor-draft textarea { resize: none; border: none; outline: none; background: transparent; color: var(--text-main); max-height: 7.5rem; overflow-y: auto; width: 100%; min-width: 0; }
+.tutor-draft textarea::placeholder { color: var(--text-muted); opacity: 0.7; }
+/* Keyboard up: the compose row goes and the draft is the outgoing bubble taking
+   shape at the end of the thread, so iOS's form bar is the only band under it. */
+.tutor-panel.kb .tutor-input { justify-content: flex-end; border-bottom: none; padding: 0.8rem 0 0.6rem; }
+.tutor-panel.kb .tutor-draft { flex: 0 1 auto; max-width: 82%; min-width: 2.5rem; background: var(--bg-card); border-radius: 16px; }
+.tutor-panel.kb .tutor-draft::after, .tutor-panel.kb .tutor-draft textarea { font-size: 1rem; line-height: 1.75; padding: 0.55rem 0.9rem; }
+.tutor-panel.kb .tutor-draft::after { max-height: calc(7.5rem + 1.1rem); }
+.tutor-panel.kb .tutor-draft textarea { max-height: calc(7.5rem + 1.1rem); }
+.tutor-panel.kb .tutor-input button { padding-bottom: 0.65rem; }
 .tutor-input button { background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; padding: 0.2rem 0; }
 .tutor-input button:disabled { opacity: 0.35; cursor: default; }
 .tutor-foot { flex: none; height: max(1.2rem, env(safe-area-inset-bottom)); }
