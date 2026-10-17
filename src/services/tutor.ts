@@ -1,7 +1,7 @@
 // ハルカ, the tutor (docs/tutor-agent-design.md): client side of the tutor-chat
 // edge function. Replies stream as server-sent events; history, the recap and
 // the Home card's opener are plain requests.
-import { supabase } from './supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
 import { invokeEdgeFn } from './api';
 
 /** What the screen behind the panel shows (each screen registers one). */
@@ -69,12 +69,12 @@ export async function streamTutor(
   signal?: AbortSignal,
 ): Promise<void> {
   if (DEV_MODE) return devReply(onEvent);
-  const post = (token: string) => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tutor-chat`, {
+  const post = (token: string) => fetch(`${supabaseUrl}/functions/v1/tutor-chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      apikey: supabaseAnonKey,
     },
     body: JSON.stringify({ action: 'send', day: localDay(), ...input }),
     signal,
