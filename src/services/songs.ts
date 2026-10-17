@@ -174,6 +174,12 @@ export async function recordPlay(song: Pick<Song, 'id' | 'play_count'>): Promise
     .update({ play_count: song.play_count + 1, last_played_at: new Date().toISOString() })
     .eq('id', song.id);
   if (error) console.error('[songs] recordPlay failed:', error);
+  // Play log for learner memory (database/36): the counter alone has no "when".
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    const { error: logErr } = await supabase.from('song_plays').insert({ user_id: session.user.id, song_id: song.id });
+    if (logErr) console.warn('[songs] play log failed:', logErr.message);
+  }
 }
 
 /** User-facing message for a failed create/retry call. */

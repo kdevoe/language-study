@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useReadingTime } from '../hooks/useReadingTime';
 import { FuriganaText, HitWeight } from './FuriganaText';
 import type { MasteryLevel } from '../services/store';
 import { YugenBox } from './YugenBox';
@@ -221,6 +222,8 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
     io.observe(el);
     return () => io.disconnect();
   });
+  // Time on the article and reaching its end feed learner memory (database/36).
+  useReadingTime(loading ? undefined : currentArticle?.id, endInView && !loading);
   const behindBookmark = !!workId && !!bookmark && partIndex < bookmark.partIndex;
 
   // Quiet serif links under a part's end: back one part, and the 目次.

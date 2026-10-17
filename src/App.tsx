@@ -117,7 +117,8 @@ function App() {
         article.title,
         snippet,
         article.sources,
-        () => {}
+        () => {},
+        { topic: article.topic, category: article.category },
       );
       const processed = { ...article, blocks: processedBlocks };
       saveProcessedArticle(article.id, processed);

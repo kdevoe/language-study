@@ -37,6 +37,9 @@ interface RawCard {
   id: string;
   title: string;
   category?: string;
+  topic?: string;      // editor mode: catalog topic id, one-line summary, why it was picked
+  summary?: string;
+  reason?: string;
   sources?: { title?: string; url?: string; teaser?: string }[];
   blocks?: { content?: { text?: string }[] }[];
 }
@@ -104,6 +107,8 @@ Deno.serve(async (req) => {
     // ── Guardrail #5: fetch fresh candidates. No source ⇒ stop. ───────────────
     // The user's topic selection (#10) rides along so server-produced buffer
     // articles match their interests. NULL/absent → fetch-raw-news defaults.
+    // mode 'edit' = the Haiku news editor: it reads this learner's memory and
+    // history and returns picks with their full text already fetched.
     const { data: prefs } = await admin.from('user_preferences')
       .select('feed_topics').eq('user_id', userId).maybeSingle();
     let candidates: RawCard[] = [];
@@ -111,7 +116,7 @@ Deno.serve(async (req) => {
       const resp = await fetch(`${supabaseUrl}/functions/v1/fetch-raw-news`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-        body: JSON.stringify({ page: 1, topics: prefs?.feed_topics ?? null }),
+        body: JSON.stringify({ page: 1, topics: prefs?.feed_topics ?? null, userId, mode: 'edit' }),
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -176,6 +181,10 @@ Deno.serve(async (req) => {
               snippet,
               sources: card?.sources ?? [],
               requireFull: true,
+              topic: card?.topic,
+              category: card?.category,
+              summary: card?.summary,
+              reason: card?.reason,
             }),
           });
           ok = resp.ok; // process-article upserts the pending row → status='ready'

@@ -250,9 +250,13 @@ interface AppState {
   readerFontSize: number;
   readerFontWeight: number;
   // Grammar points (#43): the EASY/MEDIUM/HARD set in the grammar panel, by
-  // point id. Local only in phase 1; seen counts and sync come in phase 2.
+  // point id. Synced to user_preferences.grammar_progress so ハルカ and the
+  // nightly dream can read it (database/36).
   grammarProgress: Record<string, { mastery: 'hard' | 'medium' | 'easy' }>;
   setGrammarMastery: (id: string, level: 'hard' | 'medium' | 'easy') => void;
+  // Which screen edge opens ハルカ (left for left-handed use).
+  tutorHand: 'right' | 'left';
+  setTutorHand: (hand: 'right' | 'left') => void;
   // Adaptive UI labels (docs/design-system.md §6.10): English by default, a label
   // switches to Japanese once the reader learns its word. `labelStages` keeps the
   // stage each label has switched to (0 English, 1.. Japanese) — sticky, so a
@@ -377,6 +381,7 @@ export const useAppStore = create<AppState>()(
       readerFontSize: 18,
       readerFontWeight: 500,
       grammarProgress: {},
+      tutorHand: 'right',
       uiLanguage: 'adaptive',
       labelStages: {},
 
@@ -523,9 +528,19 @@ export const useAppStore = create<AppState>()(
       }),
       setReaderFontSize: (size) => set({ readerFontSize: size }),
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
-      setGrammarMastery: (id, level) => set((state) => ({
-        grammarProgress: { ...state.grammarProgress, [id]: { mastery: level } },
-      })),
+      setGrammarMastery: (id, level) => {
+        set((state) => ({ grammarProgress: { ...state.grammarProgress, [id]: { mastery: level } } }));
+        const grammar_progress = get().grammarProgress;
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { grammar_progress }));
+        });
+      },
+      setTutorHand: (hand) => {
+        set({ tutorHand: hand });
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { tutor_hand: hand }));
+        });
+      },
       setUiLanguage: (lang) => set({ uiLanguage: lang }),
       setLabelStage: (id, stage) => set((state) =>
         (state.labelStages[id] ?? 0) >= stage ? {} : { labelStages: { ...state.labelStages, [id]: stage } }),
@@ -622,7 +637,11 @@ export const useAppStore = create<AppState>()(
                   lastSeenTs: updatedWord.lastSeenTs
                 };
                 m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
-                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, withoutLookup ? 'seen' : 'lookup');
+                // A lookup carries the word and the article it happened in, so
+                // learner memory can say "looked up 物価 in the BOJ article".
+                const art = get().currentArticle;
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, withoutLookup ? 'seen' : 'lookup',
+                  withoutLookup ? undefined : { word, ...(art ? { articleId: art.id, articleTitle: art.title } : {}) });
               });
             }
           });
@@ -1248,7 +1267,18 @@ export const useAppStore = create<AppState>()(
             podcastCast: remotePrefs.podcast_cast ?? state.podcastCast,
             podcastPersonas: remotePrefs.podcast_personas ?? state.podcastPersonas,
             songCoverStyle: remotePrefs.song_cover_style !== undefined ? remotePrefs.song_cover_style : state.songCoverStyle,
+            tutorHand: remotePrefs.tutor_hand ?? state.tutorHand,
+            // Server ratings win per point; points only rated on this device stay.
+            grammarProgress: remotePrefs.grammar_progress
+              ? { ...state.grammarProgress, ...remotePrefs.grammar_progress }
+              : state.grammarProgress,
           }));
+          // Ratings made before sync existed live only here: push them up once.
+          const local = get().grammarProgress;
+          if (!remotePrefs.grammar_progress && Object.keys(local).length > 0) {
+            const { upsertUserPreferences } = await import('./api');
+            upsertUserPreferences(userId, { grammar_progress: local });
+          }
         }
 
         // Pull remote SRS progress (Last Write Wins)
@@ -1918,6 +1948,7 @@ export const useAppStore = create<AppState>()(
         readerFontSize: state.readerFontSize,
         readerFontWeight: state.readerFontWeight,
         grammarProgress: state.grammarProgress,
+        tutorHand: state.tutorHand,
         uiLanguage: state.uiLanguage,
         labelStages: state.labelStages,
       }),
