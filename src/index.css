@@ -431,7 +431,11 @@ body.song-mode {
 /* Messages sit on the input like a chat, so the reply you're answering stays just above it. */
 .tutor-thread > :first-child { margin-top: auto; }
 .tutor-t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.95; max-width: 94%; color: var(--text-main); white-space: pre-wrap; }
-.tutor-t .fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; }
+.tutor-t .fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; border: none; margin: 0; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tutor-t .fix:disabled { cursor: default; }
+.tutor-t .fix.on { text-decoration: underline; text-decoration-color: var(--text-muted); text-underline-offset: 0.25em; }
+/* A tapped recast's note: what they wrote and why, styled like an aside. */
+.tutor-fixnote { display: block; margin-top: 0.5rem; font-family: var(--font-sans); font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; white-space: normal; }
 .tutor-u { align-self: flex-end; max-width: 82%; background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.75; white-space: pre-wrap; }
 .tutor-a { font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; max-width: 92%; }
 .tutor-ctx { align-self: center; font-size: 0.68rem; font-weight: 600; color: var(--text-muted); opacity: 0.8; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

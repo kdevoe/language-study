@@ -108,7 +108,7 @@ export async function streamTutor(
 
 /** Dev mode has no session: a canned, streamed reply so the panel can be driven locally. */
 async function devReply(onEvent: (e: TutorEvent) => void) {
-  const text = 'いいね、お寺<fix>で</fix>写真を撮りたいんだ。\n<aside>で marks where you do something; に is where you go.</aside>\nどのお寺に行くの？';
+  const text = 'いいね、お寺<fix was="に" why="で marks where you do something">で</fix>写真を撮りたいんだ。\nどのお寺に行くの？';
   onEvent({ type: 'thread', threadId: 'dev' });
   for (let i = 0; i < text.length; i += 6) {
     await new Promise((r) => setTimeout(r, 40));
