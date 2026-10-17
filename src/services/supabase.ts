@@ -1,7 +1,8 @@
 import { createClient, processLock } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/['"]/g, '') || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.replace(/['"]/g, '') || 'placeholder';
+// The env values may carry literal quotes (the production ones do): use these, not import.meta.env.
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/['"]/g, '') || 'https://placeholder.supabase.co';
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.replace(/['"]/g, '') || 'placeholder';
 
 // Create a single supabase client for interacting with your database.
 // Auth options are explicit so session persistence + token refresh behaviour is
