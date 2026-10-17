@@ -78,6 +78,7 @@ Fonts: **Shippori Mincho** (`--font-serif`) and **Inter** (`--font-sans`).
 | Lifted, ready button | `0 4px 14px rgba(0,0,0,0.1)`, then `0 6px 18px rgba(0,0,0,0.12)` on hover |
 | Toast | `0 6px 30px rgba(0,0,0,0.12)` |
 | Bottom sheet | `0 -10px 40px rgba(0,0,0,0.15)` |
+| Study card (the one exception: lifted paper, §6.16) | `0 1px 2px` / `0 8px 18px` / `0 24px 48px`, `rgba(40,40,30,0.06–0.08)`, plus a ground shadow |
 
 **Borders:** default to none. Use a 1px `--border-light` hairline only when a surface would otherwise vanish against its background (a card on the page, an input that needs a box). Prefer a **bottom hairline** over a full box for text inputs.
 
@@ -90,6 +91,7 @@ Fonts: **Shippori Mincho** (`--font-serif`) and **Inter** (`--font-sans`).
 | Bottom sheet in and out (Framer Motion) | spring `stiffness: 400, damping: 40` |
 | Content appearing | `.fade-in`: 0.3s ease-out, 4px rise |
 | Press feedback | `scale(0.98)`, 0.1s |
+| Study card flip (§6.16) | 0.6s `cubic-bezier(0.45, 0, 0.2, 1)`, no spring, 6px rise mid-turn |
 
 Motion confirms an action; it never decorates. Nothing loops or bounces at rest (spinners while working are the exception).
 
@@ -279,16 +281,22 @@ Source of truth: `src/components/WordModal.tsx` (grammar mode), `src/services/gr
   
 - **Height:** the panel's cap rises from 52% to 70% when it shows grammar (an open point, PATTERNS rows, or a sentence's points), and still never covers the tapped word.
   
-### 6.16 Flashcards: deck rows and the grade slider
-Source of truth: `src/components/Review.tsx`, `Flashcards.tsx`, `KanjiFlashcards.tsx`, `GradeSlider.tsx`, mockup `docs/mockups/kanji-deck.html`.
+### 6.16 Flashcards: deck rows, the study card and the grade slider
+Source of truth: `src/components/Review.tsx`, `Flashcards.tsx`, `KanjiFlashcards.tsx`, `StudyCard.tsx`, `GradeSlider.tsx`, the `.study-*` rules in `index.css`, mockups `docs/mockups/kanji-deck.html` and `flashcard-feel-2.html` (variant C).
+
+- **The study card is lifted paper.** It's the one surface allowed real depth: no border, three stacked soft shadows (`0 1px 2px / 0 8px 18px / 0 24px 48px`, warm ink `rgba(40,40,30,…)` at 0.06–0.08), and a separate blurred ellipse on the "table" under its bottom edge. That ground shadow paints **behind** the card, never over its face. The cards still to come wait underneath: up to two, bottom-anchored at `12px / 0.95` and `22px / 0.9` (75% opacity), and the pile thins as the session goes.
+  
+- **It moves only when touched, and quietly.** Press: it sinks to `scale(0.985)`, 1px down, and the shadow tightens (0.18s). Flip: it turns evenly in 0.6s `cubic-bezier(0.45, 0, 0.2, 1)`, **no spring**, rising 6px and growing about 1% mid-turn while the ground shadow softens. Move on: it drifts up 24px as it fades (0.34s), straight up, no sideways throw or tilt. The pile moves up one place underneath, so the next card is already there. Reduced motion drops the rise and the press. **Don't** add idle drift, springs or a bigger lift; the user tried them and they read as too much.
+  
+- **Card back layout.** Content centres in the space above the slider (padding `1.6rem` top, `1rem` above the slider). Kanji back: kanji 7.2rem, keyword 1.2rem (0.6rem below), readings 0.8rem (0.8rem below), components 0.72rem (0.35rem below), known words 1.1rem with 1.2rem between them (1.6rem below), the whole block nudged up 6px.
 
 - **Deck rows.** With an RTK kanji deck, 復習 opens on two rows, 単語 and 漢字. Each is a white card (radius 24px, hairline, card shadow): serif 1.4rem name over a muted 0.75rem line (`vocabulary · 3 new today`, `RTK · #727–729 new today`), and the due count in serif 1.8rem over a small DUE. The 復習 badge is the sum. Tapping a row replaces the heading and segment with `‹ 単語` / `‹ 漢字` (serif 2rem, muted chevron back). Finishing 漢字 offers 単語へ (lifted white button). Without a kanji deck, 復習 is the vocab deck as before.
   
-- **Grade slider.** Both decks grade with the slider toggle's shape (§6.1), used as a **setting, not buttons**: もう一度 · 難しい · 正解 · 簡単 in serif 0.9rem. It arrives already set to a grade guessed from the thinking time: quick means 簡単, normal 正解, slow 難しい, measured against the user's own median. It never starts on もう一度. A tap only moves the thumb. **Tapping the card moves on**, the same gesture that flipped it. Under the track, a muted 0.66rem line: `次は 3ヶ月` on the left, `タップで次へ` on the right.
+- **Grade slider.** Both decks grade with the slider toggle's shape (§6.1), used as a **setting, not buttons**: もう一度 · 難しい · 正解 · 簡単 in serif 0.84rem, track 44px high, inset 1.1rem from the card's sides and **1.6rem up from its bottom edge**. It arrives already set to a grade guessed from the thinking time: quick means 簡単, normal 正解, slow 難しい, measured against the user's own median. It never starts on もう一度. A tap only moves the thumb. **Tapping the card moves on**, the same gesture that flipped it. Nothing under the track: the `次は 3ヶ月` / `タップで次へ` caption was removed, and "tap to move on" is left to tutorial mode.
   
 - **Don't** commit a grade on a slider tap (the user rejected it: a slider reads as a setting). And don't bring back coloured grade pills for reviews. Discover's Hard / Medium / Easy triage pills are a different job and stay.
   
-- **Kanji card.** Front: the keyword, serif 2.3rem. Back: the kanji (serif 6.5rem), keyword (serif 1.2rem), 音 / 訓 readings (muted sans label, serif value), components (muted 0.75rem), then up to three known words with furigana and a one-line meaning. No rule above them, no title, no stroke count, no Heisig number.
+- **Kanji card.** Front: the keyword, serif 2.3rem. Back (sizes above): the kanji, keyword, 音 / 訓 readings (muted sans label, serif value), components (muted), then up to three known words with furigana and a one-line meaning. No rule above them, no title, no stroke count, no Heisig number.
   
 ## 7. Copy
 - Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.

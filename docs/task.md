@@ -602,4 +602,5 @@
   - [x] Phase 3: Home 復習 card with both counts
   - [ ] Components miss primitives that aren't kanji (掛 shows "finger · soil", not "finger · ivy")
   - [ ] New kanji / day is per device (kanji store), not synced to user_preferences
+- [x] Flashcard feel: the study card as lifted paper with a pile underneath, a quiet press / flip / lift-away, bigger kanji, slider raised and caption removed (both decks; StudyCard.tsx, mockups docs/mockups/flashcard-feel.html → flashcard-feel-2.html variant C)
 - [ ] Tutorial mode: first-run hints for non-obvious gestures (tap the card to move on, the thinking-time default, swipe to dismiss in the feed)
