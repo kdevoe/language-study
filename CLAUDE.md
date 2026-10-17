@@ -64,4 +64,4 @@ RPC `check_is_approved(email)` returns `'approved'|'waitlisted'|'not_joined'` fo
 
 ## Environment Variables
 
-See `.env.example`. Required: `VITE_NEWS_API_KEY`, `VITE_GEMINI_API_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Optional: `VITE_GROQ_API_KEY`, `VITE_DEV_MODE`.
+See `.env.example`. Required: `VITE_NEWS_API_KEY`, `VITE_GEMINI_API_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Optional: `VITE_DEV_MODE`. Provider keys (Gemini, Groq, Anthropic, ElevenLabs) live only in the edge functions' secrets, never in `VITE_` variables, which are built into the public bundle. Edge functions check their caller in `supabase/functions/_shared/auth.ts`.

@@ -623,3 +623,14 @@
   - [ ] Deploy learner-dream, tutor-chat, fetch-raw-news, ensure-buffer, process-article; test edge swipe in the
         installed PWA; read real conversations before merge
   - [ ] Later: level check on replies, request_content long reads, voice (tutor doc §9)
+- [x] Edge-function auth hardening (2026-10-17): `_shared/auth.ts` resolves the caller (service role / cron
+      via x-cron-secret / signed-in user); a user acts only for themselves, body.userId only from service or
+      cron. Closed: process-article, dictionary-lookup, fetch-raw-news open to anyone with the anon key (and
+      process-article writing as any body userId); ensure-buffer / learner-dream trusting body.userId with the
+      anon key; audio-cleanup and retired daily-feed callable by anyone. Groq disambiguation moved server-side
+      (VITE_GROQ_API_KEY no longer used by the client)
+  - [ ] Rollout: `supabase secrets set CRON_SECRET=<random>`; Vault `cron_secret` (same value); apply
+        database/38_cron_secret.sql; deploy ensure-buffer, learner-dream, audio-cleanup, process-article,
+        dictionary-lookup, fetch-raw-news, daily-feed; remove VITE_GROQ_API_KEY from Vercel and rotate the Groq key
+  - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
+        local dev against functions needs DEV_ALLOW_ANON=true in the functions env file

@@ -2,6 +2,7 @@ import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CLAUDE_HAIKU, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
+import { resolveCaller } from '../_shared/auth.ts';
 
 // Reads ANTHROPIC_API_KEY from the function's secrets.
 const anthropic = new Anthropic();
@@ -104,13 +105,50 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { word, contextSentence, jmdictEntryId, type, items, points, point } = await req.json();
+    // Signed-in users only (_shared/auth.ts): every call spends Groq / Claude credits.
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const caller = await resolveCaller(req, createClient(Deno.env.get('SUPABASE_URL')!, serviceKey), serviceKey);
+    if (!caller) {
+      return new Response(JSON.stringify({ error: 'sign in required', errorKind: 'unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await req.json();
+    const { word, contextSentence, jmdictEntryId, type, items, points, point } = body;
 
     // Batched heteronym reading disambiguation. The client sends words whose
     // surface has more than one common reading (今日, 市場, 上手, 日本…) with the
     // sentence they appear in and the candidate readings; Groq picks the right
     // one per item in a single call. This is the narrow, constrained task an LLM
     // is actually good at — the deterministic tokenizer (kuromoji) does the rest.
+    // Which JMDict entry a word means in its sentence (several entries share a
+    // surface). Moved here from the client, which called Groq with a key that
+    // shipped in the web bundle. Returns the candidate's index, 0 when unsure.
+    if (type === 'disambiguate') {
+      const list: string[] = Array.isArray(body.candidates) ? body.candidates.slice(0, 10).map(String) : [];
+      let index = 0;
+      if (list.length > 1 && typeof word === 'string') {
+        const prompt = `Given the Japanese word "${word}" in this sentence: "${String(contextSentence ?? '')}"
+
+Which dictionary entry is the correct match? Return ONLY the index number.
+
+Candidates:
+${list.map((c, i) => `[${i}] ${c}`).join('\n')}
+
+Answer (just the number):`;
+        try {
+          const n = parseInt((await groqComplete(prompt)).trim(), 10);
+          if (!isNaN(n) && n >= 0 && n < list.length) index = n;
+        } catch (e) {
+          console.warn('[dictionary-lookup] disambiguate failed:', e instanceof Error ? e.message : e);
+        }
+      }
+      return new Response(JSON.stringify({ index }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (type === 'readings') {
       const list: { surface: string; sentence: string; candidates: string[] }[] =
         Array.isArray(items) ? items.slice(0, 40) : [];
