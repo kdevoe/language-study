@@ -69,18 +69,24 @@ export async function streamTutor(
   signal?: AbortSignal,
 ): Promise<void> {
   if (DEV_MODE) return devReply(onEvent);
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('sign in required');
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tutor-chat`, {
+  const post = (token: string) => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tutor-chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
       apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({ action: 'send', day: localDay(), ...input }),
     signal,
   });
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('sign in required');
+  let res = await post(session.access_token);
+  // A long-idle PWA session can carry an expired token (as in invokeEdgeFn): refresh once and retry.
+  if (res.status === 401) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed.session) res = await post(refreshed.session.access_token);
+  }
   if (!res.ok || !res.body) throw new Error(`tutor-chat ${res.status}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
