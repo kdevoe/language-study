@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — tutor keyboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+svg.i { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 980px; margin: 0 auto 1.4rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 780px; margin: 0 auto 0.4rem; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 0.7rem 1.6rem; margin: 1.2rem auto 2rem; flex-wrap: wrap; max-width: 1200px; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 380px; text-align: center; min-height: 3.6em; }
+/* 390 × 844: a real phone, per design-system.md */
+.phone { width: 410px; height: 864px; max-width: 100%; background: var(--bg-color); border-radius: 50px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; user-select: none; -webkit-user-select: none; }
+.screen { position: absolute; inset: 0; }
+
+/* ── The app behind the sheet (今日, dimmed) ── */
+.app { position: absolute; inset: 0; padding: 60px 24px 0; }
+.app h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; margin-bottom: 1.2rem; }
+.app .row { font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.7; margin-bottom: 1.1rem; }
+.app .k { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); font-family: var(--font-sans); display: block; }
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); }
+
+/* ── The sheet, as .tutor-panel in src/index.css ── */
+/* Geometry read off the Oct 17 screenshot (iOS 26, 390pt wide):
+   keyboard 321pt, iOS bar a 40pt pill floating 13pt above it, so the visible
+   viewport ends at 462pt. The panel is pinned to that viewport. */
+.panel {
+  position: absolute; right: 0; top: 0; transition: top 0.3s cubic-bezier(0.22,1,0.36,1); width: 343px; height: var(--vv, 844px);
+  display: flex; flex-direction: column; background: var(--bg-color);
+  padding-top: 54px; border-radius: 28px 0 0 28px; box-shadow: -10px 0 40px rgba(0,0,0,0.15);
+  transition: height 0.3s cubic-bezier(0.22,1,0.36,1), border-radius 0.3s;
+}
+/* Keyboard up on iOS 26 the sheet sits 63pt down, under the status bar, and ends at 462pt. */
+.phone.kb .panel { top: 63px; --vv: 399px; padding-top: 16px; border-bottom-left-radius: 0; }
+/* Carry the panel's surface down behind the bar (the .kb::after fill in the app). */
+.phone.kb .panel::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 400px; background: var(--bg-color); }
+.head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1.4rem 0.4rem; }
+.who { display: flex; align-items: center; gap: 0.6rem; }
+.who b { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 500; }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.95rem; }
+.link { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); }
+.grab { position: absolute; top: 50%; left: 8px; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
+.thread { flex: 1; overflow: hidden; padding: 0.9rem 1.4rem 1rem; display: flex; flex-direction: column; gap: 1rem; }
+.thread > :first-child { margin-top: auto; }
+.t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.95; max-width: 94%; }
+.u { align-self: flex-end; max-width: 82%; background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.75; }
+.suggest { flex: none; display: flex; gap: 1.2rem; padding: 0.2rem 1.4rem 0.5rem; overflow: hidden; white-space: nowrap; }
+.suggest span { font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted); }
+.input { flex: none; display: flex; align-items: flex-end; gap: 0.8rem; margin: 0 1.4rem; padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
+.input .field { flex: 1; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.5; color: var(--text-main); min-height: 1.5em; }
+.field.empty { color: var(--text-muted); opacity: 0.7; }
+.input svg.i, .draft svg.i { color: var(--text-muted); }
+.dim { opacity: 0.35; }
+.foot { flex: none; height: 19px; }
+.phone.kb .foot { height: 0.4rem; }
+/* Caret: a thin bar that blinks in the focused field. */
+.caret { display: inline-block; width: 2px; height: 1.15em; background: #3478f6; vertical-align: -0.2em; margin-right: 1px; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── B: the draft is the outgoing bubble forming at the end of the thread ── */
+.draft { align-self: flex-end; display: flex; align-items: flex-end; gap: 0.6rem; max-width: 88%; }
+.draft .bubble { background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.75; min-width: 2.5rem; }
+.draft .bubble.empty { color: var(--text-muted); opacity: 0.7; }
+.draft .send { display: flex; padding: 0.45rem 0 0.5rem; }
+/* Hidden from the flow until the keyboard is up */
+.only-kb { display: none !important; }
+.phone.kb .only-kb { display: flex !important; }
+.phone.kb .not-kb { display: none !important; }
+/* B with chips hidden while typing */
+.phone.nochips.kb .suggest { display: none; }
+/* B, bubble flush: no gap between bubble and the bar */
+.phone.kb .thread.flush { padding-bottom: 0.45rem; }
+
+/* ── iOS 26 keyboard + form bar (simulated) ── */
+.ios { position: absolute; left: 0; right: 0; bottom: 0; height: 321px; background: #2b2b2b; border-radius: 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.22,1,0.36,1); }
+.phone.kb .ios { transform: none; }
+.keys { position: absolute; inset: 52px 10px 0; display: grid; grid-template-rows: repeat(4, 42px); gap: 11px; }
+.krow { display: flex; gap: 6px; justify-content: center; }
+.key { flex: 1; max-width: 33px; height: 42px; border-radius: 6px; background: #6b6b6b; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 300; }
+.key.w { max-width: 44px; background: #4a4a4a; font-size: 1rem; }
+.key.sp { max-width: none; flex: 4; }
+.key.go { max-width: 90px; flex: 2; background: #3478f6; }
+.ios .bottom { position: absolute; left: 20px; right: 20px; bottom: 10px; display: flex; justify-content: space-between; color: #fff; font-size: 1.4rem; }
+/* The bar: a floating grey pill 13pt above the keys, 40pt tall, 18pt side insets. */
+.bar { position: absolute; left: 18px; right: 18px; bottom: 334px; height: 40px; border-radius: 100px; background: #b3b3b3; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; color: #fff; font-size: 1.1rem; opacity: 0; transform: translateY(60px); transition: all 0.3s cubic-bezier(0.22,1,0.36,1); }
+.phone.kb .bar { opacity: 1; transform: none; }
+.bar .l { display: flex; gap: 28px; }
+.bar svg.i { stroke-width: 2.4; width: 18px; height: 18px; }
+
+/* ── Row 2: thread formatting, keyboard down, no chips ── */
+.phone.down .panel { --vv: 844px; }
+.phone.down .ios, .phone.down .bar { display: none; }
+.head.bare { padding-top: 0.9rem; }
+.head.bare b { font-size: 1.05rem; }
+.head.bare .link { font-size: 0.85rem; }
+.thread.two { gap: 0; }
+.turn { display: flex; flex-direction: column; }
+.turn + .turn { margin-top: 2.2rem; }           /* between speakers: a full pause */
+.turn .t + .t { margin-top: 0.55rem; }           /* within one breath: close */
+.thread.two .t { font-size: 1.02rem; line-height: 1.9; }
+.turn.me { align-items: flex-end; }
+/* C keeps the bubble, lighter */
+.thread.c .me .u { background: var(--bg-card); font-size: 0.95rem; }
+/* D, E: the learner's words as quoted speech, no bubble */
+.thread.d .me .q, .thread.e .me .q { font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.9; color: var(--text-muted); text-align: right; max-width: 82%; }
+.thread.d .me .q::before, .thread.e .me .q::before { content: '「'; }
+.thread.d .me .q::after, .thread.e .me .q::after { content: '」'; }
+/* The aside: smaller, quieter, no rule, its own pause */
+.note { font-size: 0.78rem; line-height: 1.65; color: var(--text-muted); max-width: 88%; margin: 1rem 0 0.4rem; }
+.note + .t { margin-top: 0.9rem; }
+.thread.c .note { border-left: 2px solid var(--accent-primary); padding-left: 0.8rem; margin: 0.6rem 0 0; }
+/* The closing question gets room of its own */
+.thread.d .ask, .thread.e .ask { margin-top: 1.4rem !important; }
+/* E: what came before recedes */
+.thread.e .turn.past { opacity: 0.42; }
+.thread.e .turn.past .t { font-size: 0.95rem; }
+.thread.e .turn.past .note { display: none; }
+/* Bare input: a line of placeholder, no rule; the arrow comes with the first character */
+.input.bare { border-bottom: none; padding: 1rem 0 1.1rem; }
+.input.bare .field { font-size: 1.02rem; }
+.input.bare svg { display: none; }
+.foot.two { height: 22px; }
+
+/* The iOS status bar text (the grey band above the panel in the screenshot is the dimmed app) */
+.sb { position: absolute; top: 16px; left: 28px; right: 28px; display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
+.sb .r { font-size: 0.75rem; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · ハルカ</div>
+  <h1>Keyboard up</h1>
+  <p>iOS floats its form bar (↑ ↓ ✓) between the panel and the keys, and no web API removes it. A is the panel today: two input-shaped bands stacked, ours and iOS's. B drops our compose row while the keyboard is up and lets the draft form as the outgoing bubble at the end of the thread, so the bar is the only band and reads as the keyboard's top edge.</p>
+  <p>Geometry is taken from the Oct 17 screenshot (iOS 26, 390 × 844). Keyboard down, A and B are identical.</p>
+</div>
+
+<div class="controls">
+  <div class="ctl"><span class="lbl">KEYBOARD</span>
+    <div class="pill-seg" data-k="kb"><button data-v="0">下</button><button data-v="1" class="on">上</button></div></div>
+  <div class="ctl"><span class="lbl">DRAFT</span>
+    <div class="pill-seg" data-k="draft"><button data-v="0" class="on">empty</button><button data-v="1">short</button><button data-v="2">two lines</button></div></div>
+  <div class="ctl"><span class="lbl">CHIPS WHILE TYPING (B)</span>
+    <div class="pill-seg" data-k="chips"><button data-v="1" class="on">keep</button><button data-v="0">hide</button></div></div>
+</div>
+
+<div class="stage">
+
+  <!-- A: today -->
+  <div class="phone-wrap">
+    <div class="phone-label">A · 現状</div>
+    <div class="phone kb" id="pa">
+      <div class="screen">
+        <div class="sb"><span>12:13</span><span class="r">▪▪▪ ◠ ▮</span></div>
+        <div class="app">
+          <h2>今日</h2>
+          <div class="row"><span class="k">READ</span>The brain's reward…</div>
+          <div class="row"><span class="k">REVIEW</span>Cards due today</div>
+        </div>
+        <div class="backdrop"></div>
+        <aside class="panel">
+          <div class="grab"></div>
+          <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><span class="link">終わる</span></div>
+          <div class="thread">
+            <div class="t">ノーベル賞の記事、読みましたね。脳の研究、どうでしたか？</div>
+            <div class="u">こんにちは</div>
+            <div class="t">いい質問ですね。報酬系の話、どこが気になりましたか？</div>
+          </div>
+          <div class="suggest"><span>今日の記事について</span><span>単語クイズ</span><span>ただ話そう</span></div>
+          <div class="input">
+            <div class="field empty"><span class="caret"></span><span class="dtext">ハルカに話しかける…</span></div>
+            <svg class="i dim sendico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </div>
+          <div class="foot"></div>
+        </aside>
+        <div class="bar"><div class="l"><svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></div>
+        <div class="ios"></div>
+      </div>
+    </div>
+    <div class="phone-note">Today. Our compose row with its underline, then the grey pill, then the keys: three horizontal bands before the text begins.</div>
+  </div>
+
+  <!-- B: bubble composer -->
+  <div class="phone-wrap">
+    <div class="phone-label">B · 吹き出しで書く</div>
+    <div class="phone kb" id="pb">
+      <div class="screen">
+        <div class="sb"><span>12:13</span><span class="r">▪▪▪ ◠ ▮</span></div>
+        <div class="app">
+          <h2>今日</h2>
+          <div class="row"><span class="k">READ</span>The brain's reward…</div>
+          <div class="row"><span class="k">REVIEW</span>Cards due today</div>
+        </div>
+        <div class="backdrop"></div>
+        <aside class="panel">
+          <div class="grab"></div>
+          <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><span class="link">終わる</span></div>
+          <div class="thread flush">
+            <div class="t">ノーベル賞の記事、読みましたね。脳の研究、どうでしたか？</div>
+            <div class="u">こんにちは</div>
+            <div class="t">いい質問ですね。報酬系の話、どこが気になりましたか？</div>
+            <div class="draft only-kb">
+              <div class="bubble empty"><span class="caret"></span><span class="dtext">ハルカに話しかける…</span></div>
+              <div class="send"><svg class="i dim sendico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+            </div>
+          </div>
+          <div class="suggest"><span>今日の記事について</span><span>単語クイズ</span><span>ただ話そう</span></div>
+          <div class="input not-kb">
+            <div class="field empty"><span class="dtext">ハルカに話しかける…</span></div>
+            <svg class="i dim" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </div>
+          <div class="foot"></div>
+        </aside>
+        <div class="bar"><div class="l"><svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></div>
+        <div class="ios"></div>
+      </div>
+    </div>
+    <div class="phone-note">Keyboard up: the compose row goes, the draft is the bubble taking shape where the sent message will land. Same textarea underneath, so composition and dictation are untouched.</div>
+  </div>
+
+</div>
+
+<div class="mock-header" style="margin-top:4rem">
+  <div class="kicker">MOCKUP · ハルカ</div>
+  <h1>間 · the thread itself</h1>
+  <p>Keyboard down, the suggestion row gone. The busyness in the screenshot comes from everything having the same weight: paragraphs inside one turn are spaced like the gap between speakers, the learner's bubble and the aside's rule add shapes, and the input adds a line. These three keep the same type and colours and change only the space.</p>
+</div>
+<div class="stage">
+
+  <div class="phone-wrap">
+    <div class="phone-label">C · 息つぎ</div>
+    <div class="phone down" id="pc">
+      <div class="screen">
+        <div class="sb"><span>1:41</span><span class="r">▪▪▪ ◠ ▮</span></div>
+        <div class="app">
+          <h2>ホーム</h2>
+          <div class="row"><span class="k">READ</span>The brain's reward…</div>
+          <div class="row"><span class="k">REVIEW</span>Cards due today</div>
+        </div>
+        <div class="backdrop"></div>
+        <aside class="panel">
+          <div class="grab"></div>
+          <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><span class="link">終わる</span></div>
+          <div class="thread two c">
+            <div class="turn"><div class="t">基本的に一人の方が好きなんだね。いい言い方だよ！</div><div class="t">一人で歩くと、頭がすっきりするよね。脳にもいいらしいよ。山では、どんなことを考えてる？</div></div><div class="turn me"><div class="u">この曲のテーマは何ですか</div></div><div class="turn"><div class="t">テーマは「弟との、二人だけの秘密の時間」かな。冬の土曜日に、携帯を家に置いて、町で踊って笑う歌だよ。</div><div class="t">さっきの話みたいに、電話を持たない自由な時間なんだ。</div><div class="note">The song also has 葉書 (postcard) and 漬ける (to pickle), two words you've been forgetting in your flashcards. Look for them in Verse 2!</div><div class="t ask">あなたは、子どもの時に「秘密の時間」があった？</div></div>
+          </div>
+          <div class="input"><div class="field empty">ハルカに話しかける…</div><svg class="i dim" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+          <div class="foot two"></div>
+        </aside>
+      </div>
+    </div>
+    <div class="phone-note">Smallest change. Space does the work: a full pause between speakers, a short one between paragraphs of the same breath. Bubble, aside rule and input underline all stay.</div>
+  </div>
+
+  <div class="phone-wrap">
+    <div class="phone-label">D · 「 」</div>
+    <div class="phone down" id="pd">
+      <div class="screen">
+        <div class="sb"><span>1:41</span><span class="r">▪▪▪ ◠ ▮</span></div>
+        <div class="app">
+          <h2>ホーム</h2>
+          <div class="row"><span class="k">READ</span>The brain's reward…</div>
+          <div class="row"><span class="k">REVIEW</span>Cards due today</div>
+        </div>
+        <div class="backdrop"></div>
+        <aside class="panel">
+          <div class="grab"></div>
+          <div class="head bare"><b style="font-family:var(--font-serif);font-weight:500">ハルカ</b><span class="link">終わる</span></div>
+          <div class="thread two d">
+            <div class="turn"><div class="t">基本的に一人の方が好きなんだね。いい言い方だよ！</div><div class="t">一人で歩くと、頭がすっきりするよね。脳にもいいらしいよ。山では、どんなことを考えてる？</div></div><div class="turn me"><div class="q">この曲のテーマは何ですか</div></div><div class="turn"><div class="t">テーマは「弟との、二人だけの秘密の時間」かな。冬の土曜日に、携帯を家に置いて、町で踊って笑う歌だよ。</div><div class="t">さっきの話みたいに、電話を持たない自由な時間なんだ。</div><div class="note">The song also has 葉書 (postcard) and 漬ける (to pickle), two words you've been forgetting in your flashcards. Look for them in Verse 2!</div><div class="t ask">あなたは、子どもの時に「秘密の時間」があった？</div></div>
+          </div>
+          <div class="input bare"><div class="field empty">ハルカに話しかける…</div><svg class="i dim" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+          <div class="foot two"></div>
+        </aside>
+      </div>
+    </div>
+    <div class="phone-note">No shapes at all. Your words are quoted speech, set right in a quieter grey. The aside loses its rule and shrinks. The avatar goes; the input is one line of placeholder with no rule, and the arrow arrives with the first character. Her closing question stands on its own.</div>
+  </div>
+
+  <div class="phone-wrap">
+    <div class="phone-label">E · 今だけ</div>
+    <div class="phone down" id="pe">
+      <div class="screen">
+        <div class="sb"><span>1:41</span><span class="r">▪▪▪ ◠ ▮</span></div>
+        <div class="app">
+          <h2>ホーム</h2>
+          <div class="row"><span class="k">READ</span>The brain's reward…</div>
+          <div class="row"><span class="k">REVIEW</span>Cards due today</div>
+        </div>
+        <div class="backdrop"></div>
+        <aside class="panel">
+          <div class="grab"></div>
+          <div class="head bare"><b style="font-family:var(--font-serif);font-weight:500">ハルカ</b><span class="link">終わる</span></div>
+          <div class="thread two e">
+            <div class="turn past"><div class="t">基本的に一人の方が好きなんだね。いい言い方だよ！</div><div class="t">一人で歩くと、頭がすっきりするよね。脳にもいいらしいよ。山では、どんなことを考えてる？</div></div><div class="turn me past"><div class="q">この曲のテーマは何ですか</div></div><div class="turn"><div class="t">テーマは「弟との、二人だけの秘密の時間」かな。冬の土曜日に、携帯を家に置いて、町で踊って笑う歌だよ。</div><div class="t">さっきの話みたいに、電話を持たない自由な時間なんだ。</div><div class="note">The song also has 葉書 (postcard) and 漬ける (to pickle), two words you've been forgetting in your flashcards. Look for them in Verse 2!</div><div class="t ask">あなたは、子どもの時に「秘密の時間」があった？</div></div>
+          </div>
+          <div class="input bare"><div class="field empty">ハルカに話しかける…</div><svg class="i dim" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+          <div class="foot two"></div>
+        </aside>
+      </div>
+    </div>
+    <div class="phone-note">D, and what came before recedes: earlier turns fade and sit a size smaller, so the eye lands on the exchange that is live. Scrolling up brings them back to full.</div>
+  </div>
+</div>
+
+<script>
+  // Simulated keyboard keys
+  const rows = [['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l','ー'],['⇧','z','x','c','v','b','n','m','⌫']];
+  document.querySelectorAll('.ios').forEach((k) => {
+    const keys = document.createElement('div'); keys.className = 'keys';
+    rows.forEach((r, i) => {
+      const row = document.createElement('div'); row.className = 'krow';
+      r.forEach((c) => { const el = document.createElement('div'); el.className = 'key' + (i === 2 && (c === '⇧' || c === '⌫') ? ' w' : ''); el.textContent = c; row.appendChild(el); });
+      keys.appendChild(row);
+    });
+    const last = document.createElement('div'); last.className = 'krow';
+    last.innerHTML = '<div class="key w">123</div><div class="key w">☺</div><div class="key sp" style="font-size:.8rem;color:#bbb;justify-content:flex-end;padding-right:8px">あ</div><div class="key go">↑</div>';
+    keys.appendChild(last);
+    k.appendChild(keys);
+    k.insertAdjacentHTML('beforeend', '<div class="bottom"><span>🌐</span><span>🎙</span></div>');
+  });
+
+  const DRAFTS = ['', '脳の研究は難しかったです', '報酬系の話が面白かったです。でも、ドーパミンの役割がまだよくわかりません'];
+  const state = { kb: 1, draft: 0, chips: 1 };
+  const phones = [document.getElementById('pa'), document.getElementById('pb')];
+  function render() {
+    phones.forEach((p) => {
+      p.classList.toggle('kb', state.kb === 1);
+      p.classList.toggle('nochips', state.chips === 0);
+      const text = DRAFTS[state.draft];
+      p.querySelectorAll('.field, .bubble').forEach((f) => {
+        f.classList.toggle('empty', !text);
+        f.querySelector('.dtext').textContent = text || 'ハルカに話しかける…';
+        const c = f.querySelector('.caret');
+        // Caret sits after the text when there is some, before the placeholder when empty
+        if (c) { if (text) f.appendChild(c); else f.insertBefore(c, f.firstChild); }
+      });
+      p.querySelectorAll('.sendico').forEach((s) => s.classList.toggle('dim', !text));
+    });
+  }
+  document.querySelectorAll('.pill-seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    seg.querySelectorAll('button').forEach((x) => x.classList.remove('on')); b.classList.add('on');
+    state[seg.dataset.k] = Number(b.dataset.v); render();
+  })));
+  render();
+</script>
+</body>
+</html>

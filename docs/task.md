@@ -617,6 +617,9 @@
   - [x] UI: side panel, hand-side edge swipe + nav drag-up fallback, Home card, ハルカに聞く in word/grammar/
         sentence panels, screen context (Reader, both decks front-only, podcast, song), audio pause, recap
   - [x] Settings › ハルカ: edge, corrections, aside language, "What ハルカ knows" with delete + forget everything
+  - [x] Chat 間 (Oct 17): suggestion row removed; 2.2rem between speakers, paragraphs of one turn close;
+        keyboard up → the draft is the outgoing bubble at the end of the thread (iOS's form bar can't be hidden;
+        mockup docs/mockups/tutor-keyboard.html, B + C)
   - [ ] Deploy learner-dream, tutor-chat, fetch-raw-news, ensure-buffer, process-article; test edge swipe in the
         installed PWA; read real conversations before merge
   - [ ] Later: level check on replies, request_content long reads, voice (tutor doc §9)
