@@ -6,9 +6,9 @@
  * against, and the evidence for the flash-vs-pro decision.
  *
  * DESIGN — freeze the palette, isolate the variable. The harness measures the
- * *rewrite (prompt + model)* only, NOT the palette pipeline (Groq keywords →
+ * *rewrite (prompt + model)* only, NOT the palette pipeline (Haiku concepts →
  * JMDict → bucketing). Each fixture (scripts/eval-fixtures/*.json) ships a frozen
- * palette + profile, so the harness makes NO Supabase/Groq calls — only Gemini.
+ * palette + profile, so the harness makes NO Supabase/Haiku calls — only Gemini.
  * The prompt is built by the SAME shared module the edge function ships
  * (supabase/functions/_shared/rewritePrompt.ts), bundled on the fly, so what we
  * score is exactly what production sends.

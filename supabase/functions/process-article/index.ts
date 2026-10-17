@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
-import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
+import { GEMINI_FLASH } from '../_shared/models.ts';
+import { parseJsonObject, quickHaiku } from '../_shared/claude.ts';
 import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, type WordSignal } from '../_shared/wordPriority.ts';
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
 import { actingUserId, resolveCaller } from '../_shared/auth.ts';
@@ -14,7 +15,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // ── Transient LLM failure retry ──────────────────────────────────────────────
 // Gemini flash intermittently returns 429 (rate limit) / 503 (model overloaded)
@@ -502,8 +502,8 @@ function normalizeConcepts(raw: unknown): Concept[] {
 //   actions — verbs/adjectives/abstract ideas describing what HAPPENS (the news-register
 //             vocabulary that makes articles hard and that the old noun-only extractor
 //             threw away). Each concept carries sense-appropriate English synonyms.
-async function extractConceptsWithGroq(
-  title: string, snippet: string, apiKey: string,
+async function extractConcepts(
+  title: string, snippet: string,
 ): Promise<{ topics: Concept[]; actions: Concept[] }> {
   const prompt = `You are preparing vocabulary for a Japanese news rewrite. From this English news article, extract its key CONCEPTS in two groups. For each concept give up to ${MAX_SYNONYMS_PER_CONCEPT} common English synonyms, chosen for THIS article's sense (e.g. "fine" meaning a monetary penalty → "penalty, forfeit"; NOT "healthy, delicate").
 
@@ -519,22 +519,8 @@ ${fence('snippet', snippet)}
 
 ${dataRule(['title', 'snippet'])}`;
 
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-    }),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`Groq concept extraction failed: ${err.error?.message || response.statusText}`);
-  }
-  const data = await response.json();
-  const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+  // deno-lint-ignore no-explicit-any
+  const parsed = parseJsonObject<any>(await quickHaiku(prompt, 2048));
   return {
     topics: normalizeConcepts(parsed.topics),
     actions: normalizeConcepts(parsed.actions),
@@ -598,7 +584,6 @@ Deno.serve(async (req) => {
     }
 
     const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
-    const groqKey = Deno.env.get('GROQ_API_KEY')!;
     const jinaKey = Deno.env.get('JINA_API_KEY'); // optional — lifts extraction hit rate
 
     // Hoisted (was created at the prompt step): the JIT-part path also needs
@@ -876,13 +861,13 @@ Deno.serve(async (req) => {
     const targetNew = Math.max(1, Math.round(ratios.new * wordsBudget));
     console.log(`[process-article] length: ${targetParagraphs} paragraphs (sourceKind=${sourceKind}), vocab budget ${wordsBudget} -> ${targetReview} review / ${targetNew} new`);
 
-    // Kick off concept extraction (Groq) in parallel with the lexicon build —
+    // Kick off concept extraction (Haiku) in parallel with the lexicon build —
     // neither depends on the other, and #103's concept↔SRS matching needs the
     // concepts on EVERY article (lexicon path included), not just the cluster
     // fallback. Never rejects: failure degrades to concept-less behavior
     // (topic-independent floor, no clusters).
     const conceptsPromise: Promise<{ topics: Concept[]; actions: Concept[] } | null> =
-      extractConceptsWithGroq(title, sourceText.slice(0, 2000), groqKey)
+      extractConcepts(title, sourceText.slice(0, 2000))
         .catch((e) => {
           console.warn('[process-article] concept extraction failed (continuing without):', e instanceof Error ? e.message : e);
           return null;

@@ -4,7 +4,7 @@ Each `eval-*.json` is one **golden case** for the `process-article` rewrite eval
 harness (`scripts/eval-article-rewrite.mjs`, issue #65). A fixture freezes
 everything the rewrite depends on — the English **source**, the reader
 **profile**, and a **frozen vocabulary palette** — so the only variable the
-harness measures is the *prompt + model*. The harness makes **no Supabase/Groq
+harness measures is the *prompt + model*. The harness makes **no Supabase/Haiku
 calls**; the palette is supplied here rather than computed live, which keeps runs
 reproducible.
 

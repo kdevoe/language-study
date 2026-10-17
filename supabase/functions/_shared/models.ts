@@ -4,8 +4,6 @@
 // place to change when a model is bumped.
 //
 // Pinning notes:
-// - Groq IDs ARE the version identifier (Groq exposes no dated snapshots), so the
-//   strings below are as reproducible as the provider allows.
 // - GEMINI_FLASH was previously the floating `gemini-3-flash-preview` alias. The
 //   gemini-3-flash line never shipped a stable/dated build, so we moved to the
 //   stable `gemini-3.5-flash` — a reproducible, non-preview identifier. Bumped to
@@ -16,7 +14,9 @@
 /** Gemini — article rewriting (process-article). */
 export const GEMINI_FLASH = 'gemini-3.8-flash';
 
-/** Claude — grammar insight (dictionary-lookup). Anthropic IDs carry no date suffix. */
+/** Claude — grammar insight, and (thinking off, via quickHaiku) translation, readings,
+ *  disambiguation, definition fallback and article concept extraction. Anthropic IDs
+ *  carry no date suffix. */
 export const CLAUDE_HAIKU = 'claude-haiku-5-5';
 
 /** Claude — the weekly deep dream (learner-dream mode 'weekly'). */
@@ -36,9 +36,6 @@ export const CLAUDE_PRICES: Record<string, { in: number; out: number }> = {
   [CLAUDE_HAIKU]: { in: 0.10, out: 0.50 },
   [CLAUDE_SONNET]: { in: 2, out: 10 },
 };
-
-/** Groq — keyword extraction, heteronym readings, translation, definition fallback. */
-export const GROQ_GENERAL = 'openai/gpt-oss-20b';
 
 /** ElevenLabs — podcast dialogue TTS (generate-podcast). v4 won the P0 spike over
  *  v3: ~35% faster generation and a 7–20 dB lower noise floor on every voice
