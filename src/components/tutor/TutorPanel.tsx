@@ -47,7 +47,8 @@ export function TutorPanel() {
 
   const [lines, setLines] = useState<Line[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(false);       // the first history load has finished, either way
+  const [historyOk, setHistoryOk] = useState(false); // ...and succeeded
   const [ctx, setCtx] = useState<ScreenContext | null>(null);
   const [chipOff, setChipOff] = useState(false);
   const [draft, setDraft] = useState('');
@@ -72,14 +73,15 @@ export function TutorPanel() {
     setCtx(screen?.detail ? screen : null);
     setChipOff(false);
     setOpener(options.opener ?? screen?.opener ?? null);
-    if (!loaded) {
+    if (!historyOk) {
       fetchTutorHistory().then(({ threadId: id, messages }) => {
         setThreadId(id);
         setLines(messages.filter((m) => m.text || m.role === 'context').map((m) => ({
           key: m.id, role: m.role, text: m.role === 'context' ? (m.context?.chip ?? '') : (m.text ?? ''),
         })).filter((l) => l.text));
         setLoaded(true);
-      }).catch(() => setLoaded(true));
+        setHistoryOk(true);
+      }).catch(() => setLoaded(true)); // still talkable; the next open tries again
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, openSeq]);
@@ -203,7 +205,9 @@ export function TutorPanel() {
   const backdropOn = open || (drag !== null && drag > 8);
 
   const showChip = !!ctx?.chip && !chipOff && !recap;
-  const firstLine = opener && !lines.some((l) => l.role !== 'context') ? opener : null;
+  // Her opener only once we know today's thread is empty: until the history
+  // loads, a fresh-looking opener would hide the conversation you're in.
+  const firstLine = loaded && opener && !lines.some((l) => l.role !== 'context') ? opener : null;
   const learnerSpoke = lines.some((l) => l.role === 'user');
 
   return (
@@ -242,6 +246,7 @@ export function TutorPanel() {
         ) : (
           <>
             <div className="tutor-thread" ref={threadRef}>
+              {!loaded && !lines.length && <div className="tutor-typing" role="status" aria-label="読み込み中"><span /><span /><span /></div>}
               {firstLine && <div className="tutor-t"><TutorText text={firstLine} lookup={lookup} /></div>}
               {lines.map((l) => l.role === 'context'
                 ? <div key={l.key} className="tutor-ctx">{l.text}</div>
