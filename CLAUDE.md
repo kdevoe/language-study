@@ -97,7 +97,13 @@ Articles scraped from the web, pasted or URL imports, podcast topics and song th
 - **Shared content raises the stakes.** Content generated once and served to many users (a shared news rewrite, cover art) must pass output checks before it's shared, because an injection there reaches everyone.
 
 ### Current gaps
-Tracked in `docs/task.md`: prompt-injection fencing and confirmations are not fully in place yet (tutor `request_content` has no confirmation tap and podcasts have no daily cap); RLS and storage policies have not been audited; `api/news.ts` should be removed.
+Tracked in `docs/task.md`: RLS and storage policies have not been audited; `api/news.ts` should be removed; the injection eval (`scripts/eval-prompt-injection.mjs`) covers the article rewrite only, not yet the tutor or podcasts.
+
+### Helpers
+- `supabase/functions/_shared/untrusted.ts`: `fence(tag, text)` / `fenceInline` wrap untrusted text (and defuse a closing tag inside it), `dataRule(tags)` is the rule sentence to put next to it.
+- `renderMemory` (`_shared/learner.ts`) fences learner memory itself.
+- `process-article` strips URLs and email addresses from generated blocks (`scrubLinks`).
+- `node scripts/eval-prompt-injection.mjs`: planted-instruction cases against the real rewrite prompt. Run it after changing a prompt that takes untrusted text.
 
 ## Environment Variables
 

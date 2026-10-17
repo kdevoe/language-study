@@ -48,6 +48,9 @@ const ALLOWED_MINUTES = [5, 10, 15];
 /** An in-flight episode older than this is treated as dead and may be retried. */
 const STALE_MS = 10 * 60_000;
 const MAX_IN_FLIGHT = 2;
+/** Episodes per user per rolling 24h (failed ones don't count). Each costs
+ *  ElevenLabs credits; billing tiers can raise it via PODCASTS_PER_DAY. */
+const DAILY_CAP = Number(Deno.env.get('PODCASTS_PER_DAY') ?? '') || 10;
 const ROTATION_HISTORY = 12;
 const DIGEST_STORIES = 3;
 const DIGEST_WINDOW_MS = 36 * 3600_000;
@@ -411,7 +414,7 @@ Deno.serve(async (req) => {
 
   const { data: recent } = await supabase
     .from('podcast_episodes')
-    .select('id, source_kind, source_ref, status, cast_ids, updated_at')
+    .select('id, source_kind, source_ref, status, cast_ids, updated_at, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -429,6 +432,11 @@ Deno.serve(async (req) => {
   const duplicate = sourceRef != null && inFlight.find((r) => r.source_kind === kind && r.source_ref === sourceRef);
   if (duplicate) return json(409, { error: 'this episode is already being made', errorKind: 'episode_in_progress', episodeId: duplicate.id });
   if (inFlight.length >= MAX_IN_FLIGHT) return json(429, { error: 'two episodes are already being made — try again in a minute', errorKind: 'too_many_in_flight' });
+  // Server-side daily cap (CLAUDE.md › Security › Cost and abuse). The newest 50
+  // rows are loaded above, more than any day's cap, so counting them is exact.
+  const dayAgo = Date.now() - 24 * 3600_000;
+  const today = rows.filter((r) => r.status !== 'failed' && new Date(r.created_at).getTime() > dayAgo).length;
+  if (today >= DAILY_CAP) return json(429, { error: `daily limit reached (${DAILY_CAP} episodes a day)`, errorKind: 'daily_limit' });
 
   const history: PairHistory = rows
     .filter((r) => r.cast_ids?.host && r.cast_ids?.guest)

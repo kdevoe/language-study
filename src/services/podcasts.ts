@@ -194,6 +194,7 @@ export async function episodeErrorMessage(error: unknown): Promise<string> {
   switch (kind) {
     case 'digest_empty': return 'まだ今日のニュースがありません。ニュースを読んでからもう一度試してください。';
     case 'too_many_in_flight': return 'いま2つのエピソードを作成中です。少し待ってからもう一度試してください。';
+    case 'daily_limit': return '今日作れるエピソードの上限に達しました。明日また試してください。';
     case 'episode_in_progress': return 'このエピソードはすでに作成中です。';
     case 'text_too_short': return 'テキストは200字以上貼り付けてください。';
     case 'text_too_long': return 'テキストは20,000字以内にしてください。';
