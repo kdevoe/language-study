@@ -64,6 +64,7 @@ export function Flashcards({
   onFocusChange,
   onRemainingChange,
   topOffset = '0rem',
+  focusKey,
 }: {
   onFocusChange?: (focused: boolean) => void;
   // Due cards left in this run — drives the 復習 badge in REVIEW.
@@ -71,6 +72,9 @@ export function Flashcards({
   // Height of chrome REVIEW renders above the card flow (its segmented control),
   // subtracted from the flow's min-height so the page doesn't scroll.
   topOffset?: string;
+  // Bumped each time the deck is opened from REVIEW's deck rows: enter focus mode
+  // straight away, so the nav is gone before the first card is tapped.
+  focusKey?: number;
 }) {
   const reviewWord = useAppStore((s) => s.reviewWord);
   const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
@@ -93,6 +97,7 @@ export function Flashcards({
   // cards for the rest of the run; it releases when the run ends (finish card,
   // Discover summary, empty deck) so the nav is back for onward navigation.
   const [focused, setFocused] = useState(false);
+  useEffect(() => { if (focusKey) setFocused(true); }, [focusKey]);
 
   // Discover mode (#113). Non-null = in Discover; [] while loading or exhausted.
   const [discoverCards, setDiscoverCards] = useState<IntakeCandidate[] | null>(null);
@@ -130,22 +135,22 @@ export function Flashcards({
   }
 
   // The app-open promotion pass (sync → promoteIntakeQueue) is async and can land
-  // AFTER this tab mounted with an empty deck. While the deck is empty, rebuild the
-  // snapshot whenever words change so freshly promoted cards surface without a
-  // tab-away round trip. Once a deck exists it stays snapshotted (no reshuffling).
+  // AFTER this session mounted, and in REVIEW's deck rows the session stays mounted.
+  // Whenever words change, append cards that became due and aren't in this run yet
+  // (today's new words), so they join the run instead of waiting for the next visit.
+  // Existing cards are never reordered.
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   useEffect(() => {
-    if (cards.length > 0) return;
     // In Discover mode every grade touches wordDatabase; skip the rebuild churn —
     // Discover grades never mint due cards (far-out maintenance or queued).
     if (discoverCards != null) return;
     const fresh = buildDeck();
-    if (fresh.length > 0) {
-      setCards(fresh);
-      setIndex(0);
-      setRevealed(false);
-    }
-  }, [cards.length, wordDatabase, discoverCards]);
+    setCards((cur) => {
+      const have = new Set(cur.map((c) => c.key));
+      const added = fresh.filter((c) => !have.has(c.key));
+      return added.length > 0 ? [...cur, ...added] : cur;
+    });
+  }, [wordDatabase, discoverCards]);
 
   // Dev-only: seed a demo deck, then rebuild the snapshot in place (no reload).
   function seedAndReload() {
@@ -200,8 +205,12 @@ export function Flashcards({
     setRevealed(true);
   }
 
+  // A grade tap and a card tap can both land for one card (the slider commits a
+  // beat after its tap): only the first grades it.
+  const gradedKey = useRef<string | null>(null);
   function grade(rating: Rating) {
-    if (!card) return;
+    if (!card || gradedKey.current === card.key) return;
+    gradedKey.current = card.key;
     if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
     reviewWord(card.key, rating, Date.now());
     setRevealed(false);
@@ -442,7 +451,7 @@ export function Flashcards({
         onTap={() => setFocused(true)}
         onReveal={reveal}
         onAdvance={() => grade(pick)}
-        footer={<GradeSlider value={pick} onChange={setPick} />}
+        footer={<GradeSlider value={pick} onChange={setPick} onCommit={grade} />}
       />
     </div>
   );

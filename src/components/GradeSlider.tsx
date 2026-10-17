@@ -1,21 +1,39 @@
+import { useEffect, useRef } from 'react';
 import type { Rating } from '../services/srs';
 import { GRADES } from '../services/grades';
 
 // The flashcard grade control (both decks), in the shape of the app's slider toggle
-// (design-system §6.1). It's a setting, not four buttons: it arrives already set to
-// a grade guessed from the thinking time (services/thinkTime.ts), a tap moves the
-// white thumb to another grade and nothing else, and tapping the card moves on.
+// (design-system §6.1). It arrives already set to a grade guessed from the thinking
+// time (services/thinkTime.ts). Two ways to move on, one tap each:
+//   • tap the card — keep the suggested grade
+//   • tap a grade — the thumb slides there, and a beat later the card moves on
+//     with that grade (tapping another grade inside the beat re-aims it)
 // No caption: the slider alone sits 1.6rem above the card's bottom edge.
 // See docs/mockups/kanji-deck.html (S2 + S3) and flashcard-feel-2.html.
 
-export function GradeSlider({ value, onChange }: {
+/** Long enough to see the thumb arrive before the card lifts away. */
+const COMMIT_DELAY_MS = 260;
+
+export function GradeSlider({ value, onChange, onCommit }: {
   value: Rating;
+  /** Move the thumb. */
   onChange: (rating: Rating) => void;
+  /** Grade the card and move on. */
+  onCommit: (rating: Rating) => void;
 }) {
   const i = GRADES.findIndex((g) => g.rating === value);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  const choose = (rating: Rating) => {
+    onChange(rating);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => { timer.current = null; onCommit(rating); }, COMMIT_DELAY_MS);
+  };
+
   return (
-    // Taps on the control must not reach the card: tapping the card means "move on",
-    // and a press on the slider shouldn't make the card sink.
+    // Taps on the control must not reach the card (a card tap commits the suggested
+    // grade), and a press on the slider shouldn't make the card sink.
     <div
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
@@ -47,7 +65,7 @@ export function GradeSlider({ value, onChange }: {
               key={g.rating}
               role="radio"
               aria-checked={on}
-              onClick={() => onChange(g.rating)}
+              onClick={() => choose(g.rating)}
               className="serif"
               style={{
                 position: 'relative',

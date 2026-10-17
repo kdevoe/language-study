@@ -57,6 +57,8 @@ export function Review({
   // opened this visit (kept mounted so going back to the rows keeps the session).
   const [deck, setDeck] = useState<Deck | null>(null);
   const [opened, setOpened] = useState<Deck[]>([]);
+  // Each open bumps the deck's key, so its session enters focus mode (nav hidden) at once.
+  const [focusKeys, setFocusKeys] = useState<Record<Deck, number>>({ vocab: 0, kanji: 0 });
   const reviewsToday = useAppStore((s) => s.reviewsByDay[utcDayKey(Date.now())] ?? 0);
   const trackedWords = useAppStore((s) => Object.keys(s.wordDatabase).length);
   const wordDatabase = useAppStore((s) => s.wordDatabase);
@@ -80,6 +82,7 @@ export function Review({
 
   const openDeck = (d: Deck) => {
     setOpened((o) => (o.includes(d) ? o : [...o, d]));
+    setFocusKeys((k) => ({ ...k, [d]: k[d] + 1 }));
     setDeck(d);
   };
 
@@ -162,7 +165,7 @@ export function Review({
           )}
           {opened.includes('vocab') && (
             <div hidden={deck !== 'vocab'}>
-              <Flashcards onFocusChange={handleFocus} onRemainingChange={setRemaining} topOffset="0rem" />
+              <Flashcards onFocusChange={handleFocus} onRemainingChange={setRemaining} topOffset="0rem" focusKey={focusKeys.vocab} />
             </div>
           )}
           {opened.includes('kanji') && (
@@ -172,6 +175,7 @@ export function Review({
                 onRemainingChange={setRemaining}
                 onDone={vocabDeck.length > 0 ? () => openDeck('vocab') : undefined}
                 topOffset="0rem"
+                focusKey={focusKeys.kanji}
               />
             </div>
           )}
