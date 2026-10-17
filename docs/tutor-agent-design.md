@@ -72,6 +72,8 @@ A small **context registry** (React context, e.g. `useTutorContext(snapshot)`): 
 - A **single thread**, not one per screen. Opening from a new place **appends the new context** as a mid-conversation system message instead of starting over. "The word from the article earlier" keeps working, and the history stays a stable, cacheable prefix (§8).
 - A fresh thread **each day**, or on an explicit 新しい会話 ("new conversation").
 - Previous threads are summarized into memory (§6), not kept verbatim forever.
+- **Today so far.** The memory only reaches yesterday, because the dream writes it overnight. On each send the function also lists today's articles opened or finished, podcasts heard and songs played, with times and ids. When that list has changed since the last one, it goes into the thread as a `<today>` note. "The article I just read" should resolve without asking.
+- **Time.** Each learner message carries a `<time>` note with the local time, plus the gap once it passes 20 minutes. Both come from `created_at`, so earlier turns render the same every time and stay cached. After a long gap she greets afresh, and she follows topic changes rather than steering back.
 
 * * *
 ## 5. What a conversation looks like
