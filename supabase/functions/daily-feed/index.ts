@@ -6,6 +6,7 @@
 // only as a fallback; delete this function once the new cron is verified live.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveCaller } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +27,15 @@ Deno.serve(async (req) => {
     const newsApiKey = Deno.env.get('NEWS_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Retired (superseded by ensure-buffer, database/19), and it fans out to
+    // every user: the service role or the cron only, never a user or the anon key.
+    const caller = await resolveCaller(req, supabase, supabaseKey);
+    if (!caller || caller.kind === 'user') {
+      return new Response(JSON.stringify({ error: 'unauthorized', errorKind: 'unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 1. Fetch all active users (approved users who have preferences set)
     const { data: users, error: usersError } = await supabase

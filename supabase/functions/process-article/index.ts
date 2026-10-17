@@ -3,6 +3,7 @@ import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, type WordSignal } from '../_shared/wordPriority.ts';
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
+import { actingUserId, resolveCaller } from '../_shared/auth.ts';
 import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon } from '../_shared/readerVocab.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
@@ -519,7 +520,21 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { userId, articleId, snippet, sources } = body;
+    const { articleId, snippet, sources } = body;
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Who's calling (_shared/auth.ts): a signed-in user acts only for
+    // themselves; body.userId counts only from the service role (ensure-buffer,
+    // the import hand-off) or the cron.
+    const caller = await resolveCaller(req, supabase, supabaseKey);
+    if (!caller) {
+      return new Response(JSON.stringify({ error: 'sign in required', errorKind: 'unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const userId = actingUserId(caller, body.userId);
     // ensure-buffer sets this: an article whose full text couldn't be fetched
     // is refused (422 thin_source) before any Gemini call, and the buffer takes
     // another story from the same topic instead. On-tap processing never sets
@@ -550,13 +565,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
     const groqKey = Deno.env.get('GROQ_API_KEY')!;
     const jinaKey = Deno.env.get('JINA_API_KEY'); // optional — lifts extraction hit rate
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
     // Hoisted (was created at the prompt step): the JIT-part path also needs
     // Gemini for continuity extraction before the main rewrite.
     const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { apiVersion: 'v1beta' } });

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { actingUserId, resolveCaller } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,15 +69,13 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
 
-    // ── Resolve userId. A real user JWT is trusted over the body (prevents a
-    // client triggering production for someone else); the cron path sends the
-    // service-role key + an explicit userId in the body. ──────────────────────
-    let userId: string | undefined = body.userId;
-    const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
-    if (token && token !== serviceKey) {
-      const { data: { user } } = await admin.auth.getUser(token);
-      if (user) userId = user.id;
-    }
+    // ── Resolve userId (_shared/auth.ts). A signed-in user acts only for
+    // themselves; body.userId counts only from the cron (x-cron-secret) or the
+    // service role. The anon key alone used to fall through to body.userId,
+    // letting anyone trigger production for any user. ─────────────────────────
+    const caller = await resolveCaller(req, admin, serviceKey);
+    if (!caller) return json({ error: 'unauthorized', errorKind: 'unauthorized' }, 401);
+    const userId = actingUserId(caller, body.userId);
     if (!userId) return json({ error: 'userId required' }, 400);
 
     // ── Cheap pre-check: avoid hitting RSS/NewsAPI when the buffer is already

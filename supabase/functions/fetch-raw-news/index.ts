@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { runEditor, type EditorPick } from './editor.ts';
+import { resolveCaller } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -500,6 +501,12 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Signed-in users or the service role (_shared/auth.ts): the feed spends
+    // NewsAPI quota and, in editor mode, Claude tokens.
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const caller = await resolveCaller(req, createClient(Deno.env.get('SUPABASE_URL')!, serviceKey), serviceKey);
+    if (!caller) return json({ error: 'sign in required', errorKind: 'unauthorized' }, 401);
+
     const { page = 1, topics: rawTopics, userId, mode } = await req.json().catch(() => ({ page: 1 }));
     const topics = resolveTopics(rawTopics);
 
@@ -511,8 +518,7 @@ Deno.serve(async (req) => {
 
     // Editor mode is server-to-server only (ensure-buffer sends the service key):
     // it spends Claude tokens and reads the learner's memory.
-    const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
-    if (mode === 'edit' && typeof userId === 'string' && token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+    if (mode === 'edit' && typeof userId === 'string' && caller.kind === 'service') {
       try {
         const edited = await editorCards(userId, topics);
         if (edited && edited.cards.length > 0) {

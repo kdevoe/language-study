@@ -19,6 +19,7 @@
 // signed-in user's JWT can only dream for themselves.
 // deno-lint-ignore-file no-explicit-any
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { actingUserId, resolveCaller } from '../_shared/auth.ts';
 import { CLAUDE_SONNET, DREAM_MODEL } from '../_shared/models.ts';
 import { callTool, emptyUsage } from '../_shared/claude.ts';
 import {
@@ -118,12 +119,11 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
     const body = await req.json().catch(() => ({}));
-    let userId: string | undefined = body.userId;
-    const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
-    if (token && token !== serviceKey) {
-      const { data: { user } } = await admin.auth.getUser(token);
-      if (user) userId = user.id;
-    }
+    // A signed-in user dreams only for themselves; body.userId counts only from
+    // the cron (x-cron-secret) or the service role (_shared/auth.ts).
+    const caller = await resolveCaller(req, admin, serviceKey);
+    if (!caller) return json({ error: 'unauthorized', errorKind: 'unauthorized' }, 401);
+    const userId = actingUserId(caller, body.userId);
     if (!userId) return json({ error: 'userId required' }, 400);
     const mode = body.mode === 'weekly' ? 'weekly' : 'nightly';
 

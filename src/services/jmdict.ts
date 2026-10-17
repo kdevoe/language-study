@@ -371,57 +371,22 @@ export async function disambiguateWithLLM(
   contextSentence: string,
   candidates: JMDictResult[]
 ): Promise<JMDictResult> {
-  const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROQ_MODEL = 'openai/gpt-oss-20b';
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (candidates.length <= 1) return candidates[0];
 
-  if (!apiKey || candidates.length <= 1) {
-    return candidates[0];
-  }
-
-  const candidateDescriptions = candidates.map((c, i) => {
+  const candidateDescriptions = candidates.map((c) => {
     const glosses = c.senses.map(s => s.gloss.join(', ')).join(' / ');
     const pos = c.senses.flatMap(s => s.pos).filter(Boolean).join(', ');
-    return `[${i}] ${c.kanji.join(', ') || c.readings.join(', ')} (${pos}): ${glosses}`;
-  }).join('\n');
+    return `${c.kanji.join(', ') || c.readings.join(', ')} (${pos}): ${glosses}`;
+  });
 
-  const prompt = `Given the Japanese word "${word}" in this sentence: "${contextSentence}"
-
-Which dictionary entry is the correct match? Return ONLY the index number.
-
-Candidates:
-${candidateDescriptions}
-
-Answer (just the number):`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
+  // Server-side (dictionary-lookup, type 'disambiguate'): the Groq key used to
+  // ship in the web bundle as VITE_GROQ_API_KEY. supabase-js sends the user's token.
   try {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0,
-        max_tokens: 5
-      })
+    const { data, error } = await supabase.functions.invoke<{ index: number }>('dictionary-lookup', {
+      body: { type: 'disambiguate', word, contextSentence, candidates: candidateDescriptions },
     });
-    
-    clearTimeout(timeoutId);
-
-    if (!response.ok) return candidates[0];
-
-    const data = await response.json();
-    const answer = data.choices?.[0]?.message?.content?.trim() || '0';
-    const index = parseInt(answer, 10);
-
-    if (!isNaN(index) && index >= 0 && index < candidates.length) {
+    const index = data?.index;
+    if (!error && typeof index === 'number' && index >= 0 && index < candidates.length) {
       return candidates[index];
     }
   } catch (e) {

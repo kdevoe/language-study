@@ -7,6 +7,7 @@
 // Body: { dryRun?: true } reports what it would delete without deleting.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveCaller } from '../_shared/auth.ts';
 
 const FAILED_AFTER_DAYS = 7;
 const BATCH = 100;
@@ -19,9 +20,15 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 Deno.serve(async (req) => {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
+  // It deletes rows and files across all users: the cron or the service role
+  // only. The gateway's JWT check alone let the public anon key through.
+  const caller = await resolveCaller(req, supabase, serviceKey);
+  if (!caller || caller.kind === 'user') return json(401, { error: 'unauthorized' });
+
   const body = await req.json().catch(() => ({}));
   const dryRun = body?.dryRun === true;
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const report: Record<string, unknown> = { dryRun };
 
   try {
