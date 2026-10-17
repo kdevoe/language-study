@@ -28,6 +28,7 @@ import { muteChromeScroll, isChromeScrollMuted } from './services/chromeScroll'
 import { TutorProvider } from './components/tutor/TutorProvider'
 import { TutorPanel } from './components/tutor/TutorPanel'
 import { TutorEdge } from './components/tutor/TutorEdge'
+import { startActivityTracking } from './services/activity'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -88,6 +89,10 @@ function App() {
   // Transient, user-visible message for failures that would otherwise be silent
   // (e.g. an article that does nothing when tapped because processing failed).
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Daily activity for 進捗: time on screen, listening, decks, ハルカ.
+  useEffect(() => { startActivityTracking(); }, []);
+
   useEffect(() => {
     if (!actionError) return;
     const t = setTimeout(() => setActionError(null), 5000);

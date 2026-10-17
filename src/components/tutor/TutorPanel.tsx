@@ -12,6 +12,7 @@ import {
   endTutorThread, fetchTutorHistory, streamTutor,
   type ScreenContext, type TutorAction, type TutorRecap,
 } from '../../services/tutor';
+import { addActivity, useActivityWhile } from '../../services/activity';
 
 // ハルカ's side panel (docs/mockups/tutor.html, design-system §6.17). Slides in
 // from the hand side over any screen; the screen stays visible beside it. One
@@ -52,6 +53,7 @@ export function TutorPanel() {
   const lookup = useWordLookup();
 
   useScrollLock(open);
+  useActivityWhile('chat', open);
   useDimmedStatusBar(open);
 
   // Each open: snapshot the screen (or the asked-about item), load today's thread once.
@@ -86,6 +88,7 @@ export function TutorPanel() {
   const sendText = useCallback(async (raw: string) => {
     const message = raw.trim();
     if (!message || busy !== null) return;
+    addActivity('turns', 1);
     setDraft('');
     const sentCtx = ctx && !chipOff ? ctx : undefined;
     const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;

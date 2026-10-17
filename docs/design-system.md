@@ -319,7 +319,14 @@ Mockup: `docs/mockups/tutor.html`. Components in `src/components/tutor/`, styles
 - **Recap** (終わる): 今日の会話, then 直したところ (struck-through original → better, a sans note), 新しい単語 rows with ＋ デッキ (lift to white when added), 使えた単語 with a ✓. 完了 is the white pill.
 - **Audio pauses** while the panel is open and resumes when it closes.
 - **Flashcards are front-only** until flipped: she gives hints, not the answer.
-  
+
+### 6.18 進捗 activity
+Mockup `docs/mockups/progress-stats.html`, B without the sentence. At the top of 進捗, above the review heatmap.
+- **Period:** a slider toggle, 週 · 月 · 全部. The week runs Monday to Sunday, the month is the calendar month, and all time runs from the first tracked month (at most 8 bars).
+- **Minutes card** (`--bg-card`, radius 16): the kicker MINUTES PER DAY / WEEK / MONTH, then time in Yugen on the right. For week and month this carries the change against the same span of the previous period, green when it's up. Stacked bars, at most 30px wide, split into Reading `--accent-progress`, Listening olive `#4a5d23`, Reviews amber `#c79a3f` and ハルカ green `#5b8c5a`. These are colours the app already uses, not new accents. Today's bar label is bold. The legend carries each kind's total.
+- **Counts card:** a 3×3 grid of serif numbers over small sans labels: articles opened, podcasts, songs, cards and kanji reviewed, lookups, ハルカ turns, days active, streak.
+- **Data:** `daily_activity` (database/37) holds time on screen, reading, listening, decks and ハルカ, plus turns, added to about once a minute by `services/activity.ts`. Counts come from the event tables via `progress_activity()`.
+
 ## 7. Copy
 - Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.
   

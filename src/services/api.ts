@@ -95,6 +95,7 @@ import { supabase } from './supabase'
 import { captureError } from './monitoring'
 import type { SearchCorpus } from './archiveSearch'
 import { writeListCache } from './listCache'
+import { addActivity } from './activity'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -179,6 +180,7 @@ export async function joinWaitlist(email: string): Promise<{ success: boolean; m
 /** Learner memory (database/36): add time spent on an article, and stamp
  *  finished_at the first time the reader reaches its end. */
 export async function recordArticleReading(articleId: string, seconds: number, finished: boolean): Promise<void> {
+  addActivity('read', seconds);
   if (import.meta.env.VITE_DEV_MODE === 'true') return;
   const { error } = await supabase.rpc('record_article_reading', {
     p_id: articleId, p_seconds: Math.round(seconds), p_finished: finished,
