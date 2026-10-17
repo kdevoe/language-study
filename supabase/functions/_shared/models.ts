@@ -19,11 +19,26 @@ export const GEMINI_FLASH = 'gemini-3.8-flash';
 /** Claude — grammar insight (dictionary-lookup). Anthropic IDs carry no date suffix. */
 export const CLAUDE_HAIKU = 'claude-haiku-5-5';
 
+/** Claude — the weekly deep dream (learner-dream mode 'weekly'). */
+export const CLAUDE_SONNET = 'claude-sonnet-5-5';
+
+/** Claude — ハルカ's chat turns (tutor-chat). One line to switch to Haiku after
+ *  measuring on real transcripts (docs/tutor-agent-design.md §8). */
+export const TUTOR_MODEL = CLAUDE_SONNET;
+
+/** Claude — the news editor (fetch-raw-news) and the nightly dream. */
+export const NEWS_EDITOR = CLAUDE_HAIKU;
+export const DREAM_MODEL = CLAUDE_HAIKU;
+
+/** $ per million tokens (prompts ≤100k), for the usage telemetry stored on rows.
+ *  Cache reads bill at 0.1× input, cache writes at 1.25×. Oct 2026 pricing. */
+export const CLAUDE_PRICES: Record<string, { in: number; out: number }> = {
+  [CLAUDE_HAIKU]: { in: 0.10, out: 0.50 },
+  [CLAUDE_SONNET]: { in: 2, out: 10 },
+};
+
 /** Groq — keyword extraction, heteronym readings, translation, definition fallback. */
 export const GROQ_GENERAL = 'openai/gpt-oss-20b';
-
-/** Groq — same-story news clustering/dedupe (fetch-raw-news). */
-export const GROQ_CLUSTER = 'llama-3.3-70b-versatile';
 
 /** ElevenLabs — podcast dialogue TTS (generate-podcast). v4 won the P0 spike over
  *  v3: ~35% faster generation and a 7–20 dB lower noise floor on every voice

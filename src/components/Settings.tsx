@@ -8,6 +8,7 @@ import { COVER_STYLE_MAX_CHARS, DEFAULT_COVER_STYLE, SONG_STYLES } from '../data
 import { PODCAST_CAST } from '../data/podcastCast';
 import { SliderToggle } from './SliderToggle';
 import { PageHeading } from './PageHeading';
+import { TutorSettings } from './tutor/TutorSettings';
 
 // Settings (mockup docs/mockups/settings.html; design-system §6.12): four plain
 // sections — 学習, 読む, 聞く, 表示 — grouped by serif titles and space, no
@@ -411,6 +412,9 @@ export function Settings() {
         </div>
         <div style={hintStyle}>Two hosts stay on, one of them speaking standard Japanese.</div>
       </section>
+
+      {/* ── ハルカ ── */}
+      <TutorSettings />
 
       {/* ── 表示 ── */}
       <section style={{ marginBottom: '2.5rem' }}>

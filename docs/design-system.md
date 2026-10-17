@@ -308,6 +308,18 @@ Source of truth: `src/components/Review.tsx`, `Flashcards.tsx`, `KanjiFlashcards
   
 - **Kanji card.** Front: the keyword, serif 2.3rem. Back (sizes above): the kanji, keyword, 音 / 訓 readings (muted sans label, serif value), components (muted), then up to three known words with furigana and a one-line meaning. No rule above them, no title, no stroke count, no Heisig number.
   
+### 6.17 ハルカ (the tutor)
+Mockup: `docs/mockups/tutor.html`. Components in `src/components/tutor/`, styles under `.tutor-*` in `index.css`.
+
+- **Side panel, not a sheet.** Slides in from the hand side (right by default, left in Settings), 88% wide (max 420px), full height, `--bg-color`, radius 28 on the inner corners, shadow toward the screen. The screen stays visible beside it under a 35% dim. A short vertical grabber sits on the inner edge; swipe back toward the edge or tap the dim to close.
+- **Ways in.** Swipe in from the hand-side edge (the touch must start in a 16px strip; the panel follows the finger and commits past 70px). A faint 4×46px mark on that edge shows it's there. In a Safari tab, drag up on the bottom nav. The pinned Home card. ハルカに聞く in the word, grammar and 。sentence panels. **Never sentence long-press**: long-press is furigana.
+- **Home card.** First thing under the 今日 heading: a `--bg-card` card with a light border, radius 24, a small ハ avatar + ハルカ label, then her line in serif 1.2rem (from last night's brief). No 話す link: keep it short. Tapping it, or swiping in on Home, opens with that line as her first message.
+- **Context chip** only when there's something specific (an article paragraph, a word, a card, an episode line). None on Home or list pages. The chip can be tapped away, and then the context isn't sent.
+- **Messages.** Hers: serif 1.05rem, line-height 1.95, words tappable (same word panel as the Reader), long-press furigana. Recasts: the corrected words on `--accent-primary`. Asides (explanations, English by default): sans 0.8rem muted, 2px `--accent-primary` left rule. Yours: a `--bg-card` bubble on the right. Suggestions are quiet serif text, not pills. The input is a bottom-ruled line, with no box.
+- **Recap** (終わる): 今日の会話, then 直したところ (struck-through original → better, a sans note), 新しい単語 rows with ＋ デッキ (lift to white when added), 使えた単語 with a ✓. 完了 is the white pill.
+- **Audio pauses** while the panel is open and resumes when it closes.
+- **Flashcards are front-only** until flipped: she gives hints, not the answer.
+  
 ## 7. Copy
 - Short. Prefer one word to a sentence. Chrome labels (titles, tabs) follow §6.10; content and in-page controls are Japanese.
   

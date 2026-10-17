@@ -13,6 +13,7 @@ import type { KanjiInfo } from '../data/rtkKanjiInfo';
 import { GradeSlider } from './GradeSlider';
 import { StudyCard, PILE_SPACE } from './StudyCard';
 import { CardFace, Centered, ExitFocusButton } from './Flashcards';
+import { useTutorScreen } from './tutor/TutorProvider';
 
 // The RTK kanji deck's session (docs/rtk-kanji-deck-plan.md, mockup
 // docs/mockups/kanji-deck.html). Keyword on the front; the back shows the kanji,
@@ -84,6 +85,14 @@ export function KanjiFlashcards({
   const total = cards.length;
   const card = cards[index];
   const inCardFlow = total > 0 && index < total;
+  // The kanji deck's front is the RTK keyword; before the flip ハルカ hints only.
+  useTutorScreen(() => {
+    if (!card || index >= total) return null;
+    const keyword = rtkKanjiMap[card.kanji] ?? '';
+    return revealed
+      ? { screen: 'flashcard', chip: `漢字 · ${card.kanji}`, detail: `They are on an RTK kanji card, flipped: ${card.kanji} (keyword "${keyword}").` }
+      : { screen: 'flashcard', chip: 'カード · 表だけ見えています', detail: `They are on an RTK kanji card, NOT yet flipped. The front shows the keyword "${keyword}"; they must recall the kanji. Help with hints (its parts, a story) without writing the kanji.` };
+  });
   const focusActive = focused && inCardFlow;
   useEffect(() => { onRemainingChange?.(Math.max(0, total - index)); }, [total, index, onRemainingChange]);
   useEffect(() => { onFocusChange?.(focusActive); }, [focusActive, onFocusChange]);

@@ -1,4 +1,5 @@
-import { GROQ_CLUSTER as CLUSTER_MODEL } from '../_shared/models.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { runEditor, type EditorPick } from './editor.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -105,17 +106,18 @@ function stableId(seed: string): string {
 const TOP_HEADLINES_URL = 'https://newsapi.org/v2/top-headlines';
 const EVERYTHING_URL = 'https://newsapi.org/v2/everything';
 
-// ── Clustering (dedup) ──────────────────────────────────────────────────────
-// Clustering is used conservatively, only to DEDUPE same-story coverage across
-// outlets (e.g. don't show four NASA Moon-base cards). Content richness comes
-// from full-text extraction in process-article, not from merging, so we keep
-// merges small and lean on the lead-source guard for any over-merge.
-// llama-3.3-70b is used over the smaller scout model, which produced a
-// catastrophic 91-item "misc" mega-bucket at real scale.
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-// Keep merges tight — over-merging suppresses unrelated articles and wastes
-// extraction calls. The lead article is always primary; extras are corroboration.
-const MAX_SOURCES_PER_CLUSTER = 3;
+// ── Two modes ────────────────────────────────────────────────────────────────
+// mode 'edit' (ensure-buffer, with a userId): the Haiku news editor (editor.ts)
+//   reads the learner's memory and the last 30 days of shown titles, shortlists,
+//   fetches full text, then picks and orders ~6 stories. Each card arrives with
+//   the full text in sources[].teaser plus topic / summary / reason. A run is
+//   cached in news_editor_runs and reused until its picks are used up.
+// default (the client's raw Feed): no LLM — the pool, same-story headlines
+//   grouped by word overlap, topic-interleaved. (Replaces the Groq clustering.)
+const EDITOR_CACHE_HOURS = 6;
+// Same-story grouping: different outlets, headline word overlap at least this.
+const SAME_STORY_OVERLAP = 0.5;
+const MAX_SOURCES_PER_STORY = 3;
 
 // NewsAPI fallback noise filters (only used when RSS yields nothing).
 const QUALITY_SOURCES = [
@@ -136,8 +138,9 @@ interface PoolItem {
   teaser: string;
   url: string;
   date: string;
-  source: string;   // outlet name — drives the multi-outlet cluster heuristic
+  source: string;   // outlet name — drives the multi-outlet grouping heuristic
   category: string;
+  topic: string;    // catalog topic id (src/data/feedTopics.ts)
 }
 
 // ── RSS/Atom parsing ──────────────────────────────────────────────────────
@@ -169,7 +172,7 @@ function extractLink(block: string): string {
   return '';
 }
 
-function parseFeed(xml: string, source: string, category: string): PoolItem[] {
+function parseFeed(xml: string, source: string, category: string, topic: string): PoolItem[] {
   const blocks = xml.match(/<item[\s>][\s\S]*?<\/item>/gi)
     || xml.match(/<entry[\s>][\s\S]*?<\/entry>/gi)
     || [];
@@ -187,7 +190,7 @@ function parseFeed(xml: string, source: string, category: string): PoolItem[] {
       : desc.slice(0, TEASER_CAP);
     const url = extractLink(b);
     const date = stripHtml(extractTag(b, 'pubDate') || extractTag(b, 'published') || extractTag(b, 'updated'));
-    out.push({ title, teaser, url, date, source, category });
+    out.push({ title, teaser, url, date, source, category, topic });
   }
   return out;
 }
@@ -261,7 +264,7 @@ async function fetchFeeds(topics: string[]): Promise<PoolItem[]> {
         return [] as PoolItem[];
       }
       const xml = await res.text();
-      return parseFeed(xml, f.name, f.category).filter(isValidItem).slice(0, itemsPerFeed);
+      return parseFeed(xml, f.name, f.category, f.topic).filter(isValidItem).slice(0, itemsPerFeed);
     } catch (e) {
       console.warn(`[fetch-raw-news] feed ${f.name} failed:`, e instanceof Error ? e.message : e);
       return [] as PoolItem[];
@@ -304,6 +307,7 @@ async function fetchNewsApiPool(page: number, newsApiKey: string): Promise<PoolI
         date: a.publishedAt ?? '',
         source: a.source?.name || (a.url ? new URL(a.url).host : 'NewsAPI'),
         category,
+        topic: category.toLowerCase(),
       })).filter(isValidItem);
       if (items.length > 0) {
         console.log(`[fetch-raw-news] NewsAPI fallback picked ${items.length} articles`);
@@ -316,88 +320,46 @@ async function fetchNewsApiPool(page: number, newsApiKey: string): Promise<PoolI
   return [];
 }
 
-// ── Clustering ──────────────────────────────────────────────────────────────
+// ── Same-story grouping (client raw Feed) ───────────────────────────────────
+// Dedupe same-story coverage across outlets without an LLM: two headlines from
+// DIFFERENT outlets whose content words overlap ≥ SAME_STORY_OVERLAP (of the
+// shorter headline) are one story. Conservative by design — a missed merge is a
+// duplicate card, an over-merge hides a story. The buffer path doesn't use this;
+// the Haiku editor groups coverage itself.
 interface Cluster {
   topic: string;
   indices: number[];
 }
 
-// Group same-story coverage across outlets. Multi-item clusters are only kept
-// merged if they span 2+ distinct outlets; a single-outlet multi-item group is
-// almost always the model lumping one feed's section together (grab-bag), so we
-// split those back into singletons. Degrades to one card per item on failure.
-async function clusterArticles(pool: PoolItem[], groqKey: string | undefined): Promise<Cluster[]> {
-  const singletons = (): Cluster[] => pool.map((p, i) => ({ topic: p.title, indices: [i] }));
-  if (!groqKey || pool.length < 2) return singletons();
+const STOP = new Set(['the', 'a', 'an', 'of', 'to', 'in', 'on', 'for', 'and', 'or', 'is', 'are', 'was', 'with', 'as', 'at', 'by', 'from', 'after', 'over', 'its', 'it', 'be', 'has', 'have', 'new', 'says', 'say', 'how', 'why', 'what']);
+const headlineWords = (t: string) => new Set(
+  t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)),
+);
 
-  const headlineList = pool.map((p, i) => `${i + 1}. [${p.source}] ${p.title}`).join('\n');
-  const prompt = `Group these news headlines into topic clusters. Return JSON: {"clusters": [{"topic": "short topic label", "articles": [indices]}]}. Use 1-based indices.
-
-Rules:
-- ONLY group articles that cover the SAME specific story or event (e.g. the same product launch, the same court ruling, the same company's earnings).
-- A shared THEME is NOT a story. Do NOT group articles merely because they share a broad subject like "AI", "social media", "space", or "climate". Two different AI announcements are two separate stories.
-- DO NOT group by broad category. "Technology", "Gaming", "Business" are NOT valid clusters. Never create a leftover "misc" bucket.
-- Example: three outlets reporting NASA's new moon base plan = ONE cluster. An article on Musk vs Altman and a separate article on the Pope discussing AI = TWO singletons (both mention AI, but are different stories).
-- When in doubt, keep an article as its own singleton. Most clusters will be singletons; that is expected and correct.
-
-Headlines:
-${headlineList}`;
-
-  try {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: CLUSTER_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      }),
-    });
-    if (!response.ok) {
-      console.error(`[fetch-raw-news] clustering failed: ${response.status} ${await response.text()}`);
-      return singletons();
-    }
-
-    const data = await response.json();
-    const raw = data.choices?.[0]?.message?.content ?? '{}';
-    const parsed = JSON.parse(raw);
-    const rawClusters: any[] = Array.isArray(parsed) ? parsed : (parsed.clusters ?? []);
-    if (!Array.isArray(rawClusters) || rawClusters.length === 0) return singletons();
-
-    const used = new Set<number>();
-    const clusters: Cluster[] = [];
-    for (const c of rawClusters) {
-      const idxRaw: any[] = Array.isArray(c?.articles) ? c.articles : [];
-      const indices = idxRaw
-        .map((n) => Number(n) - 1) // model returns 1-based indices
-        .filter((n) => Number.isInteger(n) && n >= 0 && n < pool.length && !used.has(n))
-        .slice(0, MAX_SOURCES_PER_CLUSTER);
-      if (indices.length === 0) continue;
-      indices.forEach((n) => used.add(n));
-
-      const distinctOutlets = new Set(indices.map((n) => domainOf(pool[n].url))).size;
-      if (indices.length > 1 && distinctOutlets < 2) {
-        // Single-outlet grab-bag — trust nothing, emit as singletons.
-        indices.forEach((n) => clusters.push({ topic: pool[n].title, indices: [n] }));
-        continue;
+function groupSameStory(pool: PoolItem[]): Cluster[] {
+  const words = pool.map((p) => headlineWords(p.title));
+  const used = new Set<number>();
+  const clusters: Cluster[] = [];
+  for (let i = 0; i < pool.length; i++) {
+    if (used.has(i)) continue;
+    used.add(i);
+    const indices = [i];
+    const outlets = new Set([domainOf(pool[i].url)]);
+    for (let j = i + 1; j < pool.length && indices.length < MAX_SOURCES_PER_STORY; j++) {
+      if (used.has(j) || outlets.has(domainOf(pool[j].url))) continue;
+      const a = words[i], b = words[j];
+      const shared = [...a].filter((w) => b.has(w)).length;
+      if (shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= SAME_STORY_OVERLAP) {
+        used.add(j);
+        indices.push(j);
+        outlets.add(domainOf(pool[j].url));
       }
-      const topic = (typeof c?.topic === 'string' && c.topic.trim()) || pool[indices[0]].title;
-      clusters.push({ topic: topic.trim(), indices });
     }
-
-    // Any item the model omitted becomes its own singleton so nothing is lost.
-    pool.forEach((p, i) => {
-      if (!used.has(i)) clusters.push({ topic: p.title, indices: [i] });
-    });
-
-    const merged = clusters.filter((c) => c.indices.length > 1).length;
-    console.log(`[fetch-raw-news] ${pool.length} items -> ${clusters.length} cards (${merged} multi-outlet)`);
-    return clusters.length > 0 ? clusters : singletons();
-  } catch (err) {
-    console.error('[fetch-raw-news] clustering error:', err);
-    return singletons();
+    clusters.push({ topic: pool[i].title, indices });
   }
+  const merged = clusters.filter((c) => c.indices.length > 1).length;
+  console.log(`[fetch-raw-news] ${pool.length} items -> ${clusters.length} cards (${merged} multi-outlet)`);
+  return clusters;
 }
 
 // ── Buffer re-rank by source richness ────────────────────────────────────────
@@ -471,26 +433,97 @@ function rerankCards<T extends { sources: { teaser?: string }[]; originalUrl: st
   return out;
 }
 
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+});
+
+/** A card from a group of pool items (lead first) — the shape the Feed and ensure-buffer read. */
+function buildCard(members: PoolItem[], extra: Record<string, unknown> = {}) {
+  const lead = members[0];
+  // Preview only — trim each member so a full-text body doesn't bloat the
+  // persisted card. The untrimmed body rides in `sources[].teaser` and is what
+  // process-article builds the article from.
+  const mergedSnippet = members
+    .map((m, n) => `${n + 1}. ${m.title} — ${(m.teaser || m.title).slice(0, PREVIEW_CHARS)}`)
+    .join('\n');
+  const when = lead.date ? new Date(lead.date) : new Date();
+  return {
+    id: `${lead.title.substring(0, 15)}-${stableId(lead.url || lead.title)}`,
+    title: lead.title,
+    originalUrl: lead.url,
+    date: (isNaN(when.getTime()) ? new Date() : when).toLocaleDateString(),
+    readTime: `${Math.min(2 + members.length, 8)} min read`,
+    category: lead.category,
+    topic: lead.topic,
+    sourceCount: members.length,
+    sources: members.map((m) => ({ title: m.title, url: m.url, teaser: m.teaser })),
+    blocks: [{ type: 'paragraph', content: [{ text: mergedSnippet }] }],
+    ...extra,
+  };
+}
+
+type Card = ReturnType<typeof buildCard>;
+
+/** Editor mode: reuse a recent run while it still has unclaimed picks, else run the editor. */
+async function editorCards(userId: string, topics: string[]): Promise<{ cards: Card[]; cached: boolean } | null> {
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) return null;
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  const since = new Date(Date.now() - EDITOR_CACHE_HOURS * 3600_000).toISOString();
+  const { data: run } = await admin.from('news_editor_runs').select('cards')
+    .eq('user_id', userId).gt('created_at', since)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (run?.cards?.length) {
+    const ids = (run.cards as Card[]).map((c) => c.id);
+    const { data: taken } = await admin.from('processed_news').select('id').eq('user_id', userId).in('id', ids);
+    const takenIds = new Set((taken ?? []).map((r: { id: string }) => r.id));
+    const left = (run.cards as Card[]).filter((c) => !takenIds.has(c.id));
+    if (left.length > 0) return { cards: left, cached: true };
+  }
+
+  const pool = await fetchFeeds(topics);
+  if (pool.length === 0) return null;
+  const { picks, usage } = await runEditor({ admin, userId, pool, topics, jinaKey: Deno.env.get('JINA_API_KEY') });
+  const cards = picks.map((p: EditorPick) => buildCard(p.items as PoolItem[], {
+    topic: p.topic,
+    summary: p.summary,
+    reason: p.reason,
+    category: FEED_LIST.find((f) => f.topic === p.topic)?.category ?? p.items[0].category,
+  }));
+  if (cards.length) await admin.from('news_editor_runs').insert({ user_id: userId, cards, usage });
+  return { cards, cached: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { page = 1, topics: rawTopics } = await req.json().catch(() => ({ page: 1 }));
+    const { page = 1, topics: rawTopics, userId, mode } = await req.json().catch(() => ({ page: 1 }));
     const topics = resolveTopics(rawTopics);
 
     // RSS is multi-outlet and fetched fresh each session; it doesn't paginate
-    // like NewsAPI. Serve the full clustered batch on page 1 and signal
-    // end-of-feed for later pages rather than re-fetch/re-cluster (which would
-    // churn ids and surface duplicates).
-    if (page > 1) {
-      return new Response(JSON.stringify({ articles: [] }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // like NewsAPI. Serve the full batch on page 1 and signal end-of-feed for
+    // later pages rather than re-fetch (which would churn ids and surface
+    // duplicates).
+    if (page > 1) return json({ articles: [] });
 
-    const groqKey = Deno.env.get('GROQ_API_KEY');
+    // Editor mode is server-to-server only (ensure-buffer sends the service key):
+    // it spends Claude tokens and reads the learner's memory.
+    const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
+    if (mode === 'edit' && typeof userId === 'string' && token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+      try {
+        const edited = await editorCards(userId, topics);
+        if (edited && edited.cards.length > 0) {
+          console.log(`[fetch-raw-news] editor: ${edited.cards.length} cards${edited.cached ? ' (cached run)' : ''}`);
+          return json({ articles: edited.cards, editor: true, cached: edited.cached });
+        }
+        console.warn('[fetch-raw-news] editor returned nothing — falling back to the raw pool');
+      } catch (e) {
+        console.error('[fetch-raw-news] editor failed — falling back to the raw pool:', e);
+      }
+    }
 
     let pool = await fetchFeeds(topics);
     if (pool.length === 0) {
@@ -503,44 +536,10 @@ Deno.serve(async (req) => {
 
     if (pool.length === 0) {
       console.error('[fetch-raw-news] No articles from any source.');
-      return new Response(JSON.stringify({ articles: [], warning: 'No articles found' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ articles: [], warning: 'No articles found' });
     }
 
-    const clusters = await clusterArticles(pool, groqKey);
-
-    const allCards = clusters.map((cluster) => {
-      const members = cluster.indices.map((i) => pool[i]);
-      const lead = members[0];
-      // The card title is the lead article's real headline — concrete and
-      // trustworthy even when clustering is imperfect — not a model-generated
-      // topic label (which can mislabel a loose merge).
-      // Preview only — trim each member so a full-text body doesn't bloat the
-      // persisted card. The untrimmed body rides in `sources[].teaser` below and
-      // is what process-article actually builds the article from.
-      const mergedSnippet = members
-        .map((m, n) => `${n + 1}. ${m.title} — ${(m.teaser || m.title).slice(0, PREVIEW_CHARS)}`)
-        .join('\n');
-      const when = lead.date ? new Date(lead.date) : new Date();
-
-      return {
-        id: `${lead.title.substring(0, 15)}-${stableId(lead.url || lead.title)}`,
-        title: lead.title,
-        originalUrl: lead.url,
-        date: (isNaN(when.getTime()) ? new Date() : when).toLocaleDateString(),
-        readTime: `${Math.min(2 + members.length, 8)} min read`,
-        category: lead.category,
-        sourceCount: members.length,
-        sources: members.map((m) => ({ title: m.title, url: m.url, teaser: m.teaser })),
-        blocks: [
-          {
-            type: 'paragraph',
-            content: [{ text: mergedSnippet }],
-          },
-        ],
-      };
-    });
+    const allCards = groupSameStory(pool).map((c) => buildCard(c.indices.map((i) => pool[i])));
 
     // Interleave topics (richest first within each), then cap. ensure-buffer
     // claims these in order, so the buffer inherits the topic mix.
@@ -548,14 +547,9 @@ Deno.serve(async (req) => {
     const tierCounts = allCards.reduce((acc, c) => { acc[richnessTier(c)]++; return acc; }, { 0: 0, 1: 0, 2: 0 } as Record<number, number>);
     console.log(`[fetch-raw-news] ${allCards.length} cards (full=${tierCounts[2]} partial=${tierCounts[1]} snippet=${tierCounts[0]}) -> top ${cards.length}, topic-interleaved`);
 
-    return new Response(JSON.stringify({ articles: cards }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ articles: cards });
   } catch (err) {
     console.error('[fetch-raw-news] Error:', err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });

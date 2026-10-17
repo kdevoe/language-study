@@ -12,6 +12,7 @@ import { seedDemoDeck } from '../services/devSeed';
 import { GradeSlider } from './GradeSlider';
 import { StudyCard, PILE_SPACE } from './StudyCard';
 import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
+import { useTutorScreen } from './tutor/TutorProvider';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -159,6 +160,15 @@ export function Flashcards({
   }
   const total = cards.length;
   const card = cards[index];
+
+  // ハルカ sees the card; before the flip only its front, so she hints, never spoils.
+  useTutorScreen(() => {
+    if (!card || index >= total) return null;
+    const front = card.word.surface ?? card.key;
+    return revealed
+      ? { screen: 'flashcard', chip: `カード · ${front}`, detail: `They are on a vocabulary flashcard, flipped: ${front} (${card.word.reading}; ${card.word.meaning}).` }
+      : { screen: 'flashcard', chip: 'カード · 表だけ見えています', detail: `They are on a vocabulary flashcard, NOT yet flipped. The front shows: ${front}. You can't see the back: give hints toward its reading and meaning, never the answer.` };
+  });
 
   // Focus is only real while a card is actually on screen — the summary/empty
   // states always get the nav back, whatever `focused` says.

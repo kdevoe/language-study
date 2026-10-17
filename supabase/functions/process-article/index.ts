@@ -525,6 +525,12 @@ Deno.serve(async (req) => {
     // another story from the same topic instead. On-tap processing never sets
     // it — a reader who picked a story gets it, thin or not.
     const requireFull: boolean = body.requireFull === true;
+    // News signals for learner memory (database/36): the feed topic id, and the
+    // news editor's one-line English summary and pick reason when it chose the story.
+    const newsTopic: string | null = typeof body.topic === 'string' ? body.topic : null;
+    const newsSummary: string | null = typeof body.summary === 'string' ? body.summary.slice(0, 400) : null;
+    const pickReason: string | null = typeof body.reason === 'string' ? body.reason.slice(0, 400) : null;
+    const newsCategory: string | null = typeof body.category === 'string' ? body.category : null;
     let title: string = body.title;
     // Import mode (BYOC): a pasted text arrives as `importText` (a URL as
     // `importUrl`) and becomes a new work; part 1 processes eagerly.
@@ -1181,7 +1187,7 @@ Deno.serve(async (req) => {
     const workRef = jitWork;
     const category = isLongform
       ? (jitWork?.source_type === 'magazine' ? '雑誌' : 'インポート')
-      : 'Recent News';
+      : (newsCategory ?? 'Recent News');
     const content = {
       id: finalArticleId,
       title,
@@ -1214,6 +1220,7 @@ Deno.serve(async (req) => {
         source_kind: sourceKind,
         source_chars: sourceChars,
         ...(workRef ? { source_type: jitWork?.source_type ?? 'import', work_id: workRef.id, part_index: partIndexNum } : {}),
+        ...(!isLongform ? { topic: newsTopic, summary: newsSummary, pick_reason: pickReason } : {}),
         content,
         metadata: {
           date: new Date().toISOString(),

@@ -54,6 +54,8 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
   // word or sentence underneath (if any).
   const [grammarStack, setGrammarStack] = useState<GrammarView[]>([]);
   const grammarInsights = useRef(new Map<string, string>());
+  // The sentence the open word was tapped in (ハルカに聞く passes it on).
+  const [wordSentence, setWordSentence] = useState('');
 
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const saveWordDefinition = useAppStore((s) => s.saveWordDefinition);
@@ -138,6 +140,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
       return;
     }
     placeAt(tap);
+    setWordSentence(sentText);
     // Track under the canonical key (entry_id when linked, else the surface/lemma),
     // so a click and a passive read of the same word land on one record (#39).
     const key = canonicalWordKey({ jmdictEntryId: details.jmdictEntryId, word: details.word });
@@ -163,6 +166,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
 
   const lookupWordAt = async (word: string, contextSentence: string, tap: Tap, tokenId: string, jmdictEntryId?: string, patterns?: GrammarHit[]) => {
     placeAt(tap);
+    setWordSentence(contextSentence);
     // Canonical key: the entry_id when the token was already linked, else the surface
     // word (a lookup that discovers an id later re-keys onto it — see below) (#39).
     const key = canonicalWordKey({ jmdictEntryId, word });
@@ -333,6 +337,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
     },
     mode: (topGrammar ? 'grammar' : selectedSentence ? 'sentence' : 'word') as 'sentence' | 'word' | 'grammar',
     wordData: selectedWord,
+    wordSentence,
     sentenceText: selectedSentence?.text,
     sentenceTranslation: selectedSentence?.translation,
     anchor: drawerAnchor,

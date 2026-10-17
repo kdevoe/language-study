@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useReadingTime } from '../hooks/useReadingTime';
+import { useTutorScreen } from './tutor/TutorProvider';
 import { FuriganaText, HitWeight } from './FuriganaText';
 import type { MasteryLevel } from '../services/store';
 import { YugenBox } from './YugenBox';
@@ -220,6 +222,35 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
     const io = new IntersectionObserver(([entry]) => setEndInView(entry.isIntersecting));
     io.observe(el);
     return () => io.disconnect();
+  });
+  // Time on the article and reaching its end feed learner memory (database/36).
+  useReadingTime(loading ? undefined : currentArticle?.id, endInView && !loading);
+
+  // Lookups made while this article is open name it in the study log.
+  const articleId = currentArticle?.id;
+  const articleTitle = currentArticle?.title;
+  useEffect(() => {
+    if (!articleId) return;
+    useAppStore.getState().setReadingArticle({ id: articleId, title: articleTitle ?? '' });
+    return () => useAppStore.getState().setReadingArticle(null);
+  }, [articleId, articleTitle]);
+
+  // ハルカ sees the article and the paragraph on screen when she opens here.
+  useTutorScreen(() => {
+    if (!currentArticle?.id || loading) return null;
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-block-idx]'));
+    const mid = window.innerHeight * 0.45;
+    const at = els.find((el) => el.getBoundingClientRect().bottom > mid) ?? els[els.length - 1];
+    const paraNo = at ? els.indexOf(at) + 1 : 0;
+    const paraText = at?.textContent?.trim().slice(0, 400) ?? '';
+    const title = currentArticle.title ?? '';
+    const shortTitle = title.length > 12 ? `${title.slice(0, 12)}…` : title;
+    const part = workId ? `, part ${partIndex} of ${partCount} of a long read` : '';
+    return {
+      screen: 'reader',
+      chip: paraNo ? `${shortTitle} · 段落${paraNo}` : shortTitle,
+      detail: `They are reading "${title}" (article id ${currentArticle.id}${part}).${paraText ? ` Paragraph ${paraNo} on screen: 「${paraText}」` : ''}`,
+    };
   });
   const behindBookmark = !!workId && !!bookmark && partIndex < bookmark.partIndex;
 

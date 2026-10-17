@@ -35,6 +35,8 @@ export interface NewsArticle {
   date: string;
   readTime: string;
   category: string;
+  /** Feed topic id (src/data/feedTopics.ts) — stored on the row for learner memory. */
+  topic?: string;
   /** Clustered source articles — passed to process-article for full-text extraction. */
   sources?: ArticleSource[];
   sourceCount?: number;
@@ -174,6 +176,16 @@ export async function joinWaitlist(email: string): Promise<{ success: boolean; m
  *  won't re-match, so both update 0 rows and return false. The caller uses that to
  *  fire ensureBuffer EXACTLY once per real consumption (guardrail #6: dismissing a
  *  raw card must never trigger production). */
+/** Learner memory (database/36): add time spent on an article, and stamp
+ *  finished_at the first time the reader reaches its end. */
+export async function recordArticleReading(articleId: string, seconds: number, finished: boolean): Promise<void> {
+  if (import.meta.env.VITE_DEV_MODE === 'true') return;
+  const { error } = await supabase.rpc('record_article_reading', {
+    p_id: articleId, p_seconds: Math.round(seconds), p_finished: finished,
+  });
+  if (error) console.warn('[api] recordArticleReading failed:', error.message);
+}
+
 export async function markArticleConsumed(
   articleId: string,
   userId: string,
@@ -753,7 +765,8 @@ export async function requestArticleProcessing(
   title: string,
   snippet: string,
   sources?: ArticleSource[],
-  onProgress?: (status: string) => void
+  onProgress?: (status: string) => void,
+  meta?: { topic?: string; category?: string },
 ): Promise<ArticleBlock[]> {
   onProgress?.('Processing article on server...');
   const result = await invokeEdgeFn<{ blocks: ArticleBlock[] }>('process-article', {
@@ -762,6 +775,7 @@ export async function requestArticleProcessing(
     title,
     snippet,
     sources,
+    ...meta,
   });
   onProgress?.('Done.');
   return result.blocks;
@@ -1092,6 +1106,9 @@ export async function upsertUserPreferences(
     podcast_cast?: string[];
     podcast_personas?: Record<string, string>;
     song_cover_style?: string | null;
+    grammar_progress?: Record<string, { mastery: 'hard' | 'medium' | 'easy' }>;
+    tutor_hand?: 'right' | 'left';
+    tutor_prefs?: { correction?: string; asides?: string };
   }
 ) {
   const { error } = await supabase

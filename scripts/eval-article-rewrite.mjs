@@ -105,7 +105,8 @@ const INTENSITY_RATIOS = {
   intensive: { known: 0.9, review: 0.08, new: 0.02 },
 };
 
-const FIXTURES_DIR = 'scripts/eval-fixtures';
+// --fixtures-dir <dir>: score ad-hoc fixtures (e.g. ones a spike wrote) instead of the golden set.
+const FIXTURES_DIR = process.argv.includes('--fixtures-dir') ? process.argv[process.argv.indexOf('--fixtures-dir') + 1] : 'scripts/eval-fixtures';
 const REPORTS_DIR = 'scripts/eval-reports';
 const TMP_BUNDLE = '.tmp_rewrite_prompt.mjs';
 

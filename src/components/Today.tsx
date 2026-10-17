@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { BookOpen, ChevronRight, Headphones, Layers, Music, Newspaper } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeading } from './PageHeading';
+import { TutorHomeCard } from './tutor/TutorHomeCard';
 import { AdaptiveLabel, useAdaptiveText } from './AdaptiveLabel';
 import { CardBody, CornerText } from './ArchiveList';
 import { PartCount } from './Library';
@@ -156,6 +157,8 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
     <div style={{ paddingBottom: '6rem' }}>
       <PageHeading id="today" />
       <div style={{ height: '0.6rem' }} />
+      {/* ハルカ, pinned above the day's blocks: her line from last night's brief. */}
+      <TutorHomeCard />
 
       {/* Blocks space 2rem apart; whichever shows first sits flush under the heading (index.css). */}
       <div className="today-blocks">
