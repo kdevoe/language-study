@@ -7,6 +7,7 @@
 // SM-2 schedule maps onto an FSRS state. No clock reads: `now` is always passed in.
 
 import type { SrsState, SrsStatus } from './srs';
+import { mixNewCards } from './deck';
 
 const DAY_MS = 86_400_000;
 
@@ -37,18 +38,19 @@ export function isNewKanji(p: KanjiProgress): boolean {
 }
 
 /**
- * Today's kanji session: due reviews first (most overdue first), then new kanji in
- * Heisig order. A new kanji is always "due" — it was introduced to be studied.
+ * Today's kanji session: due reviews (most overdue first) with the new kanji (Heisig
+ * order) spread evenly among them (mixNewCards). A new kanji is always "due" — it
+ * was introduced to be studied.
  */
 export function selectKanjiDeck(progress: KanjiProgress[], now: number): KanjiCard[] {
   const reviews = progress
     .filter((p) => !isNewKanji(p) && p.dueAt != null && p.dueAt <= now)
     .sort((a, b) => (a.dueAt! - b.dueAt!) || (a.heisigNo - b.heisigNo));
   const fresh = progress.filter(isNewKanji).sort((a, b) => a.heisigNo - b.heisigNo);
-  return [
-    ...reviews.map((p) => ({ kanji: p.kanji, kind: 'review' as const })),
-    ...fresh.map((p) => ({ kanji: p.kanji, kind: 'new' as const })),
-  ];
+  return mixNewCards<KanjiCard>(
+    reviews.map((p) => ({ kanji: p.kanji, kind: 'review' })),
+    fresh.map((p) => ({ kanji: p.kanji, kind: 'new' })),
+  );
 }
 
 /** The prior FSRS state for a graded kanji, or null for a new one (fresh card). */
