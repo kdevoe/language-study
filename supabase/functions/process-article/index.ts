@@ -4,6 +4,7 @@ import { GEMINI_FLASH, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, type WordSignal } from '../_shared/wordPriority.ts';
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
 import { actingUserId, resolveCaller } from '../_shared/auth.ts';
+import { dataRule, fence, fenceInline } from '../_shared/untrusted.ts';
 import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon } from '../_shared/readerVocab.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
@@ -60,6 +61,29 @@ function validateBlocks(raw: unknown): void {
   if (paragraphs === 0) throw new BlockValidationError('no paragraph blocks in generation');
 }
 
+// Output check (CLAUDE.md › Security › Prompt injection): the prompt forbids
+// links and contact details, and anything that still comes through is removed
+// rather than shown. A planted "visit …" in a scraped page or an import then
+// never reaches the reader as a usable address. Stripped, not rejected: a
+// source that really mentions a website shouldn't fail the whole article.
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>「」『』（）()、。]+/gi;
+const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+function scrubLinks(blocks: unknown[]): number {
+  let removed = 0;
+  const scrub = (v: unknown) => {
+    if (typeof v !== 'string') return v;
+    const out = v.replace(URL_RE, () => { removed++; return ''; }).replace(EMAIL_RE, () => { removed++; return ''; });
+    return out.replace(/[ \t]{2,}/g, ' ').trim();
+  };
+  for (const b of blocks) {
+    if (!b || typeof b !== 'object') continue;
+    const block = b as { text?: unknown; description?: unknown };
+    if ('text' in block) block.text = scrub(block.text);
+    if ('description' in block) block.description = scrub(block.description);
+  }
+  return removed;
+}
+
 /** True for the transient upstream failures worth retrying: LLM rate-limit /
  *  overload / 5xx, and malformed-JSON (empty or truncated) generations. */
 function isTransientLlmError(err: unknown): boolean {
@@ -101,7 +125,10 @@ async function runRewriteWithRetry(
         .replace(/[\s\n]*```$/i, '')
         .trim();
       const parsed = JSON.parse(rawText);
+      // Scrub before validating, so a paragraph that was only a link fails validation and regenerates.
+      const scrubbed = Array.isArray(parsed) ? scrubLinks(parsed) : 0;
       validateBlocks(parsed);
+      if (scrubbed > 0) console.warn(`[process-article] removed ${scrubbed} link(s)/address(es) from the generation`);
       const meta = result.usageMetadata;
       return {
         blocks: parsed,
@@ -294,7 +321,9 @@ Rules: summary_ja summarizes THIS part (it opens the next part's context). prope
 ACCUMULATED PROPER NOUNS: ${JSON.stringify(existing.properNouns ?? {})}
 
 PREVIOUS PART (Japanese):
-${prevPartText.slice(0, 8000)}`;
+${fence('part', prevPartText.slice(0, 8000))}
+
+${dataRule(['part'])}`;
   try {
     const result = await ai.models.generateContent({
       model: GEMINI_FLASH,
@@ -484,8 +513,11 @@ async function extractConceptsWithGroq(
 Give up to ${MAX_CONCEPTS_PER_NET} concepts per group. Return ONLY JSON of this exact shape:
 {"topics":[{"concept":"surveillance","synonyms":["monitoring","watching","oversight"]}],"actions":[{"concept":"identify","synonyms":["locate","pinpoint"]}]}
 
-Title: ${title}
-Snippet: ${snippet}`;
+Title: ${fenceInline('title', title)}
+Snippet:
+${fence('snippet', snippet)}
+
+${dataRule(['title', 'snippet'])}`;
 
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',

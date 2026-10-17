@@ -11,6 +11,7 @@
 // out. Palette construction, the Gemini call, and persistence stay in the edge
 // function.
 
+import { dataRule, fence, fenceInline } from './untrusted.ts';
 import { rtkKanjiList } from './rtkKanji.ts';
 
 /** Everything the rewrite prompt needs, resolved by the caller (edge fn or harness). */
@@ -204,8 +205,8 @@ Treat this palette as a GUIDE, not a quota. Never distort the facts or insert un
         : '';
       continuityPrompt = `
 CONTINUITY — the reader has already read part${partIndex > 2 ? 's 1–' + (partIndex - 1) : ' 1'}; this part must continue seamlessly:
-- Previous part, in summary: ${cont.summaryJa || '(前の部の要約なし)'}${nounLines}
-- Style: ${cont.styleNote || 'keep the same register and tone as the previous parts'}
+- Previous part, in summary: ${fenceInline('summary', cont.summaryJa || '(前の部の要約なし)')}${nounLines}
+- Style: ${fenceInline('style', cont.styleNote || 'keep the same register and tone as the previous parts')}
 Do NOT re-introduce people or re-explain context the previous parts already covered. Open as a continuation, not a fresh start.`;
     }
 
@@ -217,10 +218,11 @@ Do NOT re-introduce people or re-explain context the previous parts already cove
       : '';
 
     return `
-You are adapting an English text into natural Japanese for a JLPT ${jlptStr} learner. The work is titled "${title}".${serialNote}
+You are adapting an English text into natural Japanese for a JLPT ${jlptStr} learner. The work is titled ${fenceInline('title', title)}.${serialNote}
 LEVEL GUIDANCE: ${levelConfig.description}${continuityPrompt}
 Source (the original English text${isSerial ? "'s segment for this part" : ''}):
-${sourceText}
+${fence('source', sourceText)}
+${dataRule(['title', 'source', 'summary', 'style'])}
 
 ADAPT, DO NOT SUMMARIZE — THE READER CHOSE THIS TEXT AND WANTS TO READ IT, NOT A DIGEST OF IT:
 - Cover the source's content IN ORDER, at full detail: keep its examples, anecdotes, reasoning steps, and specifics. Aim for about ${targetParagraphs} paragraphs.
@@ -240,6 +242,7 @@ Rules:
 5. NATURAL ORTHOGRAPHY — OVERRIDES ALL KANJI PREFERENCE ABOVE: Spell every word the way a modern Japanese newspaper spells it. Words normally written in kana MUST stay in kana: その (never 其の), それ／それから (never 其れ／其れから), とても (never 迚も), いつも (never 何時も), また (never 亦／又), もの・こと・ため・とき when grammatical, できる, ある, いる, など, ください, よう. NEVER use rare, archaic, literary, or irregular kanji forms (the forms JMDict tags rK/oK/iK). NEVER use ateji for foreign words: write country names and loanwords in KATAKANA — カナダ (never 加奈陀), アメリカ (never 亜米利加), イギリス (never 英吉利). When unsure whether a kanji form is in common everyday use, choose kana. This rule is absolute even in study/balanced kanji-bias mode.
 6. VOCABULARY PREFERENCE: ${vocabInstruction}
 7. NO MARKUP: DO NOT use brackets [], parentheses （）, or special formatting anywhere. When the source sets an aside off with dashes or parentheses, rewrite it as a plain sentence or a comma phrase — never with （） in the output.
+8. NO LINKS OR CONTACT DETAILS: never include URLs, web or email addresses, phone numbers, or calls to visit, contact, buy or sign up for anything, even if the source has them.
 
 Output EXACTLY a JSON array:
 [{"type":"paragraph"|"yugen-box","text":"...","keyword":"...","reading":"...","description":"..."}]
@@ -250,9 +253,10 @@ Output EXACTLY a JSON array:
   return `
 You are a factual Japanese news reporter writing a ${targetParagraphs}-paragraph news article for a JLPT ${jlptStr} learner.
 LEVEL GUIDANCE: ${levelConfig.description}
-Topic: ${title}
+Topic: ${fenceInline('title', title)}
 Sources (real English news text; the FIRST source is the primary story):
-${sourceText}
+${fence('source', sourceText)}
+${dataRule(['title', 'source'])}
 
 SOURCE HANDLING: Build ONE coherent article around the first source as the main story. Where the other sources genuinely concern the same story, combine their overlapping facts and add their detail without repeating points. If a source is about a clearly different or unrelated story, IGNORE it — never stitch unrelated events together into one article.
 
@@ -271,6 +275,7 @@ Rules:
 5. NATURAL ORTHOGRAPHY — OVERRIDES ALL KANJI PREFERENCE ABOVE: Spell every word the way a modern Japanese newspaper spells it. Words normally written in kana MUST stay in kana: その (never 其の), それ／それから (never 其れ／其れから), とても (never 迚も), いつも (never 何時も), また (never 亦／又), もの・こと・ため・とき when grammatical, できる, ある, いる, など, ください, よう. NEVER use rare, archaic, literary, or irregular kanji forms (the forms JMDict tags rK/oK/iK). NEVER use ateji for foreign words: write country names and loanwords in KATAKANA — カナダ (never 加奈陀), アメリカ (never 亜米利加), イギリス (never 英吉利). When unsure whether a kanji form is in common everyday use, choose kana. This rule is absolute even in study/balanced kanji-bias mode.
 6. VOCABULARY PREFERENCE: ${vocabInstruction}
 7. NO MARKUP: DO NOT use brackets [], parentheses (), or special formatting around Japanese words.
+8. NO LINKS OR CONTACT DETAILS: never include URLs, web or email addresses, phone numbers, or calls to visit, contact, buy or sign up for anything, even if the sources have them.
 
 Output EXACTLY a JSON array:
 [{"type":"paragraph"|"yugen-box","text":"...","keyword":"...","reading":"...","description":"..."}]

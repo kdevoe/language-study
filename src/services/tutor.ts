@@ -26,6 +26,8 @@ export type TutorAction =
   | { type: 'add_to_deck'; word: string; reading: string; meaning: string }
   | { type: 'grammar_rating'; pointId: string; rating: 'easy' | 'medium' | 'hard'; why: string }
   | { type: 'content_queued'; kind: 'podcast'; topic: string; episodeId?: string }
+  // An offer the learner confirms: the tutor never starts paid generation itself.
+  | { type: 'content_offer'; kind: 'podcast'; topic: string; angle?: string }
   | { type: 'preference'; prefs: { correction?: string; asides?: string } };
 
 export type TutorEvent =

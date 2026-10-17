@@ -3,6 +3,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CLAUDE_HAIKU, GROQ_GENERAL as GROQ_MODEL } from '../_shared/models.ts';
 import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
 import { resolveCaller } from '../_shared/auth.ts';
+import { dataRule, fenceInline } from '../_shared/untrusted.ts';
+
+// Article sentences are untrusted (CLAUDE.md › Security › Prompt injection).
+const sentence = (v: unknown) => fenceInline('sentence', String(v ?? ''));
+const RULE = dataRule(['sentence', 'text']);
 
 // Reads ANTHROPIC_API_KEY from the function's secrets.
 const anthropic = new Anthropic();
@@ -129,9 +134,10 @@ Deno.serve(async (req) => {
       const list: string[] = Array.isArray(body.candidates) ? body.candidates.slice(0, 10).map(String) : [];
       let index = 0;
       if (list.length > 1 && typeof word === 'string') {
-        const prompt = `Given the Japanese word "${word}" in this sentence: "${String(contextSentence ?? '')}"
+        const prompt = `Given the Japanese word "${word}" in this sentence: ${sentence(contextSentence)}
 
 Which dictionary entry is the correct match? Return ONLY the index number.
+${RULE}
 
 Candidates:
 ${list.map((c, i) => `[${i}] ${c}`).join('\n')}
@@ -159,10 +165,11 @@ Answer (just the number):`;
       }
 
       const lines = list.map((it, i) =>
-        `${i + 1}. word: "${it.surface}" | candidates: ${(it.candidates || []).join(', ')} | sentence: "${it.sentence}"`,
+        `${i + 1}. word: "${it.surface}" | candidates: ${(it.candidates || []).join(', ')} | sentence: ${sentence(it.sentence)}`,
       ).join('\n');
       const prompt = `You are a Japanese reading disambiguator. For each item, give the correct reading of "word" as it is used in its "sentence", in HIRAGANA only. Pick from "candidates" when the right reading is among them.
 Return ONLY JSON: {"readings": ["…", "…"]} — one hiragana reading per item, in the same order, exactly ${list.length} entries.
+${RULE}
 
 ${lines}`;
 
@@ -199,10 +206,12 @@ ${lines}`;
       const clip = (v: unknown) => String(v ?? '').slice(0, 80);
       const named = (p: { pattern?: unknown; meaning?: unknown }) => `${clip(p.pattern)} (${clip(p.meaning)})`;
       const prompt = point
-        ? `In this Japanese sentence: "${contextSentence}", the part "${word}" is the grammar pattern ${named(point)}.
+        ? `In this Japanese sentence: ${sentence(contextSentence)}, the part "${word}" is the grammar pattern ${named(point)}.
+${RULE}
 MANDATORY: In 1-2 brief sentences of English, explain what this pattern does in this particular sentence: what it attaches to here and what it adds to the meaning.
 Be concise. Write plain text (no markdown) and do not include romanized readings.`
-        : `Analyze the word "${word}" in this sentence: "${contextSentence}".
+        : `Analyze the word "${word}" in this sentence: ${sentence(contextSentence)}.
+${RULE}
 MANDATORY: Provide ONLY 1 SINGLE brief sentence in English explaining its specific usage or grammar in this context.
 Be extremely concise. Write plain text (no markdown) and do not include romanized readings.${
           Array.isArray(points) && points.length
@@ -228,9 +237,10 @@ Be extremely concise. Write plain text (no markdown) and do not include romanize
 
     if (type === 'translation') {
       // Sentence translation using Groq
-      const prompt = `Translate this Japanese sentence into natural, elegant English: "${word}"
-Context: "${(contextSentence || '').substring(0, 300)}"
-Just provide the English translation, no other text.`;
+      const prompt = `Translate this Japanese sentence into natural, elegant English: ${fenceInline('text', String(word ?? ''))}
+Context: ${sentence((contextSentence || '').substring(0, 300))}
+Just provide the English translation, no other text.
+${RULE}`;
       const translation = await groqComplete(prompt);
       return new Response(JSON.stringify({ translation }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -247,7 +257,8 @@ Just provide the English translation, no other text.`;
     }
 
     console.log(`[dictionary-lookup] JMDict MISS for "${word}", falling back to Groq`);
-    const prompt = `Define "${word}" for context: "${contextSentence}".
+    const prompt = `Define "${word}" for context: ${sentence(contextSentence)}.
+${RULE}
 CRITICAL: The "furiganaMap" MUST account for EVERY character in "${word}". Break it down 1:1.
 Output JSON:
 {

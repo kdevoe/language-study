@@ -13,6 +13,7 @@ import {
   type ScreenContext, type TutorAction, type TutorRecap,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
+import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
 
 // ハルカ's side panel (docs/mockups/tutor.html, design-system §6.17). Slides in
 // from the hand side over any screen; the screen stays visible beside it. One
@@ -338,7 +339,40 @@ function ActionNote({ action, onRate, onDismiss }: {
   if (action.type === 'content_queued') {
     return <div className="tutor-ctx">番組「{action.topic}」を作っています · 聞くに届きます</div>;
   }
+  if (action.type === 'content_offer') return <ContentOffer action={action} onDismiss={onDismiss} />;
   return null;
+}
+
+/** The tutor offers a podcast; it's made only when the learner taps 作る, with
+ *  their own session (and so their own limits). The tutor never starts paid
+ *  generation by itself, so text in an article can't trigger it (CLAUDE.md › Security). */
+function ContentOffer({ action, onDismiss }: {
+  action: Extract<TutorAction, { type: 'content_offer' }>;
+  onDismiss: () => void;
+}) {
+  const [state, setState] = useState<'offer' | 'making' | 'made' | 'error'>('offer');
+  const [error, setError] = useState('');
+  const make = async () => {
+    setState('making');
+    try {
+      await createEpisode({ kind: 'topic', topic: action.topic }, 5, action.angle);
+      setState('made');
+    } catch (e) {
+      setError(await episodeErrorMessage(e));
+      setState('error');
+    }
+  };
+  if (state === 'made') return <div className="tutor-ctx">番組「{action.topic}」を作っています · 聞くに届きます</div>;
+  return (
+    <div className="tutor-a">
+      番組「{action.topic}」を作る？
+      {state === 'error' && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.3rem' }}>{error}</div>}
+      <div className="tutor-suggestion">
+        <button onClick={make} disabled={state === 'making'}>{state === 'making' ? '準備中…' : '作る'}</button>
+        <button onClick={onDismiss}>いいえ</button>
+      </div>
+    </div>
+  );
 }
 
 function Recap({ recap, added, onAdd, onDone }: {

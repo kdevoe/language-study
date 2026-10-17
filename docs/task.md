@@ -633,8 +633,13 @@
         database/38_cron_secret.sql; deploy ensure-buffer, learner-dream, audio-cleanup, process-article,
         dictionary-lookup, fetch-raw-news, daily-feed; remove VITE_GROQ_API_KEY from Vercel and rotate the Groq key
   - [x] Security posture written into CLAUDE.md › Security (secrets, caller auth, RLS, cost caps, prompt injection)
-  - [ ] Prompt injection: fence untrusted text (rewrite, editor, podcast, song, tutor prompts); tutor side-effect tools only
-        from the learner's own words; request_content as a tap-to-confirm offer; daily podcast cap; learner notes
-        treated as data; rewrite output check (no URLs / contact details); a small injection eval set
+  - [x] Prompt injection (2026-10-17): `_shared/untrusted.ts` fence + data rule in the rewrite, continuity, concepts,
+        editor, podcast, song, dream, tutor (screen notes, get_text / search_history results, recap) and dictionary
+        prompts; renderMemory fenced; tutor rules (tools only from the learner's own words, no links or personal data);
+        request_content → tap-to-confirm content_offer; podcast daily cap (PODCASTS_PER_DAY, default 10); rewrite
+        output scrub (URLs / emails); scripts/eval-prompt-injection.mjs (5 cases, rewrite)
+  - [ ] Deploy process-article, dictionary-lookup, fetch-raw-news, learner-dream, tutor-chat, generate-podcast,
+        generate-song; run `node scripts/eval-prompt-injection.mjs` with GEMINI_API_KEY
+  - [ ] Extend the injection eval to the tutor (planted instructions in get_text) and podcast scripts
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
         local dev against functions needs DEV_ALLOW_ANON=true in the functions env file
