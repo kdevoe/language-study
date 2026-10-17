@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { useAppStore, type WordData } from '../services/store';
 import { useKanjiStore, buildKanjiDeck } from '../services/kanjiStore';
 import type { KanjiCard } from '../services/kanjiDeck';
+import { mergeArrivals, queueRepeat, type SessionCard } from '../services/deck';
 import type { Rating } from '../services/srs';
 import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
 import { furiganaSegments } from '../services/furigana';
@@ -53,7 +54,7 @@ export function KanjiFlashcards({
   const progress = useKanjiStore((s) => s.progress);
   const wordDatabase = useAppStore((s) => s.wordDatabase);
 
-  const [cards, setCards] = useState<KanjiCard[]>(() => buildKanjiDeck());
+  const [cards, setCards] = useState<SessionCard<KanjiCard>[]>(() => buildKanjiDeck());
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -71,16 +72,13 @@ export function KanjiFlashcards({
   }, []);
 
   // The app-open sync and the daily drip can land after mount (the session stays
-  // mounted once opened): append anything newly due that isn't in this session yet,
-  // so today's new kanji join the run instead of waiting for the next visit. They
-  // go at the end, after the reviews, as selectKanjiDeck orders them.
+  // mounted once opened): anything newly due that isn't in this run yet joins the
+  // part still ahead, today's new kanji spread through it (mergeArrivals).
+  const indexRef = useRef(index);
+  indexRef.current = index;
   useEffect(() => {
     const fresh = buildKanjiDeck();
-    setCards((cur) => {
-      const have = new Set(cur.map((c) => c.kanji));
-      const added = fresh.filter((c) => !have.has(c.kanji));
-      return added.length > 0 ? [...cur, ...added] : cur;
-    });
+    setCards((cur) => mergeArrivals(cur, indexRef.current, fresh, (c) => c.kanji));
   }, [progress]);
 
   const total = cards.length;
@@ -94,7 +92,7 @@ export function KanjiFlashcards({
   useEffect(() => {
     shownAt.current = Date.now();
     thinkMs.current = null;
-  }, [card?.kanji]);
+  }, [index, card?.kanji]);
 
   const known = useMemo(() => (card ? knownWordsWith(card.kanji, wordDatabase) : []), [card, wordDatabase]);
 
@@ -107,12 +105,17 @@ export function KanjiFlashcards({
 
   // A grade tap and a card tap can both land for one card (the slider commits a
   // beat after its tap): only the first grades it.
-  const gradedKanji = useRef<string | null>(null);
+  const gradedAt = useRef<number | null>(null);
   function grade(rating: Rating) {
-    if (!card || gradedKanji.current === card.kanji) return;
-    gradedKanji.current = card.kanji;
-    if (thinkMs.current != null) recordThinkTime('kanji', thinkMs.current);
-    review(card.kanji, rating, thinkMs.current, Date.now());
+    if (!card || gradedAt.current === index) return;
+    gradedAt.current = index;
+    // A repeat is practice: the first grade already set the schedule.
+    if (!card.repeat) {
+      if (thinkMs.current != null) recordThinkTime('kanji', thinkMs.current);
+      review(card.kanji, rating, thinkMs.current, Date.now());
+    }
+    // もう一度 brings the kanji back a few cards later in this run.
+    if (rating === 1) setCards((cur) => queueRepeat(cur, index));
     setRevealed(false);
     setIndex((i) => i + 1);
   }
@@ -143,7 +146,7 @@ export function KanjiFlashcards({
       <Centered>
         <p className="serif" style={{ fontSize: '3rem', lineHeight: 1.15, color: 'var(--text-main)', letterSpacing: '0.08em' }}>完了</p>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.6rem' }}>
-          {total} kanji today
+          {cards.filter((c) => !c.repeat).length} kanji today
         </p>
         {onDone && (
           <button
@@ -176,7 +179,7 @@ export function KanjiFlashcards({
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
           <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            {card.kind === 'new' ? 'New' : 'Review'}
+            {card.repeat ? 'Again' : card.kind === 'new' ? 'New' : 'Review'}
           </span>
           <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {index + 1} / {total}
@@ -196,7 +199,7 @@ export function KanjiFlashcards({
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `1rem 1rem calc(1rem + ${PILE_SPACE})`, perspective: '1600px' }}>
         <div style={{ width: '100%', maxWidth: '340px' }}>
           <StudyCard
-            cardKey={card.kanji}
+            cardKey={`${card.kanji}#${index}`}
             index={index}
             total={total}
             revealed={revealed}

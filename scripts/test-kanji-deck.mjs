@@ -7,7 +7,7 @@
  * fixed inputs. Exits non-zero on any failure.
  *
  * What it locks in:
- *   • due reviews come first (most overdue first), then new kanji in Heisig order
+ *   • due reviews most overdue first, new kanji (Heisig order) mixed between them
  *   • not-yet-due kanji are left out; new kanji are always in
  *   • the daily drip continues from the highest Heisig number, counts what it
  *     already added today, and stops at the end of the list
@@ -58,9 +58,9 @@ console.log('\nselectKanjiDeck');
   ];
   const deck = m.selectKanjiDeck(progress, NOW);
   const order = deck.map((c) => c.kanji).join('');
-  check('reviews most-overdue first, then new in Heisig order', order === '宣海掛研', order);
+  check('reviews most-overdue first, new kanji in Heisig order mixed between them', order === '宣掛海研', order);
   check('not-yet-due kanji left out', !deck.some((c) => c.kanji === '抗'));
-  check('kinds', deck.map((c) => c.kind).join(',') === 'review,review,new,new');
+  check('kinds', deck.map((c) => c.kind).join(',') === 'review,new,review,new');
   check('a new kanji has no prior FSRS state', m.kanjiSrsState(progress[3]) === null);
   check('a graded kanji has one', m.kanjiSrsState(progress[0])?.stability === 30);
 }

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronDown, X } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { buildDeck, type Card } from '../services/dueDeck';
+import { mergeArrivals, queueRepeat, type SessionCard } from '../services/deck';
 import type { Rating } from '../services/srs';
 import { fetchIntakeCandidates } from '../services/jmdict';
 import { alignReading, furiganaSegments } from '../services/furigana';
@@ -82,7 +83,7 @@ export function Flashcards({
 
   // Snapshot the deck once, at mount. Flashcards mounts when the tab opens, so this
   // is "the deck as of opening REVIEW" and stays stable while the user works through it.
-  const [cards, setCards] = useState<Card[]>(buildDeck);
+  const [cards, setCards] = useState<SessionCard<Card>[]>(buildDeck);
 
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -136,20 +137,17 @@ export function Flashcards({
 
   // The app-open promotion pass (sync → promoteIntakeQueue) is async and can land
   // AFTER this session mounted, and in REVIEW's deck rows the session stays mounted.
-  // Whenever words change, append cards that became due and aren't in this run yet
-  // (today's new words), so they join the run instead of waiting for the next visit.
-  // Existing cards are never reordered.
+  // Whenever words change, cards that became due and aren't in this run yet (today's
+  // new words) join the part still ahead, new ones spread through it (mergeArrivals).
   const wordDatabase = useAppStore((s) => s.wordDatabase);
+  const indexRef = useRef(index);
+  indexRef.current = index;
   useEffect(() => {
     // In Discover mode every grade touches wordDatabase; skip the rebuild churn —
     // Discover grades never mint due cards (far-out maintenance or queued).
     if (discoverCards != null) return;
     const fresh = buildDeck();
-    setCards((cur) => {
-      const have = new Set(cur.map((c) => c.key));
-      const added = fresh.filter((c) => !have.has(c.key));
-      return added.length > 0 ? [...cur, ...added] : cur;
-    });
+    setCards((cur) => mergeArrivals(cur, indexRef.current, fresh, (c) => c.key));
   }, [wordDatabase, discoverCards]);
 
   // Dev-only: seed a demo deck, then rebuild the snapshot in place (no reload).
@@ -196,7 +194,7 @@ export function Flashcards({
   useEffect(() => {
     shownAt.current = Date.now();
     thinkMs.current = null;
-  }, [card?.key]);
+  }, [index, card?.key]);
 
   function reveal() {
     const t = Date.now() - shownAt.current;
@@ -207,12 +205,17 @@ export function Flashcards({
 
   // A grade tap and a card tap can both land for one card (the slider commits a
   // beat after its tap): only the first grades it.
-  const gradedKey = useRef<string | null>(null);
+  const gradedAt = useRef<number | null>(null);
   function grade(rating: Rating) {
-    if (!card || gradedKey.current === card.key) return;
-    gradedKey.current = card.key;
-    if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
-    reviewWord(card.key, rating, Date.now());
+    if (!card || gradedAt.current === index) return;
+    gradedAt.current = index;
+    // A repeat is practice: the first grade already set the schedule.
+    if (!card.repeat) {
+      if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
+      reviewWord(card.key, rating, Date.now());
+    }
+    // もう一度 brings the card back a few cards later in this run.
+    if (rating === 1) setCards((cur) => queueRepeat(cur, index));
     setRevealed(false);
     setIndex((i) => i + 1);
   }
@@ -413,7 +416,7 @@ export function Flashcards({
             <div style={{ height: '100%', width: '100%', backgroundColor: 'var(--accent-progress)' }} />
           </div>
         </div>
-        <FinishCard sessionCount={total} onDiscover={jlptLevel != null ? startDiscover : undefined} />
+        <FinishCard sessionCount={cards.filter((c) => !c.repeat).length} onDiscover={jlptLevel != null ? startDiscover : undefined} />
       </div>
     );
   }
@@ -424,7 +427,7 @@ export function Flashcards({
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
           <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            {card.kind === 'new' ? 'New' : 'Review'}
+            {card.repeat ? 'Again' : card.kind === 'new' ? 'New' : 'Review'}
           </span>
           <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {index + 1} / {total}
@@ -442,7 +445,7 @@ export function Flashcards({
       </div>
 
       <FlipSurface
-        cardKey={card.key}
+        cardKey={`${card.key}#${index}`}
         index={index}
         total={total}
         word={card.word}

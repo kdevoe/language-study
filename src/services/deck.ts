@@ -99,6 +99,59 @@ export function isEligible(e: DeckEntry): boolean {
   return e.jlptLevel != null;
 }
 
+/**
+ * Spread new cards evenly through the reviews instead of saving them for the end:
+ * with R reviews and N new, new card j goes after ceil((j+1)·R/(N+1)) reviews.
+ * The run opens on a review whenever there is one, and with more reviews than new
+ * cards it closes on reviews too, so a new card has reviews between it and its
+ * repeat (a もう一度 card comes back a few cards later). Each list keeps its own
+ * order. Shared by the vocab and kanji decks.
+ */
+export function mixNewCards<T>(reviews: T[], news: T[]): T[] {
+  const out: T[] = [];
+  let r = 0;
+  news.forEach((card, j) => {
+    const upTo = Math.ceil(((j + 1) * reviews.length) / (news.length + 1));
+    while (r < upTo) out.push(reviews[r++]);
+    out.push(card);
+  });
+  while (r < reviews.length) out.push(reviews[r++]);
+  return out;
+}
+
+/** A card in a running session; `repeat` marks a もう一度 card shown again for practice. */
+export type SessionCard<T> = T & { repeat?: boolean };
+
+/**
+ * Cards that became due after a session opened (the app-open sync and the daily
+ * new-card drip land late) join the part of the run still ahead: the card on screen
+ * and everything before it stay put, new reviews join the end, and new cards are
+ * spread through what's left. Cards already in the run (by key) are ignored.
+ */
+export function mergeArrivals<T extends { kind: 'review' | 'new' }>(
+  cur: SessionCard<T>[], index: number, fresh: T[], keyOf: (c: T) => string,
+): SessionCard<T>[] {
+  const have = new Set(cur.map(keyOf));
+  const added = fresh.filter((c) => !have.has(keyOf(c)));
+  if (added.length === 0) return cur;
+  const head = cur.slice(0, index + 1);
+  const ahead = [...cur.slice(index + 1), ...added.filter((c) => c.kind === 'review')];
+  return [...head, ...mixNewCards(ahead, added.filter((c) => c.kind === 'new'))];
+}
+
+/** Cards between a もう一度 card and its repeat. */
+export const REPEAT_GAP = 3;
+
+/**
+ * Show the card at `index` again later in the run, after REPEAT_GAP other cards (or
+ * at the end when fewer are left). The repeat is practice only: the first grade
+ * already set the schedule (scheduling twice in a day undoes the もう一度).
+ */
+export function queueRepeat<T>(cur: SessionCard<T>[], index: number): SessionCard<T>[] {
+  const at = Math.min(index + 1 + REPEAT_GAP, cur.length);
+  return [...cur.slice(0, at), { ...cur[index], repeat: true }, ...cur.slice(at)];
+}
+
 /** Options for deck assembly. */
 export interface DeckOptions {
   /**
@@ -112,8 +165,8 @@ export interface DeckOptions {
 }
 
 /**
- * Build today's ordered deck: due reviews (most overdue first), then new cards
- * (foundation-first). A word that is both due AND new counts once, as a review
+ * Build today's ordered deck: due reviews (most overdue first) with the new cards
+ * (foundation-first) spread evenly among them (mixNewCards). A word that is both due AND new counts once, as a review
  * (it's already scheduled and urgent). New words are paced upstream by #68; due
  * reviews are bounded by `reviewCap` (opt-in) so a large scheduled backlog can't
  * flood a session. Level-less words are excluded (isEligible).
@@ -131,7 +184,7 @@ export function selectDeck(entries: DeckEntry[], now: number, opts: DeckOptions 
   const capped = opts.reviewCap != null && opts.reviewCap >= 0
     ? reviews.slice(0, opts.reviewCap)   // keep the most-overdue `reviewCap`
     : reviews;
-  return [...capped, ...news];
+  return mixNewCards(capped, news);
 }
 
 /** Deck-health tallies for the study dashboard (#73). */
