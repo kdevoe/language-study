@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — tutor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-success: #dee5d5;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 980px; margin: 0 auto 1.4rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 780px; margin: 0 auto 0.4rem; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 0.7rem 1.6rem; margin: 1.2rem auto 2rem; flex-wrap: wrap; max-width: 1200px; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 380px; text-align: center; min-height: 3.6em; }
+/* 390 × 844: a real phone, per design-system.md */
+.phone { width: 410px; height: 864px; max-width: 100%; background: var(--bg-color); border-radius: 50px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.status { height: 44px; flex: none; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0.4rem 1.5rem 2rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── App screens (simplified, sized like the app) ── */
+.ph { display: flex; align-items: center; justify-content: space-between; margin: 0.6rem 0 1.6rem; }
+.ph h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; }
+.ph svg.i { color: var(--text-muted); stroke-width: 1.25; }
+/* Home: pinned tutor card (three candidates) */
+.hc { margin-bottom: 1.4rem; cursor: pointer; }
+.hc-top { display: flex; align-items: center; gap: 0.55rem; }
+.hc-name { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.hc-line { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.55; }
+.hc-line.s { font-size: 1.05rem; }
+.hc-a { background: var(--bg-card); border-radius: 24px; padding: 0.95rem 1.3rem 1rem; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); }
+.hc-a .hc-line { margin-top: 0.4rem; }
+.hc-go { text-align: right; font-family: var(--font-serif); font-size: 1.02rem; }
+.hc-b { background: var(--bg-card); border-radius: 24px; padding: 1.1rem 1.3rem 0.9rem; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); cursor: default; }
+.hc-b .hc-top { align-items: flex-start; } .hc-b .av { margin-top: 0.15rem; }
+.hc-in { display: flex; align-items: center; justify-content: space-between; margin-top: 0.8rem; padding: 0.35rem 0 0.4rem; border-bottom: 1px solid var(--border-light); cursor: text; font-family: var(--font-serif); font-size: 1rem; color: var(--text-muted); }
+.hc-in svg.i { width: 19px; height: 19px; }
+.hc-c { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; padding: 0.2rem 0; cursor: pointer; }
+.hc-c .hc-line { flex: 1; }
+.hc-c svg.i { width: 16px; height: 16px; color: var(--text-muted); }
+.due { background: var(--bg-pure); border-radius: 24px; padding: 1.1rem 1.3rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 25px rgba(0,0,0,0.03); border: 1px solid var(--border-light); }
+.due .n { font-family: var(--font-serif); font-size: 1.8rem; }
+.due .n small { font-size: 0.85rem; color: var(--text-muted); margin: 0 0.9rem 0 0.25rem; }
+.due .go { font-family: var(--font-serif); font-size: 1.02rem; }
+.blk { margin-top: 2rem; }
+.blk-ic { color: var(--text-muted); margin-bottom: 0.5rem; }
+.blk-ic svg.i { width: 19px; height: 19px; }
+.card { background: var(--bg-card); border-radius: 24px; padding: 1.4rem 1.5rem; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0,0,0,0.03); }
+.card .t { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.5; }
+.news { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.5; padding: 0 1.5rem; margin-bottom: 0.9rem; }
+.news small { display: block; font-family: var(--font-sans); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
+.nav { flex: none; display: flex; justify-content: space-evenly; padding: 0.95rem 1rem 0.6rem; background: var(--bg-color); }
+.nav div { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); padding: 0.4rem 0.6rem 0; }
+.nav div.on { color: var(--text-main); }
+.nav svg.i { width: 28px; height: 28px; }
+.nav span { font-size: 0.78rem; line-height: 1rem; margin-top: 2px; font-weight: 500; }
+.home-ind { height: 22px; flex: none; display: flex; justify-content: center; align-items: center; }
+.home-ind i { width: 134px; height: 5px; border-radius: 3px; background: #1c1c1c; opacity: 0.85; }
+
+.back { display: flex; align-items: center; justify-content: space-between; color: var(--text-main); margin: 0.4rem 0 1.8rem; }
+.meta { display: flex; align-items: center; gap: 0.7rem; color: var(--text-muted); margin-bottom: 1rem; font-family: var(--font-serif); font-size: 0.72rem; }
+.meta .cat { background: var(--bg-card); padding: 0.3rem 0.55rem; border-radius: 4px; }
+.rtitle { font-family: var(--font-serif); font-size: 1.75rem; font-weight: 500; line-height: 1.3; margin-bottom: 1.4rem; }
+.rule { width: 32px; height: 1px; background: var(--text-muted); opacity: 0.5; margin-bottom: 2rem; }
+.para { font-family: var(--font-serif); font-size: 1.05rem; line-height: 2.2; margin-bottom: 1.6rem; letter-spacing: 0.02em; }
+/* Word lookup (matches WordModal; see docs/mockups/grammar.html) with the ask link at the end */
+.wt { cursor: pointer; border-radius: 4px; background: rgba(0,0,0,0.035); }
+.wt.sel { background: var(--bg-pure); box-shadow: 0 0 0 4px var(--bg-pure), 0 4px 15px rgba(0,0,0,0.12); position: relative; z-index: 6; }
+.wdim { position: absolute; inset: 0; z-index: 5; background: rgba(245,245,240,0.4); display: none; }
+.wpanel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--bg-pure); border-radius: 24px 24px 0 0; padding: 0.7rem 1.4rem 1.6rem; box-shadow: 0 -10px 40px rgba(0,0,0,0.08); max-height: 52%; transform: translateY(105%); transition: transform 0.35s cubic-bezier(0.22,1,0.36,1); }
+.wopen .wpanel { transform: none; } .wopen .wdim { display: block; }
+.wgrab { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); margin: 0 auto 1rem; }
+.whead { display: flex; gap: 0.2rem; align-items: flex-end; margin-bottom: 0.9rem; }
+.kch { display: flex; flex-direction: column; align-items: center; }
+.kch .kana { font-size: 0.6rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.1em; height: 0.9rem; }
+.kch .k { font-family: var(--font-serif); font-size: 2.8rem; line-height: 1; font-weight: 500; }
+.mrow { display: flex; gap: 0.5rem; align-items: baseline; margin-bottom: 1.2rem; }
+.mrow .lv { font-size: 0.7rem; font-weight: 800; color: var(--olive); }
+.mrow .m { font-family: var(--font-serif); font-size: 1.15rem; line-height: 1.45; }
+.slider { display: flex; background: var(--border-light); border-radius: 100px; padding: 4px; height: 42px; margin-bottom: 1.3rem; }
+.slider span { flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 100px; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); }
+.slider span.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.gbox { background: var(--bg-card); padding: 0.9rem 1rem; border-radius: 14px; border-left: 5px solid var(--olive); margin-bottom: 1.1rem; }
+.gk { font-size: 0.68rem; font-weight: 900; color: var(--olive); letter-spacing: 0.05em; margin-bottom: 0.45rem; }
+.gins { font-family: var(--font-serif); font-size: 1rem; line-height: 1.6; }
+.askh { display: flex; align-items: center; gap: 0.55rem; font-family: var(--font-serif); font-size: 1rem; color: var(--text-main); padding: 0.3rem 0; }
+.askh svg.i { width: 15px; height: 15px; color: var(--text-muted); }
+.av.sm { width: 24px; height: 24px; font-size: 0.75rem; }
+
+.prog { display: flex; align-items: center; gap: 0.8rem; margin: 0.6rem 0 2rem; color: var(--text-muted); }
+.prog .bar { flex: 1; height: 3px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.prog .bar i { display: block; height: 100%; width: 35%; background: var(--accent-progress); }
+.prog small { font-size: 0.75rem; }
+.studycard { margin: 0 auto; width: 100%; max-width: 340px; aspect-ratio: 296 / 470; max-height: 62vh; background: var(--bg-pure); border-radius: 24px; box-shadow: 0 1px 2px rgba(40,40,30,0.06), 0 8px 18px rgba(40,40,30,0.07), 0 24px 48px rgba(40,40,30,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.studycard .w { font-family: var(--font-serif); font-size: 3rem; }
+.studycard small { font-size: 0.7rem; letter-spacing: 0.14em; font-weight: 700; color: var(--text-muted); margin-top: 1rem; }
+
+.pod-title { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 500; line-height: 1.35; margin-bottom: 0.3rem; }
+.pod-meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1.6rem; }
+.line { font-family: var(--font-serif); font-size: 1.02rem; line-height: 2; margin-bottom: 0.9rem; color: var(--text-muted); }
+.line b { font-family: var(--font-sans); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; margin-right: 0.4rem; }
+.line.now { color: var(--text-main); }
+.transport { flex: none; display: flex; justify-content: center; align-items: center; gap: 2.2rem; padding: 1rem 0 1.4rem; color: var(--text-muted); }
+.playc { width: 56px; height: 56px; border-radius: 50%; background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; color: var(--text-main); }
+
+/* ── Edge hint: the only always-visible sign the tutor exists ── */
+.edge-hint { position: absolute; top: 46%; width: 4px; height: 46px; border-radius: 3px; background: var(--text-muted); opacity: 0.22; z-index: 3; transition: opacity 0.3s; }
+.edge-hint.r { right: 3px; } .edge-hint.l { left: 3px; }
+.phone:hover .edge-hint { opacity: 0.35; }
+.edge-zone { position: absolute; top: 44px; bottom: 30px; width: 18px; z-index: 4; cursor: ew-resize; }
+.edge-zone.r { right: 0; } .edge-zone.l { left: 0; }
+
+/* ── Tutor surface ── */
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); opacity: 0; pointer-events: none; z-index: 10; transition: opacity 0.35s; }
+.open .backdrop { opacity: 1; pointer-events: auto; }
+.tutor { position: absolute; z-index: 11; background: var(--bg-color); display: flex; flex-direction: column; transition: transform 0.45s cubic-bezier(0.22,1,0.36,1); }
+.dragging .tutor, .dragging .backdrop { transition: none; }
+/* drawer: slides in from the swipe edge, the screen stays visible beside it */
+.tutor.drawer { top: 0; bottom: 0; width: 88%; padding-top: 44px; }
+.tutor.drawer.r { right: 0; border-radius: 28px 0 0 28px; box-shadow: -10px 0 40px rgba(0,0,0,0.15); transform: translateX(105%); }
+.tutor.drawer.l { left: 0; border-radius: 0 28px 28px 0; box-shadow: 10px 0 40px rgba(0,0,0,0.15); transform: translateX(-105%); }
+/* sheet: the same swipe raises a bottom sheet (§6.2), the screen stays visible above */
+.tutor.sheet { left: 0; right: 0; bottom: 0; height: 62%; border-radius: 28px 28px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); transform: translateY(105%); }
+.tutor.sheet.full { height: 94%; }
+.phone.open .tutor.drawer, .phone.open .tutor.sheet { transform: none; }
+.grab { flex: none; display: flex; justify-content: center; padding: 0.7rem 0 0.2rem; }
+.grab i { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); }
+.drawer .grab { display: none; }
+.drawer .vgrab { position: absolute; top: 50%; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
+.drawer.r .vgrab { left: 8px; } .drawer.l .vgrab { right: 8px; }
+.sheet .vgrab { display: none; }
+
+.t-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1.4rem 0.4rem; }
+.who { display: flex; align-items: center; gap: 0.6rem; }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.95rem; }
+.who b { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 500; }
+.t-head .end { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); }
+.chip { align-self: flex-start; margin: 0.3rem 1.4rem 0.2rem; display: inline-flex; align-items: center; gap: 0.4rem; background: var(--bg-card); border-radius: 100px; padding: 0.3rem 0.5rem 0.3rem 0.75rem; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); max-width: calc(100% - 2.8rem); }
+.chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip svg.i { width: 14px; height: 14px; }
+.chip .x { display: flex; padding: 0 0.15rem; }
+.chip.gone { display: none; }
+
+.thread { flex: 1; overflow-y: auto; padding: 0.9rem 1.4rem 1rem; scrollbar-width: none; display: flex; flex-direction: column; gap: 1rem; }
+.thread::-webkit-scrollbar { display: none; }
+.m-t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.95; max-width: 94%; }
+.m-t .w { cursor: pointer; border-radius: 3px; }
+.m-t .w:hover { background: rgba(0,0,0,0.04); }
+.m-t .fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; }
+.m-u { align-self: flex-end; max-width: 82%; background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.75; }
+.m-a { font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; max-width: 92%; }
+.m-a em { font-style: normal; font-family: var(--font-serif); color: var(--text-main); }
+.m-ctx { align-self: center; font-size: 0.68rem; font-weight: 600; color: var(--text-muted); opacity: 0.8; display: flex; align-items: center; gap: 0.35rem; }
+.m-ctx svg.i { width: 13px; height: 13px; }
+
+.sugg { flex: none; display: flex; gap: 1.2rem; padding: 0.2rem 1.4rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
+.sugg::-webkit-scrollbar { display: none; }
+.sugg button { font-family: var(--font-serif); font-size: 0.92rem; color: var(--text-muted); white-space: nowrap; }
+.input { flex: none; display: flex; align-items: center; gap: 0.8rem; margin: 0 1.4rem; padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
+.input .ph { flex: 1; margin: 0; font-family: var(--font-serif); font-size: 1.1rem; color: var(--text-muted); opacity: 0.7; }
+.input svg.i { color: var(--text-muted); width: 21px; height: 21px; }
+.t-foot { flex: none; height: 30px; }
+
+/* recap */
+.recap { flex: 1; overflow-y: auto; padding: 0.6rem 1.4rem 1.4rem; display: none; scrollbar-width: none; }
+.show-recap .recap { display: block; animation: fadeIn 0.3s ease-out; }
+.show-recap .thread, .show-recap .sugg, .show-recap .input, .show-recap .chip { display: none; }
+.recap h3 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin: 0.4rem 0 1.4rem; }
+.rk { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin: 1.6rem 0 0.6rem; }
+.fixrow { font-family: var(--font-serif); font-size: 1rem; line-height: 1.8; margin-bottom: 0.2rem; }
+.fixrow s { color: var(--text-muted); text-decoration-color: rgba(0,0,0,0.35); }
+.fixrow small { display: block; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.7rem; }
+.wrow { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.9rem; border-radius: 16px; margin-bottom: 0.45rem; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.wrow .jp { font-family: var(--font-serif); font-size: 1.05rem; }
+.wrow .jp small { font-family: var(--font-sans); font-size: 0.72rem; color: var(--text-muted); margin-left: 0.5rem; }
+.wrow button { font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-muted); }
+.wrow.added { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.wrow.added button { color: var(--text-main); }
+.used { font-family: var(--font-serif); font-size: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; }
+.used span::after { content: ' ✓'; font-family: var(--font-sans); font-size: 0.75rem; color: var(--accent-progress); }
+.recap .done { display: block; margin: 2rem 0 0 auto; height: 45px; padding: 0 1.4rem; border-radius: 100px; background: var(--bg-pure); font-family: var(--font-serif); font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ── Notes ── */
+.notes { max-width: 1100px; margin: 3rem auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+.note { background: var(--bg-color); border-radius: 20px; padding: 1.1rem 1.3rem; font-size: 0.85rem; line-height: 1.6; }
+.note h4 { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 500; margin-bottom: 0.4rem; }
+.note ul { padding-left: 1.1rem; } .note li { margin: 0.25rem 0; }
+.note .muted { color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<div class="mock-header">
+  <div class="kicker">MOCKUP · TUTOR</div>
+  <h1>ハルカ, anywhere in the app</h1>
+  <p>One tutor who is also your language partner. Swipe in from the screen edge on any page; it opens already knowing what you're looking at. Ask about the Japanese in front of you, or just talk.</p>
+  <p><b>Try it:</b> on the first phone, drag in from the edge (or click the faint mark). On 読む, tap the word 並んで.</p>
+</div>
+
+<div class="controls">
+  <div class="ctl"><span class="lbl">SCREEN</span><div class="pill-seg" data-ctl="screen">
+    <button data-v="home" class="on">ホーム</button><button data-v="reader">読む</button><button data-v="card">カード</button><button data-v="pod">番組</button></div></div>
+  <div class="ctl"><span class="lbl">OPENS AS</span><div class="pill-seg" data-ctl="form">
+    <button data-v="drawer" class="on">Side panel</button><button data-v="sheet">Bottom sheet</button></div></div>
+  <div class="ctl"><span class="lbl">HAND</span><div class="pill-seg" data-ctl="hand">
+    <button data-v="r" class="on">Right</button><button data-v="l">Left</button></div></div>
+  <div class="ctl"><span class="lbl">HOME CARD</span><div class="pill-seg" data-ctl="hc">
+    <button data-v="a" class="on">A · Card</button><button data-v="b">B · Reply box</button><button data-v="c">C · Quiet row</button></div></div>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap"><div class="phone-label">1 · SWIPE IN</div><div class="phone" id="p1"></div><div class="phone-note" id="n1"></div></div>
+  <div class="phone-wrap"><div class="phone-label">2 · HELP WITH WHAT'S ON SCREEN</div><div class="phone" id="p2"></div><div class="phone-note" id="n2"></div></div>
+  <div class="phone-wrap"><div class="phone-label">3 · JUST TALKING</div><div class="phone" id="p3"></div><div class="phone-note">A topic chat, from memory (the Kyoto trip you mentioned). Small slips are recast in passing, highlighted; a repeated one gets a short aside. Tap 終わる for the recap.</div></div>
+</div>
+
+<div class="notes">
+  <div class="note"><h4>Opening it</h4><ul>
+    <li><b>Swipe in from the right edge</b> (left in Settings for left-handed use). The touch must start within 18px of the edge, so it never fights card swipes or swipe-to-delete.</li>
+    <li>A faint mark on that edge is the only thing added to every screen. It could fade after the first week.</li>
+    <li><b>From a lookup:</b> the word panel, grammar panel and sentence (。) sheet end with <b>ハルカに聞く</b>, which opens it focused on that word, point or sentence. Long-press stays with furigana.</li>
+    <li>Fallback for the Safari tab, where iOS owns the edges: drag up on the bottom nav.</li>
+  </ul></div>
+  <div class="note"><h4>What it knows</h4><ul>
+    <li>The <b>chip</b> appears only when there's something specific on screen (a sentence, a card, a podcast line) and shows exactly what it took. Tap × and it won't use it. Pages with nothing specific (Home, lists) get no chip.</li>
+    <li>Flashcards: it sees the <b>front only</b> and gives hints, not answers.</li>
+    <li>Audio pauses while it's open and resumes after.</li>
+    <li>From memory: what you read and heard, your HARD grammar points, what you told it before.</li>
+  </ul></div>
+  <div class="note"><h4>How it talks</h4><ul>
+    <li>Japanese by default, at your level. <b>Asides</b> (muted, with a blue rule) are the tutor stepping out to explain, then straight back.</li>
+    <li>Tutor text is plain serif, no bubbles; your messages sit in a soft box. Every word is tappable like the reader.</li>
+    <li>Suggestions are quiet text, not buttons. No mode switch: "quiz me", "let's chat", "explain in English" are just things you say.</li>
+  </ul></div>
+</div>
+
+<script>
+const S = { screen: 'home', form: 'drawer', hand: 'r', hc: 'a' };
+// Home's pinned tutor card: her opening line comes from last night's brief (memory doc §2a).
+const HC = {
+  a: () => `<div class="hc hc-a" data-open><div class="hc-top"><span class="av sm">ハ</span><span class="hc-name">ハルカ</span></div>
+      <div class="hc-line">来月の京都旅行、準備は進んでる？</div></div>`,
+  b: () => `<div class="hc hc-b"><div class="hc-top"><span class="av sm">ハ</span><span class="hc-line s">来月の京都旅行、準備は進んでる？</span></div>
+      <div class="hc-in" data-open><span>返事を書く…</span>${ic('mic')}</div></div>`,
+  c: () => `<div class="hc-c" data-open><span class="av sm">ハ</span><span class="hc-line s">来月の京都旅行、準備は進んでる？</span><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>`,
+};
+const I = {
+  house: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  news: '<path d="M4 4h13v16H6a2 2 0 0 1-2-2zM17 8h3v10a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h3"/>',
+  book: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+  head: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/>',
+  layers: '<path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>',
+  sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  chev: '<path d="m15 18-6-6 6-6"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  eyeoff: '<path d="M10.7 5.1A10 10 0 0 1 12 5c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7M6.6 6.6C3.9 8.4 2 12 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  pin: '<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  pause: '<path d="M10 15V9M14 15V9"/><circle cx="12" cy="12" r="10"/>',
+  play: '<path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/>',
+  sk: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  card: '<rect x="4" y="3" width="16" height="18" rx="2"/>',
+};
+const ic = (k, extra = '') => `<svg class="i" viewBox="0 0 24 24" ${extra}>${I[k]}</svg>`;
+const nav = (on) => `<div class="nav">${[['house','ホーム','home'],['news','読む','reader'],['head','聞く','pod'],['layers','復習','card']].map(([k,l,s]) => `<div class="${s===on?'on':''}">${ic(k)}<span>${l}</span></div>`).join('')}</div><div class="home-ind"><i></i></div>`;
+
+// ── The app screens under the tutor ──
+const SCREENS = {
+  home: () => `<div class="status"></div><div class="scroll">
+      <div class="ph"><h2>ホーム</h2>${ic('sliders')}</div>
+      ${HC[S.hc]()}
+      <div class="due"><div class="n">12<small>単語</small>3<small>漢字</small></div><div class="go">始める ›</div></div>
+      <div class="blk"><div class="blk-ic">${ic('book')}</div><div class="card"><div class="t">核融合は本当に近いのか — 2026年の現在地</div></div></div>
+      <div class="blk"><div class="blk-ic">${ic('news')}</div>
+        <div class="news"><small>FOOD</small>トルコの「朝ごはん通り」</div>
+        <div class="news"><small>JAPAN</small>日銀の植田総裁、物価について話す</div></div>
+    </div>${nav('home')}`,
+  reader: () => `<div class="status"></div><div class="scroll" style="position:relative">
+      <div class="back">${ic('chev')}</div>
+      <div class="meta"><span class="cat">FOOD</span><span>約4分</span></div>
+      <div class="rtitle">トルコの「朝ごはん通り」</div><div class="rule"></div>
+      <p class="para">トルコの東にあるヴァンという町には、朝ごはんのための特別な通りがあります。ヴァンは、朝ごはんで一番有名な町として知られています。</p>
+      <p class="para">通りにはたくさんの店が<span class="wt">並んで</span>います。道の中にはテーブルや椅子が置いてあって、大勢の客が朝ごはんを楽しんでいます。</p>
+      <p class="para">２０１４年には、ヴァンで５万２千人近くが集まって朝ごはんを食べる世界記録も作られました。</p>
+    </div><div class="home-ind"><i></i></div>
+    <div class="wdim"></div>
+    <div class="wpanel">
+      <div class="wgrab"></div>
+      <div class="whead"><div class="kch"><span class="kana">なら</span><span class="k">並</span></div><div class="kch"><span class="kana"></span><span class="k">ぶ</span></div></div>
+      <div class="mrow"><span class="lv">N4</span><span class="m">to line up; to stand in a row</span></div>
+      <div class="slider"><span>EASY</span><span class="on">MEDIUM</span><span>HARD</span></div>
+      <div class="gbox"><div class="gk">INSIGHT</div><div class="gins">ここでは「並んでいます」で、店が通りに沿って続いている様子。</div></div>
+      <button class="askh"><span class="av sm">ハ</span>ハルカに聞く<svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>`,
+  card: () => `<div class="status"></div><div class="scroll">
+      <div class="prog">${ic('x')}<div class="bar"><i></i></div><small>5 / 14</small></div>
+      <div class="studycard"><div class="w">看板</div><small>REVIEW</small></div>
+    </div><div class="home-ind"><i></i></div>`,
+  pod: () => `<div class="status"></div><div class="scroll">
+      <div class="back">${ic('chev')}</div>
+      <div class="pod-title">納豆は好き？ 食べ物の好き嫌い</div>
+      <div class="pod-meta">ハルカ · ソウタ · 約6分</div>
+      <p class="line"><b>ハルカ</b>ソウタは納豆、食べられる？</p>
+      <p class="line now"><b>ソウタ</b>うーん、嫌いなわけじゃないんだけど、毎日は無理かな。</p>
+      <p class="line"><b>ハルカ</b>あ、それ分かる。においがね。</p>
+    </div>
+    <div class="transport">${ic('sk')}<div class="playc">${ic('play')}</div>${ic('sk','style="transform:scaleX(-1)"')}</div><div class="home-ind"><i></i></div>`,
+};
+
+// ── What the tutor says, per screen (phone 1 + 2) ──
+const HELP = {
+  home: { thread: `
+      <div class="m-t"><span class="w">来月</span>の<span class="w">京都</span><span class="w">旅行</span>、<span class="w">準備</span>は<span class="w">進んで</span>る？</div>`,
+    sugg: ['京都の話をする', '今朝の記事について', '単語クイズ'],
+    note: 'On Home the conversation starts from the pinned card: her line there (from last night\'s brief) is the first message, so tapping the card or swiping in lands in the same place. Talk about it, or change the subject.' },
+  reader: { chip: [ic('pin'), '並んで · 段落2'], thread: `
+      <div class="m-u">「並んでいます」ってどういう意味？</div>
+      <div class="m-a"><em>並ぶ</em> (narabu) is "to line up". With <em>〜ています</em> it describes a state: the shops <i>are</i> lined up along the street, not that they're getting in line right now.</div>
+      <div class="m-t"><span class="w">朝ごはん</span>の<span class="w">店</span>がずらっと<span class="w">並んで</span>いる<span class="w">通り</span>、<span class="w">行って</span>みたい？</div>`,
+    sugg: ['例文をもっと', 'もっと簡単に', '話そう'],
+    note: 'Opened from the word panel (ハルカに聞く) or by swiping in while reading: the chip carries the word and its paragraph. The explanation is an aside, then it goes back to Japanese.' },
+  card: { chip: [ic('eyeoff'), 'カード · 表だけ見えています'], thread: `
+      <div class="m-u">ヒントちょうだい</div>
+      <div class="m-t"><span class="w">お店</span>の<span class="w">前</span>や<span class="w">上</span>に、よくあるよ。<span class="w">店</span>の<span class="w">名前</span>が<span class="w">大きく</span><span class="w">書いて</span>ある<span class="w">板</span>。</div>
+      <div class="m-a">I can only see the front of the card, so hints, not the answer. Flip it when you're ready.</div>`,
+    sugg: ['もう一つヒント', '漢字のヒント'],
+    note: 'On an unrevealed card it only gets the front, so it can hint but not spoil. Grading stays yours.' },
+  pod: { chip: [ic('pause'), '番組 · 4:12 · 一時停止中'], thread: `
+      <div class="m-u">「わけじゃない」がよく分からない</div>
+      <div class="m-a"><em>〜わけじゃない</em> softens a "no": "it's not that…". ソウタ says <em>嫌いなわけじゃない</em>: he doesn't dislike nattō, he just can't eat it every day. It's on your <b>HARD</b> list in grammar, so I'll slip it into our chat a few times.</div>
+      <div class="m-t">じゃあ、<span class="w">練習</span>しよう。<span class="w">納豆</span>、<span class="w">好き</span>？</div>`,
+    sugg: ['もう一回聞く', '例文', '続きを再生'],
+    note: 'Audio pauses while it\'s open and resumes when it closes. It knows the line being spoken, and pairs your grammar ratings with what it hears you use.' },
+};
+
+function tutorHTML(kind) {
+  const h = kind === 'chat' ? null : HELP[S.screen];
+  const thread = kind === 'chat' ? `
+      <div class="m-t"><span class="w">来月</span>、<span class="w">京都</span>に<span class="w">行く</span>って<span class="w">言って</span>たよね。<span class="w">準備</span>はどう？</div>
+      <div class="m-t"><span class="w">来月</span>の<span class="w">京都</span><span class="w">旅行</span>、<span class="w">準備</span>は<span class="w">進んで</span>る？</div>
+      <div class="m-t">いいね、お<span class="w">寺</span><span class="fix">で</span><span class="w">写真</span>を<span class="w">撮りたい</span>んだ。どのお<span class="w">寺</span>に<span class="w">行く</span>の？</div>
+      <div class="m-u">金閣寺に行きます。それから、公園に散歩もしたいです。</div>
+      <div class="m-a">A quick one: <em>で</em> marks where you <i>do</i> something (<em>写真を撮る, 散歩する</em>); <em>に</em> is where you go or where something is. That's twice today, so it's in your recap.</div>
+      <div class="m-t"><span class="w">公園</span><span class="fix">で</span><span class="w">散歩</span>、<span class="w">気持ちいい</span>よね。１１<span class="w">月</span>なら<span class="w">紅葉</span>がきれいだよ。</div>`
+    : h.thread;
+  const sugg = kind === 'chat' ? ['紅葉って？', 'ゆっくり話して', '英語で説明して'] : h.sugg;
+  const chip = kind === 'chat' || !h.chip ? '' : `<div class="chip">${h.chip[0]}<span>${h.chip[1]}</span><button class="x">${ic('x')}</button></div>`;
+  return `<div class="backdrop"></div>
+    <div class="tutor ${S.form} ${S.hand} ${kind === 'chat' && S.form === 'sheet' ? 'full' : ''}">
+      <div class="vgrab"></div><div class="grab"><i></i></div>
+      <div class="t-head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><button class="end">終わる</button></div>
+      ${chip}
+      <div class="thread">${thread}</div>
+      <div class="recap">
+        <h3>今日の会話</h3>
+        <div class="rk">直したところ</div>
+        <div class="fixrow">お寺<s>に</s>で写真を撮りたい<small>で: where you do something. に: where you go or are.</small></div>
+        <div class="fixrow">公園<s>に</s>で散歩したい<small>Same pattern: 散歩 is something you do there.</small></div>
+        <div class="rk">新しい単語</div>
+        <div class="wrow"><span class="jp">紅葉<small>こうよう · autumn leaves</small></span><button>＋ デッキ</button></div>
+        <div class="wrow"><span class="jp">金閣寺<small>きんかくじ · Kinkaku-ji</small></span><button>＋ デッキ</button></div>
+        <div class="rk">使えた単語</div>
+        <div class="used"><span>準備</span><span>写真</span><span>散歩</span></div>
+        <button class="done">完了</button>
+      </div>
+      <div class="sugg">${sugg.map((s) => `<button>${s}</button>`).join('')}</div>
+      <div class="input"><span class="ph">ハルカに話しかける…</span>${ic('mic')}${ic('send')}</div>
+      <div class="t-foot"></div>
+    </div>`;
+}
+
+function build(el, { open, kind, interactive }) {
+  el.className = 'phone' + (open ? ' open' : '');
+  const scr = kind === 'chat' ? 'home' : S.screen;
+  el.innerHTML = `<div class="screen">${SCREENS[scr]()}</div>
+    ${interactive ? `<div class="edge-hint ${S.hand}"></div><div class="edge-zone ${S.hand}"></div>` : ''}
+    ${tutorHTML(kind)}`;
+  wire(el, { interactive, kind });
+}
+
+function wire(el, { interactive }) {
+  const tutor = el.querySelector('.tutor');
+  const backdrop = el.querySelector('.backdrop');
+  el.querySelectorAll('.chip .x').forEach((b) => b.onclick = () => b.parentElement.classList.add('gone'));
+  el.querySelector('.end').onclick = () => el.classList.toggle('show-recap');
+  el.querySelector('.done').onclick = () => { el.classList.remove('show-recap'); if (interactive) el.classList.remove('open'); };
+  el.querySelectorAll('.wrow button').forEach((b) => b.onclick = () => { const r = b.parentElement; r.classList.toggle('added'); b.textContent = r.classList.contains('added') ? '✓ 追加' : '＋ デッキ'; });
+  if (!interactive) return;
+  el.querySelectorAll('[data-open]').forEach((o) => o.onclick = () => el.classList.add('open'));
+  backdrop.onclick = () => el.classList.remove('open');
+
+  // Reader: tap a word → the usual word panel; its last line, ハルカに聞く, opens the tutor on that word.
+  const wt = el.querySelector('.wt');
+  if (wt) {
+    wt.onclick = () => { wt.classList.add('sel'); el.classList.add('wopen'); };
+    el.querySelector('.wdim').onclick = () => { wt.classList.remove('sel'); el.classList.remove('wopen'); };
+    el.querySelector('.askh').onclick = () => { wt.classList.remove('sel'); el.classList.remove('wopen'); el.classList.add('open'); };
+  }
+
+  // Edge swipe: the panel follows the finger; commit past 70px.
+  const zone = el.querySelector('.edge-zone');
+  const hint = el.querySelector('.edge-hint');
+  hint.style.pointerEvents = 'auto'; hint.style.cursor = 'pointer';
+  hint.onclick = () => el.classList.add('open');
+  let x0 = null, w = 0, h = 0;
+  const sign = S.hand === 'r' ? -1 : 1;
+  const move = (e) => {
+    if (x0 === null) return;
+    const d = Math.max(0, (e.clientX - x0) * sign);
+    const p = Math.min(1, d / (S.form === 'drawer' ? w : 260));
+    if (S.form === 'drawer') tutor.style.transform = `translateX(${(1 - p) * 105 * (S.hand === 'r' ? 1 : -1)}%)`;
+    else tutor.style.transform = `translateY(${(1 - p) * 105}%)`;
+    backdrop.style.opacity = p;
+  };
+  const up = (e) => {
+    if (x0 === null) return;
+    const d = (e.clientX - x0) * sign;
+    x0 = null; el.classList.remove('dragging'); tutor.style.transform = ''; backdrop.style.opacity = '';
+    if (d > 70) el.classList.add('open');
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+  };
+  zone.onpointerdown = (e) => {
+    x0 = e.clientX; w = tutor.offsetWidth; h = tutor.offsetHeight; el.classList.add('dragging');
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  // Swipe it away: drag the open panel back toward its edge.
+  let c0 = null;
+  tutor.addEventListener('pointerdown', (e) => { if (e.target.closest('button, .w')) return; c0 = S.form === 'drawer' ? e.clientX : e.clientY; });
+  tutor.addEventListener('pointerup', (e) => {
+    if (c0 === null) return;
+    const d = S.form === 'drawer' ? (e.clientX - c0) * -sign : e.clientY - c0;
+    c0 = null; if (d > 70) el.classList.remove('open', 'show-recap');
+  });
+}
+
+const NOTE1 = { drawer: 'Drag in from the faint mark on the edge. The panel follows your finger and the screen stays visible beside it.', sheet: 'The same edge swipe raises a bottom sheet instead: the screen stays visible above it.' };
+function render() {
+  build(document.getElementById('p1'), { open: false, kind: 'help', interactive: true });
+  build(document.getElementById('p2'), { open: true, kind: 'help' });
+  build(document.getElementById('p3'), { open: true, kind: 'chat' });
+  document.getElementById('n1').textContent = NOTE1[S.form] + (S.screen === 'reader' ? ' Or tap 並んで, then ハルカに聞く at the bottom of the word panel.' : '');
+  document.getElementById('n2').textContent = HELP[S.screen].note;
+}
+document.querySelectorAll('.pill-seg').forEach((seg) => seg.onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  S[seg.dataset.ctl] = b.dataset.v; render();
+});
+render();
+</script>
+</body>
+</html>
