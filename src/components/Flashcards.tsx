@@ -13,6 +13,7 @@ import { GradeSlider } from './GradeSlider';
 import { StudyCard, PILE_SPACE } from './StudyCard';
 import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
 import { useTutorScreen } from './tutor/TutorProvider';
+import { useActivityWhile } from '../services/activity';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -177,6 +178,7 @@ export function Flashcards({
       ? !discoverLoading && discoverIndex < discoverCards.length && discoverCards.length > 0
       : total > 0 && index < total;
   const focusActive = focused && inCardFlow;
+  useActivityWhile('review', inCardFlow);
   useEffect(() => {
     onRemainingChange?.(Math.max(0, total - index));
   }, [total, index, onRemainingChange]);

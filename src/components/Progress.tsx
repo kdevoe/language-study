@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
+import { ActivityStats } from './ActivityStats';
 
 // Mastery palette mirrors the generated vocab-summary report so the in-app
 // dashboard shares the same earthy, muted language as the rest of Yūgen.
@@ -219,6 +220,9 @@ export function Progress({ embedded = false }: { embedded?: boolean } = {}) {
           ? `Tracking ${totalWords} ${totalWords === 1 ? 'word' : 'words'} across your reading.`
           : 'Words you encounter while reading will appear here.'}
       </p>
+
+      {/* Activity: minutes per day/week/month by kind, and counts (database/37). */}
+      <ActivityStats />
 
       {/* Study dashboard (#73): global deck health + review-activity heatmap. Sits
           up top, ahead of the per-JLPT-level breakdown, since it summarizes the

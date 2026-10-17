@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — progress stats</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css; the two chart tones are the mastery
+   colours Progress.tsx already uses (no new accents). */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --green: #5b8c5a;
+  --amber: #c79a3f;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+.serif { font-family: var(--font-serif); }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.data-note { max-width: 760px; margin: 1.2rem auto 0; background: var(--bg-pure); border-radius: 16px; padding: 1rem 1.3rem; font-size: 0.8rem; color: var(--text-muted); text-align: left; }
+.data-note b { color: var(--text-main); }
+.data-note ul { margin: 0.4rem 0 0 1.1rem; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1700px; margin: 2rem auto 0; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 370px; text-align: center; }
+/* 390×844 inside a 10px bezel: the app's real phone size. */
+.phone { width: 410px; height: 864px; max-width: 100%; background: var(--bg-color); border-radius: 48px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 3.4rem 1.25rem 7rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── App chrome (as in 復習) ── */
+.heading { display: flex; align-items: baseline; gap: 0.95rem; margin-bottom: 0.35rem; }
+.heading .on { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.heading .off { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 500; opacity: 0.5; }
+.sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.4rem; }
+.nav { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; background: var(--bg-pure); border-top: 1px solid var(--border-light); display: flex; justify-content: space-around; align-items: flex-start; padding-top: 10px; }
+.nav div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.62rem; font-weight: 600; color: var(--text-muted); width: 70px; }
+.nav div i { width: 52px; height: 30px; border-radius: 100px; display: block; }
+.nav div.on { color: var(--text-main); }
+.nav div.on i { background: var(--accent-primary); }
+
+/* Slider toggle (design-system shared component) */
+.seg { display: flex; background: var(--border-light); border-radius: 100px; padding: 3px; margin-bottom: 1.1rem; }
+.seg button { flex: 1; border: none; background: transparent; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); padding: 0.4rem 0; border-radius: 100px; transition: background 0.25s, color 0.25s; }
+.seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+.card { background: var(--bg-card); border-radius: 16px; padding: 1.2rem 1.3rem; margin-bottom: 1.2rem; }
+.kick { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); }
+.muted { color: var(--text-muted); }
+.since { font-size: 0.66rem; color: var(--text-muted); opacity: 0.8; }
+
+/* ── A: tiles ── */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; margin-bottom: 1.2rem; }
+.tile { background: var(--bg-card); border-radius: 16px; padding: 0.95rem 1rem 0.9rem; min-height: 112px; display: flex; flex-direction: column; }
+.tile .num { font-family: var(--font-serif); font-size: 1.75rem; font-weight: 500; line-height: 1.15; margin-top: 0.35rem; }
+.tile .num small { font-size: 0.9rem; margin-left: 0.1rem; }
+.tile .det { font-size: 0.72rem; color: var(--text-muted); margin-top: auto; padding-top: 0.35rem; line-height: 1.4; }
+.tile .delta { font-size: 0.68rem; font-weight: 600; color: var(--green); }
+.tile.wide { grid-column: span 2; flex-direction: row; align-items: center; gap: 1rem; min-height: 0; }
+.tile.wide .num { margin-top: 0; }
+.spark { display: flex; align-items: flex-end; gap: 5px; height: 40px; flex: 1; justify-content: flex-end; }
+.spark span { width: 9px; border-radius: 3px; background: var(--accent-progress); opacity: 0.85; }
+.spark span.today { background: var(--text-main); opacity: 0.75; }
+
+/* ── B: sentence + stacked bars ── */
+.story { font-family: var(--font-serif); font-size: 1.15rem; line-height: 1.85; margin: 0.2rem 0 1.3rem; }
+.story b { font-weight: 600; background: linear-gradient(transparent 62%, var(--accent-primary) 62%); }
+.bars { display: flex; align-items: flex-end; justify-content: space-between; height: 150px; gap: 8px; margin-top: 0.8rem; }
+.bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.stack { width: 100%; max-width: 30px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; }
+.stack i { display: block; }
+.bar .d { font-size: 0.66rem; color: var(--text-muted); }
+.bar.today .d { color: var(--text-main); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; margin-top: 0.9rem; font-size: 0.7rem; color: var(--text-muted); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; text-align: center; }
+.totals .n { font-family: var(--font-serif); font-size: 1.35rem; line-height: 1.2; }
+.totals .l { font-size: 0.66rem; color: var(--text-muted); line-height: 1.3; }
+
+/* ── C: ledger ── */
+.hero { display: flex; align-items: baseline; justify-content: space-between; margin: 0.2rem 0 0.2rem; }
+.hero .big { font-family: var(--font-serif); font-size: 2.6rem; font-weight: 500; line-height: 1.1; }
+.hero .streak { font-size: 0.78rem; color: var(--text-muted); text-align: right; line-height: 1.4; }
+.hero .streak b { color: var(--text-main); font-size: 1rem; }
+.line { height: 46px; margin: 0.6rem 0 1.4rem; }
+.group { margin-bottom: 1.4rem; }
+.group .kick { margin-bottom: 0.3rem; }
+.lrow { display: flex; align-items: baseline; justify-content: space-between; padding: 0.62rem 0; border-top: 1px solid var(--border-light); gap: 1rem; }
+.lrow .k { font-size: 0.92rem; }
+.lrow .k small { display: block; font-size: 0.7rem; color: var(--text-muted); line-height: 1.3; }
+.lrow .v { font-family: var(--font-serif); font-size: 1.15rem; white-space: nowrap; }
+.lrow .v small { font-family: var(--font-sans); font-size: 0.68rem; color: var(--green); font-weight: 600; margin-left: 0.35rem; }
+
+/* The existing review heatmap card, kept below each variant, dimmed: unchanged. */
+.existing { opacity: 0.45; }
+.heat { display: flex; gap: 3px; margin-top: 0.5rem; }
+.heat div { display: flex; flex-direction: column; gap: 3px; }
+.heat span { width: 11px; height: 11px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · 復習 › 進捗</div>
+  <h1>Progress: time, listening, reading, chat</h1>
+  <p>Three ways to add activity stats above what 進捗 already shows. Each phone switches between this week, this month and all time; the toggle inside any phone moves all three. The dimmed card under each is the existing review heatmap, unchanged, and the JLPT donuts and word list follow it as today.</p>
+  <div class="data-note">
+    <b>What the numbers need.</b> Articles opened, words looked up and reviews go back months already. Some numbers are new:
+    <ul>
+      <li><b>Time in app</b> isn't tracked anywhere yet. It needs a small daily row counting the seconds the app is on screen, and, for B and C's split, the seconds spent in the decks and with ハルカ.</li>
+      <li><b>Listening minutes</b> today are only the length of podcasts you finished. Real minutes need the podcast and song players to count playback into the same row.</li>
+      <li><b>Chat turns</b> can't come from transcripts, which are deleted after 30 days. The daily row keeps a count.</li>
+      <li>Reading minutes, articles finished and song plays started being recorded on 17 Oct. In “All time”, those numbers say “since 17 Oct”.</li>
+    </ul>
+  </div>
+</header>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone-label">A · TILES</div>
+    <div class="phone"><div class="scroll" id="A"></div><div class="nav" data-nav></div></div>
+    <div class="phone-note">A tile per activity: the number big, the detail small, a change vs the previous period in green. Time in app spans the top with a bar for each day.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">B · THE WEEK IN A SENTENCE</div>
+    <div class="phone"><div class="scroll" id="B"></div><div class="nav" data-nav></div></div>
+    <div class="phone-note">The period written out as one sentence, numbers marked. Below, minutes per day split into reading, listening, reviews and chat. Counts sit in a row of totals.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">C · LEDGER</div>
+    <div class="phone"><div class="scroll" id="C"></div><div class="nav" data-nav></div></div>
+    <div class="phone-note">The quietest: one big total and a streak, a thin line of daily minutes, then two hairline lists like Settings, TIME and DONE. Change vs last period is shown only when it went up.</div>
+  </div>
+</div>
+
+<script>
+// Realistic numbers for this reader (the real counts to date, projected over a
+// few weeks of the new tracking). Minutes per day: [read, listen, review, chat].
+const DATA = {
+  week: {
+    label: 'This week', prev: 'last week',
+    app: 252, appDelta: '+38m', read: 112, articles: 9, opened: 14, listen: 58, podcasts: 4, songs: 11,
+    reviews: 214, kanji: 61, chat: 46, chatDays: 4, lookups: 132, streak: 12, readDelta: '+21m', listenDelta: '+12m', reviewDelta: '+40', chatDelta: '+46',
+    days: [['月', [18, 6, 9, 0]], ['火', [22, 12, 11, 4]], ['水', [9, 0, 7, 0]], ['木', [16, 14, 12, 8]], ['金', [24, 9, 8, 10]], ['土', [12, 17, 6, 14]], ['日', [11, 0, 10, 6]]],
+    since: {},
+  },
+  month: {
+    label: 'This month', prev: 'September',
+    app: 1010, appDelta: '+2h 10m', read: 446, articles: 37, opened: 61, listen: 231, podcasts: 15, songs: 44,
+    reviews: 892, kanji: 248, chat: 180, chatDays: 15, lookups: 540, streak: 12, readDelta: '+64m', listenDelta: '+1h 40m', reviewDelta: '+120', chatDelta: '+180',
+    days: [['1週', [80, 30, 60, 0]], ['2週', [96, 52, 58, 10]], ['3週', [112, 58, 63, 42]], ['4週', [104, 61, 64, 38]], ['5週', [54, 30, 31, 20]]],
+    since: {},
+  },
+  all: {
+    label: 'All time', prev: '',
+    app: 1010, appDelta: '', read: 446, articles: 1222, opened: 1222, listen: 301, podcasts: 28, songs: 44,
+    reviews: 2310, kanji: 248, chat: 180, chatDays: 15, lookups: 1690, streak: 12, readDelta: '', listenDelta: '', reviewDelta: '', chatDelta: '',
+    days: [['5月', [0, 0, 0, 0]], ['6月', [0, 0, 0, 0]], ['7月', [0, 0, 0, 0]], ['8月', [0, 0, 0, 0]], ['9月', [0, 0, 0, 0]], ['10月', [446, 231, 300, 180]]],
+    since: { app: 'since 17 Oct', read: 'minutes since 17 Oct', listen: 'since 10 Oct', chat: 'since 17 Oct', articles: 'opened, since April', lookups: 'since May', reviews: 'since July' },
+  },
+};
+const TONES = ['var(--accent-progress)', 'var(--olive)', 'var(--amber)', 'var(--green)'];
+const KINDS = ['Reading', 'Listening', 'Reviews', 'Chat'];
+let period = 'week';
+
+const hm = (m) => (m >= 60 ? `${Math.floor(m / 60)}<small>h</small> ${m % 60}<small>m</small>` : `${m}<small>m</small>`);
+const hmPlain = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
+const seg = () => `<div class="seg">${[['week', '週'], ['month', '月'], ['all', '全部']].map(([k, l]) =>
+  `<button class="${k === period ? 'on' : ''}" onclick="setPeriod('${k}')">${l}</button>`).join('')}</div>`;
+const head = () => `<div class="heading"><span class="on">進捗</span><span class="off">単語</span><span class="off">漢字</span></div>
+  <p class="sub">Tracking 4,812 words across your reading.</p>`;
+const heat = () => {
+  let s = '<div class="heat">';
+  for (let c = 0; c < 14; c++) { s += '<div>'; for (let r = 0; r < 7; r++) { const v = (c * 7 + r) * 37 % 11; const lv = c < 3 ? 0 : v < 3 ? 0 : v < 5 ? 1 : v < 8 ? 2 : v < 10 ? 3 : 4; s += `<span style="background:${['var(--border-light)', 'rgba(91,140,90,.35)', 'rgba(91,140,90,.6)', 'rgba(91,140,90,.82)', 'rgba(91,140,90,1)'][lv]}"></span>`; } s += '</div>'; }
+  return `<div class="card existing"><div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted)"><span>Reviews today <b style="color:var(--text-main)">23</b></span><span>2,310 in 14 weeks</span></div>${s}</div></div>`;
+};
+const total = (d) => d.reduce((a, b) => a + b, 0);
+
+function renderA(D) {
+  const max = Math.max(...D.days.map(([, d]) => total(d)), 1);
+  const spark = D.days.map(([, d], i) => `<span class="${i === D.days.length - 1 ? 'today' : ''}" style="height:${Math.max(3, total(d) / max * 40)}px"></span>`).join('');
+  const t = (label, num, det, delta, since) => `<div class="tile"><span class="kick">${label}</span><span class="num">${num}</span>
+    <span class="det">${det}${since ? `<br><span class="since">${since}</span>` : ''}${delta ? `<br><span class="delta">${delta} vs ${D.prev}</span>` : ''}</span></div>`;
+  return head() + seg() + `
+    <div class="tiles">
+      <div class="tile wide"><div><span class="kick">TIME IN YUGEN</span><div class="num">${hm(D.app)}</div>
+        <span class="det">${D.appDelta ? `<span class="delta">${D.appDelta} vs ${D.prev}</span>` : `<span class="since">${D.since.app}</span>`}</span></div><div class="spark">${spark}</div></div>
+      ${t('READING', hm(D.read), period === 'all' ? `${D.articles.toLocaleString()} articles opened` : `${D.articles} articles finished`, D.readDelta, D.since.read)}
+      ${t('LISTENING', hm(D.listen), `${D.podcasts} podcasts · ${D.songs} songs`, D.listenDelta, D.since.listen)}
+      ${t('REVIEWS', D.reviews.toLocaleString(), `cards · ${D.kanji} kanji`, D.reviewDelta, D.since.reviews)}
+      ${t('ハルカ', D.chat, `turns on ${D.chatDays} days`, D.chatDelta, D.since.chat)}
+      ${t('LOOKUPS', D.lookups.toLocaleString(), 'words tapped while reading', '', D.since.lookups)}
+      ${t('STREAK', `${D.streak}<small>日</small>`, 'days in a row', '', '')}
+    </div>` + heat();
+}
+
+function renderB(D) {
+  const max = Math.max(...D.days.map(([, d]) => total(d)), 1);
+  const bars = D.days.map(([lbl, d], i) => `<div class="bar ${i === D.days.length - 1 ? 'today' : ''}">
+      <div class="stack" style="height:${total(d) / max * 118}px">${d.map((m, k) => `<i style="height:${total(d) ? m / total(d) * 100 : 0}%;background:${TONES[k]}"></i>`).join('')}</div>
+      <span class="d">${lbl}</span></div>`).join('');
+  const when = period === 'week' ? 'This week' : period === 'month' ? 'This month' : 'Since you started';
+  const story = period === 'all'
+    ? `${when} you’ve opened <b>${D.articles.toLocaleString()} articles</b>, looked up <b>${D.lookups.toLocaleString()} words</b> and reviewed <b>${D.reviews.toLocaleString()} cards</b>. Since 17 Oct: <b>${hmPlain(D.app)}</b> in Yugen and <b>${D.chat} turns</b> with ハルカ.`
+    : `${when} you spent <b>${hmPlain(D.app)}</b> in Yugen. You read <b>${D.articles} articles</b>, listened for <b>${hmPlain(D.listen)}</b>, reviewed <b>${D.reviews} cards</b> and talked with ハルカ for <b>${D.chat} turns</b>.`;
+  return head() + seg() + `<p class="story">${story}</p>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="kick">MINUTES ${period === 'week' ? 'PER DAY' : period === 'month' ? 'PER WEEK' : 'PER MONTH'}</span>
+      <span class="muted" style="font-size:.72rem">${D.appDelta ? `${D.appDelta} vs ${D.prev}` : 'tracked since 17 Oct'}</span></div>
+      <div class="bars">${bars}</div>
+      <div class="legend">${KINDS.map((k, i) => `<span><i style="background:${TONES[i]}"></i>${k}</span>`).join('')}</div></div>
+    <div class="card"><div class="totals">
+      <div><div class="n">${D.podcasts}</div><div class="l">podcasts</div></div>
+      <div><div class="n">${D.songs}</div><div class="l">songs</div></div>
+      <div><div class="n">${D.kanji}</div><div class="l">kanji reviewed</div></div>
+      <div style="margin-top:.6rem"><div class="n">${D.lookups.toLocaleString()}</div><div class="l">lookups</div></div>
+      <div style="margin-top:.6rem"><div class="n">${hmPlain(D.read)}</div><div class="l">reading</div></div>
+      <div style="margin-top:.6rem"><div class="n">${D.streak}日</div><div class="l">streak</div></div>
+    </div></div>` + heat();
+}
+
+function renderC(D) {
+  const pts = D.days.map(([, d]) => total(d));
+  const max = Math.max(...pts, 1);
+  const w = 350, h = 46;
+  const path = pts.map((v, i) => `${i ? 'L' : 'M'}${(i / Math.max(pts.length - 1, 1) * w).toFixed(1)},${(h - 4 - v / max * (h - 10)).toFixed(1)}`).join(' ');
+  const r = (k, sub, v, delta) => `<div class="lrow"><span class="k">${k}${sub ? `<small>${sub}</small>` : ''}</span><span class="v">${v}${delta ? `<small>${delta}</small>` : ''}</span></div>`;
+  return head() + seg() + `
+    <div class="hero"><span class="big">${hm(D.app)}</span><span class="streak"><b>${D.streak}日</b><br>in a row</span></div>
+    <div class="muted" style="font-size:.78rem">in Yugen ${period === 'all' ? '<span class="since">· since 17 Oct</span>' : `· ${D.label.toLowerCase()}`}</div>
+    <svg class="line" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" width="100%"><path d="${path}" fill="none" stroke="var(--accent-progress)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="group"><div class="kick">TIME</div>
+      ${r('Reading', D.since.read || '', hmPlain(D.read), D.readDelta)}
+      ${r('Listening', `${D.podcasts} podcasts · ${D.songs} songs`, hmPlain(D.listen), D.listenDelta)}
+      ${r('Reviews', '', hmPlain(Math.round(D.reviews * 0.12)), '')}
+      ${r('Talking with ハルカ', '', hmPlain(Math.round(D.chat * 0.6)), '')}
+    </div>
+    <div class="group"><div class="kick">DONE</div>
+      ${r('Articles', period === 'all' ? D.since.articles : `${D.opened} opened`, `${D.articles.toLocaleString()}`, '')}
+      ${r('Cards reviewed', `${D.kanji} kanji`, D.reviews.toLocaleString(), D.reviewDelta)}
+      ${r('Words looked up', D.since.lookups || '', D.lookups.toLocaleString(), '')}
+      ${r('Turns with ハルカ', `on ${D.chatDays} days`, D.chat, D.chatDelta)}
+      ${r('Songs played', '', D.songs, '')}
+    </div>` + heat();
+}
+
+const NAV = '<div><i></i>ホーム</div><div><i></i>読む</div><div><i></i>聞く</div><div class="on"><i></i>復習</div>';
+function render() {
+  const D = DATA[period];
+  document.getElementById('A').innerHTML = renderA(D);
+  document.getElementById('B').innerHTML = renderB(D);
+  document.getElementById('C').innerHTML = renderC(D);
+}
+function setPeriod(p) { period = p; render(); }
+document.querySelectorAll('[data-nav]').forEach((n) => { n.innerHTML = NAV; });
+render();
+</script>
+</body>
+</html>
