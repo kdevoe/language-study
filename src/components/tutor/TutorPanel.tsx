@@ -83,11 +83,13 @@ export function TutorPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, openSeq]);
 
-  // Keep the newest line in view.
+  // Keep the newest line in view, including when the keyboard shrinks the panel.
+  const keyboard = useKeyboardViewport();
+  const keyboardHeight = keyboard?.height;
   useEffect(() => {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [lines, busy, actions, open]);
+  }, [lines, busy, actions, open, keyboardHeight]);
 
   const sendText = useCallback(async (raw: string) => {
     const message = raw.trim();
@@ -192,7 +194,6 @@ export function TutorPanel() {
 
   const side = hand === 'left' ? 'l' : 'r';
   const sign = side === 'r' ? 1 : -1;
-  const keyboard = useKeyboardOpen();
   const width = Math.min(window.innerWidth * 0.88, 420);
   const offset = open ? closeDrag : drag !== null ? Math.max(0, width - drag) : width * 1.05;
   const dragging = drag !== null || closeDrag > 0;
@@ -207,7 +208,11 @@ export function TutorPanel() {
       <div className={`tutor-backdrop${backdropOn ? ' on' : ''}`} onClick={closeTutor} />
       <aside
         className={`tutor-panel ${side}${dragging ? ' dragging' : ''}${keyboard ? ' kb' : ''}`}
-        style={{ transform: `translateX(${sign * offset}px)`, visibility: open || drag !== null ? 'visible' : 'hidden' }}
+        style={{
+          transform: `translateX(${sign * offset}px)`,
+          visibility: open || drag !== null ? 'visible' : 'hidden',
+          ...(keyboard && { top: keyboard.top, height: keyboard.height, bottom: 'auto' }),
+        }}
         aria-hidden={!open}
         aria-label="ハルカ"
         onTouchStart={onTouchStart}
@@ -371,15 +376,18 @@ function Recap({ recap, added, onAdd, onDone }: {
   );
 }
 
-/** True while the on-screen keyboard is up (the visual viewport is well short of the layout one). */
-function useKeyboardOpen() {
-  const [open, setOpen] = useState(false);
+/** The visible area while the on-screen keyboard is up, else null. iOS pans the
+ *  page to keep a focused input above the keys; pinning the panel to the visual
+ *  viewport keeps its header and the latest reply on screen instead. */
+function useKeyboardViewport() {
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const check = () => setOpen(window.innerHeight - vv.height > 120);
+    const check = () => setBox(window.innerHeight - vv.height > 120 ? { top: vv.offsetTop, height: vv.height } : null);
     vv.addEventListener('resize', check);
-    return () => vv.removeEventListener('resize', check);
+    vv.addEventListener('scroll', check);
+    return () => { vv.removeEventListener('resize', check); vv.removeEventListener('scroll', check); };
   }, []);
-  return open;
+  return box;
 }
