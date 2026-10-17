@@ -629,9 +629,10 @@
       process-article writing as any body userId); ensure-buffer / learner-dream trusting body.userId with the
       anon key; audio-cleanup and retired daily-feed callable by anyone. Groq disambiguation moved server-side
       (VITE_GROQ_API_KEY no longer used by the client)
-  - [ ] Rollout: `supabase secrets set CRON_SECRET=<random>`; Vault `cron_secret` (same value); apply
-        database/38_cron_secret.sql; deploy ensure-buffer, learner-dream, audio-cleanup, process-article,
-        dictionary-lookup, fetch-raw-news, daily-feed; remove VITE_GROQ_API_KEY from Vercel and rotate the Groq key
+  - [x] Rollout (Oct 17): CRON_SECRET + Vault `cron_secret` set; database/38_cron_secret.sql applied; the 7
+        functions deployed; anon-key-only and no-token calls get 401 on all 7, service role passes
+  - [ ] Remove VITE_GROQ_API_KEY from Vercel (and local .env) and rotate the Groq key
+  - [ ] Check Oct 18 cron logs: 09:00 ensure-buffer refill and 10:00 audio-cleanup return 2xx
   - [x] Security posture written into CLAUDE.md › Security (secrets, caller auth, RLS, cost caps, prompt injection)
   - [ ] Prompt injection: fence untrusted text (rewrite, editor, podcast, song, tutor prompts); tutor side-effect tools only
         from the learner's own words; request_content as a tap-to-confirm offer; daily podcast cap; learner notes
