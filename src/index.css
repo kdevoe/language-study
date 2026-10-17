@@ -486,7 +486,7 @@ body.song-mode {
 .tutor-card { background: var(--bg-card); border-radius: 24px; padding: 0.95rem 1.3rem 1rem; border: 1px solid var(--border-light); box-shadow: 0 4px 25px rgba(0, 0, 0, 0.03); cursor: pointer; margin-bottom: 1.4rem; }
 .tutor-card-top { display: flex; align-items: center; gap: 0.55rem; }
 .tutor-card-name { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); }
-.tutor-card-line { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.55; margin-top: 0.4rem; color: var(--text-main); }
+.tutor-card-line { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.55; margin-top: 0.4rem; color: var(--text-main); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 /* ハルカに聞く in the lookup panels. */
 .tutor-ask { display: flex; align-items: center; gap: 0.55rem; background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 1rem; color: var(--text-main); padding: 0.3rem 0; margin: 0 0 1.2rem; }
 .tutor-ask svg { color: var(--text-muted); }
