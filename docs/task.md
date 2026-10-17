@@ -632,5 +632,9 @@
   - [ ] Rollout: `supabase secrets set CRON_SECRET=<random>`; Vault `cron_secret` (same value); apply
         database/38_cron_secret.sql; deploy ensure-buffer, learner-dream, audio-cleanup, process-article,
         dictionary-lookup, fetch-raw-news, daily-feed; remove VITE_GROQ_API_KEY from Vercel and rotate the Groq key
+  - [x] Security posture written into CLAUDE.md › Security (secrets, caller auth, RLS, cost caps, prompt injection)
+  - [ ] Prompt injection: fence untrusted text (rewrite, editor, podcast, song, tutor prompts); tutor side-effect tools only
+        from the learner's own words; request_content as a tap-to-confirm offer; daily podcast cap; learner notes
+        treated as data; rewrite output check (no URLs / contact details); a small injection eval set
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
         local dev against functions needs DEV_ALLOW_ANON=true in the functions env file

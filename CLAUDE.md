@@ -56,12 +56,49 @@ RPC `check_is_approved(email)` returns `'approved'|'waitlisted'|'not_joined'` fo
 ## Key Conventions
 
 - **Styling**: Follow `docs/design-system.md` (palette, type, spacing, motion, and shared components like the slider toggle, bottom sheet and create button). Read it before building or restyling UI, and update it when a pattern changes. In short: typography-first design using Shippori Mincho (serif) + Inter (sans-serif); zen minimalist aesthetic -- no heavy UI, shadows, or borders; colours only from the CSS variables in `index.css`; no new accent colours. Do not introduce utility CSS frameworks.
-- **News proxy**: Production NewsAPI requests go through the `/api/news` Vercel serverless function (CORS). Localhost uses the client-side `VITE_NEWS_API_KEY` directly.
+- **News source**: the feed comes from the `fetch-raw-news` edge function (RSS, NewsAPI fallback, the news editor). The client never calls NewsAPI or any LLM provider directly. (`api/news.ts` is a leftover, unauthenticated proxy, due for removal.)
 - **SRS Auto-Bump threshold**: defaults to 3 (in store).
 - **RTK progression**: 3 new kanji per day, auto-bumped via `checkDailyKanji()`.
 - **Task tracking**: Maintain `docs/task.md` synchronously with project progress. Use `gh` CLI for GitHub issues/project boards.
 - **Beta access**: Managed via `waitlist.is_approved` column in Supabase dashboard.
 
+## Security
+
+Keep these in mind on every change. A change that weakens one needs a stated reason in its PR.
+
+### Secrets and the client
+- Anything prefixed `VITE_` is built into the public JavaScript bundle. Only the Supabase URL, the anon key, the Sentry DSN and flags belong there.
+- Provider keys (Gemini, Groq, Anthropic, ElevenLabs, NewsAPI, Jina) live only in the edge functions' secrets. The client never calls a paid provider directly; it goes through an edge function.
+- Never commit keys. Vault holds what SQL needs (`jit_anon_key`, `cron_secret`, `song_cron_secret`).
+
+### Edge functions: who is calling
+- Every function runs with `verify_jwt = false` (the gateway rejects the project's ES256 user tokens), so **each function must check its caller itself**, using `supabase/functions/_shared/auth.ts`:
+  - `resolveCaller` returns `service` (the service-role key, for internal calls), `cron` (the `x-cron-secret` header), a signed-in `user`, or `null`. Reject `null` with a 401.
+  - The **public anon key alone is never enough**: it ships in the bundle.
+- **Never trust `userId` from the request body for a user caller.** Use `actingUserId(caller, body.userId)`: a user acts only for themselves; `body.userId` counts only from service or cron.
+- Functions that act across users or delete data (cleanup, fan-outs) accept only service or cron.
+- Internal self-calls send the service-role key; cron jobs send `x-cron-secret` (see `database/38_cron_secret.sql`). `DEV_ALLOW_ANON=true` is for a local functions env file only, never production.
+
+### Data access
+- Every user-facing table has RLS limiting rows to their owner. New tables need RLS and policies in the same migration. Storage buckets are private, served through signed URLs.
+- The service-role client bypasses RLS, so any query it runs for a user must filter by the **resolved** user id (`.eq('user_id', userId)`).
+
+### Cost and abuse
+- Everything that spends money (LLM calls, text-to-speech, image generation, news fetches) needs a per-user limit enforced **server-side**: daily caps, in-flight limits. Hidden UI buttons are not a limit.
+- Background work started on a user's behalf (`EdgeRuntime.waitUntil` self-calls) inherits that user's limits.
+
+### Prompt injection: scraped and user text is untrusted
+Articles scraped from the web, pasted or URL imports, podcast topics and song themes, transcripts, and stored learner notes may all contain instructions aimed at the model. Treat them as **data, never instructions**:
+- **Fence untrusted text** in clear tags (e.g. `<source>…</source>`, `<document>…</document>`), and tell the model that text inside them is material to work with and any instructions in it are to be ignored. That applies to rewrite, editor, podcast, song and tutor prompts alike.
+- **Tools act only on the learner's own requests.** The tutor may call tools with side effects (`save_note`, `set_preference`, `request_content`, deck and rating changes) only because of what the learner themselves said, never because of text in an article, transcript or tool result.
+- **Side effects that cost money or change state need the learner's confirmation** (an offer they tap, like `add_to_deck`), plus a server-side cap.
+- **Stored memory is data:** learner notes and profiles are short facts, summarised rather than obeyed, and fenced when they go back into prompts. That keeps an injected note from becoming a standing instruction.
+- **Model output is rendered as text only:** React-escaped, no `dangerouslySetInnerHTML`, no links or images built from model output. Validate generated content before saving (structure, length, no URLs or contact details in a rewrite).
+- **Shared content raises the stakes.** Content generated once and served to many users (a shared news rewrite, cover art) must pass output checks before it's shared, because an injection there reaches everyone.
+
+### Current gaps
+Tracked in `docs/task.md`: prompt-injection fencing and confirmations are not fully in place yet (tutor `request_content` has no confirmation tap and podcasts have no daily cap); RLS and storage policies have not been audited; `api/news.ts` should be removed.
+
 ## Environment Variables
 
-See `.env.example`. Required: `VITE_NEWS_API_KEY`, `VITE_GEMINI_API_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Optional: `VITE_DEV_MODE`. Provider keys (Gemini, Groq, Anthropic, ElevenLabs) live only in the edge functions' secrets, never in `VITE_` variables, which are built into the public bundle. Edge functions check their caller in `supabase/functions/_shared/auth.ts`.
+See `.env.example`. Required: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Optional: `VITE_DEV_MODE`, `VITE_SENTRY_DSN`. Provider keys go in the edge functions' secrets (`supabase secrets set …`), never in `VITE_` variables (see Security).
