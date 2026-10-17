@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — flashcard feel 2</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --soft-spring: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --slow: 1;            /* the slow-motion switch multiplies every duration */
+  --shadow-ink: 40, 40, 30;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+
+.mock-header { max-width: 760px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; }
+
+.controls { display: flex; justify-content: center; gap: 0.6rem; margin-bottom: 2rem; font-size: 0.75rem; color: var(--text-muted); align-items: center; }
+.controls .seg { display: inline-flex; padding: 3px; border-radius: 100px; background: var(--border-light); }
+.controls .seg button { border: none; background: none; padding: 0.3rem 0.9rem; border-radius: 100px; font-size: 0.75rem; cursor: pointer; color: var(--text-muted); }
+.controls .seg button.on { background: var(--bg-pure); color: var(--text-main); font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+
+/* Tuning section: the C card on the left, controls on the right */
+.tune { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: center; align-items: flex-start; max-width: 1000px; margin: 0 auto 3.5rem; }
+.pager { display: inline-flex; padding: 3px; border-radius: 100px; background: var(--border-light); }
+.pager button { border: none; background: none; padding: 0.3rem 1rem; border-radius: 100px; font-family: var(--font-serif); font-size: 0.8rem; cursor: pointer; }
+.pager button:hover { background: var(--bg-pure); }
+.panel { width: 340px; background: var(--bg-color); border-radius: 24px; padding: 1.2rem 1.3rem 1.3rem; box-shadow: 0 10px 40px rgba(0,0,0,0.06); font-size: 0.75rem; }
+.panel h3 { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.18em; color: var(--olive); margin: 1rem 0 0.4rem; }
+.panel h3:first-child { margin-top: 0; }
+.panel .row { display: grid; grid-template-columns: 1fr 120px 52px; gap: 0.6rem; align-items: center; padding: 0.2rem 0; }
+.panel .row span { color: var(--text-muted); }
+.panel .row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main); }
+.panel input[type=range] { width: 100%; accent-color: var(--accent-progress); }
+.panel select { font: inherit; padding: 0.15rem 0.3rem; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-pure); }
+.panel .acts { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.panel .acts button { flex: 1; border: none; border-radius: 100px; padding: 0.45rem; background: var(--border-light); font-size: 0.75rem; cursor: pointer; }
+.panel textarea { width: 100%; height: 7.5rem; margin-top: 0.7rem; font: 0.68rem/1.45 ui-monospace, Menlo, monospace; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.5rem; background: var(--bg-pure); color: var(--text-main); resize: vertical; }
+
+.grid { display: flex; flex-wrap: wrap; gap: 2.4rem 2rem; justify-content: center; max-width: 1200px; margin: 0 auto; }
+.wrap { width: 360px; display: flex; flex-direction: column; align-items: center; gap: 0.7rem; }
+.label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.note { font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 340px; }
+.note b { color: var(--text-main); font-weight: 600; }
+
+.stage { width: 360px; height: 680px; background: var(--bg-color); border-radius: 36px; position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 1.4rem 1.3rem 1.6rem; box-shadow: 0 10px 40px rgba(0,0,0,0.08); }
+.prog { flex: none; margin-bottom: 0.6rem; }
+.prog .top { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.08em; margin-bottom: 0.4rem; }
+.track { height: 3px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent-progress); transition: width calc(0.35s * var(--slow)) var(--ease); }
+.area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; perspective: 1400px; }
+/* Leave room under the card for the pile */
+.combo .area { padding-bottom: 40px; }
+
+/* ── Card anatomy ──
+   .slot   positions the card; enter / leave
+   .lift   rises off the table during the flip
+   .press  sinks under the thumb
+   .card   rotates for the flip; two faces inside
+   .ground the shadow on the table — it stays put while the card rises. It comes
+           first in the slot so it paints behind the card and only shows below it */
+.slot { position: absolute; width: 296px; height: var(--card-h); }
+.lift, .press { position: absolute; inset: 0; transform-style: preserve-3d; }
+.card { position: absolute; inset: 0; transform-style: preserve-3d; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.card.flipped { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--bg-pure); border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.6rem 1.2rem 5.6rem; overflow: hidden; }
+.face.front { padding-bottom: 1.6rem; }
+/* The back's layout is driven by the tuning panel's variables (defaults set in JS) */
+.face.back { transform: rotateY(180deg); justify-content: flex-start; padding: var(--pad-top) 1.2rem 0; }
+.body { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: var(--align); padding-bottom: calc(var(--gs-bottom) + var(--gs-h) + var(--gs-clear)); }
+.body > * { transform: translateY(var(--shift)); }
+.ground { position: absolute; left: 8%; right: 8%; bottom: -14px; height: 40px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(var(--shadow-ink),0.22), rgba(var(--shadow-ink),0) 70%); filter: blur(6px); pointer-events: none; }
+
+.keyword { font-family: var(--font-serif); font-size: 2.1rem; line-height: 1.25; max-width: 11ch; }
+.chev { position: absolute; bottom: 1.3rem; left: 0; right: 0; color: var(--text-muted); opacity: 0.35; font-size: 1rem; }
+.kanji { font-family: var(--font-serif); font-size: var(--kanji-size); line-height: 1; }
+.kw { font-family: var(--font-serif); font-size: var(--kw-size); margin-top: var(--g-kanji); }
+.facts { display: flex; gap: 0.8rem; justify-content: center; margin-top: var(--g-kw); font-size: calc(var(--facts-size) * 0.85); color: var(--text-muted); }
+.facts b { font-family: var(--font-serif); font-size: var(--facts-size); font-weight: 600; color: var(--text-main); }
+.parts { font-size: var(--parts-size); color: var(--text-muted); margin-top: var(--g-facts); }
+.known { display: flex; gap: var(--known-gap); justify-content: center; margin-top: var(--g-known); flex-wrap: wrap; }
+.known .w { font-family: var(--font-serif); font-size: var(--known-size); line-height: 1.2; display: flex; flex-direction: column; align-items: center; }
+.known rt { font-family: var(--font-sans); font-size: 0.48em; font-weight: 600; color: var(--text-muted); }
+.known small { font-family: var(--font-sans); font-size: 0.55em; color: var(--text-muted); }
+
+/* Grade slider (GradeSlider.tsx) */
+.gs { position: absolute; left: 0; right: 0; bottom: var(--gs-bottom); padding: 0 var(--gs-side); cursor: default; }
+.gs .tr { position: relative; display: flex; height: var(--gs-h); padding: 4px; border-radius: 100px; background: var(--border-light); }
+.gs .th { position: absolute; top: 4px; bottom: 4px; width: calc((100% - 8px) / 4); left: calc(4px + var(--i, 2) * (100% - 8px) / 4); background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.gs button { position: relative; z-index: 1; flex: 1; border: none; background: none; font-family: var(--font-serif); font-size: var(--gs-text); color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: color 0.4s; }
+.gs button.on { color: var(--text-main); font-weight: 700; }
+
+.done { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; animation: fade calc(0.5s * var(--slow)) var(--ease) both; }
+.done .t { font-family: var(--font-serif); font-size: 2rem; }
+.done .s { font-size: 0.8rem; color: var(--text-muted); }
+.done button { margin-top: 1rem; border: none; background: var(--border-light); padding: 0.5rem 1.4rem; border-radius: 100px; font-family: var(--font-serif); cursor: pointer; }
+@keyframes fade { from { opacity: 0; } }
+
+/* ── Today (reference) ── */
+.today .face { border: 1px solid var(--border-light); box-shadow: 0 6px 24px rgba(0,0,0,0.05); }
+.today .ground { display: none; }
+.today .card { transition: transform calc(0.55s * var(--slow)) var(--ease); }
+.today .slot.enter { animation: enter calc(0.24s * var(--slow)) var(--ease) both; }
+.today .slot.leave { animation: leave calc(0.14s * var(--slow)) ease-in both; }
+@keyframes enter { from { opacity: 0; transform: translateY(12px); } }
+@keyframes leave { to { opacity: 0; transform: translateY(-10px); } }
+
+/* ── Combined: lifted paper (V1) + the deck (V4) + press and release (V6) ── */
+
+/* V1 · three stacked soft shadows instead of a border */
+.combo .face { box-shadow: 0 1px 2px rgba(var(--shadow-ink),0.06), 0 8px 18px rgba(var(--shadow-ink),0.07), 0 24px 48px rgba(var(--shadow-ink),0.08); transition: box-shadow calc(0.2s * var(--slow)) ease-out; }
+
+/* V6 · the card gives under the thumb; its shadow tightens */
+.combo .press { transition: transform calc(0.18s * var(--slow)) ease-out; }
+.combo .press.down { transform: scale(0.97) translateY(2px); }
+.combo .press.down .face { box-shadow: 0 1px 2px rgba(var(--shadow-ink),0.08), 0 4px 10px rgba(var(--shadow-ink),0.08), 0 10px 20px rgba(var(--shadow-ink),0.05); }
+.combo .ground { transition: transform calc(0.18s * var(--slow)) ease-out, opacity calc(0.18s * var(--slow)) ease-out; }
+.combo .ground.down { transform: scale(0.9); }
+
+/* V1 · on release it springs over, rising off the table while it turns */
+.combo .card { transition: transform calc(0.68s * var(--slow)) var(--soft-spring); }
+.combo .lift.flipping { animation: rise calc(0.68s * var(--slow)) var(--ease); }
+@keyframes rise { 0% { transform: translateY(0) scale(1); } 42% { transform: translateY(-18px) scale(1.04); } 100% { transform: translateY(0) scale(1); } }
+.combo .ground.flipping { animation: groundRise calc(0.68s * var(--slow)) var(--ease); }
+@keyframes groundRise { 42% { transform: scale(0.8); opacity: 0.5; filter: blur(11px); } }
+
+/* V4 · the cards still to come wait underneath; the pile thins as you go */
+.under { position: absolute; width: 296px; height: var(--card-h); border-radius: 22px; background: var(--bg-pure); box-shadow: 0 1px 2px rgba(var(--shadow-ink),0.05), 0 6px 14px rgba(var(--shadow-ink),0.05); transition: transform calc(0.45s * var(--slow)) var(--ease), opacity calc(0.45s * var(--slow)) var(--ease); }
+.under.u1 { transform: translateY(24px) scale(0.95); }
+.under.u2 { transform: translateY(46px) scale(0.9); opacity: 0.75; }
+.under.gone { opacity: 0; transform: translateY(60px) scale(0.86); }
+/* When the top card leaves, the pile moves up one place */
+.under.u1.up { transform: translateY(0) scale(1); }
+.under.u2.up { transform: translateY(24px) scale(0.95); opacity: 1; }
+
+/* A graded card lifts away up and to the side… */
+.combo .slot.leave { animation: lift-away calc(0.42s * var(--slow)) var(--ease) both; }
+@keyframes lift-away { 0% { transform: scale(0.97) translateY(2px); } 100% { transform: translate(22px, -80px) rotate(4deg) scale(1.02); opacity: 0; } }
+/* Variant B: it rises straight up and fades, no sideways drift or turn */
+.combo.straight .slot.leave { animation: lift-up calc(0.4s * var(--slow)) var(--ease) both; }
+@keyframes lift-up { 0% { transform: scale(0.97) translateY(2px); } 100% { transform: translateY(-56px) scale(1.01); opacity: 0; } }
+/* Variant C: B, toned down. No spring on the flip; a small lift; a lighter press; a shorter exit */
+.combo.subtle .press.down { transform: scale(0.985) translateY(1px); }
+.combo.subtle .ground.down { transform: scale(0.95); }
+.combo.subtle .card { transition: transform calc(0.6s * var(--slow)) cubic-bezier(0.45, 0, 0.2, 1); }
+.combo.subtle .lift.flipping { animation: rise-soft calc(0.6s * var(--slow)) cubic-bezier(0.45, 0, 0.2, 1); }
+@keyframes rise-soft { 50% { transform: translateY(-6px) scale(1.012); } }
+.combo.subtle .ground.flipping { animation: groundRise-soft calc(0.6s * var(--slow)) cubic-bezier(0.45, 0, 0.2, 1); }
+@keyframes groundRise-soft { 50% { transform: scale(0.92); opacity: 0.8; filter: blur(8px); } }
+.combo.subtle .slot.leave { animation: lift-up-soft calc(0.34s * var(--slow)) var(--ease) both; }
+@keyframes lift-up-soft { 0% { transform: scale(0.985) translateY(1px); } 100% { transform: translateY(-24px); opacity: 0; } }
+.combo.subtle .under { transition-duration: calc(0.38s * var(--slow)); }
+/* …and the next is already in place: it was the top of the pile */
+.combo .slot.enter .ground { animation: fade calc(0.3s * var(--slow)) var(--ease) both; }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · FLASHCARD FEEL · ROUND 2</div>
+  <h1>持ち上がる山札</h1>
+  <p>The combination: lifted paper (V1), the deck (V4), and press and release (V6). Tap to flip, set the slider, tap the card to move on. A six-card session, so you can watch the pile thin out and reach the end. B is the same card, leaving straight up instead of up and to the side. Today's card sits alongside for comparison. Use slow motion to see each move.</p>
+</header>
+
+<div class="controls">
+  <span>Speed</span>
+  <div class="seg" id="speed"><button data-s="1" class="on">Normal</button><button data-s="4">Slow ×4</button></div>
+</div>
+
+<section class="tune">
+  <div class="wrap">
+    <div class="label">C · TUNE THE BACK</div>
+    <div class="stage combo straight subtle" id="tune-stage"></div>
+    <div class="note">Tap the card to turn it over and back. The arrows under it change the kanji. Every change here applies to all the cards on the page.</div>
+    <div class="seg pager"><button data-step="-1">‹ 前</button><button data-step="1">次 ›</button></div>
+  </div>
+  <aside class="panel" id="panel"></aside>
+</section>
+
+<div class="grid">
+  <div class="wrap">
+    <div class="label">TODAY</div>
+    <div class="stage today" id="today"></div>
+    <div class="note"><b>今のカード.</b> Hairline border, one faint shadow, a plain flip, a quick fade between cards.</div>
+  </div>
+  <div class="wrap">
+    <div class="label">A · V1 + V4 + V6</div>
+    <div class="stage combo" id="combo"></div>
+    <div class="note"><b>持ち上がる山札.</b> <b>Press:</b> the card sinks a little and its shadow tightens. <b>Release:</b> it springs over, rising off the table mid-turn while its shadow softens below. <b>Move on:</b> it lifts away up and to the side, and the pile moves up one place. Nothing moves at rest.</div>
+  </div>
+  <div class="wrap">
+    <div class="label">B · SAME, LEAVES STRAIGHT UP</div>
+    <div class="stage combo straight" id="combo-straight"></div>
+    <div class="note"><b>真上へ.</b> Identical press, flip and pile, but a graded card simply rises and fades: straight up, a shorter distance, no turn. Quieter exit.</div>
+  </div>
+  <div class="wrap">
+    <div class="label">C · B, MORE SUBTLE</div>
+    <div class="stage combo straight subtle" id="combo-subtle"></div>
+    <div class="note"><b>静か.</b> Same ideas at a third of the strength. The flip turns evenly with no spring, lifting only 6px. The press barely gives. A graded card drifts up 24px as it fades, and the pile moves up a little faster.</div>
+  </div>
+</div>
+
+<script>
+const CARDS = [
+  { k: '海', kw: 'sea', on: 'カイ', kun: 'うみ', parts: 'water · every', known: [['海', 'うみ', 'sea'], ['海外', 'かいがい', 'overseas'], ['日本海', 'にほんかい', 'Sea of Japan']] },
+  { k: '宣', kw: 'proclaim', on: 'セン', kun: 'のたまう', parts: 'house · span', known: [['宣伝', 'せんでん', 'advertising']] },
+  { k: '掛', kw: 'hang', on: 'カイ・ケイ', kun: 'かける', parts: 'finger · ivy', known: [['掛ける', 'かける', 'to hang']] },
+  { k: '研', kw: 'polish', on: 'ケン', kun: 'とぐ', parts: 'stone · two hands', known: [['研究', 'けんきゅう', 'research']] },
+  { k: '抗', kw: 'confront', on: 'コウ', kun: '—', parts: 'finger · whirlwind', known: [['抵抗', 'ていこう', 'resistance']] },
+  { k: '朝', kw: 'morning', on: 'チョウ', kun: 'あさ', parts: 'mist · month', known: [['朝', 'あさ', 'morning'], ['毎朝', 'まいあさ', 'every morning']] },
+];
+const GRADES = [['もう一度', '10分'], ['難しい', '12日'], ['正解', '3ヶ月'], ['簡単', '7ヶ月']];
+let slow = 1;
+const ms = (t) => t * slow;
+
+document.getElementById('speed').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  slow = +b.dataset.s;
+  document.documentElement.style.setProperty('--slow', slow);
+  document.querySelectorAll('#speed button').forEach((x) => x.classList.toggle('on', x === b));
+});
+
+const faces = (c) => `
+  <div class="face front"><div class="keyword">${c.kw}</div><div class="chev">⌄</div></div>
+  <div class="face back">
+    <div class="body">
+      <div class="kanji">${c.k}</div><div class="kw">${c.kw}</div>
+      <div class="facts"><span>音 <b>${c.on}</b></span><span>訓 <b>${c.kun}</b></span></div>
+      <div class="parts">${c.parts}</div>
+      <div class="known">${c.known.map(([w, r, m]) => `<span class="w"><ruby>${w}<rt>${r}</rt></ruby><small>${m}</small></span>`).join('')}</div>
+    </div>
+    <div class="gs"><div class="tr"><div class="th"></div>${GRADES.map(([g], i) => `<button data-g="${i}">${g}</button>`).join('')}</div></div>
+  </div>`;
+
+// tune: the tuning card opens on its back, a tap turns it over and back, and
+// the pager steps through the kanji instead of grading.
+function session(stage, combo, leaveMs = combo ? 420 : 140, tune = false) {
+  stage.innerHTML = `<div class="prog"><div class="top"><span>REVIEW</span><span data-n></span></div><div class="track"><i data-bar></i></div></div><div class="area"></div>`;
+  const area = stage.querySelector('.area');
+  const N = CARDS.length;
+  let i = 0, flipped = false, busy = false;
+
+  function draw(enter) {
+    const left = N - i - 1; // cards still under this one
+    const pile = combo ? `<div class="under u2 ${left >= 2 ? '' : 'gone'}"></div><div class="under u1 ${left >= 1 ? '' : 'gone'}"></div>` : '';
+    area.innerHTML = pile + `<div class="slot ${enter ? 'enter' : ''}"><div class="ground"></div><div class="lift"><div class="press"><div class="card">${faces(CARDS[i])}</div></div></div></div>`;
+    stage.querySelector('[data-n]').textContent = `${i + 1} / ${N}`;
+    stage.querySelector('[data-bar]').style.width = `${(i / N) * 100}%`;
+    flipped = false; busy = false;
+    wire();
+    if (tune) { flipped = true; area.querySelector('.card').classList.add('flipped'); setPick(2); }
+  }
+
+  function turn() {
+    flipped = !flipped;
+    area.querySelector('.card').classList.toggle('flipped', flipped);
+    const lift = area.querySelector('.lift'), ground = area.querySelector('.ground');
+    lift.classList.add('flipping'); ground.classList.add('flipping');
+    setTimeout(() => { lift.classList.remove('flipping'); ground.classList.remove('flipping'); }, ms(700));
+  }
+
+  function setPick(n) {
+    const back = area.querySelector('.back');
+    back.querySelector('.th').style.setProperty('--i', n);
+    back.querySelectorAll('[data-g]').forEach((b, j) => b.classList.toggle('on', j === n));
+  }
+
+  function flip() {
+    flipped = true;
+    area.querySelector('.card').classList.add('flipped');
+    const lift = area.querySelector('.lift'), ground = area.querySelector('.ground');
+    lift.classList.add('flipping'); ground.classList.add('flipping');
+    setTimeout(() => { lift.classList.remove('flipping'); ground.classList.remove('flipping'); }, ms(700));
+    setPick(2);
+  }
+
+  function advance() {
+    busy = true;
+    const slot = area.querySelector('.slot');
+    slot.classList.remove('enter');
+    slot.classList.add('leave');
+    stage.querySelector('[data-bar]').style.width = `${((i + 1) / N) * 100}%`;
+    if (combo) area.querySelectorAll('.under:not(.gone)').forEach((u) => u.classList.add('up'));
+    setTimeout(() => {
+      i++;
+      if (i < N) draw(true);
+      else finish();
+    }, ms(leaveMs));
+  }
+
+  function finish() {
+    area.innerHTML = `<div class="done"><div class="t">完了</div><div class="s">${N} 枚</div><button>もう一度</button></div>`;
+    stage.querySelector('[data-n]').textContent = `${N} / ${N}`;
+    area.querySelector('button').addEventListener('click', () => { i = 0; draw(false); });
+  }
+
+  function wire() {
+    const cardEl = area.querySelector('.card');
+    const press = area.querySelector('.press');
+    const ground = area.querySelector('.ground');
+    const gs = area.querySelector('.gs');
+    area.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); setPick(+b.dataset.g); }));
+    gs.addEventListener('click', (e) => e.stopPropagation());
+    gs.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    if (combo) {
+      const up = () => { press.classList.remove('down'); ground.classList.remove('down'); };
+      cardEl.addEventListener('pointerdown', () => { if (!busy) { press.classList.add('down'); ground.classList.add('down'); } });
+      cardEl.addEventListener('pointerup', up);
+      cardEl.addEventListener('pointerleave', up);
+      cardEl.addEventListener('pointercancel', up);
+    }
+    cardEl.addEventListener('click', () => { if (busy) return; if (tune) turn(); else (flipped ? advance() : flip()); });
+  }
+
+  draw(false);
+  return { step: (d) => { i = (i + d + N) % N; draw(false); } };
+}
+
+// ── Tuning panel: every control sets one CSS variable on :root ──
+const CONTROLS = [
+  ['Kanji', [
+    ['--kanji-size', 'Size', 4, 10, 0.1, 7.2, 'rem'],
+  ]],
+  ['Text', [
+    ['--kw-size', 'Keyword', 0.8, 2, 0.05, 1.2, 'rem'],
+    ['--facts-size', 'Readings', 0.6, 1.2, 0.02, 0.8, 'rem'],
+    ['--parts-size', 'Components', 0.6, 1.1, 0.02, 0.72, 'rem'],
+    ['--known-size', 'Known words', 0.8, 1.6, 0.05, 1.1, 'rem'],
+    ['--known-gap', 'Between words', 0.4, 2.5, 0.05, 1.2, 'rem'],
+  ]],
+  ['Spacing', [
+    ['--g-kanji', 'Kanji → keyword', 0, 2, 0.05, 0.6, 'rem'],
+    ['--g-kw', 'Keyword → readings', 0, 2, 0.05, 0.8, 'rem'],
+    ['--g-facts', 'Readings → components', 0, 1.5, 0.05, 0.35, 'rem'],
+    ['--g-known', '→ known words', 0, 3, 0.05, 1.6, 'rem'],
+  ]],
+  ['Position', [
+    ['--align', 'Content', ['center', 'flex-start', 'flex-end'], null, null, 'center', ''],
+    ['--shift', 'Nudge up / down', -60, 60, 1, -6, 'px'],
+    ['--pad-top', 'Top padding', 0, 4, 0.05, 1.6, 'rem'],
+    ['--gs-clear', 'Space above slider', 0, 3, 0.05, 1, 'rem'],
+  ]],
+  ['Slider', [
+    ['--gs-bottom', 'From bottom', 0.4, 3.5, 0.05, 1.6, 'rem'],
+    ['--gs-side', 'Side inset', 0.4, 2.5, 0.05, 1.1, 'rem'],
+    ['--gs-h', 'Height', 32, 60, 1, 44, 'px'],
+    ['--gs-text', 'Text size', 0.7, 1.05, 0.01, 0.84, 'rem'],
+  ]],
+  ['Card', [
+    ['--card-h', 'Height', 380, 520, 2, 470, 'px'],
+  ]],
+];
+const ALIGN_LABEL = { center: 'centred', 'flex-start': 'top', 'flex-end': 'bottom' };
+const KEY = 'yugen-mock-card-tune';
+const defaults = Object.fromEntries(CONTROLS.flatMap(([, rows]) => rows.map((r) => [r[0], r[5]])));
+let values = { ...defaults };
+try { Object.assign(values, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch {}
+
+const root = document.documentElement;
+const unitOf = (name) => CONTROLS.flatMap(([, r]) => r).find((r) => r[0] === name)[6];
+function apply() {
+  for (const [name, v] of Object.entries(values)) root.style.setProperty(name, `${v}${unitOf(name)}`);
+  try { localStorage.setItem(KEY, JSON.stringify(values)); } catch {}
+  const changed = Object.entries(values).filter(([n, v]) => v !== defaults[n]);
+  document.getElementById('out').value = `/* card back — ${changed.length} changed from the mockup defaults */\n` +
+    Object.entries(values).map(([n, v]) => `${n}: ${v}${unitOf(n)};${v !== defaults[n] ? '  /* was ' + defaults[n] + unitOf(n) + ' */' : ''}`).join('\n');
+}
+
+const panel = document.getElementById('panel');
+panel.innerHTML = CONTROLS.map(([group, rows]) => `<h3>${group.toUpperCase()}</h3>` + rows.map(([name, label, min, max, step, , unit]) => Array.isArray(min)
+  ? `<label class="row"><span>${label}</span><select data-v="${name}">${min.map((o) => `<option value="${o}">${ALIGN_LABEL[o]}</option>`).join('')}</select><output></output></label>`
+  : `<label class="row"><span>${label}</span><input type="range" data-v="${name}" min="${min}" max="${max}" step="${step}"><output data-o="${name}"></output></label>`).join('')).join('') +
+  `<div class="acts"><button id="reset">Reset</button><button id="copy">Copy values</button></div><textarea id="out" readonly></textarea>`;
+
+function sync() {
+  panel.querySelectorAll('[data-v]').forEach((el) => { el.value = values[el.dataset.v]; });
+  panel.querySelectorAll('[data-o]').forEach((o) => { o.textContent = `${values[o.dataset.o]}${unitOf(o.dataset.o)}`; });
+}
+panel.addEventListener('input', (e) => {
+  const name = e.target.dataset.v; if (!name) return;
+  values[name] = e.target.tagName === 'SELECT' ? e.target.value : +e.target.value;
+  sync(); apply();
+});
+document.getElementById('reset').addEventListener('click', () => { values = { ...defaults }; sync(); apply(); });
+document.getElementById('copy').addEventListener('click', (e) => {
+  const out = document.getElementById('out');
+  out.select();
+  navigator.clipboard?.writeText(out.value).catch(() => document.execCommand('copy'));
+  e.target.textContent = 'Copied'; setTimeout(() => { e.target.textContent = 'Copy values'; }, 1200);
+});
+sync(); apply();
+
+const tuner = session(document.getElementById('tune-stage'), true, 340, true);
+document.querySelector('.pager').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) tuner.step(+b.dataset.step); });
+
+session(document.getElementById('today'), false);
+session(document.getElementById('combo'), true);
+session(document.getElementById('combo-straight'), true);
+session(document.getElementById('combo-subtle'), true, 340);
+</script>
+</body>
+</html>

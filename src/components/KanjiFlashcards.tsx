@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { useAppStore, type WordData } from '../services/store';
 import { useKanjiStore, buildKanjiDeck } from '../services/kanjiStore';
-import { kanjiSrsState, type KanjiCard } from '../services/kanjiDeck';
-import { scheduleKanji, type Rating } from '../services/srs';
+import type { KanjiCard } from '../services/kanjiDeck';
+import type { Rating } from '../services/srs';
 import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
 import { furiganaSegments } from '../services/furigana';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import type { KanjiInfo } from '../data/rtkKanjiInfo';
 import { GradeSlider } from './GradeSlider';
-import { GRADES, formatIntervalJa } from '../services/grades';
+import { StudyCard, PILE_SPACE } from './StudyCard';
 import { CardFace, Centered, ExitFocusButton } from './Flashcards';
 
 // The RTK kanji deck's session (docs/rtk-kanji-deck-plan.md, mockup
@@ -85,16 +85,6 @@ export function KanjiFlashcards({
     shownAt.current = Date.now();
     thinkMs.current = null;
   }, [card?.kanji]);
-
-  const intervals = useMemo(() => {
-    const out = {} as Record<Rating, string>;
-    const p = card ? useKanjiStore.getState().progress[card.kanji] : undefined;
-    if (!p) return out;
-    const now = Date.now();
-    const prior = kanjiSrsState(p);
-    for (const { rating } of GRADES) out[rating] = formatIntervalJa(scheduleKanji(prior, rating, now).intervalDays);
-    return out;
-  }, [card]);
 
   const known = useMemo(() => (card ? knownWordsWith(card.kanji, wordDatabase) : []), [card, wordDatabase]);
 
@@ -189,35 +179,22 @@ export function KanjiFlashcards({
         </div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={card.kanji}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }}
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.11, ease: 'easeIn' } }}
-            style={{ width: '100%', maxWidth: '340px' }}
-          >
-            <motion.div
-              onClick={(e) => {
-                e.stopPropagation();
-                setFocused(true);
-                if (!revealed) reveal();
-                else grade(pick);
-              }}
-              initial={false}
-              animate={{ rotateY: revealed ? 180 : 0 }}
-              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: focusActive ? 'min(660px, 74vh)' : 'min(540px, 62vh)',
-                transition: 'height 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
-                transformStyle: 'preserve-3d',
-                cursor: 'pointer',
-              }}
-            >
-              {/* FRONT — the keyword to recall the kanji from. */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `1rem 1rem calc(1rem + ${PILE_SPACE})`, perspective: '1600px' }}>
+        <div style={{ width: '100%', maxWidth: '340px' }}>
+          <StudyCard
+            cardKey={card.kanji}
+            index={index}
+            total={total}
+            revealed={revealed}
+            height={focusActive ? 'min(660px, 74vh)' : 'min(540px, 62vh)'}
+            onClick={(e) => {
+              e.stopPropagation();
+              setFocused(true);
+              if (!revealed) reveal();
+              else grade(pick);
+            }}
+            front={
+              // FRONT — the keyword to recall the kanji from.
               <CardFace>
                 <span className="serif" style={{ fontSize: '2.3rem', lineHeight: 1.25, color: 'var(--text-main)', maxWidth: '12ch' }}>
                   {keyword}
@@ -226,29 +203,34 @@ export function KanjiFlashcards({
                   <ChevronDown size={20} strokeWidth={1.5} />
                 </div>
               </CardFace>
-
-              {/* BACK — kanji, keyword, readings, parts, then known words (no rule, no title). */}
-              <CardFace back footer={<GradeSlider value={pick} onChange={setPick} intervals={intervals} />}>
-                <span className="serif" translate="no" style={{ fontSize: '6.5rem', lineHeight: 1, color: 'var(--text-main)' }}>
-                  {card.kanji}
-                </span>
-                <span className="serif" style={{ fontSize: '1.2rem', color: 'var(--text-main)', marginTop: '0.7rem' }}>{keyword}</span>
-                {(on || kun) && (
-                  <div style={{ display: 'flex', gap: '0.9rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {on && <span>音 <span className="serif" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>{on}</span></span>}
-                    {kun && <span>訓 <span className="serif" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>{kun}</span></span>}
-                  </div>
-                )}
-                {parts && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{parts}</div>}
-                {known.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1.3rem', flexWrap: 'wrap', marginTop: '1.6rem' }}>
-                    {known.map((w) => <KnownWord key={w.surface} word={w} />)}
-                  </div>
-                )}
+            }
+            back={
+              // BACK — kanji, keyword, readings, parts, then known words (no rule, no
+              // title), centred above the slider and nudged up 6px. Sizes from the
+              // tuning panel in docs/mockups/flashcard-feel-2.html.
+              <CardFace back footer={<GradeSlider value={pick} onChange={setPick} />}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translateY(-6px)' }}>
+                  <span className="serif" translate="no" style={{ fontSize: '7.2rem', lineHeight: 1, color: 'var(--text-main)' }}>
+                    {card.kanji}
+                  </span>
+                  <span className="serif" style={{ fontSize: '1.2rem', color: 'var(--text-main)', marginTop: '0.6rem' }}>{keyword}</span>
+                  {(on || kun) && (
+                    <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.8rem', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      {on && <span>音 <span className="serif" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{on}</span></span>}
+                      {kun && <span>訓 <span className="serif" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{kun}</span></span>}
+                    </div>
+                  )}
+                  {parts && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>{parts}</div>}
+                  {known.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1.2rem', flexWrap: 'wrap', marginTop: '1.6rem' }}>
+                      {known.map((w) => <KnownWord key={w.surface} word={w} />)}
+                    </div>
+                  )}
+                </div>
               </CardFace>
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>
+            }
+          />
+        </div>
       </div>
     </div>
   );
@@ -259,7 +241,7 @@ function KnownWord({ word }: { word: WordData }) {
   const meaning = (word.meaning ?? '').split(/[;,]/)[0].trim();
   return (
     <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '7.5rem' }}>
-      <span translate="no" className="serif" style={{ fontSize: '1.15rem', lineHeight: 1.2, color: 'var(--text-main)' }}>
+      <span translate="no" className="serif" style={{ fontSize: '1.1rem', lineHeight: 1.2, color: 'var(--text-main)' }}>
         {furiganaSegments(word).map((s, i) =>
           s.kanji === s.kana
             ? <span key={i}>{s.kanji}</span>

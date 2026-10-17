@@ -347,3 +347,49 @@ body.song-mode {
 /* 今日 (Today.tsx): blocks sit 2rem apart; the first one shown, whichever it is, sits flush under the heading. */
 .today-section { margin-top: 2rem; }
 .today-blocks > .today-section:first-child { margin-top: 0; }
+
+/* ── Study card (StudyCard.tsx, docs/design-system.md §6.16) ──────────────────
+   Lifted paper: layered soft shadows instead of a border, and a separate shadow
+   on the "table" that stays put while the card rises. Still at rest. */
+.study-face {
+  box-shadow: 0 1px 2px rgba(40, 40, 30, 0.06), 0 8px 18px rgba(40, 40, 30, 0.07), 0 24px 48px rgba(40, 40, 30, 0.08);
+  transition: box-shadow 0.2s ease-out;
+}
+.study-press.down .study-face {
+  box-shadow: 0 1px 2px rgba(40, 40, 30, 0.08), 0 4px 10px rgba(40, 40, 30, 0.08), 0 10px 20px rgba(40, 40, 30, 0.05);
+}
+.study-pile {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  background: var(--bg-pure);
+  box-shadow: 0 1px 2px rgba(40, 40, 30, 0.05), 0 6px 14px rgba(40, 40, 30, 0.05);
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+/* The shadow comes first in the slot so it paints behind the card. */
+.study-shadow { position: absolute; inset: 0; pointer-events: none; animation: studyFade 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.study-ground {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -14px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(40, 40, 30, 0.22), rgba(40, 40, 30, 0) 70%);
+  filter: blur(6px);
+  transition: transform 0.18s ease-out;
+}
+.study-ground.down { transform: scale(0.95); }
+.study-ground.flipping { animation: studyGroundRise 0.6s cubic-bezier(0.45, 0, 0.2, 1); }
+.study-lift, .study-press { position: absolute; inset: 0; transform-style: preserve-3d; }
+.study-lift.flipping { animation: studyRise 0.6s cubic-bezier(0.45, 0, 0.2, 1); }
+.study-press { transition: transform 0.18s ease-out; }
+.study-press.down { transform: scale(0.985) translateY(1px); }
+@keyframes studyFade { from { opacity: 0; } }
+@keyframes studyRise { 50% { transform: translateY(-6px) scale(1.012); } }
+@keyframes studyGroundRise { 50% { transform: scale(0.92); opacity: 0.8; filter: blur(8px); } }
+@media (prefers-reduced-motion: reduce) {
+  .study-lift.flipping, .study-ground.flipping { animation: none; }
+  .study-press.down, .study-ground.down { transform: none; }
+}

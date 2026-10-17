@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { ChevronDown, X } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { buildDeck, type Card } from '../services/dueDeck';
-import { schedule, seedSrsFromDifficulty, type Rating, type SrsState } from '../services/srs';
+import type { Rating } from '../services/srs';
 import { fetchIntakeCandidates } from '../services/jmdict';
 import { alignReading, furiganaSegments } from '../services/furigana';
 import type { IntakeCandidate } from '../services/intake';
 import { seedDemoDeck } from '../services/devSeed';
 import { GradeSlider } from './GradeSlider';
-import { GRADES, formatIntervalJa } from '../services/grades';
+import { StudyCard, PILE_SPACE } from './StudyCard';
 import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -59,26 +59,6 @@ function wordForCandidate(c: IntakeCandidate): WordData {
     streak: 0,
   };
 }
-
-// Prior FSRS state for a word, or a seed from `difficulty` if it isn't scheduled
-// yet — mirrors store.reviewWord so the per-button interval preview matches what a
-// grade will actually assign.
-function priorSrsFor(w: WordData, now: number): SrsState {
-  const baseDifficulty = w.difficulty ?? 5;
-  return w.stability != null && w.dueAt != null
-    ? {
-        stability: w.stability,
-        fsrsDifficulty: w.fsrsDifficulty ?? baseDifficulty,
-        dueAt: w.dueAt,
-        lastReviewedAt: w.lastReviewedTs ?? w.lastSeenTs ?? now,
-        reps: w.reps ?? 0,
-        lapses: w.lapses ?? 0,
-        status: (w.srsStatus ?? 'review') as SrsState['status'],
-      }
-    : seedSrsFromDifficulty(baseDifficulty, w.lastSeenTs ?? now);
-}
-
-
 
 export function Flashcards({
   onFocusChange,
@@ -206,24 +186,6 @@ export function Flashcards({
     boxSizing: 'border-box',
     transition: 'padding-bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
   };
-
-  // Interval each rating would assign, previewed against the current card's schedule.
-  const previews = useMemo(() => {
-    if (!card) return {} as Record<Rating, string>;
-    const now = Date.now();
-    // A never-studied card previews from a fresh FSRS card (State.New) so the
-    // grades ladder (Again→Easy) instead of bunching around the synthetic
-    // difficulty-seed stability that promotion writes as status 'review'.
-    // Never-studied = the SAME predicate store.reviewWord uses (promoted, reps
-    // still 0) — NOT the deck's card.kind: a promoted-never-graded word that is
-    // already due gets kind 'review', and keying off kind made the pills show
-    // seed-bunched intervals while grading actually applied the fresh ladder.
-    const neverStudied = card.word.promotedTs != null && (card.word.reps ?? 0) === 0;
-    const prior = neverStudied ? null : priorSrsFor(card.word, now);
-    const out = {} as Record<Rating, string>;
-    for (const { rating } of GRADES) out[rating] = formatIntervalJa(schedule(prior, rating, now).intervalDays);
-    return out;
-  }, [card]);
 
   // Each new card starts its thinking clock when it appears.
   useEffect(() => {
@@ -355,13 +317,15 @@ export function Flashcards({
 
         <FlipSurface
           cardKey={cand.entryId}
+          index={discoverIndex}
+          total={dTotal}
           word={wordForCandidate(cand)}
           revealed={revealed}
           tall={focusActive}
           onTap={() => setFocused(true)}
           onReveal={() => setRevealed(true)}
           footer={
-            <div style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.15rem' }}>
+            <div onPointerDown={(e) => e.stopPropagation()} style={{ display: 'flex', flexShrink: 0, gap: '9px', padding: '0 1.1rem 1.6rem' }}>
               {DISCOVER_GRADES.map(({ level, label, shadow }) => (
                 <button
                   key={level}
@@ -470,13 +434,15 @@ export function Flashcards({
 
       <FlipSurface
         cardKey={card.key}
+        index={index}
+        total={total}
         word={card.word}
         revealed={revealed}
         tall={focusActive}
         onTap={() => setFocused(true)}
         onReveal={reveal}
         onAdvance={() => grade(pick)}
-        footer={<GradeSlider value={pick} onChange={setPick} intervals={previews} />        }
+        footer={<GradeSlider value={pick} onChange={setPick} />}
       />
     </div>
   );
@@ -530,8 +496,10 @@ function ExitDiscoverButton({ onClick }: { onClick: () => void }) {
 // The grade buttons live INSIDE the back face (passed as `footer`), as a strip
 // along its bottom edge — so flipping never changes the card's height or shifts
 // the layout, and the buttons arrive with the flip itself (no second animation).
-function FlipSurface({ cardKey, word, revealed, onReveal, onAdvance, onTap, footer, tall = false }: {
+function FlipSurface({ cardKey, index, total, word, revealed, onReveal, onAdvance, onTap, footer, tall = false }: {
   cardKey: string;
+  index: number; // position in the session and its length: the pile under the card shows what's left
+  total: number;
   word: WordData;
   revealed: boolean;
   onReveal: () => void;
@@ -541,51 +509,36 @@ function FlipSurface({ cardKey, word, revealed, onReveal, onAdvance, onTap, foot
   tall?: boolean; // focus mode: grow into the space the hidden nav frees up
 }) {
   return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', perspective: '1600px' }}>
-      <AnimatePresence mode="wait">
-        {/* Outer wrapper handles the between-cards slide/fade. */}
-        <motion.div
-          key={cardKey}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }}
-          exit={{ opacity: 0, y: -10, transition: { duration: 0.11, ease: 'easeIn' } }}
-          style={{ width: '100%', maxWidth: '340px' }}
-        >
-          {/* Inner element rotates in 3D — front and back are its two faces.
-              Capped in px but scaled by vh so it never tucks under the nav.
-              Clicks stop here: anything outside the card (the flow wrapper)
-              exits focus mode, so in-card taps must not bubble that far. */}
-          <motion.div
-            onClick={(e) => {
-              e.stopPropagation();
-              onTap?.();
-              if (!revealed) onReveal();
-              else onAdvance?.();
-            }}
-            initial={false}
-            animate={{ rotateY: revealed ? 180 : 0 }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              position: 'relative',
-              width: '100%',
-              // Framer only drives `transform` here, so a plain CSS transition
-              // can own the focus-mode height change without any conflict.
-              height: tall ? 'min(660px, 74vh)' : 'min(540px, 62vh)',
-              transition: 'height 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
-              transformStyle: 'preserve-3d',
-              cursor: revealed && !onAdvance ? 'default' : 'pointer',
-            }}
-          >
-            {/* FRONT — the word to recall (furigana hidden), with a subtle flip hint. */}
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `1rem 1rem calc(1rem + ${PILE_SPACE})`, perspective: '1600px' }}>
+      <div style={{ width: '100%', maxWidth: '340px' }}>
+        {/* Capped in px but scaled by vh so it never tucks under the nav.
+            Clicks stop at the card: anything outside it (the flow wrapper)
+            exits focus mode, so in-card taps must not bubble that far. */}
+        <StudyCard
+          cardKey={cardKey}
+          index={index}
+          total={total}
+          revealed={revealed}
+          height={tall ? 'min(660px, 74vh)' : 'min(540px, 62vh)'}
+          cursor={revealed && !onAdvance ? 'default' : 'pointer'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTap?.();
+            if (!revealed) onReveal();
+            else onAdvance?.();
+          }}
+          front={
+            // FRONT — the word to recall (furigana hidden), with a subtle flip hint.
             <CardFace>
               <FuriganaWord word={word} reveal={false} />
               <div style={{ position: 'absolute', bottom: '1.5rem', left: 0, right: 0, display: 'flex', justifyContent: 'center', color: 'var(--text-muted)', opacity: 0.35 }}>
                 <ChevronDown size={20} strokeWidth={1.5} />
               </div>
             </CardFace>
-
-            {/* BACK — reading (furigana) + meaning + grammar note + JLPT level,
-                with the grade slider along the bottom edge. */}
+          }
+          back={
+            // BACK — reading (furigana) + meaning + grammar note + JLPT level,
+            // with the grade slider along the bottom edge.
             <CardFace back footer={footer}>
               <FuriganaWord word={word} reveal={true} />
               <div style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginTop: '1.5rem', lineHeight: 1.6, maxWidth: '28ch' }}>
@@ -615,9 +568,9 @@ function FlipSurface({ cardKey, word, revealed, onReveal, onAdvance, onTap, foot
                 </span>
               )}
             </CardFace>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
+          }
+        />
+      </div>
     </div>
   );
 }
@@ -778,23 +731,23 @@ function FuriganaWord({ word, reveal }: { word: WordData; reveal: boolean }) {
   );
 }
 
-// One face of the flip card — a minimal white card surface (hairline border, soft
-// shadow). Both faces stack via absolute positioning; the back is pre-rotated 180°
-// so it reads correctly once the card flips. `backface-visibility: hidden` hides
-// whichever face currently points away from the viewer. `footer` renders flush
-// against the face's bottom edge, outside the content padding (the grade strip).
+// One face of the flip card — a white card surface lifted by layered soft shadows
+// (.study-face, no border). Both faces stack via absolute positioning; the back is
+// pre-rotated 180° so it reads correctly once the card flips. `backface-visibility:
+// hidden` hides whichever face currently points away from the viewer. `footer`
+// renders along the face's bottom edge, outside the content padding (the grade
+// strip); the content centres in the space above it.
 export function CardFace({ children, back = false, footer }: { children: React.ReactNode; back?: boolean; footer?: React.ReactNode }) {
   return (
     <div
+      className="study-face"
       style={{
         position: 'absolute',
         inset: 0,
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--bg-pure)',
-        border: '1px solid var(--border-light)',
         borderRadius: '22px',
-        boxShadow: '0 6px 24px rgba(0, 0, 0, 0.05)',
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
         transform: back ? 'rotateY(180deg)' : undefined,
@@ -811,7 +764,7 @@ export function CardFace({ children, back = false, footer }: { children: React.R
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          padding: '2rem 1.75rem',
+          padding: footer ? '1.6rem 1.75rem 1rem' : '2rem 1.75rem',
         }}
       >
         {children}

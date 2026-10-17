@@ -5,22 +5,26 @@ import { GRADES } from '../services/grades';
 // (design-system §6.1). It's a setting, not four buttons: it arrives already set to
 // a grade guessed from the thinking time (services/thinkTime.ts), a tap moves the
 // white thumb to another grade and nothing else, and tapping the card moves on.
-// See docs/mockups/kanji-deck.html (S2 + S3).
+// No caption: the slider alone sits 1.6rem above the card's bottom edge.
+// See docs/mockups/kanji-deck.html (S2 + S3) and flashcard-feel-2.html.
 
-export function GradeSlider({ value, onChange, intervals }: {
+export function GradeSlider({ value, onChange }: {
   value: Rating;
   onChange: (rating: Rating) => void;
-  /** Next interval per grade, already formatted. */
-  intervals: Record<Rating, string>;
 }) {
   const i = GRADES.findIndex((g) => g.rating === value);
   return (
-    // Taps on the control must not reach the card: tapping the card means "move on".
-    <div onClick={(e) => e.stopPropagation()} style={{ padding: '0 1rem 1.05rem', cursor: 'default' }}>
+    // Taps on the control must not reach the card: tapping the card means "move on",
+    // and a press on the slider shouldn't make the card sink.
+    <div
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      style={{ padding: '0 1.1rem 1.6rem', cursor: 'default' }}
+    >
       <div
         role="radiogroup"
         aria-label="How did it go?"
-        style={{ position: 'relative', display: 'flex', height: '45px', padding: '4px', borderRadius: '100px', backgroundColor: 'var(--border-light)' }}
+        style={{ position: 'relative', display: 'flex', height: '44px', padding: '4px', borderRadius: '100px', backgroundColor: 'var(--border-light)' }}
       >
         <div
           aria-hidden
@@ -52,7 +56,7 @@ export function GradeSlider({ value, onChange, intervals }: {
                 border: 'none',
                 background: 'none',
                 cursor: 'pointer',
-                fontSize: '0.9rem',
+                fontSize: '0.84rem',
                 fontWeight: on ? 700 : 500,
                 color: on ? 'var(--text-main)' : 'var(--text-muted)',
                 transition: 'color 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -63,13 +67,6 @@ export function GradeSlider({ value, onChange, intervals }: {
             </button>
           );
         })}
-      </div>
-      <div
-        className="sans"
-        style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.45rem', padding: '0 0.3rem', fontSize: '0.66rem', color: 'var(--text-muted)' }}
-      >
-        <span>次は {intervals[value]}</span>
-        <span>タップで次へ</span>
       </div>
     </div>
   );

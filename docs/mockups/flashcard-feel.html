@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — flashcard feel</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+.serif { font-family: var(--font-serif); }
+
+.mock-header { max-width: 860px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 2.4rem 1.6rem; max-width: 1200px; margin: 0 auto; justify-items: center; }
+.wrap { width: 360px; display: flex; flex-direction: column; align-items: center; gap: 0.7rem; }
+.label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.note { font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 340px; }
+.note b { color: var(--text-main); font-weight: 600; }
+.note .warn { display: block; margin-top: 0.3rem; color: #9a6b4f; font-size: 0.74rem; }
+
+/* The page the card sits on: the app's background, phone width */
+.stage { width: 360px; height: 640px; background: var(--bg-color); border-radius: 36px; position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 1.4rem 1.3rem 1.6rem; box-shadow: 0 10px 40px rgba(0,0,0,0.08); }
+.prog { flex: none; margin-bottom: 0.6rem; }
+.prog .top { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.08em; margin-bottom: 0.4rem; }
+.track { height: 3px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent-progress); transition: width 0.35s var(--ease); }
+.area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; perspective: 1400px; }
+
+/* ── Card anatomy shared by every variant ──
+   .slot   positions the card and runs enter/leave animations
+   .lift   moves the card off the table (float, press, mid-flip rise)
+   .card   rotates for the flip; two faces inside
+   .ground a separate shadow on the "table" — it stays put while the card rises,
+           so height reads as a softer, smaller shadow (V1–V6) */
+.slot { position: absolute; width: 296px; height: 452px; }
+.lift { position: absolute; inset: 0; transform-style: preserve-3d; }
+.card { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 0.55s var(--ease); cursor: pointer; }
+.card.flipped { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--bg-pure); border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.6rem 1.2rem 5.6rem; overflow: hidden; }
+.face.front { padding-bottom: 1.6rem; }
+.face.back { transform: rotateY(180deg); justify-content: flex-start; padding-top: 2.4rem; }
+.ground { position: absolute; left: 8%; right: 8%; bottom: -14px; height: 40px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(40,40,30,0.22), rgba(40,40,30,0) 70%); filter: blur(6px); transition: all 0.55s var(--ease); pointer-events: none; }
+
+.keyword { font-family: var(--font-serif); font-size: 2.1rem; line-height: 1.25; max-width: 11ch; }
+.chev { position: absolute; bottom: 1.3rem; left: 0; right: 0; color: var(--text-muted); opacity: 0.35; font-size: 1rem; }
+.kanji { font-family: var(--font-serif); font-size: 5.6rem; line-height: 1; }
+.kw { font-family: var(--font-serif); font-size: 1.1rem; margin-top: 0.5rem; }
+.facts { display: flex; gap: 0.8rem; justify-content: center; margin-top: 0.7rem; font-size: 0.68rem; color: var(--text-muted); }
+.facts b { font-family: var(--font-serif); font-size: 0.8rem; font-weight: 600; color: var(--text-main); }
+.parts { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem; }
+.known { display: flex; gap: 1.1rem; justify-content: center; margin-top: 1.2rem; flex-wrap: wrap; }
+.known .w { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.2; display: flex; flex-direction: column; align-items: center; }
+.known rt { font-family: var(--font-sans); font-size: 0.5rem; font-weight: 600; color: var(--text-muted); }
+.known small { font-family: var(--font-sans); font-size: 0.58rem; color: var(--text-muted); }
+
+/* Grade slider (GradeSlider.tsx) */
+.gs { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0.9rem 0.95rem; cursor: default; }
+.gs .tr { position: relative; display: flex; height: 42px; padding: 4px; border-radius: 100px; background: var(--border-light); }
+.gs .th { position: absolute; top: 4px; bottom: 4px; width: calc((100% - 8px) / 4); left: calc(4px + var(--i) * (100% - 8px) / 4); background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.gs button { position: relative; z-index: 1; flex: 1; border: none; background: none; font-family: var(--font-serif); font-size: 0.82rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: color 0.4s; }
+.gs button.on { color: var(--text-main); font-weight: 700; }
+.gs .cap { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--text-muted); margin-top: 0.35rem; padding: 0 0.3rem; }
+
+/* Enter / leave (current app: a short fade-slide) */
+.slot.enter { animation: enter 0.24s var(--ease) both; }
+.slot.leave { animation: leave 0.14s ease-in both; }
+@keyframes enter { from { opacity: 0; transform: translateY(12px); } }
+@keyframes leave { to { opacity: 0; transform: translateY(-10px); } }
+
+/* ── V0 · today ── */
+.v0 .face { border: 1px solid var(--border-light); box-shadow: 0 6px 24px rgba(0,0,0,0.05); }
+.v0 .ground { display: none; }
+
+/* ── V1 · lifted paper: layered shadow, the card rises off the table mid-flip ── */
+.v1 .face { box-shadow: 0 1px 2px rgba(40,40,30,0.06), 0 8px 18px rgba(40,40,30,0.07), 0 24px 48px rgba(40,40,30,0.08); }
+.v1 .lift.flipping { animation: rise 0.62s var(--ease); }
+@keyframes rise { 0% { transform: translateY(0) scale(1); } 45% { transform: translateY(-18px) scale(1.04); } 100% { transform: translateY(0) scale(1); } }
+.v1 .ground.flipping { animation: groundRise 0.62s var(--ease); }
+@keyframes groundRise { 45% { transform: scale(0.82); opacity: 0.55; filter: blur(10px); } }
+.v1 .card { transition-duration: 0.62s; }
+
+/* ── V2 · floating: a slow idle drift, the shadow breathing with it ── */
+.v2 .face { box-shadow: 0 1px 2px rgba(40,40,30,0.05), 0 12px 30px rgba(40,40,30,0.08); }
+.v2 .lift { animation: drift 6s ease-in-out infinite; }
+.v2 .ground { bottom: -22px; animation: breathe 6s ease-in-out infinite; }
+@keyframes drift { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(2px); } }
+@keyframes breathe { 0%, 100% { transform: scale(0.86); opacity: 0.7; } 50% { transform: scale(1); opacity: 1; } }
+.v2 .card { transition: transform 0.7s var(--spring); }
+
+/* ── V3 · tilt to touch: leans toward your finger; drag sideways to turn it over ── */
+.v3 .face { box-shadow: 0 1px 2px rgba(40,40,30,0.06), 0 10px 26px rgba(40,40,30,0.09); }
+.v3 .card { transition: transform 0.5s var(--ease); }
+.v3 .card.dragging { transition: none; }
+.v3 .sheen { position: absolute; inset: 0; border-radius: 22px; pointer-events: none; background: radial-gradient(circle at var(--sx, 50%) var(--sy, 30%), rgba(255,255,255,0.75), rgba(255,255,255,0) 55%); mix-blend-mode: soft-light; opacity: 0; transition: opacity 0.3s; }
+.v3 .slot:hover .sheen { opacity: 1; }
+
+/* ── V4 · the deck: the next cards wait underneath; a graded card lifts away ── */
+.v4 .face { box-shadow: 0 1px 2px rgba(40,40,30,0.06), 0 10px 24px rgba(40,40,30,0.08); }
+.v4 .under { position: absolute; width: 296px; height: 452px; border-radius: 22px; background: var(--bg-pure); box-shadow: 0 1px 2px rgba(40,40,30,0.05), 0 6px 14px rgba(40,40,30,0.05); transition: transform 0.45s var(--ease), opacity 0.45s; }
+.v4 .under.u1 { transform: translateY(28px) scale(0.95); opacity: 0.95; }
+.v4 .under.u2 { transform: translateY(54px) scale(0.9); opacity: 0.8; }
+.v4 .slot.enter { animation: rise-from-deck 0.42s var(--ease) both; }
+@keyframes rise-from-deck { from { transform: translateY(28px) scale(0.95); } }
+.v4 .slot.leave { animation: lift-away 0.38s var(--ease) both; }
+@keyframes lift-away { to { transform: translate(18px, -70px) rotate(4deg); opacity: 0; } }
+.v4 .ground { bottom: -40px; opacity: 0.6; }
+
+/* ── V5 · material: warm paper, a lit top edge, grain ── */
+.v5 .face { background: linear-gradient(180deg, #ffffff 0%, #fbfaf6 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(40,40,30,0.07), 0 10px 24px rgba(40,40,30,0.08), 0 30px 60px -20px rgba(40,40,30,0.12); }
+.v5 .face::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.35; mix-blend-mode: multiply; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.48  0 0 0 0 0.42  0 0 0 0.18 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.v5 .card { transition: transform 0.6s var(--ease); }
+.v5 .lift.flipping { animation: rise 0.6s var(--ease); }
+.v5 .ground.flipping { animation: groundRise 0.6s var(--ease); }
+
+/* ── V6 · press and release: the card gives under your thumb, then springs over ── */
+.v6 .face { box-shadow: 0 1px 2px rgba(40,40,30,0.06), 0 12px 28px rgba(40,40,30,0.09); transition: box-shadow 0.2s; }
+.v6 .lift { transition: transform 0.18s ease-out; }
+.v6 .lift.pressed { transform: scale(0.97) translateY(2px); }
+.v6 .lift.pressed .face { box-shadow: 0 1px 2px rgba(40,40,30,0.08), 0 4px 10px rgba(40,40,30,0.08); }
+.v6 .ground { transition: all 0.18s ease-out; }
+.v6 .lift.pressed + .ground, .v6 .ground.pressed { transform: scale(0.92); opacity: 1.2; }
+.v6 .card { transition: transform 0.75s var(--spring); }
+.v6 .slot.leave { animation: float-off 0.32s var(--ease) both; }
+@keyframes float-off { to { transform: translateY(-40px) scale(1.02); opacity: 0; } }
+.v6 .slot.enter { animation: settle 0.5s var(--spring) both; }
+@keyframes settle { from { transform: translateY(-26px) scale(1.02); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · FLASHCARD FEEL</div>
+  <h1>浮かぶカード</h1>
+  <p>Ways to make the study card feel like an object you hold rather than a flat panel, staying in the same calm palette. Every card is live: tap to flip, set the slider, tap the card to move on. The main shared idea is a separate shadow on the "table": as the card rises, that shadow softens and shrinks, which is what makes something look like it floats. V0 is today's card for comparison.</p>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const CARDS = [
+  { k: '海', kw: 'sea', on: 'カイ', kun: 'うみ', parts: 'water · every', known: [['海', 'うみ', 'sea'], ['海外', 'かいがい', 'overseas'], ['日本海', 'にほんかい', 'Sea of Japan']] },
+  { k: '宣', kw: 'proclaim', on: 'セン', kun: 'のたまう', parts: 'house · span', known: [['宣伝', 'せんでん', 'advertising']] },
+  { k: '掛', kw: 'hang', on: 'カイ・ケイ', kun: 'かける', parts: 'finger · ivy', known: [['掛ける', 'かける', 'to hang']] },
+  { k: '研', kw: 'polish', on: 'ケン', kun: 'とぐ', parts: 'stone · two hands', known: [['研究', 'けんきゅう', 'research']] },
+];
+const GRADES = [['もう一度', '10分'], ['難しい', '12日'], ['正解', '3ヶ月'], ['簡単', '7ヶ月']];
+
+const VARIANTS = [
+  { id: 'v0', name: '今のカード', en: 'Today', note: 'Hairline border and one faint shadow; a plain flip. Correct, but it reads as a panel printed on the page.' },
+  { id: 'v1', name: '持ち上がる紙', en: 'Lifted paper', note: 'No border: three stacked soft shadows give it thickness. When you flip it, the card rises off the table and settles back, and its ground shadow softens while it is up. One clear moment of physicality per card, nothing at rest.' },
+  { id: 'v2', name: '浮遊', en: 'Floating', note: 'The card drifts very slowly up and down, the shadow breathing with it, as if it rests on air. The flip has a soft spring.', warn: 'Breaks the design system’s “nothing moves at rest” rule (§5); included so you can feel it.' },
+  { id: 'v3', name: '手に応える', en: 'Tilts to your touch', note: 'The card leans a few degrees toward your finger, with a faint light on its face. You can also drag it sideways to turn it over and let go past halfway. Most tactile; only moves while you touch it.' },
+  { id: 'v4', name: '山札', en: 'The deck', note: 'The next cards wait underneath, so the session has depth and you can see what’s left. A graded card lifts away up and to the side, and the next one rises from the pile.' },
+  { id: 'v5', name: '和紙', en: 'Material', note: 'Lifted paper (V1) plus surface: a barely warm gradient, a lit top edge, and fine grain. Feels like card stock rather than a screen.' },
+  { id: 'v6', name: '押して返す', en: 'Press and release', note: 'The card gives slightly under your thumb (it sinks, the shadow tightens), then springs over on release. A graded card floats up and away; the next settles down into place.' },
+];
+
+const card = (c) => `
+  <div class="face front"><div class="keyword">${c.kw}</div><div class="chev">⌄</div>${'<div class="sheen"></div>'}</div>
+  <div class="face back">
+    <div class="kanji">${c.k}</div><div class="kw">${c.kw}</div>
+    <div class="facts"><span>音 <b>${c.on}</b></span><span>訓 <b>${c.kun}</b></span></div>
+    <div class="parts">${c.parts}</div>
+    <div class="known">${c.known.map(([w, r, m]) => `<span class="w"><ruby>${w}<rt>${r}</rt></ruby><small>${m}</small></span>`).join('')}</div>
+    <div class="gs"><div class="tr"><div class="th"></div>${GRADES.map(([g], i) => `<button data-g="${i}">${g}</button>`).join('')}</div><div class="cap"><span data-cap></span><span>タップで次へ</span></div></div>
+    <div class="sheen"></div>
+  </div>`;
+
+const grid = document.getElementById('grid');
+VARIANTS.forEach((v) => {
+  const wrap = document.createElement('div');
+  wrap.className = 'wrap';
+  wrap.innerHTML = `<div class="label">${v.id.toUpperCase()} · ${v.en.toUpperCase()}</div>
+    <div class="stage ${v.id}"><div class="prog"><div class="top"><span>REVIEW</span><span data-n></span></div><div class="track"><i data-bar></i></div></div><div class="area"></div></div>
+    <div class="note"><b>${v.name}.</b> ${v.note}${v.warn ? `<span class="warn">${v.warn}</span>` : ''}</div>`;
+  grid.appendChild(wrap);
+  run(v.id, wrap.querySelector('.stage'));
+});
+
+function run(id, stage) {
+  const area = stage.querySelector('.area');
+  let i = 0, pick = 2, flipped = false;
+
+  function draw(enter) {
+    const c = CARDS[i % CARDS.length];
+    const remaining = 2; // cards shown underneath in the deck variant
+    area.innerHTML = (id === 'v4' ? `<div class="under u2"></div><div class="under u1"></div>` : '') +
+      `<div class="slot ${enter ? 'enter' : ''}"><div class="lift"><div class="card">${card(c)}</div></div><div class="ground"></div></div>`;
+    stage.querySelector('[data-n]').textContent = `${(i % 12) + 1} / 12`;
+    stage.querySelector('[data-bar]').style.width = `${((i % 12) / 12) * 100}%`;
+    flipped = false; pick = 2;
+    wire();
+  }
+
+  function setPick(n) {
+    pick = n;
+    const back = area.querySelector('.back');
+    back.querySelector('.th').style.setProperty('--i', n);
+    back.querySelectorAll('[data-g]').forEach((b, j) => b.classList.toggle('on', j === n));
+    back.querySelector('[data-cap]').textContent = `次は ${GRADES[n][1]}`;
+  }
+
+  function flip() {
+    const cardEl = area.querySelector('.card');
+    cardEl.style.transform = '';
+    cardEl.classList.add('flipped');
+    flipped = true;
+    const lift = area.querySelector('.lift'), ground = area.querySelector('.ground');
+    lift.classList.remove('flipping'); ground.classList.remove('flipping');
+    void lift.offsetWidth;
+    lift.classList.add('flipping'); ground.classList.add('flipping');
+    setPick(2);
+  }
+
+  function advance() {
+    const slot = area.querySelector('.slot');
+    slot.classList.remove('enter');
+    slot.classList.add('leave');
+    const dur = id === 'v4' ? 360 : id === 'v6' ? 300 : 140;
+    if (id === 'v4') area.querySelectorAll('.under').forEach((u) => u.style.transform = u.classList.contains('u1') ? 'translateY(0) scale(1)' : 'translateY(28px) scale(0.95)');
+    setTimeout(() => { i++; draw(true); }, dur);
+  }
+
+  function wire() {
+    const slot = area.querySelector('.slot');
+    const cardEl = area.querySelector('.card');
+    const lift = area.querySelector('.lift');
+    const ground = area.querySelector('.ground');
+    area.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); setPick(+b.dataset.g); }));
+    area.querySelector('.gs').addEventListener('click', (e) => e.stopPropagation());
+    area.querySelector('.gs').addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    if (id === 'v6') {
+      cardEl.addEventListener('pointerdown', () => { lift.classList.add('pressed'); ground.classList.add('pressed'); });
+      const up = () => { lift.classList.remove('pressed'); ground.classList.remove('pressed'); };
+      cardEl.addEventListener('pointerup', up);
+      cardEl.addEventListener('pointerleave', up);
+    }
+
+    if (id === 'v3') {
+      // Lean toward the pointer; drag sideways to turn the card over.
+      let down = null, dragged = false;
+      slot.addEventListener('pointermove', (e) => {
+        const r = slot.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+        slot.querySelectorAll('.sheen').forEach((s) => { s.style.setProperty('--sx', `${px * 100}%`); s.style.setProperty('--sy', `${py * 100}%`); });
+        if (down) {
+          const dx = e.clientX - down.x;
+          if (Math.abs(dx) > 6) dragged = true;
+          if (!flipped && dragged) {
+            cardEl.classList.add('dragging');
+            cardEl.style.transform = `rotateY(${Math.max(-180, Math.min(180, dx / r.width * 200))}deg)`;
+          }
+          return;
+        }
+        lift.style.transition = 'transform 0.2s ease-out';
+        lift.style.transform = `rotateX(${(0.5 - py) * 8}deg) rotateY(${(px - 0.5) * 8}deg)`;
+      });
+      slot.addEventListener('pointerleave', () => { lift.style.transition = 'transform 0.5s var(--ease)'; lift.style.transform = ''; });
+      slot.addEventListener('pointerdown', (e) => { down = { x: e.clientX }; dragged = false; });
+      slot.addEventListener('pointerup', (e) => {
+        const dx = down ? e.clientX - down.x : 0;
+        down = null;
+        if (dragged && !flipped) {
+          cardEl.classList.remove('dragging');
+          if (Math.abs(dx) > slot.getBoundingClientRect().width * 0.45) flip();
+          else cardEl.style.transform = '';
+        }
+      });
+      cardEl.addEventListener('click', (e) => {
+        if (dragged) return;
+        flipped ? advance() : flip();
+      });
+      return;
+    }
+
+    cardEl.addEventListener('click', () => (flipped ? advance() : flip()));
+  }
+
+  draw(false);
+}
+</script>
+</body>
+</html>
