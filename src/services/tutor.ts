@@ -78,7 +78,7 @@ export async function streamTutor(
       Authorization: `Bearer ${token}`,
       apikey: supabaseAnonKey,
     },
-    body: JSON.stringify({ action: 'send', day: localDay(), ...input }),
+    body: JSON.stringify({ action: 'send', day: localDay(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, ...input }),
     signal,
   });
   const { data: { session } } = await supabase.auth.getSession();
