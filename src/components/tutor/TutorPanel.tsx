@@ -299,7 +299,7 @@ const TOOL_LABEL: Record<string, string> = {
 
 /** ハルカ's turn: Japanese lines with tappable words, asides set apart. */
 function AssistantLine({ text, pending, lookup }: { text: string; pending?: boolean; lookup: ReturnType<typeof useWordLookup> }) {
-  if (pending && !text) return <div className="tutor-busy">…</div>;
+  if (pending && !text) return <div className="tutor-typing" role="status" aria-label="ハルカが考えています"><span /><span /><span /></div>;
   return <>{splitAsides(text).map((part, i) => part.aside
     ? <div key={i} className="tutor-a">{part.text}</div>
     : <div key={i} className="tutor-t"><TutorText text={part.text} streaming={pending} lookup={lookup} /></div>)}</>;
