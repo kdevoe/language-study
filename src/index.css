@@ -406,6 +406,14 @@ body.song-mode {
 .tutor-panel.dragging { transition: none; }
 .tutor-panel.r { right: 0; border-radius: 28px 0 0 28px; box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15); }
 .tutor-panel.l { left: 0; border-radius: 0 28px 28px 0; box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15); }
+/* Keyboard up: iOS floats its form bar (arrows + ✓) between the panel and the
+   keys and no web API hides it. Square the bottom corner and carry the panel and
+   backdrop down behind the bar so it sits on one surface instead of a gap. */
+.tutor-panel.kb.r { border-bottom-left-radius: 0; }
+.tutor-panel.kb.l { border-bottom-right-radius: 0; }
+.tutor-panel.kb::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 50vh; background: var(--bg-color); }
+.tutor-panel.kb .tutor-foot { height: 0.4rem; }
+.tutor-backdrop:has(+ .tutor-panel.kb) { bottom: -50vh; }
 .tutor-vgrab { position: absolute; top: 50%; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
 .tutor-panel.r .tutor-vgrab { left: 8px; }
 .tutor-panel.l .tutor-vgrab { right: 8px; }

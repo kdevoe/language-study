@@ -29,3 +29,8 @@ verify_jwt = false
 # Auth is checked in code: user JWT via auth.getUser, or the service key for the
 # internal voice-stage self-call.
 verify_jwt = false
+
+[functions.tutor-chat]
+# Auth is checked in code via auth.getUser. The gateway check rejects the
+# project's ES256 user tokens, so it must stay off for user-called functions.
+verify_jwt = false
