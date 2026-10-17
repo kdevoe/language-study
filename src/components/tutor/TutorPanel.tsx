@@ -63,6 +63,7 @@ export function TutorPanel() {
   const lookup = useWordLookup();
 
   useScrollLock(open);
+  useDimmedStatusBar(open);
 
   // Each open: snapshot the screen (or the asked-about item), load today's thread once.
   useEffect(() => {
@@ -378,6 +379,21 @@ function Recap({ recap, added, onAdd, onDone }: {
       <button className="tutor-done" onClick={onDone}>完了</button>
     </div>
   );
+}
+
+/** iOS paints the status-bar strip from theme-color, outside the page, so the
+ *  backdrop can't dim it. While the panel is open, set it to the current colour
+ *  under the backdrop's 35% #2d2d2d, and put the old colour back on close. */
+function useDimmedStatusBar(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const was = meta?.content;
+    if (!meta || !was || !/^#[0-9a-f]{6}$/i.test(was)) return;
+    const dim = (i: number) => Math.round(parseInt(was.slice(i, i + 2), 16) * 0.65 + 45 * 0.35).toString(16).padStart(2, '0');
+    meta.content = `#${dim(1)}${dim(3)}${dim(5)}`;
+    return () => { meta.content = was; };
+  }, [open]);
 }
 
 /** The visible area while the on-screen keyboard is up, else null. iOS pans the

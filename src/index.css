@@ -395,8 +395,10 @@ body.song-mode {
 }
 
 /* ── ハルカ, the tutor panel (design-system §6.17, docs/mockups/tutor.html) ── */
-.tutor-backdrop { position: fixed; inset: 0; z-index: 44; background: rgba(45, 45, 45, 0.35); opacity: 0; pointer-events: none; transition: opacity 0.35s; }
-.tutor-backdrop.on { opacity: 1; pointer-events: auto; }
+/* Hidden (not just transparent) when off: iOS reads the colour of a fixed
+   full-screen layer for its status bar even at opacity 0, leaving it grey. */
+.tutor-backdrop { position: fixed; inset: 0; z-index: 44; background: rgba(45, 45, 45, 0.35); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.35s, visibility 0s 0.35s; }
+.tutor-backdrop.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.35s; }
 .tutor-panel {
   position: fixed; top: 0; bottom: 0; z-index: 45; width: min(88vw, 420px);
   display: flex; flex-direction: column; background: var(--bg-color);
