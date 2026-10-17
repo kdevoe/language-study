@@ -3,6 +3,8 @@ The reference for how the app looks and moves. Check new UI against it before bu
 
 Interactive reference: `docs/mockups/podcast-create.html` shows the slider toggle, bottom sheet and create button below working together.
 
+**Mockups must size things the way the app does.** Build a mockup's phone at a real phone size (390 × 844), and size each component with the same rule the code uses: the same max width, height cap and aspect ratio. Then carry those rules into the code, not just the font sizes. Text is in fixed rem, so a container that grows with the viewport changes the balance even when every font size matches. The study card was tuned on a fixed 296 × 470 card, but shipped sized by viewport height. On a phone it grew to about 315 × 612, with the text floating in white space (fixed in #175, §6.16). Before merging, compare one screenshot at phone size against the mockup.
+
 * * *
 ## 1. Principles
 The look comes from Japanese and Scandinavian minimalism. The ideas below (ma, kanso, shibui) come from that tradition.
