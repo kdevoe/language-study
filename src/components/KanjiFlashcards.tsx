@@ -186,7 +186,7 @@ export function KanjiFlashcards({
             index={index}
             total={total}
             revealed={revealed}
-            height={focusActive ? 'min(660px, 74vh)' : 'min(540px, 62vh)'}
+            maxHeight={focusActive ? '74vh' : '62vh'}
             onClick={(e) => {
               e.stopPropagation();
               setFocused(true);

@@ -519,7 +519,7 @@ function FlipSurface({ cardKey, index, total, word, revealed, onReveal, onAdvanc
           index={index}
           total={total}
           revealed={revealed}
-          height={tall ? 'min(660px, 74vh)' : 'min(540px, 62vh)'}
+          maxHeight={tall ? '74vh' : '62vh'}
           cursor={revealed && !onAdvance ? 'default' : 'pointer'}
           onClick={(e) => {
             e.stopPropagation();

@@ -284,6 +284,8 @@ Source of truth: `src/components/WordModal.tsx` (grammar mode), `src/services/gr
 ### 6.16 Flashcards: deck rows, the study card and the grade slider
 Source of truth: `src/components/Review.tsx`, `Flashcards.tsx`, `KanjiFlashcards.tsx`, `StudyCard.tsx`, `GradeSlider.tsx`, the `.study-*` rules in `index.css`, mockups `docs/mockups/kanji-deck.html` and `flashcard-feel-2.html` (variant C).
 
+- **Proportions.** The card keeps the mockup's 296 × 470 shape (`aspect-ratio`, width up to 340px), capped at 62vh (74vh in focus mode) on short screens. Don't size it by viewport height alone: on a tall phone that stretched it into a column of white space around the fixed-size text.
+  
 - **The study card is lifted paper.** It's the one surface allowed real depth: no border, three stacked soft shadows (`0 1px 2px / 0 8px 18px / 0 24px 48px`, warm ink `rgba(40,40,30,…)` at 0.06–0.08), and a separate blurred ellipse on the "table" under its bottom edge. That ground shadow paints **behind** the card, never over its face. The cards still to come wait underneath: up to two, bottom-anchored at `12px / 0.95` and `22px / 0.9` (75% opacity), and the pile thins as the session goes.
   
 - **It moves only when touched, and quietly.** Press: it sinks to `scale(0.985)`, 1px down, and the shadow tightens (0.18s). Flip: it turns evenly in 0.6s `cubic-bezier(0.45, 0, 0.2, 1)`, **no spring**, rising 6px and growing about 1% mid-turn while the ground shadow softens. Move on: it drifts up 24px as it fades (0.34s), straight up, no sideways throw or tilt. The pile moves up one place underneath, so the next card is already there. Reduced motion drops the rise and the press. **Don't** add idle drift, springs or a bigger lift; the user tried them and they read as too much.
