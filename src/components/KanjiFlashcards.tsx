@@ -39,12 +39,15 @@ export function KanjiFlashcards({
   onRemainingChange,
   onDone,
   topOffset = '0rem',
+  focusKey,
 }: {
   onFocusChange?: (focused: boolean) => void;
   onRemainingChange?: (remaining: number) => void;
   /** Offered on the finish screen ("単語へ"), when there are vocab cards waiting. */
   onDone?: () => void;
   topOffset?: string;
+  /** Bumped each time the deck is opened from the deck rows: enter focus mode at once. */
+  focusKey?: number;
 }) {
   const review = useKanjiStore((s) => s.review);
   const progress = useKanjiStore((s) => s.progress);
@@ -54,6 +57,7 @@ export function KanjiFlashcards({
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [focused, setFocused] = useState(false);
+  useEffect(() => { if (focusKey) setFocused(true); }, [focusKey]);
   const [pick, setPick] = useState<Rating>(3);
   const thinkMs = useRef<number | null>(null);
   const shownAt = useRef(Date.now());
@@ -66,12 +70,18 @@ export function KanjiFlashcards({
     return () => { live = false; };
   }, []);
 
-  // The app-open sync / daily drip can land after mount with an empty deck.
+  // The app-open sync and the daily drip can land after mount (the session stays
+  // mounted once opened): append anything newly due that isn't in this session yet,
+  // so today's new kanji join the run instead of waiting for the next visit. They
+  // go at the end, after the reviews, as selectKanjiDeck orders them.
   useEffect(() => {
-    if (cards.length > 0) return;
     const fresh = buildKanjiDeck();
-    if (fresh.length > 0) { setCards(fresh); setIndex(0); setRevealed(false); }
-  }, [cards.length, progress]);
+    setCards((cur) => {
+      const have = new Set(cur.map((c) => c.kanji));
+      const added = fresh.filter((c) => !have.has(c.kanji));
+      return added.length > 0 ? [...cur, ...added] : cur;
+    });
+  }, [progress]);
 
   const total = cards.length;
   const card = cards[index];
@@ -95,8 +105,12 @@ export function KanjiFlashcards({
     setRevealed(true);
   }
 
+  // A grade tap and a card tap can both land for one card (the slider commits a
+  // beat after its tap): only the first grades it.
+  const gradedKanji = useRef<string | null>(null);
   function grade(rating: Rating) {
-    if (!card) return;
+    if (!card || gradedKanji.current === card.kanji) return;
+    gradedKanji.current = card.kanji;
     if (thinkMs.current != null) recordThinkTime('kanji', thinkMs.current);
     review(card.kanji, rating, thinkMs.current, Date.now());
     setRevealed(false);
@@ -208,7 +222,7 @@ export function KanjiFlashcards({
               // BACK — kanji, keyword, readings, parts, then known words (no rule, no
               // title), centred above the slider and nudged up 6px. Sizes from the
               // tuning panel in docs/mockups/flashcard-feel-2.html.
-              <CardFace back footer={<GradeSlider value={pick} onChange={setPick} />}>
+              <CardFace back footer={<GradeSlider value={pick} onChange={setPick} onCommit={grade} />}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translateY(-6px)' }}>
                   <span className="serif" translate="no" style={{ fontSize: '7.2rem', lineHeight: 1, color: 'var(--text-main)' }}>
                     {card.kanji}
