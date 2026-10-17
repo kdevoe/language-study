@@ -192,6 +192,7 @@ export function TutorPanel() {
 
   const side = hand === 'left' ? 'l' : 'r';
   const sign = side === 'r' ? 1 : -1;
+  const keyboard = useKeyboardOpen();
   const width = Math.min(window.innerWidth * 0.88, 420);
   const offset = open ? closeDrag : drag !== null ? Math.max(0, width - drag) : width * 1.05;
   const dragging = drag !== null || closeDrag > 0;
@@ -205,7 +206,7 @@ export function TutorPanel() {
     <>
       <div className={`tutor-backdrop${backdropOn ? ' on' : ''}`} onClick={closeTutor} />
       <aside
-        className={`tutor-panel ${side}${dragging ? ' dragging' : ''}`}
+        className={`tutor-panel ${side}${dragging ? ' dragging' : ''}${keyboard ? ' kb' : ''}`}
         style={{ transform: `translateX(${sign * offset}px)`, visibility: open || drag !== null ? 'visible' : 'hidden' }}
         aria-hidden={!open}
         aria-label="ハルカ"
@@ -256,6 +257,8 @@ export function TutorPanel() {
                 rows={1}
                 value={draft}
                 placeholder="ハルカに話しかける…"
+                enterKeyHint="send"
+                autoComplete="off"
                 onChange={(e) => {
                   setDraft(e.target.value);
                   e.target.style.height = 'auto';
@@ -366,4 +369,17 @@ function Recap({ recap, added, onAdd, onDone }: {
       <button className="tutor-done" onClick={onDone}>完了</button>
     </div>
   );
+}
+
+/** True while the on-screen keyboard is up (the visual viewport is well short of the layout one). */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setOpen(window.innerHeight - vv.height > 120);
+    vv.addEventListener('resize', check);
+    return () => vv.removeEventListener('resize', check);
+  }, []);
+  return open;
 }
