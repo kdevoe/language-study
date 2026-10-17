@@ -7,6 +7,8 @@ import { canonicalWordKey } from '../services/wordKey';
 import { rtkKanjiMap } from '../data/rtkKanji';
 import { useEffect, useRef } from 'react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useTutorMaybe } from './tutor/TutorProvider';
+import type { ScreenContext } from '../services/tutor';
 
 export interface WordDetails {
   word: string;
@@ -54,6 +56,8 @@ interface Props {
   onDismissStart?: () => void; 
   mode: 'word' | 'sentence' | 'grammar';
   wordData: WordDetails | null;
+  /** Word mode: the sentence the word was tapped in. */
+  wordSentence?: string;
   sentenceText?: string;
   sentenceTranslation?: string;
   anchor: 'top' | 'bottom';
@@ -71,8 +75,8 @@ interface Props {
 }
 
 export function WordModal({ 
-  isOpen, onClose, onDismissStart, mode, wordData, 
-  sentenceText, sentenceTranslation, 
+  isOpen, onClose, onDismissStart, mode, wordData, wordSentence,
+  sentenceText, sentenceTranslation,
   anchor, onSetMastery, isLoading, targetRect,
   grammar, patterns = [], sentencePoints = [], onOpenPoint, onGrammarBack, onAsWord,
 }: Props) {
@@ -135,7 +139,46 @@ export function WordModal({
     );
   };
 
-  const kickerStyle: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 900, color: OLIVE, display: 'flex', alignItems: 'center', gap: '0.5rem', letterSpacing: '0.05em' };
+  // ハルカに聞く: open the tutor about exactly this word / point / sentence. The
+  // screen's own chip (the article, the episode) rides along after it.
+  const tutor = useTutorMaybe();
+  const askHaruka = () => {
+    if (!tutor) return;
+    const screen = tutor.snapshot();
+    const where = screen?.detail ? ` ${screen.detail}` : '';
+    const withScreen = (chip: string) => (screen?.chip ? `${chip} · ${screen.chip}` : chip);
+    let ask: ScreenContext | null = null;
+    if (mode === 'grammar' && grammar) {
+      const p = GRAMMAR_POINTS[grammar.id];
+      if (p) ask = {
+        screen: screen?.screen ?? 'lookup',
+        chip: withScreen(p.pattern),
+        detail: `The learner opened the grammar point ${p.pattern} (${p.meaning}; id ${p.id}; their rating ${(grammarProgress[p.id]?.mastery ?? 'unrated').toUpperCase()})${grammar.hit ? ` as used in 「${grammar.hit.sentence}」` : ''} and asked you about it.${where}`,
+      };
+    } else if (mode === 'sentence' && sentenceText) {
+      ask = {
+        screen: screen?.screen ?? 'lookup',
+        chip: withScreen(`「${sentenceText.length > 10 ? `${sentenceText.slice(0, 10)}…` : sentenceText}」`),
+        detail: `The learner tapped this sentence to translate it: 「${sentenceText}」${sentenceTranslation ? ` (app translation: "${sentenceTranslation}")` : ''} and asked you about it.${where}`,
+      };
+    } else if (wordData) {
+      ask = {
+        screen: screen?.screen ?? 'lookup',
+        chip: withScreen(wordData.word),
+        detail: `The learner looked up ${wordData.word} (${wordData.reading}; ${wordData.meaning || 'no gloss'}${wordData.jlptLevel ? `; N${wordData.jlptLevel}` : ''})${wordSentence ? ` in the sentence 「${wordSentence}」` : ''} and asked you about it.${where}`,
+      };
+    }
+    if (!ask) return;
+    executeClose();
+    tutor.openTutor({ ask });
+  };
+  const askButton = tutor ? (
+    <button key="ask" className="tutor-ask" onClick={askHaruka}>
+      <span className="tutor-av sm">ハ</span>ハルカに聞く<ChevronRight size={15} />
+    </button>
+  ) : null;
+
+  const kickerStyle: React.CSSProperties ={ fontSize: '0.7rem', fontWeight: 900, color: OLIVE, display: 'flex', alignItems: 'center', gap: '0.5rem', letterSpacing: '0.05em' };
   const subKickerStyle: React.CSSProperties = { fontSize: '0.66rem', fontWeight: 800, letterSpacing: '0.1em', color: 'var(--text-muted)', margin: '1.1rem 0 0.35rem' };
 
   /** One grammar point as a tappable row (PATTERNS, the sentence's list). The dot
@@ -236,6 +279,7 @@ export function WordModal({
           )}
         </div>
       ),
+      askButton,
     ];
     return (
       <div style={{ display: 'flex', flexDirection: anchor === 'bottom' ? 'column' : 'column-reverse', paddingBottom: anchor === 'bottom' ? '1rem' : 0 }}>
@@ -279,6 +323,7 @@ export function WordModal({
               {renderPointRows(sentencePoints)}
             </div>
           )}
+          {!isLoading && <div style={{ marginTop: '1rem' }}>{askButton}</div>}
         </div>
       );
     }
@@ -476,7 +521,9 @@ export function WordModal({
       )
     };
 
-    const orderedList = [sections.header, sections.translation, sections.mastery, sections.grammar, sections.status];
+    // The ask link tucks up under the INSIGHT box (which keeps a wide gap below it).
+    const ask = askButton && <div key="ask" style={{ marginTop: anchor === 'bottom' ? '-1.5rem' : 0 }}>{askButton}</div>;
+    const orderedList = [sections.header, sections.translation, sections.mastery, sections.grammar, ask, sections.status];
     
     return (
       <div style={{ 

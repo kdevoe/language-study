@@ -604,7 +604,19 @@
   - [ ] New kanji / day is per device (kanji store), not synced to user_preferences
 - [x] Flashcard feel: the study card as lifted paper with a pile underneath, a quiet press / flip / lift-away, bigger kanji, slider raised and caption removed (both decks; StudyCard.tsx, mockups docs/mockups/flashcard-feel.html → flashcard-feel-2.html variant C)
 - [ ] Tutorial mode: first-run hints for non-obvious gestures (tap the card to move on, the thinking-time default, swipe to dismiss in the feed)
-- [ ] Tutor & speaking partner (proposal, 2026-10-17) — docs/tutor-agent-design.md: one persona (a podcast cast
-      member) who chats in Japanese at the learner's level and steps out to explain; opens from a gesture on any
-      screen with that screen's context; memory, tools, voice later. First step: mockup, then "ask your tutor
-      about this" from the Reader
+- [/] ハルカ agent: tutor + learner memory + news editor (branch feat/haruka-agent; docs/tutor-agent-design.md,
+      docs/learner-memory-design.md, mockup docs/mockups/tutor.html, design-system §6.17)
+  - [x] database/36_learner_memory.sql — signals (finished_at, read time, topic, summary, pick reason, song
+        plays, synced grammar ratings), tutor threads/messages, notes, digests, versioned profiles, briefs,
+        learner_events view, nightly/weekly dream + 30-day transcript crons (**apply by hand**)
+  - [x] learner-dream edge fn: nightly Haiku (digest, guarded profile version, tomorrow's brief), weekly Sonnet prune
+  - [x] fetch-raw-news: Haiku editor for the buffer (memory-aware shortlist → full text → pick, variety first,
+        keyed Jina → web_fetch), cached in news_editor_runs; Groq clustering removed (client feed: no-LLM grouping)
+  - [x] tutor-chat edge fn: Sonnet (TUTOR_MODEL), streaming, tools (lookup, text, deck offer, usage, notes,
+        preferences, history search, grammar-rating suggestion, podcast request), cached prompt, recap
+  - [x] UI: side panel, hand-side edge swipe + nav drag-up fallback, Home card, ハルカに聞く in word/grammar/
+        sentence panels, screen context (Reader, both decks front-only, podcast, song), audio pause, recap
+  - [x] Settings › ハルカ: edge, corrections, aside language, "What ハルカ knows" with delete + forget everything
+  - [ ] Deploy learner-dream, tutor-chat, fetch-raw-news, ensure-buffer, process-article; test edge swipe in the
+        installed PWA; read real conversations before merge
+  - [ ] Later: level check on replies, request_content long reads, voice (tutor doc §9)

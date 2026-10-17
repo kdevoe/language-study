@@ -25,6 +25,9 @@ import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { OpenSettingsContext, PageHeading, type TitleSwitch } from './components/PageHeading'
 import { muteChromeScroll, isChromeScrollMuted } from './services/chromeScroll'
+import { TutorProvider } from './components/tutor/TutorProvider'
+import { TutorPanel } from './components/tutor/TutorPanel'
+import { TutorEdge } from './components/tutor/TutorEdge'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -794,6 +797,7 @@ function App() {
 
   return (
     <OpenSettingsContext.Provider value={openSettings}>
+    <TutorProvider>
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <UpdatePrompt />
       {actionError && (
@@ -942,7 +946,11 @@ function App() {
         onChange={handleTabChange}
         isVisible={showNav && !isReading && !(activeTab === 'flashcards' && studyFocus)}
       />
+      {/* ハルカ, available on every screen: edge swipe, the Home card, ハルカに聞く. */}
+      <TutorEdge />
+      <TutorPanel />
     </div>
+    </TutorProvider>
     </OpenSettingsContext.Provider>
   )
 }

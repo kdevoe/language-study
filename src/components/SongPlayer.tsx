@@ -15,6 +15,7 @@ import { cachedAudioUrl, saveAudio } from '../services/audioCache';
 import { AddToListSheet } from './AddToListSheet';
 import { coverOf, useCoverMap } from './MusicParts';
 import { usePlaylists } from '../services/playlists';
+import { useTutorScreen } from './tutor/TutorProvider';
 
 // Song player (mockup docs/mockups/lyrics.html, phone B 霧): the whole player
 // sits on soft blue (body.song-mode). Cover, title and style open big; as the
@@ -127,6 +128,17 @@ export function SongPlayer({ song: initial, queue = [initial], context = null, o
   const programmaticScrollUntil = useRef(0);
   const resumeAfterModal = useRef(false);
   const prepared = useRef<Prepared | null>(null);
+
+  // ハルカ sees the song and the line being sung.
+  useTutorScreen(() => {
+    const line = curLineRef.current?.textContent?.trim() ?? '';
+    const title = initial.title || '曲';
+    return {
+      screen: 'song',
+      chip: line ? `${title} · 「${line.length > 10 ? `${line.slice(0, 10)}…` : line}」` : title,
+      detail: `They are listening to the song "${title}" (song id ${initial.id}).${line ? ` The line being sung: 「${line}」` : ''}`,
+    };
+  });
 
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const lookup = useWordLookup();

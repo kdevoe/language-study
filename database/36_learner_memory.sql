@@ -94,7 +94,8 @@ create index if not exists idx_tutor_threads_user on public.tutor_threads(user_i
 
 -- role 'context' = a screen-context snapshot appended when the panel opens from a
 -- new place. content = the raw API content blocks (text, tool_use, tool_result)
--- so the thread replays exactly; text = what the panel shows.
+-- so the thread replays exactly; text = what the panel shows (null for a
+-- tool-result turn, which is stored as role 'user' like the API's).
 create table if not exists public.tutor_messages (
   id         uuid default gen_random_uuid() primary key,
   thread_id  uuid references public.tutor_threads on delete cascade not null,
@@ -251,7 +252,7 @@ with (security_invoker = true) as
   union all
   select user_id, created_at, 'tutor_message', thread_id::text,
          jsonb_build_object('text', left(text, 400))
-    from public.tutor_messages where role = 'user';
+    from public.tutor_messages where role = 'user' and text is not null;  -- not tool results
 
 -- ── Nightly + weekly dream, transcript retention ────────────────────────────
 -- learner_dream_active_users: one fire-and-forget POST to learner-dream per

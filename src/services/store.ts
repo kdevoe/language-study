@@ -257,6 +257,9 @@ interface AppState {
   // Which screen edge opens ハルカ (left for left-handed use).
   tutorHand: 'right' | 'left';
   setTutorHand: (hand: 'right' | 'left') => void;
+  // The article open in the Reader right now (not persisted): lookups name it.
+  readingArticle: { id: string; title: string } | null;
+  setReadingArticle: (a: { id: string; title: string } | null) => void;
   // Adaptive UI labels (docs/design-system.md §6.10): English by default, a label
   // switches to Japanese once the reader learns its word. `labelStages` keeps the
   // stage each label has switched to (0 English, 1.. Japanese) — sticky, so a
@@ -382,6 +385,8 @@ export const useAppStore = create<AppState>()(
       readerFontWeight: 500,
       grammarProgress: {},
       tutorHand: 'right',
+      readingArticle: null,
+      setReadingArticle: (a) => set({ readingArticle: a }),
       uiLanguage: 'adaptive',
       labelStages: {},
 
@@ -639,7 +644,7 @@ export const useAppStore = create<AppState>()(
                 m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
                 // A lookup carries the word and the article it happened in, so
                 // learner memory can say "looked up 物価 in the BOJ article".
-                const art = get().currentArticle;
+                const art = get().readingArticle;
                 m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, withoutLookup ? 'seen' : 'lookup',
                   withoutLookup ? undefined : { word, ...(art ? { articleId: art.id, articleTitle: art.title } : {}) });
               });

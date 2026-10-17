@@ -1,5 +1,7 @@
 import { House, BookOpen, Headphones, Layers } from 'lucide-react';
+import { useRef } from 'react';
 import { AdaptiveLabel } from './AdaptiveLabel';
+import { useTutorMaybe } from './tutor/TutorProvider';
 
 export type Tab = 'today' | 'read' | 'listen' | 'flashcards' | 'settings';
 
@@ -9,7 +11,23 @@ interface Props {
   isVisible?: boolean;
 }
 
+// Dragging up on the nav opens ハルカ: the way in from a Safari tab, where the
+// browser keeps the screen edges for back/forward (docs/tutor-agent-design.md §2).
+const NAV_DRAG_PX = 40;
+
 export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
+  const tutor = useTutorMaybe();
+  const dragStart = useRef<{ y: number; x: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => { dragStart.current = { y: e.touches[0].clientY, x: e.touches[0].clientX }; };
+  const onTouchMove = (e: React.TouchEvent) => {
+    const s = dragStart.current;
+    if (!s || !tutor) return;
+    const dy = s.y - e.touches[0].clientY;
+    if (dy > NAV_DRAG_PX && dy > Math.abs(e.touches[0].clientX - s.x) * 1.5) {
+      dragStart.current = null;
+      tutor.openTutor();
+    }
+  };
   const tabs = [
     { id: 'today', label: 'today', icon: House },
     { id: 'read', label: 'read', icon: BookOpen },
@@ -18,7 +36,7 @@ export function BottomNav({ activeTab, onChange, isVisible = true }: Props) {
   ] as const;
 
   return (
-    <nav style={{
+    <nav onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={() => { dragStart.current = null; }} style={{
       position: 'fixed',
       left: 0,
       right: 0,

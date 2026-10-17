@@ -17,6 +17,7 @@ import {
 import { castMember } from '../data/podcastCast';
 import { isUnlockClip, sharedAudio } from '../services/sharedAudio';
 import { cachedAudioUrl, cleanPodcastBlob, saveAudio } from '../services/audioCache';
+import { useTutorScreen } from './tutor/TutorProvider';
 
 // Podcast player (docs/podcast-design.md §6.2, mockup docs/mockups/listen.html):
 // the transcript IS the interface. The playing sentence gets a soft tint, the
@@ -84,6 +85,18 @@ export function PodcastPlayer({ episode: initial }: { episode: PodcastEpisode })
 
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const lookup = useWordLookup();
+
+  // ハルカ sees the episode and the sentence being spoken (audio pauses while she's open).
+  useTutorScreen(() => {
+    const t = audioRef.current?.currentTime ?? 0;
+    const clock = `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+    const line = curSentRef.current?.textContent?.trim() ?? '';
+    return {
+      screen: 'podcast',
+      chip: `番組 · ${clock}`,
+      detail: `They are listening to the podcast episode "${initial.title}" (podcast id ${initial.id}) at ${clock}.${line ? ` The sentence being spoken: 「${line}」` : ''}`,
+    };
+  });
 
   autoScrollRef.current = autoScroll;
 
