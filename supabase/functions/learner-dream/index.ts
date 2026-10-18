@@ -20,9 +20,11 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { actingUserId, resolveCaller } from '../_shared/auth.ts';
-import { CLAUDE_SONNET, DREAM_MODEL } from '../_shared/models.ts';
+import { CLAUDE_HAIKU, CLAUDE_SONNET, DREAM_MODEL, RESEARCH_MODEL } from '../_shared/models.ts';
+import { research } from '../_shared/research.ts';
+import { hasContact } from '../_shared/researchFilter.ts';
 import { dataRule, fence } from '../_shared/untrusted.ts';
-import { callTool, emptyUsage } from '../_shared/claude.ts';
+import { callTool, emptyUsage, type Usage } from '../_shared/claude.ts';
 import {
   type LearnerBrief, type LearnerProfile, type ProfileItem,
   PROFILE_MAX_CHARS, PROFILE_MAX_ITEMS,
@@ -37,6 +39,7 @@ const corsHeaders = {
 const MAX_DROPS_PER_NIGHT = 5;     // more than this in one pass = suspicious, keep yesterday's
 const FIRST_RUN_DAYS = 30;         // no profile yet: read a month so the first one isn't empty
 const THREAD_CHARS = 6000;         // per-thread transcript cap in the prompt
+const MAX_LOOKUPS = 2;             // overnight web research for tomorrow's openers
 
 const ITEM_SCHEMA = {
   type: 'object',
@@ -96,6 +99,12 @@ const BRIEF_SCHEMA = {
         properties: { kind: { type: 'string', enum: ['longform', 'podcast'] }, topic: { type: 'string' }, why: { type: 'string' } },
         required: ['kind', 'topic', 'why'],
       },
+    },
+    lookups: {
+      type: 'array',
+      maxItems: MAX_LOOKUPS,
+      items: { type: 'string' },
+      description: `0-${MAX_LOOKUPS} short English questions worth looking up on the web for tomorrow's chat`,
     },
   },
   required: ['editor', 'studyFocus', 'openers', 'ideas'],
@@ -202,7 +211,7 @@ Call write_memory with:
 - threadSummaries: 1-2 sentences per conversation above (by thread id).
 - profile: the whole new profile (replace, merge, prune as the rules say).
 - changes: short phrases for what's new, faded and updated vs the current profile.
-- brief: for tomorrow. editor.dueTopics = 1-2 of their chosen topic ids that were rare lately; angles and followUps from interests; studyFocus = 2-3 words or grammar points to weave into articles and chat; openers = 1-3 short Japanese lines ハルカ could open with, at their level, about something real (a finished article, a plan they mentioned) — no generic greetings; ideas = 0-2 long reads or podcasts they might want, offered not created.`;
+- brief: for tomorrow. editor.dueTopics = 1-2 of their chosen topic ids that were rare lately; angles and followUps from interests; studyFocus = 2-3 words or grammar points to weave into articles and chat; openers = 1-3 short Japanese lines ハルカ could open with, at their level, about something real (a finished article, a plan they mentioned) — no generic greetings; ideas = 0-2 long reads or podcasts they might want, offered not created; lookups = 0-${MAX_LOOKUPS} questions about the real world worth looking up for tomorrow, tied to the learner (a trip or event coming up soon: what's on, the season; a story they followed: what happened since; a team, show or place they care about). Facts only, never about the Japanese language. Empty when nothing fits.`;
 
   const out = await callTool<{
     digest: string;
@@ -229,13 +238,15 @@ Call write_memory with:
     },
   });
 
+  const researchUsage = emptyUsage(RESEARCH_MODEL);
+  const brief = await researchForBrief(out.brief as LearnerBrief & { lookups?: unknown }, prefs.data?.jlpt_level, researchUsage);
   const profile = cleanProfile(out.profile, forgotten);
   const guard = checkGuards(prev?.profile ?? null, profile);
   const stats = activityStats(evs);
 
   await Promise.all([
     admin.from('learner_digests').upsert({ user_id: userId, day: digestDay, text: out.digest, stats }),
-    admin.from('learner_briefs').upsert({ user_id: userId, day: today, brief: out.brief }),
+    admin.from('learner_briefs').upsert({ user_id: userId, day: today, brief }),
     insertVersion(admin, userId, prev?.version ?? 0, 'nightly', profile, out.changes, guard, usage),
     ...(out.threadSummaries ?? []).map((t) =>
       admin.from('tutor_threads').update({ summary: t.summary }).eq('user_id', userId).eq('id', t.threadId)),
@@ -244,7 +255,53 @@ Call write_memory with:
       : Promise.resolve(),
   ]);
 
-  return { events: evs.length, notes: noteRows.length, accepted: guard.ok, guard: guard.notes, items: profile.items.length, costUsd: +usage.costUsd.toFixed(5) };
+  return {
+    events: evs.length, notes: noteRows.length, accepted: guard.ok, guard: guard.notes, items: profile.items.length,
+    lookups: brief.research?.length ?? 0, costUsd: +(usage.costUsd + researchUsage.costUsd).toFixed(5),
+  };
+}
+
+/**
+ * Look up the brief's questions (quarantined: _shared/research.ts) and write
+ * openers from the checked facts. The writer sees only those facts, fenced, and
+ * has no tools but its output. Best effort: on failure the brief is unchanged.
+ */
+async function researchForBrief(raw: LearnerBrief & { lookups?: unknown }, jlpt: number | null | undefined, usage: Usage): Promise<LearnerBrief> {
+  const { lookups, ...brief } = raw;
+  const questions = (Array.isArray(lookups) ? lookups : [])
+    .filter((q): q is string => typeof q === 'string' && q.trim().length >= 5)
+    .map((q) => q.trim().slice(0, 200)).slice(0, MAX_LOOKUPS);
+  if (!questions.length) return brief;
+  const found: NonNullable<LearnerBrief['research']> = [];
+  for (const q of questions) {
+    try {
+      const r = await research(q, usage);
+      if (r.facts.length) found.push({ question: q, facts: r.facts });
+    } catch (e) {
+      console.warn('[learner-dream] lookup failed:', e instanceof Error ? e.message : e);
+    }
+  }
+  if (!found.length) return brief;
+  try {
+    const facts = found.map((f) => `${f.question}\n${f.facts.map((x) => `- ${x.fact} (${x.source})`).join('\n')}`).join('\n\n');
+    const out = await callTool<{ openers: string[] }>({
+      model: CLAUDE_HAIKU, usage, maxTokens: 800, name: 'write_openers',
+      description: "Short Japanese lines ハルカ could open tomorrow's chat with.",
+      prompt: `ハルカ is a friendly Japanese tutor. Write 1-2 short, natural Japanese lines she could open tomorrow's chat with, each built on one of these facts, at JLPT ${jlpt ? `N${jlpt}` : 'N4'} or easier. Casual, like a friend who saw something and thought of them; end with an easy question. No links, no romaji, no markup.
+
+${fence('research', facts)}
+
+${dataRule(['research'])}`,
+      schema: { type: 'object', properties: { openers: { type: 'array', items: { type: 'string' } } }, required: ['openers'] },
+    });
+    const fresh = (out.openers ?? [])
+      .filter((o) => typeof o === 'string' && o.trim().length >= 4 && o.length <= 120 && !hasContact(o) && !/[<>]/.test(o))
+      .slice(0, 2);
+    return { ...brief, openers: [...fresh, ...(brief.openers ?? [])].slice(0, 3), research: found };
+  } catch (e) {
+    console.warn('[learner-dream] openers from research failed:', e instanceof Error ? e.message : e);
+    return { ...brief, research: found };
+  }
 }
 
 // ── Weekly ───────────────────────────────────────────────────────────────────

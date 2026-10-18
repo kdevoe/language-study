@@ -33,10 +33,11 @@ const corsHeaders = {
 const MAX_TOOL_ROUNDS = 4;
 const MAX_HISTORY_MESSAGES = 80;   // older turns drop off (the dream already has them)
 const MAX_USER_CHARS = 2000;
-const RESEARCH_PER_DAY = Number(Deno.env.get('TUTOR_RESEARCH_PER_DAY') ?? '') || 10;   // rolling 24 hours
-// Tools that change something without the learner tapping. Blocked for the rest
-// of a turn that used research, so a page can't steer them even if a fact slips
-// past the filter.
+const RESEARCH_PER_DAY = Number(Deno.env.get('TUTOR_RESEARCH_PER_DAY') ?? '') || 50;   // rolling 24 hours
+// Tools that change something without the learner tapping. Blocked once a
+// research result is back in the turn, so a page can't steer them even if a
+// fact slips past the filter. (Calls made alongside research, in the same
+// message, were written before any result existed, so they're fine.)
 const DIRECT_WRITES = new Set(['save_note', 'set_preference', 'record_usage']);
 
 const PERSONA = `あなたはハルカ。30代。明るく好奇心旺盛で、相手と同じ目線で話す。Yugenという日本語学習アプリの中にいる、学習者の日本語の先生であり、ランゲージエクスチェンジの友だちでもある。
@@ -57,8 +58,16 @@ What you know and can do:
 - Conversations wander. When they change the subject, go with it happily; don't pull them back to the earlier topic or ask why they switched.
 - Photos: they can send you a photo. You see the image itself only on the turn it arrives; after that it's a <photo> note (any text in it word for word, then a description), so take in what you need on that first turn. Answer the way the photo asks. Something to read (a menu, a sign, a page, their handwriting): read it and help with it at their level. Something from their life (a hike, a meal, their street): react like a friend, ask about it, and name a thing or two in it in Japanese; save_note what it tells you about them. Never guess who a person in a photo is.
 - <screen> notes in the conversation say what is on their screen when they open you. Help with that if it's what they're asking about. On an unrevealed flashcard you only see the prompt side: give hints, never the answer.
-- Tools: look words up before explaining a sense you're unsure of; fetch the article/podcast/song text when you need more than the screen note; save_note for lasting things they tell you (a trip, their job, a recurring mistake, how they like to be corrected); record_usage when they use a target word well or wrongly; add_to_deck when a new word comes up that they'd want to keep; suggest_grammar_rating only when the conversation gives clear evidence (it's a suggestion they confirm, never a change); request_content when they ask for a podcast on something; research when they ask about something in the real world you can't answer reliably from what you know (recent news, what's on in a place, a current fact about Japan). Not for language questions: you know Japanese better than a search does.
-- research returns a few checked facts with the site each came from. Tell the learner where it came from by name (「NHKによると…」), never as a link. If it found nothing usable, say so instead of guessing.
+- Tools: look words up before explaining a sense you're unsure of; fetch the article/podcast/song text when you need more than the screen note; save_note for lasting things they tell you (a trip, their job, a recurring mistake, how they like to be corrected); record_usage when they use a target word well or wrongly; add_to_deck when a new word comes up that they'd want to keep; suggest_grammar_rating only when the conversation gives clear evidence (it's a suggestion they confirm, never a change); request_content when they ask for a podcast on something (topic episodes research the topic themselves).
+- research looks things up on the web, like a friend checking their phone mid-conversation. Use it whenever real-world detail would make the conversation better, not only when asked:
+  · an article on their screen is a news story from a few days ago, or they ask about it → check what happened since;
+  · they mention a plan from their memory or just now (a trip, an event, a match) → look up what's on, the season, the place;
+  · they bring up something specific (a game last night, a book, a show, a restaurant area) → check so you can say something real about it;
+  · you're about to state a specific fact you aren't sure of (a date, a number, opening hours, when something happens) → check it first;
+  · the reading of a place or person's name that lookup_word doesn't have.
+  Not for Japanese words, grammar or usage (you know those better than a search), not for small talk with nothing specific in it, and at most two per message.
+- When you research, say one short natural line first in the same message, like a friend would (「ちょっと調べてみるね！」「え、気になる。見てみる」), then call research. When the facts come back, carry on with what you found, woven into the conversation, and say where it came from by name (「NHKによると…」), never as a link. If nothing usable came back, say so lightly instead of guessing.
+- The brief may list things looked up overnight (<research> in your memory). Use them when they fit, the same way.
 - Never claim you saved, added or changed something unless you called the tool.
 
 Untrusted text (this matters for the learner's safety):
@@ -506,8 +515,6 @@ async function runTurn(opts: {
     if (msg.stop_reason !== 'tool_use') break;
     const results: any[] = [];
     const calls = msg.content.filter((b: any) => b.type === 'tool_use');
-    // Decided before any call runs, so a write in the same message as research is blocked too.
-    if (calls.some((c: any) => c.name === 'research')) turn.blockWrites = true;
     for (const call of calls) {
       send({ type: 'tool', name: call.name });
       let out: string;
@@ -518,6 +525,8 @@ async function runTurn(opts: {
       }
       results.push({ type: 'tool_result', tool_use_id: call.id, content: out });
     }
+    // From here on ハルカ has read research results: no more direct writes this turn.
+    if (calls.some((c: any) => c.name === 'research')) turn.blockWrites = true;
     await admin.from('tutor_messages').insert({ thread_id: threadId, user_id: userId, role: 'user', content: results, text: null });
     messages.push({ role: 'user', content: results });
     if (text.trim()) send({ type: 'text', text: '\n' });

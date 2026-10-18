@@ -245,7 +245,8 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
     const paraText = at?.textContent?.trim().slice(0, 400) ?? '';
     const title = currentArticle.title ?? '';
     const shortTitle = title.length > 12 ? `${title.slice(0, 12)}…` : title;
-    const part = workId ? `, part ${partIndex} of ${partCount} of a long read` : '';
+    const part = workId ? `, part ${partIndex} of ${partCount} of a long read`
+      : currentArticle.date ? `, a news story dated ${currentArticle.date}` : '';
     return {
       screen: 'reader',
       chip: paraNo ? `${shortTitle} · 段落${paraNo}` : shortTitle,

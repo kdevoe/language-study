@@ -649,8 +649,13 @@
   - [x] ハルカ web research (quarantined): `research` tool → Haiku + web_search (allowed news / encyclopedia /
         travel domains, ≤3 searches) with no other tools, reporting ≤5 short facts → `_shared/researchFilter.ts`
         deterministic checks (shape, links / contacts, text aimed at the agent or reader, source must be a page the
-        search returned) → fenced `<research>`; direct-write tools blocked for the rest of that turn; cap
-        TUTOR_RESEARCH_PER_DAY (default 10, rolling 24h); `node scripts/eval-research-filter.mjs` (offline)
+        search returned) → fenced `<research>`; direct-write tools blocked once a research result is back in the
+        turn; cap TUTOR_RESEARCH_PER_DAY (default 50, rolling 24h); `node scripts/eval-research-filter.mjs` (offline)
+  - [x] Research used more widely: ハルカ looks things up on her own (article follow-ups, the learner's plans,
+        specific things they mention, her own uncertain facts, name readings), says 「ちょっと調べてみるね」 first
+        (its own bubble) and follows up with what she found; article screen notes carry the story's date; topic
+        podcasts research the topic first; the nightly dream picks 0-2 lookups and writes openers from them
+        (brief.research, shown to ハルカ as <research> in memory)
   - [ ] Rollout: deploy tutor-chat (web search must be enabled for the org in the Claude Console); try a live
         question, then a planted page, and check the `[research] withheld:` logs
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);

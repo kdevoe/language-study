@@ -22,7 +22,9 @@
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
-import { GEMINI_FLASH, ELEVEN_DIALOGUE_MODEL } from '../_shared/models.ts';
+import { GEMINI_FLASH, ELEVEN_DIALOGUE_MODEL, RESEARCH_MODEL } from '../_shared/models.ts';
+import { emptyUsage } from '../_shared/claude.ts';
+import { research } from '../_shared/research.ts';
 import { CAST, STANDARD, pickPairing, personaById, type PairHistory, type Persona } from '../_shared/podcastCast.ts';
 import {
   buildPodcastPrompt,
@@ -182,6 +184,22 @@ async function loadSources(supabase: SupabaseClient, ep: EpisodeRow): Promise<Po
   }
 }
 
+/** Topic episodes: a few checked facts from quarantined web research. Best effort:
+ *  on failure the episode is written from general knowledge, as before. */
+async function researchTopic(topic: string, instructions?: string) {
+  if (topic.trim().length < 2) return null;
+  const usage = emptyUsage(RESEARCH_MODEL);
+  try {
+    const focus = instructions?.trim() ? ` The listener asked for this focus: ${instructions.trim().slice(0, 200)}` : '';
+    const r = await research(`Key facts and recent developments about: ${topic.trim()}.${focus}`.slice(0, 400), usage);
+    const notes = r.facts.map((f) => `- ${f.fact} (${f.source})`).join('\n');
+    return { notes: notes || undefined, usage: { facts: r.facts.length, withheld: r.withheld.length, searches: usage.webSearches, costUsd: +usage.costUsd.toFixed(5) } };
+  } catch (e) {
+    console.warn('[generate-podcast] topic research failed:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 const dateLabel = (ymd: string | null) => {
   const m = ymd?.match(/^\d{4}-(\d{2})-(\d{2})$/);
   return m ? `${Number(m[1])}月${Number(m[2])}日` : undefined;
@@ -201,6 +219,7 @@ async function runScriptStage(supabase: SupabaseClient, episodeId: string) {
     const guest = withOverride(personaById(ep.cast_ids?.guest ?? ''));
     if (!host || !guest) throw new Error('episode has no valid cast');
     const items = await loadSources(supabase, ep);
+    const looked = ep.source_kind === 'topic' ? await researchTopic(ep.source_ref ?? '', ep.source_payload?.instructions) : null;
     const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')!, httpOptions: { apiVersion: 'v1beta' } });
     const t0 = Date.now();
     const { script, usage } = await generateScript(ai, {
@@ -213,13 +232,14 @@ async function runScriptStage(supabase: SupabaseClient, episodeId: string) {
       targetChars: ep.minutes * CHARS_PER_MINUTE,
       dateLabel: ep.source_kind === 'digest' ? dateLabel(ep.source_ref) : undefined,
       instructions: ep.source_payload?.instructions,
+      researchNotes: looked?.notes,
     });
     await supabase.from('podcast_episodes').update({
       script,
       title: script.title,
       status: 'voicing',
       status_detail: null,
-      usage: { ...(ep.usage ?? {}), script: { ...usage, ms: Date.now() - t0 } },
+      usage: { ...(ep.usage ?? {}), script: { ...usage, ms: Date.now() - t0 }, ...(looked ? { research: looked.usage } : {}) },
       updated_at: new Date().toISOString(),
     }).eq('id', episodeId);
   } catch (err) {

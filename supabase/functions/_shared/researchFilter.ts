@@ -45,6 +45,13 @@ const SUSPICIOUS: [RegExp, string][] = [
   [/(指示|命令|ルール).{0,10}(無視|従|忘れ)|ください|なさい|しろ[。！!]?$|してね/, 'Japanese instruction'],
 ];
 
+/** True when text carries a link, email address or phone-like number. */
+export function hasContact(text: string): boolean {
+  if (URL_RE.test(text) || EMAIL_RE.test(text)) return true;
+  for (const m of text.matchAll(DIGIT_RUN_RE)) if ((m[0].match(/\d/g) ?? []).length >= 10) return true;
+  return false;
+}
+
 /** Bare lower-case hostname of a URL or domain-ish string, without www. */
 export function hostOf(s: string): string {
   const raw = String(s ?? '').trim().toLowerCase();
@@ -66,9 +73,7 @@ function problem(fact: string): string | null {
   if (/[\r\n]/.test(fact)) return 'multi-line';
   if (URL_RE.test(fact)) return 'link';
   if (EMAIL_RE.test(fact)) return 'email';
-  for (const m of fact.matchAll(DIGIT_RUN_RE)) {
-    if ((m[0].match(/\d/g) ?? []).length >= 10) return 'phone or account number';
-  }
+  if (hasContact(fact)) return 'phone or account number';
   for (const [re, why] of SUSPICIOUS) if (re.test(fact)) return why;
   return null;
 }

@@ -108,7 +108,10 @@ export function TutorPanel() {
     if (sentPhoto) keepThumb(sentPhoto.upload.id, localDay(), sentPhoto.thumb);
     const sentCtx = ctx && !chipOff ? ctx : undefined;
     const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;
-    const pendingKey = `p-${Date.now()}`;
+    // ハルカ's reply can span tool calls ("ちょっと調べてみるね" → research → what she
+    // found): each stretch of text is its own bubble, like the reloaded history.
+    let pendingKey = `p-${Date.now()}`;
+    let bubbleText = '';
     setLines((prev) => [
       ...prev,
       ...(sentCtx?.chip && !prev.some((l) => l.role === 'context' && l.text === sentCtx.chip)
@@ -130,21 +133,35 @@ export function TutorPanel() {
         }
         else if (e.type === 'text') {
           setBusy('');
-          setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, text: l.text + e.text } : l)));
-        } else if (e.type === 'tool') setBusy(TOOL_LABEL[e.name] ?? '考えています…');
-        else if (e.type === 'action') setActions((prev) => [...prev, e.action]);
+          const key = pendingKey;
+          const add = bubbleText ? e.text : e.text.trimStart();
+          bubbleText += add;
+          setLines((prev) => prev.map((l) => (l.key === key ? { ...l, text: l.text + add } : l)));
+        } else if (e.type === 'tool') {
+          setBusy(TOOL_LABEL[e.name] ?? '考えています…');
+          if (bubbleText.trim()) {
+            const done = pendingKey;
+            const next = `p-${Date.now()}-${e.name}`;
+            pendingKey = next;
+            bubbleText = '';
+            setLines((prev) => [...prev.map((l) => (l.key === done ? { ...l, text: l.text.trimEnd(), pending: false } : l)),
+              { key: next, role: 'assistant' as const, text: '', pending: true }]);
+          }
+        } else if (e.type === 'action') setActions((prev) => [...prev, e.action]);
         else if (e.type === 'error') {
-          setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, text: l.text || e.error } : l)));
+          const key = pendingKey;
+          setLines((prev) => prev.map((l) => (l.key === key ? { ...l, text: l.text || e.error } : l)));
         }
       }, ac.signal);
     } catch (err) {
       if (!ac.signal.aborted) {
         const code = String(err instanceof Error ? err.message : err).match(/\d{3}/)?.[0];
-        setLines((prev) => prev.map((l) => (l.key === pendingKey
+        const key = pendingKey;
+        setLines((prev) => prev.map((l) => (l.key === key
           ? { ...l, text: l.text || `接続できませんでした。もう一度どうぞ。${code ? `（${code}）` : ''}` } : l)));
       }
     } finally {
-      setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, pending: false } : l)).filter((l) => l.text || l.photo));
+      setLines((prev) => prev.map((l) => (l.pending ? { ...l, pending: false } : l)).filter((l) => l.text || l.photo));
       setBusy(null);
       abortRef.current = null;
     }
