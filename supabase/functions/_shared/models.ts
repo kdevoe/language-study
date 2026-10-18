@@ -32,7 +32,7 @@ export const RESEARCH_MODEL = CLAUDE_HAIKU;
 
 /** Claude — the news editor (fetch-raw-news) and the nightly dream. */
 export const NEWS_EDITOR = CLAUDE_HAIKU;
-export const DREAM_MODEL = CLAUDE_HAIKU;
+export const DREAM_MODEL = CLAUDE_SONNET;
 
 /** $ per million tokens (prompts ≤100k), for the usage telemetry stored on rows.
  *  Cache reads bill at 0.1× input, cache writes at 1.25×. Oct 2026 pricing. */

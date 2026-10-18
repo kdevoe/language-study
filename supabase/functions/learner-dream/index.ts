@@ -73,9 +73,11 @@ const CHANGES_SCHEMA = {
 };
 const BRIEF_SCHEMA = {
   type: 'object',
+  description: "Tomorrow's brief: editor, studyFocus, openers, ideas, lookups.",
   properties: {
     editor: {
       type: 'object',
+      description: "For the news editor only: dueTopics, angles, followUps. studyFocus, openers, ideas and lookups are brief's own fields, beside this one.",
       properties: {
         dueTopics: { type: 'array', items: { type: 'string' }, description: 'topic ids rare lately that tomorrow should include' },
         angles: { type: 'array', items: { type: 'string' }, description: 'angles within topics that fit current interests' },
@@ -220,7 +222,12 @@ Call write_memory with:
 - threadSummaries: 1-2 sentences per conversation above (by thread id).
 - profile: the whole new profile (replace, merge, prune as the rules say).
 - changes: short phrases for what's new, faded and updated vs the current profile.
-- brief: for tomorrow. editor.dueTopics = 1-2 of their chosen topic ids that were rare lately; angles and followUps from interests; studyFocus = 2-3 words or grammar points to weave into articles and chat; openers = 1-3 short Japanese lines ハルカ could open with, at their level, about something real — no generic greetings. When articles are waiting, at least one opener ties into one of them by its title (so they can find it), ideally linked to an interest or plan of theirs (「今日のニュースに『…』があるよ。…好きだったよね？」); the others can pick up a finished article or a plan they mentioned; ideas = 0-2 long reads or podcasts they might want, offered not created; lookups = 0-${MAX_LOOKUPS} questions about the real world worth looking up for tomorrow, tied to the learner (a trip or event coming up soon: what's on, the season; a waiting article or a story they followed: background or what happened since; a team, show or place they care about). Facts only, never about the Japanese language. Empty when nothing fits.`;
+- brief: for tomorrow. It has five fields side by side; only the news editor's three sit inside brief.editor.
+  - brief.editor = { dueTopics: 1-2 of their chosen topic ids that were rare lately; angles and followUps: from interests }. Nothing else goes in editor.
+  - brief.studyFocus = 2-3 words or grammar points to weave into articles and chat.
+  - brief.openers = 1-3 short Japanese lines ハルカ could open with, at their level, about something real — no generic greetings. When articles are waiting, at least one opener ties into one of them by its title (so they can find it), ideally linked to an interest or plan of theirs (「今日のニュースに『…』があるよ。…好きだったよね？」); the others can pick up a finished article or a plan they mentioned.
+  - brief.ideas = 0-2 long reads or podcasts they might want, offered not created.
+  - brief.lookups = 0-${MAX_LOOKUPS} questions about the real world worth looking up for tomorrow, tied to the learner (a trip or event coming up soon: what's on, the season; a waiting article or a story they followed: background or what happened since; a team, show or place they care about). Facts only, never about the Japanese language. Empty when nothing fits.`;
 
   const out = await callTool<{
     digest: string;

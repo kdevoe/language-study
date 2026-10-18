@@ -58,7 +58,31 @@ export function parseJsonObject<T>(text: string): T {
 // instruction to answer only through the tool, and the reply is validated.
 const NO_FORCED_TOOL = new Set<string>([CLAUDE_SONNET]);
 
+// model:tool pairs whose strict tool mode failed here (a schema it can't take,
+// or no support): they fall back to plain tool use plus our own checks.
+const NO_STRICT = new Set<string>();
+
 class BadToolOutput extends Error {}
+
+// Strict tool use constrains decoding to the schema, so a reply can't put fields
+// in the wrong place (the brief nested inside editor, 2026-10-18). It needs
+// additionalProperties: false on every object and takes only part of JSON
+// Schema, so size limits are dropped here (callers trim lengths themselves).
+const STRICT_UNSUPPORTED = ['maxItems', 'minItems', 'maxLength', 'minLength', 'minimum', 'maximum', 'pattern', 'format'];
+export function toStrictSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toStrictSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+    if (STRICT_UNSUPPORTED.includes(k)) continue;
+    if (k === 'properties' && v && typeof v === 'object') {
+      out[k] = Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([pk, pv]) => [pk, toStrictSchema(pv)]));
+    } else if (k === 'items' || k === 'anyOf') out[k] = toStrictSchema(v);
+    else out[k] = v;
+  }
+  if (out.type === 'object') out.additionalProperties = false;
+  return out;
+}
 
 /** Required fields missing anywhere in `value`, as paths ("brief.openers"):
  *  nested objects too, since a model once tucked the brief's top-level fields
@@ -77,7 +101,8 @@ function missingRequired(schema: Record<string, unknown>, value: unknown, path =
 
 /**
  * Structured output through a tool call: the model calls `name` with input
- * matching `schema`, and we return that input. The reply is checked (a tool
+ * matching `schema`, and we return that input. Strict tool use holds the reply
+ * to the schema where the API allows it; either way the reply is checked (a tool
  * call, not cut off at max_tokens, every required field present, nested ones too) and
  * regenerated once if it fails, as on a transient error (429/5xx/overloaded).
  */
@@ -94,12 +119,17 @@ export async function callTool<T>(opts: {
   let retried = false;
   for (;;) {
     const forced = !NO_FORCED_TOOL.has(opts.model);
+    const strict = !NO_STRICT.has(`${opts.model}:${opts.name}`);
     const system = forced ? opts.system : `${opts.system ? `${opts.system}\n\n` : ''}Answer only by calling the ${opts.name} tool, once, with every required field.`;
     const req = {
       model: opts.model,
       max_tokens: opts.maxTokens,
       ...(system ? { system } : {}),
-      tools: [{ name: opts.name, description: opts.description, input_schema: opts.schema }],
+      tools: [{
+        name: opts.name, description: opts.description,
+        input_schema: strict ? toStrictSchema(opts.schema) : opts.schema,
+        ...(strict ? { strict: true } : {}),
+      }],
       tool_choice: forced ? { type: 'tool' as const, name: opts.name } : { type: 'auto' as const },
       messages: [{ role: 'user' as const, content: opts.prompt }],
     };
@@ -121,6 +151,12 @@ export async function callTool<T>(opts: {
       if (status === 400 && forced && /tool_choice/.test(message) && /not supported/.test(message)) {
         NO_FORCED_TOOL.add(opts.model);
         console.warn(`[claude] ${opts.model} rejects forced tool_choice; using auto`);
+        continue;
+      }
+      // Strict mode refused (the schema or the model): plain tool use, checked by us.
+      if (status === 400 && strict && /strict|schema|additionalProperties/i.test(message)) {
+        NO_STRICT.add(`${opts.model}:${opts.name}`);
+        console.warn(`[claude] ${opts.model} strict tool use refused (${message.slice(0, 200)}); using plain tool use`);
         continue;
       }
       const retryable = e instanceof BadToolOutput || status === 429 || status === 529 || (status ?? 0) >= 500;
