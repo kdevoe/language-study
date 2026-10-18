@@ -253,18 +253,26 @@ export async function saveProcessedArticleToSupabase(article: NewsArticle, userI
 
 /** Fetch a single processed article by id — used to recover articles that
  *  finished processing server-side while the app was closed. */
+/**
+ * A processed article by id: null when it isn't processed yet, and THROWS when
+ * the fetch itself failed. The two must not look alike: a failed fetch read as
+ * "not processed" sent the app to re-run the rewrite. Retries once, because the
+ * first request after an iOS PWA comes back from the background often fails on
+ * a stale connection.
+ */
 export async function fetchProcessedArticleById(articleId: string, userId: string): Promise<NewsArticle | null> {
-  const { data, error } = await supabase
-    .from('processed_news')
-    .select('content')
-    .eq('id', articleId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) {
+  for (let attempt = 0; ; attempt++) {
+    const { data, error } = await supabase
+      .from('processed_news')
+      .select('content')
+      .eq('id', articleId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!error) return (data?.content as NewsArticle) ?? null;
     console.error('Error fetching processed article:', error);
-    return null;
+    if (attempt >= 1) throw new Error(`could not fetch article ${articleId}: ${error.message}`);
+    await new Promise((r) => setTimeout(r, 800));
   }
-  return (data?.content as NewsArticle) ?? null;
 }
 
 // Hydrate the local cache with the user's RECENT processed articles only.
@@ -371,9 +379,9 @@ export async function fetchWorkResumeArticle(
     && (work.parts ?? []).some(p => p.index === pos.partIndex && p.status !== 'failed' && p.status !== 'pending');
   const targetIndex = resumable ? pos!.partIndex : 1;
   const targetId = targetIndex === 1 ? work.partArticleId : workPartArticleId(work.id, targetIndex);
-  let article = await fetchProcessedArticleById(targetId, userId);
+  let article = await fetchProcessedArticleById(targetId, userId).catch(() => null);
   if (!article && targetIndex !== 1) {
-    article = await fetchProcessedArticleById(work.partArticleId, userId);
+    article = await fetchProcessedArticleById(work.partArticleId, userId).catch(() => null);
   }
   if (!article) return null;
   const resumeBlock = pos && article.partIndex === pos.partIndex ? (pos.blockIndex ?? 0) : 0;

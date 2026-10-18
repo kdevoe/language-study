@@ -583,6 +583,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Idempotent for news: a finished rewrite comes back as is, never regenerated.
+    // A client whose first fetch failed on a flaky connection (an iOS PWA just
+    // back from the background) used to fall through to here and overwrite a
+    // good rewrite with a fresh run from the card's snippet: thinner, and paid twice.
+    if (!isImport && !isPartJit && typeof articleId === 'string' && articleId) {
+      const { data: existing } = await supabase.from('processed_news').select('status, content')
+        .eq('user_id', userId).eq('id', articleId).maybeSingle();
+      const content = existing?.content as { blocks?: unknown[] } | null | undefined;
+      if ((existing?.status === 'ready' || existing?.status === 'read') && content?.blocks?.length) {
+        console.log(JSON.stringify({ fn: 'process-article', articleId, cached: true }));
+        return new Response(JSON.stringify({ success: true, articleId, blocks: content.blocks, article: content, cached: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
     const jinaKey = Deno.env.get('JINA_API_KEY'); // optional — lifts extraction hit rate
 
