@@ -254,10 +254,16 @@ Call write_memory with:
     },
   });
 
-  const researchUsage = emptyUsage(RESEARCH_MODEL);
-  const brief = await researchForBrief(out.brief as LearnerBrief & { lookups?: unknown }, prefs.data?.jlpt_level, waitingList, researchUsage, usage, today);
   const profile = cleanProfile(out.profile, forgotten);
   const guard = checkGuards(prev?.profile ?? null, profile);
+  // The openers writer gets the profile that will stand tomorrow, so it doesn't
+  // ask what ハルカ already knows (「家に植物はある？」 to a monstera owner, 2026-10-18).
+  // The summary alone is too general ("houseplants", not the monstera), so each
+  // item's one line goes with it.
+  const standing = guard.ok ? profile : prev?.profile ?? profile;
+  const knownSummary = standing ? [standing.summary, ...standing.items.map((i) => `- ${i.text}`)].join('\n') : '';
+  const researchUsage = emptyUsage(RESEARCH_MODEL);
+  const brief = await researchForBrief(out.brief as LearnerBrief & { lookups?: unknown }, prefs.data?.jlpt_level, waitingList, researchUsage, usage, today, knownSummary);
   const stats = activityStats(evs);
 
   await Promise.all([
@@ -284,7 +290,7 @@ Call write_memory with:
  */
 async function researchForBrief(
   raw: LearnerBrief & { lookups?: unknown }, jlpt: number | null | undefined, waitingList: string, usage: Usage,
-  writerUsage: Usage, today: string,
+  writerUsage: Usage, today: string, knownSummary: string,
 ): Promise<LearnerBrief> {
   // callTool now insists on `brief`; this guard keeps a lookup failure from ever
   // costing the whole night's memory (a missing brief crashed it on 2026-10-18).
@@ -325,13 +331,17 @@ async function researchForBrief(
 - ハルカ speaks these lines to the learner. Never address the learner by a name, and never as ハルカ.
 - Today is ${today}. Use the dates in the facts exactly; any relative time (明日, あさって, 来週, 来月) must be right from today, or just give the date.
 - Say only what the facts say: no added causes, numbers or details.
+- ハルカ already knows the learner (the profile below): build on it and never ask about something it already says.
 
 ${fence('research', facts)}
 
 Articles waiting in their feed:
 ${fence('waiting', waitingList || '(none)')}
 
-${dataRule(['research', 'waiting'])}`,
+What ハルカ knows about the learner:
+${fence('profile', knownSummary || '(nothing yet)')}
+
+${dataRule(['research', 'waiting', 'profile'])}`,
       schema: { type: 'object', properties: { openers: { type: 'array', items: { type: 'string' } } }, required: ['openers'] },
     });
     const fresh = (out.openers ?? [])
