@@ -26,6 +26,10 @@ export const CLAUDE_SONNET = 'claude-sonnet-5-5';
  *  measuring on real transcripts (docs/tutor-agent-design.md §8). */
 export const TUTOR_MODEL = CLAUDE_SONNET;
 
+/** Claude — ハルカ's quarantined web research (_shared/research.ts): reads raw
+ *  search results with no tools but web_search and its report. */
+export const RESEARCH_MODEL = CLAUDE_HAIKU;
+
 /** Claude — the news editor (fetch-raw-news) and the nightly dream. */
 export const NEWS_EDITOR = CLAUDE_HAIKU;
 export const DREAM_MODEL = CLAUDE_HAIKU;
@@ -36,6 +40,9 @@ export const CLAUDE_PRICES: Record<string, { in: number; out: number }> = {
   [CLAUDE_HAIKU]: { in: 0.10, out: 0.50 },
   [CLAUDE_SONNET]: { in: 2, out: 10 },
 };
+
+/** Claude web search: $10 per 1,000 searches, on top of tokens. */
+export const WEB_SEARCH_USD = 0.01;
 
 /** ElevenLabs — podcast dialogue TTS (generate-podcast). v4 won the P0 spike over
  *  v3: ~35% faster generation and a 7–20 dB lower noise floor on every voice

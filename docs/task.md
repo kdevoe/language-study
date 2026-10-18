@@ -646,5 +646,20 @@
   - [ ] Deploy process-article, dictionary-lookup, fetch-raw-news, learner-dream, tutor-chat, generate-podcast,
         generate-song; run `node scripts/eval-prompt-injection.mjs` with GEMINI_API_KEY
   - [ ] Extend the injection eval to the tutor (planted instructions in get_text) and podcast scripts
+  - [x] ハルカ web research (quarantined): `research` tool → Haiku + web_search (allowed news / encyclopedia /
+        travel domains, ≤3 searches) with no other tools, reporting ≤5 short facts → `_shared/researchFilter.ts`
+        deterministic checks (shape, links / contacts, text aimed at the agent or reader, source must be a page the
+        search returned) → fenced `<research>`; direct-write tools blocked once a research result is back in the
+        turn; cap TUTOR_RESEARCH_PER_DAY (default 50, rolling 24h); `node scripts/eval-research-filter.mjs` (offline)
+  - [x] Research used more widely: ハルカ looks things up on her own (article follow-ups, the learner's plans,
+        specific things they mention, her own uncertain facts, name readings). Lookups run in the background
+        (EdgeRuntime.waitUntil): she says 「調べておくね」 and keeps talking; the checked facts land as a <research>
+        note appended to the thread; the panel polls (research_status) and, if the chat is quiet and the learner
+        isn't typing, asks for a `followup` turn where she shares them (no direct writes, no new lookups in it).
+        Article screen notes carry the story's date; topic podcasts research the topic first; the nightly dream
+        sees the unopened articles waiting in the feed, ties at least one opener to one, picks 0-2 lookups and
+        writes openers from them (brief.research, shown to ハルカ as <research> in memory)
+  - [ ] Rollout: deploy tutor-chat (web search must be enabled for the org in the Claude Console); try a live
+        question, then a planted page, and check the `[research] withheld:` logs
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
         local dev against functions needs DEV_ALLOW_ANON=true in the functions env file

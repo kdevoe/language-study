@@ -47,3 +47,4 @@ scripts/out/
 # Dev-mode demo song (VITE_DEV_MODE), see services/songs.ts
 public/music-dev/
 scripts/.injection-prompt.bundle.mjs
+scripts/.research-filter.bundle.mjs

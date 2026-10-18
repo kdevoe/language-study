@@ -34,6 +34,8 @@ export interface PodcastPromptInput {
   topic?: string;
   /** 1 item for article/text/url, 2–4 for digest, none for topic. */
   items: PodcastSourceItem[];
+  /** Topic only: checked facts from web research (_shared/research.ts), one per line. */
+  researchNotes?: string;
   /** Total Japanese characters to aim for (≈ 280 chars per minute of audio). */
   targetChars: number;
   /** Human date label for the digest intro, e.g. "10月9日". */
@@ -77,8 +79,12 @@ function sourceBlock(input: PodcastPromptInput): string {
   if (input.kind === 'topic') {
     return `TOPIC: ${fenceInline('topic', input.topic ?? '')}
 ${dataRule(['topic'])}
-There is no source article. Make an evergreen, explanatory episode about this topic.
-Do NOT invent current events, dates, statistics, names of real people, or quotes — explain general, well-established facts only.`;
+There is no source article. Make an explanatory episode about this topic.${input.researchNotes ? `
+These facts were looked up for this episode (checked, with their source sites). Use them as the episode's concrete details; the hosts can mention a source by name (「NHKによると」), never as a link:
+${fence('research', input.researchNotes)}
+${dataRule(['research'])}
+Do NOT invent any other current events, dates, statistics, names of real people, or quotes beyond these facts and general, well-established knowledge.` : `
+Do NOT invent current events, dates, statistics, names of real people, or quotes — explain general, well-established facts only.`}`;
   }
   const items = input.items
     .map((it, i) => `${input.items.length > 1 ? `STORY ${i + 1}: ` : ''}${fenceInline('title', it.title)}\n${fence('source', it.text.slice(0, SOURCE_CHAR_CAP))}`)

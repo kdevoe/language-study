@@ -28,6 +28,8 @@ export interface LearnerBrief {
   studyFocus: { kind: 'word' | 'grammar'; item: string; why: string }[];
   openers: string[];     // Japanese, for ハルカ's Home card and the first turn
   ideas: { kind: 'longform' | 'podcast'; topic: string; why: string }[];
+  /** Looked up overnight for tomorrow's chat (learner-dream → _shared/research.ts); checked facts only. */
+  research?: { question: string; facts: { fact: string; source: string }[] }[];
 }
 
 export interface Memory {
@@ -112,6 +114,11 @@ export function renderMemory(m: Memory, opts: { brief?: boolean } = {}): string 
 Study focus: ${b.studyFocus.map((f) => `${f.item} (${f.kind}: ${f.why})`).join('; ') || 'none'}
 Openers: ${b.openers.join(' / ') || 'none'}
 Ideas to offer: ${b.ideas.map((i) => `${i.kind} on ${i.topic}`).join('; ') || 'none'}`);
+    const looked = (b.research ?? []).filter((r) => r.facts?.length);
+    if (looked.length) {
+      parts.push(`LOOKED UP OVERNIGHT\n${fence('research', looked.map((r) =>
+        `${r.question}\n${r.facts.map((f) => `- ${f.fact} (${f.source})`).join('\n')}`).join('\n\n'))}`);
+    }
   }
   // Memory is built from the learner's activity, notes the tutor saved and
   // overnight summaries, all of which can echo text from articles. Fenced, so a
