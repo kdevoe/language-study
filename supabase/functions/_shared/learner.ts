@@ -92,10 +92,13 @@ export function grammarRatings(grammar: Memory['grammar']): string {
     .filter(Boolean).join(' · ');
 }
 
-export function renderProfile(p: LearnerProfile | null): string {
+export function renderProfile(p: LearnerProfile | null, opts: { ids?: boolean } = {}): string {
   if (!p) return '(no profile yet — the first nightly dream writes one)';
+  // The dreams rewrite the profile, so they see each item's id and importance:
+  // without them a model can't keep an id, and every renamed item looked like a
+  // dropped one to the guard (Sonnet renamed all 16, 2026-10-18).
   const lines = p.items.map((i) =>
-    `- [${i.kind}${i.persona ? `, told ${i.persona}` : ''}] ${i.text} — ${i.evidence} (last ${i.lastSeen})`);
+    `- ${opts.ids ? `{id: ${i.id}, importance: ${i.importance}} ` : ''}[${i.kind}${i.persona ? `, told ${i.persona}` : ''}] ${i.text} — ${i.evidence} (last ${i.lastSeen})`);
   return `${p.summary}\n${lines.join('\n')}`;
 }
 
