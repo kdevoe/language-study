@@ -58,7 +58,7 @@ export function parseJsonObject<T>(text: string): T {
 export async function callTool<T>(opts: {
   model: string;
   system?: string;
-  prompt: string;
+  prompt: string | unknown[];   // a string, or content blocks (e.g. an image then text)
   name: string;
   description: string;
   schema: Record<string, unknown>;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, X } from 'lucide-react';
+import { ArrowUp, Camera, X } from 'lucide-react';
 import { useTutor } from './TutorProvider';
 import { TutorText } from './TutorText';
 import { useAppStore } from '../../services/store';
@@ -9,11 +9,12 @@ import { WordModal } from '../WordModal';
 import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
 import { lookupWord as jmdictLookup } from '../../services/jmdict';
 import {
-  endTutorThread, fetchTutorHistory, streamTutor,
+  endTutorThread, fetchTutorHistory, localDay, streamTutor,
   type ScreenContext, type TutorAction, type TutorRecap,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
 import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
+import { clearThumbs, keepThumb, preparePhoto, thumbsFor, type PreparedPhoto } from '../../services/tutorPhotos';
 
 // ハルカ's side panel (docs/mockups/tutor.html, design-system §6.17). Slides in
 // from the hand side over any screen; the screen stays visible beside it. One
@@ -25,6 +26,8 @@ interface Line {
   role: 'user' | 'assistant' | 'context';
   text: string;
   pending?: boolean;
+  /** A photo you sent: the thumbnail kept on this phone (if any), and what she saved of it. */
+  photo?: { id: string; thumb?: string; label?: string; transcript?: string; live?: boolean };
 }
 
 const COMMIT_PX = 70;
@@ -42,6 +45,8 @@ export function TutorPanel() {
   const [ctx, setCtx] = useState<ScreenContext | null>(null);
   const [chipOff, setChipOff] = useState(false);
   const [draft, setDraft] = useState('');
+  const [photo, setPhoto] = useState<PreparedPhoto | null>(null);   // attached, not sent yet
+  const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);   // null idle · '' replying · tool label
   const [actions, setActions] = useState<TutorAction[]>([]);
   const [recap, setRecap] = useState<TutorRecap | null>(null);
@@ -65,11 +70,18 @@ export function TutorPanel() {
     setChipOff(false);
     setOpener(options.opener ?? screen?.opener ?? null);
     if (!historyOk) {
-      fetchTutorHistory().then(({ threadId: id, messages }) => {
+      fetchTutorHistory().then(async ({ threadId: id, messages }) => {
+        const photoOf = (m: (typeof messages)[number]) => (m.context && 'photo' in m.context ? m.context.photo : undefined);
+        const thumbs = await thumbsFor(messages.map((m) => photoOf(m)?.id).filter((x): x is string => !!x));
         setThreadId(id);
-        setLines(messages.filter((m) => m.text || m.role === 'context').map((m) => ({
-          key: m.id, role: m.role, text: m.role === 'context' ? (m.context?.chip ?? '') : (m.text ?? ''),
-        })).filter((l) => l.text));
+        setLines(messages.map((m): Line => {
+          const p = photoOf(m);
+          return {
+            key: m.id, role: m.role,
+            text: m.role === 'context' ? (m.context && 'chip' in m.context ? m.context.chip ?? '' : '') : (m.text ?? ''),
+            ...(p && { photo: { ...p, thumb: thumbs[p.id] } }),
+          };
+        }).filter((l) => l.text || l.photo));
         setLoaded(true);
         setHistoryOk(true);
       }).catch(() => setLoaded(true)); // still talkable; the next open tries again
@@ -88,9 +100,12 @@ export function TutorPanel() {
 
   const sendText = useCallback(async (raw: string) => {
     const message = raw.trim();
-    if (!message || busy !== null) return;
+    const sentPhoto = photo;
+    if ((!message && !sentPhoto) || busy !== null) return;
     addActivity('turns', 1);
     setDraft('');
+    setPhoto(null);
+    if (sentPhoto) keepThumb(sentPhoto.upload.id, localDay(), sentPhoto.thumb);
     const sentCtx = ctx && !chipOff ? ctx : undefined;
     const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;
     const pendingKey = `p-${Date.now()}`;
@@ -99,7 +114,8 @@ export function TutorPanel() {
       ...(sentCtx?.chip && !prev.some((l) => l.role === 'context' && l.text === sentCtx.chip)
         ? [{ key: `c-${Date.now()}`, role: 'context' as const, text: sentCtx.chip }] : []),
       ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener }] : []),
-      { key: `u-${Date.now()}`, role: 'user', text: message },
+      { key: `u-${Date.now()}`, role: 'user', text: message,
+        ...(sentPhoto && { photo: { id: sentPhoto.upload.id, thumb: sentPhoto.thumb, live: true } }) },
       { key: pendingKey, role: 'assistant', text: '', pending: true },
     ]);
     setOpener(null);
@@ -107,8 +123,11 @@ export function TutorPanel() {
     const ac = new AbortController();
     abortRef.current = ac;
     try {
-      await streamTutor({ message, context: sentCtx, opener: sentOpener }, (e) => {
+      await streamTutor({ message, context: sentCtx, opener: sentOpener, image: sentPhoto?.upload }, (e) => {
         if (e.type === 'thread') setThreadId(e.threadId);
+        else if (e.type === 'photo') {
+          setLines((prev) => prev.map((l) => (l.photo?.id === e.id ? { ...l, photo: { ...l.photo, label: e.label, transcript: e.transcript } } : l)));
+        }
         else if (e.type === 'text') {
           setBusy('');
           setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, text: l.text + e.text } : l)));
@@ -125,11 +144,20 @@ export function TutorPanel() {
           ? { ...l, text: l.text || `接続できませんでした。もう一度どうぞ。${code ? `（${code}）` : ''}` } : l)));
       }
     } finally {
-      setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, pending: false } : l)).filter((l) => l.text));
+      setLines((prev) => prev.map((l) => (l.key === pendingKey ? { ...l, pending: false } : l)).filter((l) => l.text || l.photo));
       setBusy(null);
       abortRef.current = null;
     }
-  }, [busy, ctx, chipOff, opener, lines]);
+  }, [busy, ctx, chipOff, opener, lines, photo]);
+
+  const pickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setPhoto(await preparePhoto(file));
+    } catch (e) {
+      console.warn('[tutor] photo failed:', e);
+    }
+  };
 
   const end = async () => {
     if (ending) return;
@@ -148,6 +176,8 @@ export function TutorPanel() {
     setThreadId(null);
     setActions([]);
     setAdded(new Set());
+    setPhoto(null);
+    clearThumbs();
     closeTutor();
   };
 
@@ -243,7 +273,7 @@ export function TutorPanel() {
               {lines.map((l) => l.role === 'context'
                 ? <div key={l.key} className="tutor-ctx">{l.text}</div>
                 : l.role === 'user'
-                  ? <div key={l.key} className="tutor-u">{l.text}</div>
+                  ? <UserLine key={l.key} line={l} />
                   : <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />)}
               {busy && <div className="tutor-busy">{busy}</div>}
               {actions.map((a, i) => (
@@ -251,6 +281,14 @@ export function TutorPanel() {
                   onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
               ))}
             </div>
+            {photo && (
+              <div className="tutor-attach">
+                <div className="tutor-photo">
+                  <img src={photo.thumb} alt="" />
+                  <button className="tutor-photo-x" onClick={() => setPhoto(null)} aria-label="写真を外す"><X size={11} strokeWidth={2.4} /></button>
+                </div>
+              </div>
+            )}
             <div className="tutor-input">
               {/* The wrapper's ::after holds a hidden copy of the draft and sizes the
                   textarea to it; with the keyboard up that also fits its width, so the
@@ -271,7 +309,13 @@ export function TutorPanel() {
                   }}
                 />
               </div>
-              <button onClick={() => sendText(draft)} disabled={!draft.trim() || busy !== null} aria-label="送る">
+              {/* No capture attribute: iOS offers Take Photo or Photo Library. */}
+              <input ref={fileRef} type="file" accept="image/*" hidden
+                onChange={(e) => { pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+              <button onClick={() => fileRef.current?.click()} aria-label="写真">
+                <Camera size={21} strokeWidth={1.6} />
+              </button>
+              <button onClick={() => sendText(draft)} disabled={(!draft.trim() && !photo) || busy !== null} aria-label="送る">
                 <ArrowUp size={21} strokeWidth={1.6} />
               </button>
             </div>
@@ -290,6 +334,25 @@ const TOOL_LABEL: Record<string, string> = {
   search_history: '前のことを思い出しています…',
   request_content: '番組を作っています…',
 };
+
+/** Your turn: the photo (if any) above your bubble. Live, it's the photo as
+ *  sent; after a reload, the thumbnail this phone kept, smaller; with none kept
+ *  (another device, or the conversation ended), a chip. A tap on either shows
+ *  what she saved of it. */
+function UserLine({ line }: { line: Line }) {
+  const [open, setOpen] = useState(false);
+  const p = line.photo;
+  const canOpen = !!p?.transcript;
+  return (
+    <div className="tutor-me">
+      {p && (p.thumb
+        ? <button className={`tutor-photo${p.live ? '' : ' kept'}`} onClick={() => canOpen && setOpen(!open)} aria-label={p.label ?? '写真'}><img src={p.thumb} alt="" /></button>
+        : <button className="tutor-photochip" onClick={() => canOpen && setOpen(!open)}><Camera size={15} strokeWidth={1.6} /><span>写真{p.label ? ` · ${p.label}` : ''}</span></button>)}
+      {open && p?.transcript && <div className="tutor-a tutor-transcript">{p.transcript}</div>}
+      {line.text && <div className="tutor-u">{line.text}</div>}
+    </div>
+  );
+}
 
 /** ハルカ's turn: Japanese lines with tappable words, asides set apart. */
 function AssistantLine({ text, pending, lookup }: { text: string; pending?: boolean; lookup: ReturnType<typeof useWordLookup> }) {
