@@ -30,7 +30,7 @@ Long-horizon memory works by keeping raw history cheap and complete, and giving 
 | Layer | What | Size in context | Updated |
 | --- | --- | --- | --- |
 | **L0 Event log** | everything that happened: article shown / opened / finished / skipped, podcast and song plays, lookups, reviews, chat messages | never loaded whole; searched | live |
-| **L1 Daily digest** | one short paragraph per day: what was read and heard, words struggled with, conversation highlights, notable moments | last 7 days, about 1k tokens | nightly (Haiku) |
+| **L1 Daily digest** | one short paragraph per day: what was read and heard, words struggled with, conversation highlights, notable moments | last 7 days, about 1k tokens | nightly (Sonnet) |
 | **L2 Learner profile** | one structured document: level, interests with evidence and recency, struggles (grammar patterns, words), topic coverage, preferences, personal notes ("works in tech", "trip to Kyoto in Nov") | 1.5–2.5k tokens | nightly consolidation + live tool writes |
 | **L3 Retrieval** | search over L0 + L1 for specifics: "the article about the breakfast street", "what did we talk about last Tuesday" | on demand, via a tool | — |
 
@@ -67,7 +67,7 @@ Long-horizon memory works by keeping raw history cheap and complete, and giving 
 
    The editor and tutor start each day from this brief instead of working it out on every call.
 7. **Associations, carefully.** SCM's "REM" step links memories into new connections. For us that means cross-interest ideas (Kyoto trip + food → a Kyoto food story). Useful for curation, but kept as *suggestions in the brief*, never written into the profile as facts.
-8. **Light nightly, deep weekly.** Nightly on Haiku: digest the day, apply notes, write the brief. Weekly, a deeper pass on a stronger model rereads the week's digests and conversations, re-checks the evidence and prunes. Nobody waits, so the stronger model is affordable (about $0.05–0.10 per learner per week on Sonnet).
+8. **Light nightly, deep weekly.** Nightly on Sonnet (Haiku until 2026-10-18; it misplaced brief fields and wrote formulaic openers): digest the day, apply notes, write the brief. Weekly, a deeper pass on a stronger model rereads the week's digests and conversations, re-checks the evidence and prunes. Nobody waits, so the stronger model is affordable (about $0.05–0.10 per learner per week on Sonnet).
 9. **Measure whether dreaming helps** (Auto-Dreamer trains on task results; we can at least track them): open and finish rates, the variety of what's actually read, review recall on the study-focus words, whether tutor corrections recur less. If a change to the dream prompt doesn't move these, it isn't helping.
 
 **Build or buy?** Anthropic's Dreams API is the closest off-the-shelf version, but it doesn't fit yet: it's a research preview, it takes **Managed Agents sessions** as input (our app calls the Messages API from edge functions), it runs on Sonnet or Opus only, and it takes minutes to hours per run. We'd build the same shape ourselves: a nightly edge function per learner, Haiku, writing to Postgres. Revisit if the tutor ends up on Managed Agents.
@@ -107,7 +107,7 @@ Same memory, same persona and voice, different job prompts. Each job assembles i
 | **Tutor chat** | learner opens the sheet | Sonnet or Haiku (measure; tutor doc §8) | screen context + thread | messages, notes (`save_note`), word usage (`record_usage`) |
 | **News editor** | buffer refill / overnight cron | Haiku | RSS pool + recent shown titles | picks + reasons (so the tutor knows why something was chosen) |
 | **Content on request** | tutor tool or "describe a topic" box | Haiku + web search | topic + profile | a long read or podcast research pack ($0.04–0.05 each in the spike) |
-| **Nightly dream** (§2a) | cron | Haiku | today's L0 + the day's notes + current profile | L1 digest, new L2 version, tomorrow's brief |
+| **Nightly dream** (§2a) | cron | Sonnet | today's L0 + the day's notes + current profile | L1 digest, new L2 version, tomorrow's brief |
 | **Weekly deep dream** | cron | Sonnet | the week's digests + conversations + profile | re-checked, pruned L2 version |
 
 The tutor gets two more tools on top of its design-doc list:
@@ -132,7 +132,7 @@ New with memory:
 ## 6. Cost (per active learner, per day)
 | Item | Estimate |
 | --- | --- |
-| Nightly dream (Haiku: digest, profile, brief) | about $0.005 |
+| Nightly dream (Sonnet: digest, profile, brief) | about $0.06 |
 | Weekly deep dream (Sonnet) | about $0.01 a day, averaged |
 | News editor (Haiku, 4 articles, from the spike) | about $0.02 |
 | Gemini rewrites (unchanged) | about $0.016 for 4 |
