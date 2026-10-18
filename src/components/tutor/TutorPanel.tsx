@@ -221,7 +221,7 @@ export function TutorPanel() {
 
   const side = hand === 'left' ? 'l' : 'r';
   const sign = side === 'r' ? 1 : -1;
-  const width = Math.min(window.innerWidth * 0.88, 420);
+  const width = Math.min(window.innerWidth * 0.94, 420);
   const offset = open ? closeDrag : drag !== null ? Math.max(0, width - drag) : width * 1.05;
   const dragging = drag !== null || closeDrag > 0;
   const backdropOn = open || (drag !== null && drag > 8);

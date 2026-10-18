@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — tutor width</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+svg.i { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.mock-header { max-width: 980px; margin: 0 auto 1.4rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 780px; margin: 0 auto 0.4rem; }
+
+/* Live tuning panel (applies to the TUNE phone) */
+.tune { max-width: 560px; margin: 1.2rem auto 2rem; background: var(--bg-pure); border-radius: 18px; padding: 1rem 1.3rem; box-shadow: 0 6px 20px rgba(0,0,0,0.06); display: grid; grid-template-columns: auto 1fr auto; gap: 0.6rem 1rem; align-items: center; font-size: 0.8rem; }
+.tune .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.tune input { width: 100%; accent-color: var(--olive); }
+.tune output { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 4.5em; text-align: right; }
+.tune .read { grid-column: 1 / -1; color: var(--text-muted); font-size: 0.78rem; border-top: 1px solid var(--border-light); padding-top: 0.6rem; }
+.tune .read b { color: var(--text-main); font-weight: 600; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 380px; text-align: center; min-height: 3.6em; }
+/* 390 × 844 inside a 10px bezel */
+.phone { width: 410px; height: 864px; max-width: 100%; background: var(--bg-color); border-radius: 50px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; }
+.screen { position: absolute; inset: 0; }
+
+/* The app behind (今日) */
+.app { position: absolute; inset: 0; padding: 60px 24px 0; }
+.app h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; margin-bottom: 1.2rem; }
+.app .card { background: var(--bg-card); border-radius: 24px; padding: 1rem 1.2rem; margin-bottom: 1rem; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.7; }
+.app .k { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); font-family: var(--font-sans); display: block; }
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); }
+
+/* The panel: width as a share of the 390pt screen, padding as px (as .tutor-panel) */
+.panel { --w: 88; --pad: 22px; position: absolute; right: 0; top: 0; bottom: 0; width: min(calc(390px * var(--w) / 100), 420px); display: flex; flex-direction: column; background: var(--bg-color); padding-top: 54px; border-radius: 28px 0 0 28px; box-shadow: -10px 0 40px rgba(0,0,0,0.15); transition: width 0.25s; }
+.head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0.6rem var(--pad) 0.4rem; }
+.who { display: flex; align-items: center; gap: 0.6rem; }
+.who b { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 500; }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.95rem; }
+.link { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); }
+.grab { position: absolute; top: 50%; left: 8px; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
+.thread { flex: 1; overflow: hidden; padding: 0.9rem var(--pad) 1rem; display: flex; flex-direction: column; }
+.thread > :first-child { margin-top: auto; }
+.thread > * + * { margin-top: 2.2rem; }
+.thread > .t + .t, .thread > .t + .a { margin-top: 0.55rem; }
+.thread > .a + .t { margin-top: 0.9rem; }
+.t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.95; max-width: 94%; }
+.fx { background: var(--accent-primary); border-radius: 3px; }
+.a { font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; max-width: 92%; }
+.u { align-self: flex-end; max-width: 82%; background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.75; }
+.input { flex: none; display: flex; align-items: flex-end; gap: 0.8rem; margin: 0 var(--pad); padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
+.input .field { flex: 1; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.5; color: var(--text-muted); opacity: 0.7; }
+.input svg.i { color: var(--text-muted); }
+.foot { flex: none; height: 34px; }
+
+/* Text-column guide (toggle) */
+.guides .thread { background: linear-gradient(90deg, rgba(212,224,232,0.0) 0, rgba(212,224,232,0.0) var(--pad), rgba(212,224,232,0.35) var(--pad), rgba(212,224,232,0.35) calc(100% - var(--pad)), rgba(212,224,232,0) calc(100% - var(--pad))); }
+.ctl { display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-bottom: 1.6rem; }
+.ctl label { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 0.4rem; align-items: center; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · ハルカ</div>
+  <h1>A wider panel</h1>
+  <p>The same conversation (from the Oct 17 screenshot) at three widths on a 390pt phone. The strip of screen on the left keeps it reading as a panel over your page and is a tap target to close. Swiping back toward the edge also closes it.</p>
+</header>
+
+<div class="tune">
+  <span class="lbl">WIDTH</span><input id="w" type="range" min="85" max="100" step="1" value="94"><output id="wo"></output>
+  <span class="lbl">SIDE PADDING</span><input id="p" type="range" min="12" max="24" step="1" value="18"><output id="po"></output>
+  <div class="read" id="read"></div>
+</div>
+<div class="ctl"><label><input type="checkbox" id="g"> Show the text column</label></div>
+
+<div class="stage" id="stage">
+  <template id="conv">
+    <div class="screen">
+      <div class="app"><h2>今日</h2><div class="card"><span class="k">ハルカ</span>作ったの？木とか葉っぱ？</div><div class="card"><span class="k">CONTINUE</span>Super El Niño is here</div></div>
+      <div class="backdrop"></div>
+      <div class="panel">
+        <div class="grab"></div>
+        <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><button class="link">終わる</button></div>
+        <div class="thread">
+          <div class="u">温暖化は大変な</div>
+          <div class="t"><span class="fx">温暖化は大変だ</span>よね。急にどうしたの？森の話から、温暖化のことを考えた？</div>
+          <div class="a">"は大変な" is cut off. As a full sentence, use 大変だ or 大変です. Or say 大変な問題 (a serious problem) if you want a noun after な.</div>
+          <div class="t">もしかして、今住んでる所の森にも、変化があるの？</div>
+          <div class="u">さっきに読んだ記事の内容について考えている</div>
+          <div class="t"><span class="fx">さっき</span>読んだ記事のことを考えてたんだね。スーパー・エルニーニョの記事？</div>
+          <div class="a">さっき (a little while ago) is a time word that doesn't take に: さっき読んだ。</div>
+        </div>
+        <div class="input">
+          <div class="field">ハルカに話しかける…</div>
+          <svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg>
+          <svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </div>
+        <div class="foot"></div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+const PHONES = [
+  { label: 'NOW · 88% · 22PX', w: 88, p: 22, note: 'Today: a 343pt panel, a 47pt strip of screen, a 299pt text column.' },
+  { label: 'TUNE', w: 94, p: 18, tune: true, note: 'Drag the sliders above. Starts at the suggestion: 94% and 18px.' },
+  { label: 'FULL · 100% · 18PX', w: 100, p: 18, note: 'For comparison: no strip. It reads as a page, not a panel over one, and the dim has nothing to show.' },
+];
+const stage = document.getElementById('stage');
+const tpl = document.getElementById('conv');
+const panels = [];
+for (const ph of PHONES) {
+  const wrap = document.createElement('div'); wrap.className = 'phone-wrap';
+  wrap.innerHTML = `<div class="phone-label">${ph.label}</div><div class="phone"></div><div class="phone-note">${ph.note}</div>`;
+  wrap.querySelector('.phone').appendChild(tpl.content.cloneNode(true));
+  const panel = wrap.querySelector('.panel');
+  panel.style.setProperty('--w', ph.w); panel.style.setProperty('--pad', ph.p + 'px');
+  if (ph.full) panel.style.borderRadius = '0';
+  panels.push({ ph, panel, wrap });
+  stage.appendChild(wrap);
+}
+const w = document.getElementById('w'), p = document.getElementById('p');
+function update() {
+  const t = panels.find((x) => x.ph.tune);
+  t.panel.style.setProperty('--w', w.value);
+  t.panel.style.setProperty('--pad', p.value + 'px');
+  document.getElementById('wo').textContent = `${w.value}%`;
+  document.getElementById('po').textContent = `${p.value}px`;
+  const pw = Math.min(Math.round(390 * w.value / 100), 420);
+  const col = pw - 2 * p.value;
+  document.getElementById('read').innerHTML = `Panel <b>${pw}pt</b> · strip of screen <b>${390 - pw}pt</b> · text column <b>${col}pt</b> (<b>${col >= 299 ? '+' : ''}${col - 299}pt</b>, ${col >= 299 ? '+' : ''}${Math.round((col / 299 - 1) * 100)}% vs now)`;
+  t.wrap.querySelector('.phone-label').textContent = `TUNE · ${w.value}% · ${p.value}PX`;
+}
+w.oninput = p.oninput = update; update();
+document.getElementById('g').onchange = (e) => document.body.classList.toggle('guides', e.target.checked);
+</script>
+</body>
+</html>
