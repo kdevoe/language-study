@@ -40,6 +40,7 @@ export type TutorEvent =
   | { type: 'research'; id: string; question: string }
   | { type: 'action'; action: TutorAction }
   | { type: 'photo'; id: string; label: string; transcript: string }
+  | { type: 'ping' }   // server heartbeat, every 15 s (the watchdog's sign of life)
   | { type: 'done'; text: string }
   | { type: 'error'; error: string };
 
@@ -90,6 +91,15 @@ export async function streamTutor(
   signal?: AbortSignal,
 ): Promise<void> {
   if (DEV_MODE) return devReply(input, onEvent);
+  // Watchdog: no response within 25 s, or 60 s without a byte once streaming (the
+  // server pings every 15 s), means a dead connection, often a stale one after
+  // iOS resumes the PWA. Give up and say so instead of showing dots for minutes.
+  const wd = new AbortController();
+  let stalled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (ms: number) => { clearTimeout(timer); timer = setTimeout(() => { stalled = true; wd.abort(); }, ms); };
+  const onAbort = () => wd.abort();
+  signal?.addEventListener('abort', onAbort);
   const post = (token: string) => fetch(`${supabaseUrl}/functions/v1/tutor-chat`, {
     method: 'POST',
     headers: {
@@ -98,33 +108,44 @@ export async function streamTutor(
       apikey: supabaseAnonKey,
     },
     body: JSON.stringify({ action: 'send', day: localDay(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, ...input }),
-    signal,
+    signal: wd.signal,
   });
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('sign in required');
-  let res = await post(session.access_token);
-  // A long-idle PWA session can carry an expired token (as in invokeEdgeFn): refresh once and retry.
-  if (res.status === 401) {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    if (refreshed.session) res = await post(refreshed.session.access_token);
-  }
-  if (!res.ok || !res.body) throw new Error(`tutor-chat ${res.status}`);
-  if (!(res.headers.get('Content-Type') ?? '').includes('text/event-stream')) return; // followup skipped
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let cut: number;
-    while ((cut = buf.indexOf('\n\n')) >= 0) {
-      const chunk = buf.slice(0, cut);
-      buf = buf.slice(cut + 2);
-      const line = chunk.split('\n').find((l) => l.startsWith('data: '));
-      if (!line) continue;
-      try { onEvent(JSON.parse(line.slice(6)) as TutorEvent); } catch { /* partial or malformed */ }
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('sign in required');
+    arm(25_000);
+    let res = await post(session.access_token);
+    // A long-idle PWA session can carry an expired token (as in invokeEdgeFn): refresh once and retry.
+    if (res.status === 401) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      arm(25_000);
+      if (refreshed.session) res = await post(refreshed.session.access_token);
     }
+    if (!res.ok || !res.body) throw new Error(`tutor-chat ${res.status}`);
+    if (!(res.headers.get('Content-Type') ?? '').includes('text/event-stream')) return; // followup skipped
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      arm(60_000);
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let cut: number;
+      while ((cut = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, cut);
+        buf = buf.slice(cut + 2);
+        const line = chunk.split('\n').find((l) => l.startsWith('data: '));
+        if (!line) continue;
+        try { onEvent(JSON.parse(line.slice(6)) as TutorEvent); } catch { /* partial or malformed */ }
+      }
+    }
+  } catch (e) {
+    if (stalled) throw new Error('tutor-chat timeout');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
 }
 

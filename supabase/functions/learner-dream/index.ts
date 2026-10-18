@@ -278,7 +278,19 @@ Call write_memory with:
 async function researchForBrief(
   raw: LearnerBrief & { lookups?: unknown }, jlpt: number | null | undefined, waitingList: string, usage: Usage,
 ): Promise<LearnerBrief> {
-  const { lookups, ...brief } = raw;
+  // callTool now insists on `brief`; this guard keeps a lookup failure from ever
+  // costing the whole night's memory (a missing brief crashed it on 2026-10-18).
+  // A reply once nested studyFocus, openers, ideas and lookups inside editor:
+  // lift any such field back up (callTool now regenerates that, this is the backstop).
+  const top = { ...(raw ?? {}) } as Record<string, unknown>;
+  const editor = (top.editor && typeof top.editor === 'object' ? { ...(top.editor as Record<string, unknown>) } : null);
+  if (editor) {
+    for (const k of ['studyFocus', 'openers', 'ideas', 'lookups']) {
+      if (k in editor) { if (top[k] === undefined) top[k] = editor[k]; delete editor[k]; }
+    }
+    top.editor = editor;
+  }
+  const { lookups, ...brief } = top as unknown as LearnerBrief & { lookups?: unknown };
   const questions = (Array.isArray(lookups) ? lookups : [])
     .filter((q): q is string => typeof q === 'string' && q.trim().length >= 5)
     .map((q) => q.trim().slice(0, 200)).slice(0, MAX_LOOKUPS);

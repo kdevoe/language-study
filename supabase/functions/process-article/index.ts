@@ -108,11 +108,15 @@ interface RewriteUsage {
 }
 
 /** Run the Pass-1 rewrite (Gemini generate + JSON.parse + block validation)
- *  with backoff on transient failures. Non-transient errors throw immediately. */
+ *  with backoff on transient failures. Non-transient errors throw immediately.
+ *  A rewrite with fewer than `minParagraphs` paragraphs is regenerated (Gemini
+ *  sometimes stops early: 2 of 5 paragraphs from a full 4.6k source, 2026-10-18);
+ *  if every attempt is short, the longest one is kept rather than failing. */
 async function runRewriteWithRetry(
-  ai: GoogleGenAI, prompt: string,
+  ai: GoogleGenAI, prompt: string, minParagraphs = 1,
 ): Promise<{ blocks: any; usage: RewriteUsage }> {
   let lastErr: unknown;
+  let best: { blocks: any; usage: RewriteUsage; paragraphs: number } | null = null;
   for (let attempt = 0; attempt < REWRITE_MAX_ATTEMPTS; attempt++) {
     try {
       const result = await ai.models.generateContent({
@@ -130,7 +134,7 @@ async function runRewriteWithRetry(
       validateBlocks(parsed);
       if (scrubbed > 0) console.warn(`[process-article] removed ${scrubbed} link(s)/address(es) from the generation`);
       const meta = result.usageMetadata;
-      return {
+      const out = {
         blocks: parsed,
         usage: {
           promptTokens: meta?.promptTokenCount ?? null,
@@ -139,6 +143,12 @@ async function runRewriteWithRetry(
           attempts: attempt + 1,
         },
       };
+      const paragraphs = (parsed as any[]).filter((b) => b?.type === 'paragraph').length;
+      if (paragraphs >= minParagraphs) return out;
+      console.warn(`[process-article] rewrite attempt ${attempt + 1}/${REWRITE_MAX_ATTEMPTS} too short: ${paragraphs} of at least ${minParagraphs} paragraphs`);
+      if (!best || paragraphs > best.paragraphs) best = { ...out, paragraphs };
+      if (attempt === REWRITE_MAX_ATTEMPTS - 1) break;
+      continue;
     } catch (err) {
       lastErr = err;
       const transient = isTransientLlmError(err);
@@ -146,10 +156,14 @@ async function runRewriteWithRetry(
         `[process-article] rewrite attempt ${attempt + 1}/${REWRITE_MAX_ATTEMPTS} failed (transient=${transient}):`,
         err instanceof Error ? err.message : err,
       );
-      if (!transient || attempt === REWRITE_MAX_ATTEMPTS - 1) throw err;
+      if (!transient || attempt === REWRITE_MAX_ATTEMPTS - 1) {
+        if (best) break;   // an earlier, short rewrite beats none
+        throw err;
+      }
       await new Promise((r) => setTimeout(r, REWRITE_BACKOFF_MS[attempt]));
     }
   }
+  if (best) return { blocks: best.blocks, usage: { ...best.usage, attempts: REWRITE_MAX_ATTEMPTS } };
   throw lastErr;
 }
 
@@ -1204,7 +1218,8 @@ Deno.serve(async (req) => {
     // Retries transient Gemini overload/rate-limit and malformed-JSON blips with
     // backoff (see runRewriteWithRetry) so one upstream hiccup no longer surfaces
     // as "the server may be busy."
-    const { blocks: rawBlocks, usage } = await runRewriteWithRetry(ai, prompt1);
+    // Under 60% of the target length is an early stop, not a style choice: regenerate.
+    const { blocks: rawBlocks, usage } = await runRewriteWithRetry(ai, prompt1, Math.max(1, Math.ceil(targetParagraphs * 0.6)));
 
     // 1.3 (path-forward): real prompt size + token counts, per article. One
     // greppable line for the function logs, and persisted into metadata below
