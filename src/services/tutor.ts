@@ -36,6 +36,8 @@ export type TutorEvent =
   | { type: 'thread'; threadId: string }
   | { type: 'text'; text: string }
   | { type: 'tool'; name: string }
+  // A background lookup started: its facts land in the thread later (pollResearch).
+  | { type: 'research'; id: string; question: string }
   | { type: 'action'; action: TutorAction }
   | { type: 'photo'; id: string; label: string; transcript: string }
   | { type: 'done'; text: string }
@@ -67,13 +69,27 @@ export async function endTutorThread(threadId: string | null): Promise<TutorReca
   return res.recap;
 }
 
-/** Send a message and stream the reply. Resolves when the stream ends. */
+/** Which of these background lookups have landed in the thread. */
+export async function pollResearch(threadId: string, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  if (DEV_MODE) return ids.filter((id) => Date.now() - Number(id.split('-')[1]) > 4000);
+  const res = await invokeEdgeFn<{ done: string[] }>('tutor-chat', { action: 'research_status', threadId, ids });
+  return res.done ?? [];
+}
+
+/**
+ * Send a message (or, with action 'followup', let ハルカ share a lookup that
+ * landed while the chat was quiet) and stream the reply. Resolves when the
+ * stream ends; a skipped followup ends with no events.
+ */
 export async function streamTutor(
-  input: { message: string; context?: ScreenContext; opener?: string; newThread?: boolean; image?: PhotoUpload },
+  input:
+    | { action?: 'send'; message: string; context?: ScreenContext; opener?: string; newThread?: boolean; image?: PhotoUpload }
+    | { action: 'followup'; threadId: string; researchId: string },
   onEvent: (e: TutorEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (DEV_MODE) return devReply(onEvent);
+  if (DEV_MODE) return devReply(input, onEvent);
   const post = (token: string) => fetch(`${supabaseUrl}/functions/v1/tutor-chat`, {
     method: 'POST',
     headers: {
@@ -93,6 +109,7 @@ export async function streamTutor(
     if (refreshed.session) res = await post(refreshed.session.access_token);
   }
   if (!res.ok || !res.body) throw new Error(`tutor-chat ${res.status}`);
+  if (!(res.headers.get('Content-Type') ?? '').includes('text/event-stream')) return; // followup skipped
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
@@ -111,14 +128,34 @@ export async function streamTutor(
   }
 }
 
-/** Dev mode has no session: a canned, streamed reply so the panel can be driven locally. */
-async function devReply(onEvent: (e: TutorEvent) => void) {
-  const text = 'いいね、お寺<fix was="に" why="で marks where you do something">で</fix>写真を撮りたいんだ。\nどのお寺に行くの？';
+/** Dev mode has no session: canned, streamed replies so the panel can be driven
+ *  locally. A message with 調べ in it starts a fake lookup that lands after ~4s. */
+async function devReply(input: Parameters<typeof streamTutor>[0], onEvent: (e: TutorEvent) => void) {
+  const say = async (text: string) => {
+    for (let i = 0; i < text.length; i += 6) {
+      await new Promise((r) => setTimeout(r, 40));
+      onEvent({ type: 'text', text: text.slice(i, i + 6) });
+    }
+  };
   onEvent({ type: 'thread', threadId: 'dev' });
-  for (let i = 0; i < text.length; i += 6) {
-    await new Promise((r) => setTimeout(r, 40));
-    onEvent({ type: 'text', text: text.slice(i, i + 6) });
+  if (input.action === 'followup') {
+    const text = 'さっきの、調べたよ！NHKによると、新しい図書館は土曜日に開いたんだって。行ってみたい？';
+    await say(text);
+    onEvent({ type: 'done', text });
+    return;
   }
+  if (input.message.includes('調べ')) {
+    await say('え、気になる！調べておくね。');
+    onEvent({ type: 'tool', name: 'research' });
+    onEvent({ type: 'research', id: `dev-${Date.now()}`, question: 'dev lookup' });
+    await new Promise((r) => setTimeout(r, 300));
+    const text = '\nところで、週末は何をする予定？';
+    await say(text);
+    onEvent({ type: 'done', text });
+    return;
+  }
+  const text = 'いいね、お寺<fix was="に" why="で marks where you do something">で</fix>写真を撮りたいんだ。\nどのお寺に行くの？';
+  await say(text);
   onEvent({ type: 'action', action: { type: 'add_to_deck', word: '紅葉', reading: 'こうよう', meaning: 'autumn leaves' } });
   onEvent({ type: 'done', text });
 }

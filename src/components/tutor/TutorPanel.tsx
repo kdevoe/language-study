@@ -9,7 +9,7 @@ import { WordModal } from '../WordModal';
 import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
 import { lookupWord as jmdictLookup } from '../../services/jmdict';
 import {
-  endTutorThread, fetchTutorHistory, localDay, streamTutor,
+  endTutorThread, fetchTutorHistory, localDay, pollResearch, streamTutor,
   type ScreenContext, type TutorAction, type TutorRecap,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
@@ -31,6 +31,8 @@ interface Line {
 }
 
 const COMMIT_PX = 70;
+const RESEARCH_POLL_MS = 3000;
+const RESEARCH_GIVE_UP_MS = 120_000;
 
 export function TutorPanel() {
   const { open, drag, options, openSeq, closeTutor, snapshot } = useTutor();
@@ -53,6 +55,10 @@ export function TutorPanel() {
   const [ending, setEnding] = useState(false);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [opener, setOpener] = useState<string | null>(null);
+  // Background lookups ハルカ started (research tool): polled until they land,
+  // then she shares them, in a followup turn if the chat is quiet.
+  const [researching, setResearching] = useState<{ id: string; at: number }[]>([]);
+  const [landed, setLanded] = useState<string[]>([]);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -98,35 +104,19 @@ export function TutorPanel() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines, busy, actions, open, keyboardHeight]);
 
-  const sendText = useCallback(async (raw: string) => {
-    const message = raw.trim();
-    const sentPhoto = photo;
-    if ((!message && !sentPhoto) || busy !== null) return;
-    addActivity('turns', 1);
-    setDraft('');
-    setPhoto(null);
-    if (sentPhoto) keepThumb(sentPhoto.upload.id, localDay(), sentPhoto.thumb);
-    const sentCtx = ctx && !chipOff ? ctx : undefined;
-    const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;
-    // ハルカ's reply can span tool calls ("ちょっと調べてみるね" → research → what she
-    // found): each stretch of text is its own bubble, like the reloaded history.
+  // One streamed reply from ハルカ, after `before` lines (the learner's message,
+  // a context chip) are shown. Her reply can span tool calls ("調べておくね" →
+  // research → the conversation goes on): each stretch of text is its own
+  // bubble, like the reloaded history.
+  const streamReply = useCallback(async (input: Parameters<typeof streamTutor>[0], before: Line[]) => {
     let pendingKey = `p-${Date.now()}`;
     let bubbleText = '';
-    setLines((prev) => [
-      ...prev,
-      ...(sentCtx?.chip && !prev.some((l) => l.role === 'context' && l.text === sentCtx.chip)
-        ? [{ key: `c-${Date.now()}`, role: 'context' as const, text: sentCtx.chip }] : []),
-      ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener }] : []),
-      { key: `u-${Date.now()}`, role: 'user', text: message,
-        ...(sentPhoto && { photo: { id: sentPhoto.upload.id, thumb: sentPhoto.thumb, live: true } }) },
-      { key: pendingKey, role: 'assistant', text: '', pending: true },
-    ]);
-    setOpener(null);
+    setLines((prev) => [...prev, ...before, { key: pendingKey, role: 'assistant', text: '', pending: true }]);
     setBusy('');
     const ac = new AbortController();
     abortRef.current = ac;
     try {
-      await streamTutor({ message, context: sentCtx, opener: sentOpener, image: sentPhoto?.upload }, (e) => {
+      await streamTutor(input, (e) => {
         if (e.type === 'thread') setThreadId(e.threadId);
         else if (e.type === 'photo') {
           setLines((prev) => prev.map((l) => (l.photo?.id === e.id ? { ...l, photo: { ...l.photo, label: e.label, transcript: e.transcript } } : l)));
@@ -147,7 +137,8 @@ export function TutorPanel() {
             setLines((prev) => [...prev.map((l) => (l.key === done ? { ...l, text: l.text.trimEnd(), pending: false } : l)),
               { key: next, role: 'assistant' as const, text: '', pending: true }]);
           }
-        } else if (e.type === 'action') setActions((prev) => [...prev, e.action]);
+        } else if (e.type === 'research') setResearching((prev) => [...prev, { id: e.id, at: Date.now() }]);
+        else if (e.type === 'action') setActions((prev) => [...prev, e.action]);
         else if (e.type === 'error') {
           const key = pendingKey;
           setLines((prev) => prev.map((l) => (l.key === key ? { ...l, text: l.text || e.error } : l)));
@@ -165,7 +156,30 @@ export function TutorPanel() {
       setBusy(null);
       abortRef.current = null;
     }
-  }, [busy, ctx, chipOff, opener, lines, photo]);
+  }, []);
+
+  const sendText = useCallback(async (raw: string) => {
+    const message = raw.trim();
+    const sentPhoto = photo;
+    if ((!message && !sentPhoto) || busy !== null) return;
+    addActivity('turns', 1);
+    setDraft('');
+    setPhoto(null);
+    if (sentPhoto) keepThumb(sentPhoto.upload.id, localDay(), sentPhoto.thumb);
+    const sentCtx = ctx && !chipOff ? ctx : undefined;
+    const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;
+    const before: Line[] = [
+      ...(sentCtx?.chip && !lines.some((l) => l.role === 'context' && l.text === sentCtx.chip)
+        ? [{ key: `c-${Date.now()}`, role: 'context' as const, text: sentCtx.chip }] : []),
+      ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener }] : []),
+      { key: `u-${Date.now()}`, role: 'user', text: message,
+        ...(sentPhoto && { photo: { id: sentPhoto.upload.id, thumb: sentPhoto.thumb, live: true } }) },
+    ];
+    setOpener(null);
+    // Anything that landed is in the thread now: she sees it in this turn.
+    setLanded([]);
+    await streamReply({ message, context: sentCtx, opener: sentOpener, image: sentPhoto?.upload }, before);
+  }, [busy, ctx, chipOff, opener, lines, photo, streamReply]);
 
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return;
@@ -175,6 +189,29 @@ export function TutorPanel() {
       console.warn('[tutor] photo failed:', e);
     }
   };
+
+  // Poll the lookups in flight; drop any that never land.
+  useEffect(() => {
+    if (!researching.length || !threadId || recap) return;
+    const t = setTimeout(async () => {
+      const ids = researching.map((r) => r.id);
+      const done = await pollResearch(threadId, ids).catch(() => [] as string[]);
+      const now = Date.now();
+      setResearching((prev) => prev.filter((r) => !done.includes(r.id) && now - r.at < RESEARCH_GIVE_UP_MS));
+      if (done.length) setLanded((prev) => [...prev, ...done]);
+    }, RESEARCH_POLL_MS);
+    return () => clearTimeout(t);
+  }, [researching, threadId, recap]);
+
+  // A lookup landed while ハルカ isn't replying: she brings it up herself. The
+  // server skips it if the learner spoke since (she already saw it then).
+  useEffect(() => {
+    // Not while they're typing: their next message carries it instead.
+    if (!landed.length || busy !== null || !threadId || recap || ending || draft.trim()) return;
+    const researchId = landed[landed.length - 1];
+    setLanded([]);
+    void streamReply({ action: 'followup', threadId, researchId }, []);
+  }, [landed, busy, threadId, recap, ending, draft, streamReply]);
 
   const end = async () => {
     if (ending) return;
@@ -192,6 +229,8 @@ export function TutorPanel() {
     setLines([]);
     setThreadId(null);
     setActions([]);
+    setResearching([]);
+    setLanded([]);
     setAdded(new Set());
     setPhoto(null);
     clearThumbs();
@@ -293,6 +332,7 @@ export function TutorPanel() {
                   ? <UserLine key={l.key} line={l} />
                   : <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />)}
               {busy && <div className="tutor-busy">{busy}</div>}
+              {busy === null && researching.length > 0 && <div className="tutor-busy">ハルカが調べています…</div>}
               {actions.map((a, i) => (
                 <ActionNote key={i} action={a} onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
                   onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
@@ -349,7 +389,7 @@ const TOOL_LABEL: Record<string, string> = {
   lookup_word: '辞書を見ています…',
   get_text: '本文を読んでいます…',
   search_history: '前のことを思い出しています…',
-  research: '調べています…',
+  research: '調べ始めています…',
   request_content: '番組を作っています…',
 };
 
