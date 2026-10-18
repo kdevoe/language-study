@@ -68,32 +68,67 @@ export function TutorPanel() {
   useActivityWhile('chat', open);
   useDimmedStatusBar(open);
 
-  // Each open: snapshot the screen (or the asked-about item), load today's thread once.
+  // Today's thread from the server. A PWA resumed the next morning used to keep
+  // yesterday's lines, because history loaded once per app session (2026-10-18).
+  // Now: on a new local day, start clean; after the app was in the background,
+  // reload, since the thread may have moved on (a lookup landed, another device).
+  const historyDayRef = useRef<string | null>(null);
+  const staleRef = useRef(false);
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const syncHistory = useCallback(() => {
+    const today = localDay();
+    if (historyDayRef.current && historyDayRef.current !== today) {
+      setLines([]);
+      setThreadId(null);
+      setActions([]);
+      setResearching([]);
+      setLanded([]);
+      setRecap(null);
+      setLoaded(false);
+      setHistoryOk(false);
+    }
+    staleRef.current = false;
+    fetchTutorHistory().then(async ({ threadId: id, messages }) => {
+      const photoOf = (m: (typeof messages)[number]) => (m.context && 'photo' in m.context ? m.context.photo : undefined);
+      const thumbs = await thumbsFor(messages.map((m) => photoOf(m)?.id).filter((x): x is string => !!x));
+      if (busyRef.current !== null) return;   // a reply started meanwhile: keep what's on screen
+      historyDayRef.current = today;
+      setThreadId(id);
+      setLines(messages.map((m): Line => {
+        const p = photoOf(m);
+        return {
+          key: m.id, role: m.role,
+          text: m.role === 'context' ? (m.context && 'chip' in m.context ? m.context.chip ?? '' : '') : (m.text ?? ''),
+          ...(p && { photo: { ...p, thumb: thumbs[p.id] } }),
+        };
+      }).filter((l) => l.text || l.photo));
+      setLoaded(true);
+      setHistoryOk(true);
+    }).catch(() => setLoaded(true)); // still talkable; the next open tries again
+  }, []);
+
+  // Each open: snapshot the screen (or the asked-about item), and load today's
+  // thread if it isn't loaded, is from another day, or may be stale.
   useEffect(() => {
     if (!open) return;
     const screen = options.ask ?? snapshot();
     setCtx(screen?.detail ? screen : null);
     setChipOff(false);
     setOpener(options.opener ?? screen?.opener ?? null);
-    if (!historyOk) {
-      fetchTutorHistory().then(async ({ threadId: id, messages }) => {
-        const photoOf = (m: (typeof messages)[number]) => (m.context && 'photo' in m.context ? m.context.photo : undefined);
-        const thumbs = await thumbsFor(messages.map((m) => photoOf(m)?.id).filter((x): x is string => !!x));
-        setThreadId(id);
-        setLines(messages.map((m): Line => {
-          const p = photoOf(m);
-          return {
-            key: m.id, role: m.role,
-            text: m.role === 'context' ? (m.context && 'chip' in m.context ? m.context.chip ?? '' : '') : (m.text ?? ''),
-            ...(p && { photo: { ...p, thumb: thumbs[p.id] } }),
-          };
-        }).filter((l) => l.text || l.photo));
-        setLoaded(true);
-        setHistoryOk(true);
-      }).catch(() => setLoaded(true)); // still talkable; the next open tries again
-    }
+    if (busy === null && (!historyOk || staleRef.current || historyDayRef.current !== localDay())) syncHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, openSeq]);
+
+  // Coming back to the app with the panel open counts the same as opening it.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') { staleRef.current = true; return; }
+      if (open && busyRef.current === null) syncHistory();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [open, syncHistory]);
 
   // Keep the newest line in view, including when the keyboard shrinks the panel.
   const [typing, setTyping] = useState(false);
@@ -111,6 +146,7 @@ export function TutorPanel() {
   const streamReply = useCallback(async (input: Parameters<typeof streamTutor>[0], before: Line[]) => {
     let pendingKey = `p-${Date.now()}`;
     let bubbleText = '';
+    let failed = false;   // the connection failed before she said anything
     setLines((prev) => [...prev, ...before, { key: pendingKey, role: 'assistant', text: '', pending: true }]);
     setBusy('');
     const ac = new AbortController();
@@ -146,6 +182,7 @@ export function TutorPanel() {
       }, ac.signal);
     } catch (err) {
       if (!ac.signal.aborted) {
+        failed = !bubbleText;
         const code = String(err instanceof Error ? err.message : err).match(/\d{3}/)?.[0];
         const key = pendingKey;
         setLines((prev) => prev.map((l) => (l.key === key
@@ -156,6 +193,7 @@ export function TutorPanel() {
       setBusy(null);
       abortRef.current = null;
     }
+    return !failed;
   }, []);
 
   const sendText = useCallback(async (raw: string) => {
@@ -178,7 +216,9 @@ export function TutorPanel() {
     setOpener(null);
     // Anything that landed is in the thread now: she sees it in this turn.
     setLanded([]);
-    await streamReply({ message, context: sentCtx, opener: sentOpener, image: sentPhoto?.upload }, before);
+    const ok = await streamReply({ message, context: sentCtx, opener: sentOpener, image: sentPhoto?.upload }, before);
+    // Nothing got through: hand the message back so it isn't lost (a photo isn't re-attached).
+    if (!ok && message) setDraft((d) => d || message);
   }, [busy, ctx, chipOff, opener, lines, photo, streamReply]);
 
   const pickPhoto = async (file: File | undefined) => {
@@ -412,8 +452,12 @@ function UserLine({ line }: { line: Line }) {
   );
 }
 
+const LEAKED_CALL_RE = /<\/?(?:antml:)?(?:invoke|function_calls|parameter)\b[\s\S]*$/;
+
 /** ハルカ's turn: Japanese lines with tappable words, asides set apart. */
 function AssistantLine({ text, pending, lookup }: { text: string; pending?: boolean; lookup: ReturnType<typeof useWordLookup> }) {
+  // A tool call she wrote out as text (the server strips and carries it out; hide it while streaming).
+  text = text.replace(LEAKED_CALL_RE, '').trimEnd();
   if (pending && !text) return <div className="tutor-typing" role="status" aria-label="ハルカが考えています"><span /><span /><span /></div>;
   // A blank line in her turn is a paragraph: each gets its own line, set close
   // together (the gap between speakers is wider; see .tutor-thread).

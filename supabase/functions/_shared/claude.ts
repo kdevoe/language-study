@@ -2,7 +2,7 @@
 // (fetch-raw-news), the tutor (tutor-chat), and the quick lookups in
 // dictionary-lookup and process-article.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
-import { CLAUDE_HAIKU, CLAUDE_PRICES, WEB_SEARCH_USD } from './models.ts';
+import { CLAUDE_HAIKU, CLAUDE_PRICES, CLAUDE_SONNET, WEB_SEARCH_USD } from './models.ts';
 
 export const anthropic = new Anthropic();
 
@@ -53,10 +53,33 @@ export function parseJsonObject<T>(text: string): T {
   return JSON.parse(text.slice(start, end + 1)) as T;
 }
 
+// Models that reject a forced tool_choice ("type tool and any are not supported
+// for this model": Sonnet 5.5, 2026-10-18). They get tool_choice auto plus an
+// instruction to answer only through the tool, and the reply is validated.
+const NO_FORCED_TOOL = new Set<string>([CLAUDE_SONNET]);
+
+class BadToolOutput extends Error {}
+
+/** Required fields missing anywhere in `value`, as paths ("brief.openers"):
+ *  nested objects too, since a model once tucked the brief's top-level fields
+ *  inside brief.editor and passed a top-level-only check (2026-10-18). */
+function missingRequired(schema: Record<string, unknown>, value: unknown, path = ''): string[] {
+  if (schema.type !== 'object' || !value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const obj = value as Record<string, unknown>;
+  const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const required = Array.isArray(schema.required) ? (schema.required as string[]) : [];
+  const out = required.filter((k) => obj[k] === undefined || obj[k] === null).map((k) => `${path}${k}`);
+  for (const [k, sub] of Object.entries(props)) {
+    if (obj[k] !== undefined && obj[k] !== null) out.push(...missingRequired(sub, obj[k], `${path}${k}.`));
+  }
+  return out;
+}
+
 /**
- * Structured output through a forced tool call: the model must call `name` with
- * input matching `schema`, and we return that input. Retries once on a transient
- * error (429/5xx/overloaded).
+ * Structured output through a tool call: the model calls `name` with input
+ * matching `schema`, and we return that input. The reply is checked (a tool
+ * call, not cut off at max_tokens, every required field present, nested ones too) and
+ * regenerated once if it fails, as on a transient error (429/5xx/overloaded).
  */
 export async function callTool<T>(opts: {
   model: string;
@@ -68,27 +91,43 @@ export async function callTool<T>(opts: {
   maxTokens: number;
   usage: Usage;
 }): Promise<T> {
-  const req = {
-    model: opts.model,
-    max_tokens: opts.maxTokens,
-    ...(opts.system ? { system: opts.system } : {}),
-    tools: [{ name: opts.name, description: opts.description, input_schema: opts.schema }],
-    tool_choice: { type: 'tool' as const, name: opts.name },
-    messages: [{ role: 'user' as const, content: opts.prompt }],
-  };
-  for (let attempt = 0; ; attempt++) {
+  let retried = false;
+  for (;;) {
+    const forced = !NO_FORCED_TOOL.has(opts.model);
+    const system = forced ? opts.system : `${opts.system ? `${opts.system}\n\n` : ''}Answer only by calling the ${opts.name} tool, once, with every required field.`;
+    const req = {
+      model: opts.model,
+      max_tokens: opts.maxTokens,
+      ...(system ? { system } : {}),
+      tools: [{ name: opts.name, description: opts.description, input_schema: opts.schema }],
+      tool_choice: forced ? { type: 'tool' as const, name: opts.name } : { type: 'auto' as const },
+      messages: [{ role: 'user' as const, content: opts.prompt }],
+    };
     try {
       // deno-lint-ignore no-explicit-any
       const msg = await anthropic.messages.create(req as any);
       addUsage(opts.usage, msg.usage);
       const tool = msg.content.find((b) => b.type === 'tool_use');
-      if (!tool || tool.type !== 'tool_use') throw new Error(`${opts.name}: no tool call (stop_reason ${msg.stop_reason})`);
-      return tool.input as T;
+      if (!tool || tool.type !== 'tool_use') throw new BadToolOutput(`${opts.name}: no tool call (stop_reason ${msg.stop_reason})`);
+      if (msg.stop_reason === 'max_tokens') throw new BadToolOutput(`${opts.name}: cut off at max_tokens (${opts.maxTokens})`);
+      const input = (tool.input ?? {}) as Record<string, unknown>;
+      const missing = missingRequired(opts.schema, input);
+      if (missing.length) throw new BadToolOutput(`${opts.name}: missing ${missing.join(', ')}`);
+      return input as T;
     } catch (e) {
       const status = (e as { status?: number })?.status;
-      const transient = status === 429 || status === 529 || (status ?? 0) >= 500;
-      if (attempt >= 1 || !transient) throw e;
-      await new Promise((r) => setTimeout(r, 2000));
+      const message = String((e as Error)?.message ?? '');
+      // Free retry: switch this model to tool_choice auto for the life of the instance.
+      if (status === 400 && forced && /tool_choice/.test(message) && /not supported/.test(message)) {
+        NO_FORCED_TOOL.add(opts.model);
+        console.warn(`[claude] ${opts.model} rejects forced tool_choice; using auto`);
+        continue;
+      }
+      const retryable = e instanceof BadToolOutput || status === 429 || status === 529 || (status ?? 0) >= 500;
+      if (retried || !retryable) throw e;
+      retried = true;
+      console.warn(`[claude] ${opts.name}: retrying after: ${message.slice(0, 200)}`);
+      await new Promise((r) => setTimeout(r, e instanceof BadToolOutput ? 0 : 2000));
     }
   }
 }

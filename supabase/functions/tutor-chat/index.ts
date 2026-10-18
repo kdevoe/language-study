@@ -40,6 +40,9 @@ const corsHeaders = {
 };
 
 const MAX_TOOL_ROUNDS = 4;
+const API_TIMEOUT_MS = 90_000;   // one model call; the app's watchdog gives up after 60 s of silence
+// A tool call written out as text instead of a tool_use block (cut from there on).
+const LEAKED_CALL_RE = /<\/?(?:antml:)?(?:invoke|function_calls|parameter)\b[\s\S]*$/;
 const MAX_HISTORY_MESSAGES = 80;   // older turns drop off (the dream already has them)
 const MAX_USER_CHARS = 2000;
 const RESEARCH_PER_DAY = Number(Deno.env.get('TUTOR_RESEARCH_PER_DAY') ?? '') || 50;   // rolling 24 hours
@@ -47,6 +50,24 @@ const RESEARCH_PER_DAY = Number(Deno.env.get('TUTOR_RESEARCH_PER_DAY') ?? '') ||
 // followup turn: it has no new learner message to act on, only research facts,
 // so a page can't steer them even if a fact slips past the filter.
 const DIRECT_WRITES = new Set(['save_note', 'set_preference', 'record_usage']);
+
+// Tools whose whole effect is the side effect (no answer she needs to read), so
+// a call she wrote out as text can still be carried out after the fact.
+const SALVAGEABLE = new Set(['add_to_deck', 'record_usage', 'save_note', 'set_preference', 'suggest_grammar_rating', 'request_content']);
+
+/** Calls written out as text: `<invoke name="x"><parameter name="k">v</parameter>…</invoke>`. */
+function parseLeakedCalls(text: string): { name: string; input: Record<string, unknown> }[] {
+  const out: { name: string; input: Record<string, unknown> }[] = [];
+  for (const m of text.matchAll(/<(?:antml:)?invoke\s+name="([^"]+)"\s*>([\s\S]*?)(?:<\/(?:antml:)?invoke>|$)/g)) {
+    const input: Record<string, unknown> = {};
+    for (const p of m[2].matchAll(/<(?:antml:)?parameter\s+name="([^"]+)"\s*>([\s\S]*?)<\/(?:antml:)?parameter>/g)) {
+      const v = p[2].trim();
+      input[p[1]] = v === 'true' ? true : v === 'false' ? false : v;
+    }
+    out.push({ name: m[1], input });
+  }
+  return out;
+}
 
 const PERSONA = `あなたはハルカ。30代。明るく好奇心旺盛で、相手と同じ目線で話す。Yugenという日本語学習アプリの中にいる、学習者の日本語の先生であり、ランゲージエクスチェンジの友だちでもある。
 
@@ -326,11 +347,15 @@ function streamTurn(threadId: string, run: (send: (o: unknown) => void) => Promi
     async start(controller) {
       const send = (o: unknown) => { try { controller.enqueue(sse(o)); } catch { /* client went away */ } };
       send({ type: 'thread', threadId });
+      // A heartbeat, so the app's watchdog can tell "still thinking" from a dead stream.
+      const beat = setInterval(() => send({ type: 'ping' }), 15_000);
       try {
         await run(send);
       } catch (e) {
         console.error('[tutor-chat] turn failed:', e);
         send({ type: 'error', error: 'ハルカが今は答えられません。少し待ってからもう一度どうぞ。' });
+      } finally {
+        clearInterval(beat);
       }
       controller.close();
     },
@@ -552,25 +577,46 @@ async function runTurn(opts: {
       tools: TOOLS,
       messages: [...messages.slice(0, -1), { role: last.role, content: [...last.content.slice(0, -1), marked] }],
     };
-    const stream = anthropic.messages.stream(req as any);
+    // A stalled call must end the turn, not hold the stream open until the
+    // runtime kills it (4 minutes of typing dots, 2026-10-18).
+    const stream = anthropic.messages.stream(req as any, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
     stream.on('text', (t: string) => send({ type: 'text', text: t }));
     const msg: any = await stream.finalMessage();
     addUsage(usage, msg.usage);
 
-    const text = msg.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
+    // The model once wrote a tool call out as text (`<invoke name="get_text">…`)
+    // and stopped with stop_reason tool_use but no tool_use block. Strip the
+    // leaked call and end the turn there: sending back an empty tool_result
+    // turn is an invalid request.
+    const calls = msg.content.filter((b: any) => b.type === 'tool_use');
+    const leaked = msg.content.some((b: any) => b.type === 'text' && LEAKED_CALL_RE.test(b.text));
+    let content = msg.content;
+    if (leaked) {
+      // Carry out the side-effect ones she meant (an add_to_deck written as text, 2026-10-18).
+      const salvaged = calls.length ? [] : parseLeakedCalls(content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join(''))
+        .filter((c) => SALVAGEABLE.has(c.name));
+      console.warn('[tutor-chat] stripped a tool call written as text', JSON.stringify({ stop: msg.stop_reason, calls: calls.length, salvaged: salvaged.map((c) => c.name) }));
+      for (const c of salvaged) {
+        try { await runTool(admin, userId, threadId, c.name, c.input, send, turn); } catch (e) { console.warn('[tutor-chat] salvaged call failed', c.name, String(e)); }
+      }
+      content = content.map((b: any) => (b.type === 'text' ? { ...b, text: b.text.replace(LEAKED_CALL_RE, '').trimEnd() } : b))
+        .filter((b: any) => b.type !== 'text' || b.text);
+    }
+    const ended = msg.stop_reason !== 'tool_use' || calls.length === 0;
+    const text = content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
     finalText += text;
     // Keep every block (thinking included): a tool loop must hand back the
-    // assistant turn exactly as it came.
-    const content = msg.content;
+    // assistant turn exactly as it came. A turn left with nothing to say isn't
+    // stored (an assistant message of only thinking is invalid next turn).
+    if (!text.trim() && ended) break;
     await admin.from('tutor_messages').insert({
       thread_id: threadId, user_id: userId, role: 'assistant', content,
-      text: text.trim() || null, usage: msg.stop_reason === 'tool_use' ? null : usage,
+      text: text.trim() || null, usage: ended ? usage : null,
     });
     messages.push({ role: 'assistant', content });
 
-    if (msg.stop_reason !== 'tool_use') break;
+    if (ended) break;
     const results: any[] = [];
-    const calls = msg.content.filter((b: any) => b.type === 'tool_use');
     for (const call of calls) {
       send({ type: 'tool', name: call.name });
       let out: string;

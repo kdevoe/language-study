@@ -203,7 +203,7 @@ export function Reader({ initialArticle, onComplete, onOpenPart, bookmark, onBoo
       const userId = await resolveUserId();
       if (!userId) return;
       setOpeningPart(true);
-      article = await fetchProcessedArticleById(id, userId);
+      article = await fetchProcessedArticleById(id, userId).catch(() => null);
       setOpeningPart(false);
     }
     if (!article) return;
