@@ -36,6 +36,19 @@ const parse = (s: string) => { const [y, m, d] = s.split('-').map(Number); retur
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mins = (secs: number) => Math.round(secs / 60);
 const hm = (secs: number) => { const m = mins(secs); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; };
+const md = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+// The rough y-axis (docs/mockups/activity-axis.html, C): two or three round
+// marks, so a bar reads as "about an hour". The step is the smallest round one
+// that fits the tallest bar in three; the plot's top is the last mark.
+const STEPS = [5, 10, 15, 30, 60, 120, 180, 300, 600, 1200, 1800, 3000, 6000]; // minutes
+function axis(maxSecs: number) {
+  const max = Math.max(1, maxSecs / 60);
+  const step = STEPS.find((st) => Math.ceil(max / st) <= 3) ?? STEPS[STEPS.length - 1];
+  const n = Math.max(1, Math.ceil(max / step));
+  return { top: step * n * 60, ticks: Array.from({ length: n }, (_, i) => step * (i + 1)) };
+}
+const tickLabel = (m: number) => (m < 60 ? `${m}m` : `${+(m / 60).toFixed(1)}h`);
 
 /** The period's span, the same span one period back (for the change), and how to bucket it. */
 function spans(period: Period, today: Date) {
@@ -51,6 +64,22 @@ function spans(period: Period, today: Date) {
     return { start, end, prevStart, prevEnd };
   }
   return { start: new Date(2020, 0, 1), end: today, prevStart: null, prevEnd: null };
+}
+
+/** The counts grid for some days (the period, or a tapped bar). */
+function counts(rows: Day[], streak: number): { n: number | string; l: string }[] {
+  const sum = (k: keyof Day) => rows.reduce((a, d) => a + (d[k] as number), 0);
+  return [
+    { n: sum('opened'), l: 'articles opened' },
+    { n: sum('podcasts'), l: 'podcasts' },
+    { n: sum('songs'), l: 'songs' },
+    { n: sum('cards'), l: 'cards reviewed' },
+    { n: sum('kanji'), l: 'kanji reviewed' },
+    { n: sum('lookups'), l: 'lookups' },
+    { n: sum('turns'), l: 'ハルカ turns' },
+    { n: rows.filter((d) => d.app >= 60 || d.cards + d.kanji + d.lookups + d.opened > 0).length, l: 'days active' },
+    { n: `${streak}日`, l: 'streak' },
+  ];
 }
 
 export function ActivityStats() {
@@ -84,26 +113,28 @@ export function ActivityStats() {
     const sum = (rows: Day[], k: keyof Day) => rows.reduce((a, d) => a + (d[k] as number), 0);
 
     // Buckets: days of the week, weeks of the month (1–7, 8–14…), or months tracked.
-    let buckets: { label: string; rows: Day[]; current: boolean }[];
+    // `detail` names the bar when it's tapped.
+    let buckets: { label: string; detail: string; rows: Day[]; current: boolean }[];
     if (period === 'week') {
       buckets = Array.from({ length: 7 }, (_, i) => {
         const day = addDays(s.start, i);
-        return { label: WEEKDAYS[day.getDay()], rows: cur.filter((d) => d.day === iso(day)), current: iso(day) === data.today };
+        return { label: WEEKDAYS[day.getDay()], detail: `${WEEKDAYS[day.getDay()]} ${md(day)}`, rows: cur.filter((d) => d.day === iso(day)), current: iso(day) === data.today };
       });
     } else if (period === 'month') {
       const weeks = Math.ceil(s.end.getDate() / 7);
       buckets = Array.from({ length: weeks }, (_, w) => ({
         label: `${w + 1}週`,
+        detail: `${md(new Date(s.start.getFullYear(), s.start.getMonth(), w * 7 + 1))}–${md(new Date(s.start.getFullYear(), s.start.getMonth(), Math.min(w * 7 + 7, s.end.getDate())))}`,
         rows: cur.filter((d) => Math.floor((parse(d.day).getDate() - 1) / 7) === w),
         current: Math.floor((today.getDate() - 1) / 7) === w,
       }));
     } else {
       const tracked = cur.filter((d) => d.app + d.read + d.listen + d.review + d.chat > 0);
       const first = tracked.length ? parse(tracked[0].day) : today;
-      const months: { label: string; rows: Day[]; current: boolean }[] = [];
+      const months: { label: string; detail: string; rows: Day[]; current: boolean }[] = [];
       for (let m = new Date(first.getFullYear(), first.getMonth(), 1); m <= today; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
         const key = iso(m).slice(0, 7);
-        months.push({ label: `${m.getMonth() + 1}月`, rows: cur.filter((d) => d.day.startsWith(key)), current: key === data.today.slice(0, 7) });
+        months.push({ label: `${m.getMonth() + 1}月`, detail: m.toLocaleDateString('en', { month: 'long', year: 'numeric' }), rows: cur.filter((d) => d.day.startsWith(key)), current: key === data.today.slice(0, 7) });
       }
       buckets = months.slice(-8);
     }
@@ -114,21 +145,16 @@ export function ActivityStats() {
     return {
       buckets, app, delta, firstTracked,
       kinds: KINDS.map((k) => ({ ...k, secs: sum(cur, k.key) })),
-      counts: [
-        { n: sum(cur, 'opened'), l: 'articles opened' },
-        { n: sum(cur, 'podcasts'), l: 'podcasts' },
-        { n: sum(cur, 'songs'), l: 'songs' },
-        { n: sum(cur, 'cards'), l: 'cards reviewed' },
-        { n: sum(cur, 'kanji'), l: 'kanji reviewed' },
-        { n: sum(cur, 'lookups'), l: 'lookups' },
-        { n: sum(cur, 'turns'), l: 'ハルカ turns' },
-        { n: cur.filter((d) => d.app >= 60 || d.cards + d.kanji + d.lookups + d.opened > 0).length, l: 'days active' },
-        { n: `${data.streak}日`, l: 'streak' },
-      ],
+      counts: counts(cur, data.streak),
     };
   }, [stats, period]);
 
-  const max = view ? Math.max(1, ...view.buckets.map((b) => b.rows.reduce((a, d) => a + d.read + d.listen + d.review + d.chat, 0))) : 1;
+  // A tapped bar: the header and legend show its own numbers until it's tapped again.
+  const [sel, setSel] = useState<number | null>(null);
+  useEffect(() => setSel(null), [period]);
+  const scale = axis(view ? Math.max(0, ...view.buckets.map((b) => b.rows.reduce((a, d) => a + d.read + d.listen + d.review + d.chat, 0))) : 0);
+  const picked = view && sel !== null ? view.buckets[sel] : null;
+  const pickedSum = (k: keyof Day) => (picked ? picked.rows.reduce((a, d) => a + (d[k] as number), 0) : 0);
   const prevLabel = period === 'week' ? 'last week' : 'last month';
 
   return (
@@ -138,29 +164,43 @@ export function ActivityStats() {
       <div className="act-card">
         <div className="act-head">
           <span className="act-kick">{period === 'week' ? 'MINUTES PER DAY' : period === 'month' ? 'MINUTES PER WEEK' : 'MINUTES PER MONTH'}</span>
-          {view && (
+          {picked ? (
+            <span className="act-app">{picked.detail} · <b>{hm(pickedSum('app'))}</b> in Yugen</span>
+          ) : view && (
             <span className="act-app">
               <b>{hm(view.app)}</b> in Yugen
               {period !== 'all' && view.delta !== 0 && <span className={view.delta > 0 ? 'up' : ''}> · {view.delta > 0 ? '+' : '−'}{hm(Math.abs(view.delta))} vs {prevLabel}</span>}
             </span>
           )}
         </div>
-        <div className="act-bars">
-          {(view?.buckets ?? Array.from({ length: 7 }, () => ({ label: '', rows: [], current: false }))).map((b, i) => {
-            const parts = KINDS.map((k) => b.rows.reduce((a, d) => a + d[k.key as Kind], 0));
-            const total = parts.reduce((a, p) => a + p, 0);
-            return (
-              <div key={i} className={`act-bar${b.current ? ' now' : ''}`}>
-                <div className="act-stack" style={{ height: `calc((100% - 1.1rem) * ${(total / max).toFixed(3)})` }}>
-                  {parts.map((p, k) => p > 0 && <i key={k} style={{ flexGrow: p, background: KINDS[k].color }} />)}
-                </div>
-                <span>{b.label}</span>
-              </div>
-            );
-          })}
+        <div className="act-plot">
+          <div className="act-axis" aria-hidden="true">
+            {view && scale.ticks.map((t) => (
+              <div key={t} className="act-tick" style={{ bottom: `${(t * 60 / scale.top * 100).toFixed(2)}%` }}><em>{tickLabel(t)}</em></div>
+            ))}
+          </div>
+          <div className={`act-bars${picked ? ' picking' : ''}`}>
+            {(view?.buckets ?? Array.from({ length: 7 }, () => ({ label: '', detail: '', rows: [], current: false }))).map((b, i) => {
+              const parts = KINDS.map((k) => b.rows.reduce((a, d) => a + d[k.key as Kind], 0));
+              const total = parts.reduce((a, p) => a + p, 0);
+              return (
+                <button
+                  key={i} type="button" disabled={!view}
+                  className={`act-bar${b.current ? ' now' : ''}${sel === i ? ' sel' : ''}`}
+                  aria-pressed={sel === i} aria-label={b.detail ? `${b.detail}: ${hm(total)}` : undefined}
+                  onClick={() => setSel((cur) => (cur === i ? null : i))}
+                >
+                  <div className="act-stack" style={{ height: `calc((100% - 1.1rem) * ${(total / scale.top).toFixed(3)})` }}>
+                    {parts.map((p, k) => p > 0 && <i key={k} style={{ flexGrow: p, background: KINDS[k].color }} />)}
+                  </div>
+                  <span>{b.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="act-legend">
-          {(view?.kinds ?? KINDS.map((k) => ({ ...k, secs: 0 }))).map((k) => (
+          {(picked ? KINDS.map((k) => ({ ...k, secs: pickedSum(k.key) })) : view?.kinds ?? KINDS.map((k) => ({ ...k, secs: 0 }))).map((k) => (
             <span key={k.key}><i style={{ background: k.color }} />{k.label} <b>{hm(k.secs)}</b></span>
           ))}
         </div>
@@ -170,7 +210,7 @@ export function ActivityStats() {
       </div>
 
       <div className="act-card act-counts">
-        {(view?.counts ?? []).map((c) => (
+        {(picked ? counts(picked.rows, stats[period]?.streak ?? 0) : view?.counts ?? []).map((c) => (
           <div key={c.l}><div className="n">{typeof c.n === 'number' ? c.n.toLocaleString() : c.n}</div><div className="l">{c.l}</div></div>
         ))}
       </div>

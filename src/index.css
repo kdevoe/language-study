@@ -536,11 +536,23 @@ body.song-mode {
 .act-app { font-size: 0.72rem; color: var(--text-muted); }
 .act-app b { color: var(--text-main); font-weight: 600; }
 .act-app .up { color: #5b8c5a; font-weight: 600; }
-.act-bars { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; height: 150px; margin-top: 0.8rem; }
-.act-bar { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
+/* Rough y-axis, ticks only (mockup activity-axis.html, C): round marks in a left gutter, nothing across the bars. */
+.act-plot { position: relative; height: 150px; margin-top: 0.8rem; }
+.act-axis { position: absolute; left: 0; right: 0; top: 0; bottom: 1.1rem; pointer-events: none; }
+.act-tick { position: absolute; left: 0; height: 0; }
+.act-tick em { position: absolute; left: 0; transform: translateY(-50%); font-style: normal; font-size: 0.58rem; line-height: 1; color: var(--text-muted); opacity: 0.75; white-space: nowrap; }
+.act-tick::after { content: ''; position: absolute; left: 22px; width: 4px; border-top: 1px solid rgba(102, 102, 102, 0.35); }
+.act-bars { position: absolute; top: 0; right: 0; bottom: 0; left: 30px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.act-bar { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px;
+  appearance: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.act-bar:disabled { cursor: default; }
+/* A tapped bar stays; the rest step back. */
+.act-bars.picking .act-bar:not(.sel) .act-stack { opacity: 0.35; }
+.act-bars.picking .act-bar:not(.sel) > span { opacity: 0.6; }
+.act-bar.sel > span { color: var(--text-main); font-weight: 700; }
 .act-bar > span { font-size: 0.66rem; color: var(--text-muted); line-height: 1; min-height: 0.66rem; }
 .act-bar.now > span { color: var(--text-main); font-weight: 700; }
-.act-stack { width: 100%; max-width: 30px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.act-stack { width: 100%; max-width: 30px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease; }
 .act-stack i { display: block; flex-basis: 0; }
 .act-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; margin-top: 0.9rem; font-size: 0.7rem; color: var(--text-muted); }
 .act-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
