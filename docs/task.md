@@ -646,5 +646,12 @@
   - [ ] Deploy process-article, dictionary-lookup, fetch-raw-news, learner-dream, tutor-chat, generate-podcast,
         generate-song; run `node scripts/eval-prompt-injection.mjs` with GEMINI_API_KEY
   - [ ] Extend the injection eval to the tutor (planted instructions in get_text) and podcast scripts
+  - [x] ハルカ web research (quarantined): `research` tool → Haiku + web_search (allowed news / encyclopedia /
+        travel domains, ≤3 searches) with no other tools, reporting ≤5 short facts → `_shared/researchFilter.ts`
+        deterministic checks (shape, links / contacts, text aimed at the agent or reader, source must be a page the
+        search returned) → fenced `<research>`; direct-write tools blocked for the rest of that turn; cap
+        TUTOR_RESEARCH_PER_DAY (default 10, rolling 24h); `node scripts/eval-research-filter.mjs` (offline)
+  - [ ] Rollout: deploy tutor-chat (web search must be enabled for the org in the Claude Console); try a live
+        question, then a planted page, and check the `[research] withheld:` logs
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
         local dev against functions needs DEV_ALLOW_ANON=true in the functions env file

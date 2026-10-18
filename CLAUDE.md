@@ -104,6 +104,7 @@ Tracked in `docs/task.md`: RLS and storage policies have not been audited; `api/
 - `renderMemory` (`_shared/learner.ts`) fences learner memory itself.
 - `process-article` strips URLs and email addresses from generated blocks (`scrubLinks`).
 - `node scripts/eval-prompt-injection.mjs`: planted-instruction cases against the real rewrite prompt. Run it after changing a prompt that takes untrusted text.
+- **Web search is quarantined** (`_shared/research.ts`): only a Haiku call with no tools but `web_search` (allowed domains) and its report reads raw pages. Its report passes deterministic checks in `_shared/researchFilter.ts` (bounded shape, no links or contacts, nothing addressed to the agent or the reader, every source a page the search returned) before ハルカ sees it, fenced as `<research>`, and her direct-write tools are blocked for the rest of that turn. Never give a model that has side-effect tools raw search or fetch results. `node scripts/eval-research-filter.mjs` checks the filter offline; run it after changing it.
 
 ## Environment Variables
 

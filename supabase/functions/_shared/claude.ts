@@ -2,7 +2,7 @@
 // (fetch-raw-news), the tutor (tutor-chat), and the quick lookups in
 // dictionary-lookup and process-article.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
-import { CLAUDE_HAIKU, CLAUDE_PRICES } from './models.ts';
+import { CLAUDE_HAIKU, CLAUDE_PRICES, WEB_SEARCH_USD } from './models.ts';
 
 export const anthropic = new Anthropic();
 
@@ -13,11 +13,12 @@ export interface Usage {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   webFetches: number;
+  webSearches: number;
   costUsd: number;
 }
 
 export function emptyUsage(model: string): Usage {
-  return { model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, webFetches: 0, costUsd: 0 };
+  return { model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, webFetches: 0, webSearches: 0, costUsd: 0 };
 }
 
 /** Fold one response's usage into a running total (cost in USD). */
@@ -32,8 +33,10 @@ export function addUsage(total: Usage, u: any): Usage {
   total.outputTokens += output;
   total.cacheReadTokens += read;
   total.cacheWriteTokens += write;
+  const searches = u?.server_tool_use?.web_search_requests ?? 0;
   total.webFetches += u?.server_tool_use?.web_fetch_requests ?? 0;
-  total.costUsd += (input * p.in + output * p.out + read * p.in * 0.1 + write * p.in * 1.25) / 1e6;
+  total.webSearches += searches;
+  total.costUsd += (input * p.in + output * p.out + read * p.in * 0.1 + write * p.in * 1.25) / 1e6 + searches * WEB_SEARCH_USD;
   return total;
 }
 

@@ -332,6 +332,7 @@ const TOOL_LABEL: Record<string, string> = {
   lookup_word: '辞書を見ています…',
   get_text: '本文を読んでいます…',
   search_history: '前のことを思い出しています…',
+  research: '調べています…',
   request_content: '番組を作っています…',
 };
 
