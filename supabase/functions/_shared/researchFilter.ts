@@ -19,10 +19,15 @@ export const MAX_FACT_CHARS = 240;
 
 // Where research may search. Broad, reputable sources a learner of Japanese
 // would ask about: news, encyclopedias, travel. Subdomains are covered.
-export const RESEARCH_DOMAINS = [
-  'nhk.or.jp', 'japantimes.co.jp', 'mainichi.jp', 'asahi.com', 'kyodonews.net', 'nippon.com',
-  'wikipedia.org', 'japan-guide.com', 'japan.travel', 'jnto.go.jp',
-  'bbc.com', 'bbc.co.uk', 'reuters.com', 'apnews.com',
+// The open web minus the noisiest sources: social media, forums, Q&A and
+// content farms. Questions are general ("where was this weekend's F1 race?"),
+// and an allowlist can't cover them: most big news sites block Anthropic's
+// crawler, and one blocked allowed domain fails the whole request (Oct 17 2026).
+// Safety comes from the quarantine and the checks below, not from the list.
+export const RESEARCH_BLOCKED_DOMAINS = [
+  'x.com', 'twitter.com', 'facebook.com', 'instagram.com', 'tiktok.com', 'threads.net',
+  'reddit.com', 'quora.com', 'pinterest.com', 'medium.com', 'substack.com',
+  'chiebukuro.yahoo.co.jp', '5ch.net', '2ch.sc', 'note.com', 'ameblo.jp', 'hatenablog.com',
 ];
 
 const URL_RE = /\b(?:https?:\/\/|www\.)\S+|\b[\w-]+\.(?:com|net|org|jp|io|co|info|biz|xyz|app|link)(?:\/\S*)?\b/i;
@@ -81,10 +86,10 @@ function problem(fact: string): string | null {
 /**
  * Check the research model's report. `seenHosts` are the hosts of every page
  * the search returned in this call; a fact whose source isn't one of them is
- * withheld (the model can't cite a page it never saw). `allowedDomains`, when
- * given, must also cover the source.
+ * withheld (the model can't cite a page it never saw). A source under
+ * `blockedDomains` is withheld too (the search shouldn't return one).
  */
-export function filterReport(report: unknown, seenHosts: string[], allowedDomains: string[] = RESEARCH_DOMAINS): FilteredReport {
+export function filterReport(report: unknown, seenHosts: string[], blockedDomains: string[] = RESEARCH_BLOCKED_DOMAINS): FilteredReport {
   const r = (report ?? {}) as { answerable?: unknown; findings?: unknown };
   const list = Array.isArray(r.findings) ? r.findings : [];
   const seen = new Set(seenHosts.map(hostOf).filter(Boolean));
@@ -101,7 +106,7 @@ export function filterReport(report: unknown, seenHosts: string[], allowedDomain
       : problem(fact)
         ?? (!host ? 'no source'
           : ![...seen].some((s) => underDomain(host, s) || underDomain(s, host)) ? 'source not in the search results'
-          : allowedDomains.length && !allowedDomains.some((d) => underDomain(host, d)) ? 'source not allowed'
+          : blockedDomains.some((d) => underDomain(host, d)) ? 'source blocked'
           : dupes.has(fact.toLowerCase()) ? 'duplicate'
           : null);
     if (reason) {

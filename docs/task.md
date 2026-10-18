@@ -659,7 +659,11 @@
         Article screen notes carry the story's date; topic podcasts research the topic first; the nightly dream
         sees the unopened articles waiting in the feed, ties at least one opener to one, picks 0-2 lookups and
         writes openers from them (brief.research, shown to ハルカ as <research> in memory)
-  - [ ] Rollout: deploy tutor-chat (web search must be enabled for the org in the Claude Console); try a live
-        question, then a planted page, and check the `[research] withheld:` logs
+  - [x] Rollout: tutor-chat, learner-dream, generate-podcast deployed Oct 17. First live lookup failed: 8 of the
+        allowed domains (NHK, Mainichi, Asahi, Kyodo, BBC, Reuters, AP) block Anthropic's crawler and the API
+        rejects the whole request. Switched to the open web minus a blocklist (social, forums, Q&A, content farms);
+        a domain the API names as unreadable is dropped and the call retried once
+  - [ ] Try a live general question (e.g. this weekend's F1 race), then a planted page, and check the
+        `[research] withheld:` logs
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
         local dev against functions needs DEV_ALLOW_ANON=true in the functions env file
