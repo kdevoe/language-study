@@ -377,13 +377,18 @@ async function loadThread(admin: SupabaseClient, threadId: string, tz: string) {
     return { ...r, content: [{ type: 'text', text: `<time>${clock.format(at)}${gapNote(gap)}</time>` }, ...r.content] };
   });
   // A background lookup can land while ハルカ is mid-turn. Its note waits until
-  // that turn is over (the next learner message or screen note, or the end),
-  // so turns read back exactly as she wrote them: history only grows at the end.
+  // that turn is over (the next learner message, screen note or followup turn,
+  // or the end), so turns read back exactly as she wrote them: history only
+  // grows at the end. A followup turn is the one the note itself prompted, so
+  // the note goes before it; otherwise it would land after her sharing it and
+  // read as news she hadn't shared yet.
   const ordered: typeof rows = [];
   let held: typeof rows = [];
   for (const r of rows) {
     if (r.role === 'context' && r.context?.screen === 'research') { held.push(r); continue; }
-    const turnStart = r.role === 'context' || (r.role === 'user' && r.content.every((b) => b.type === 'text'));
+    const prev = ordered[ordered.length - 1];
+    const followupStart = r.role === 'assistant' && prev?.role === 'assistant' && !prev.content.some((b) => b.type === 'tool_use');
+    const turnStart = followupStart || r.role === 'context' || (r.role === 'user' && r.content.every((b) => b.type === 'text'));
     if (turnStart && held.length) { ordered.push(...held); held = []; }
     ordered.push(r);
   }
