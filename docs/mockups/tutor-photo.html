@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — tutor photos</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+svg.i { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── Page chrome ── */
+.mock-header { max-width: 980px; margin: 0 auto 1.4rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 780px; margin: 0 auto 0.4rem; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 0.7rem 1.6rem; margin: 1.2rem auto 2rem; flex-wrap: wrap; max-width: 1200px; }
+.ctl { display: flex; gap: 0.5rem; align-items: center; }
+.ctl .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); }
+.pill-seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 3px; }
+.pill-seg button { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); padding: 0.35rem 0.9rem; border-radius: 100px; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.pill-seg button.on { background: var(--bg-pure); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 380px; text-align: center; min-height: 3.6em; }
+/* 390 × 844: a real phone, per design-system.md */
+.phone { width: 410px; height: 864px; max-width: 100%; background: var(--bg-color); border-radius: 50px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; }
+.screen { position: absolute; inset: 0; }
+
+/* ── The app behind the panel (今日, dimmed) ── */
+.app { position: absolute; inset: 0; padding: 60px 24px 0; }
+.app h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; margin-bottom: 1.2rem; }
+.app .row { font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.7; margin-bottom: 1.1rem; }
+.app .k { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); font-family: var(--font-sans); display: block; }
+.backdrop { position: absolute; inset: 0; background: rgba(45,45,45,0.35); }
+
+/* ── The panel, as .tutor-panel in src/index.css ── */
+.panel { position: absolute; right: 0; top: 0; width: 343px; height: 844px; display: flex; flex-direction: column; background: var(--bg-color); padding-top: 54px; border-radius: 28px 0 0 28px; box-shadow: -10px 0 40px rgba(0,0,0,0.15); }
+.head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.4rem 0.4rem; }
+.who { display: flex; align-items: center; gap: 0.6rem; }
+.who b { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 500; }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.95rem; }
+.link { font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-muted); }
+.grab { position: absolute; top: 50%; left: 8px; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
+.thread { flex: 1; overflow: hidden; padding: 0.9rem 1.4rem 1rem; display: flex; flex-direction: column; }
+.thread > :first-child { margin-top: auto; }
+.turn { display: flex; flex-direction: column; }
+.turn + .turn { margin-top: 2.2rem; }
+.turn .t + .t, .turn .t + .aside, .turn .aside + .t { margin-top: 0.55rem; }
+.turn.me { align-items: flex-end; gap: 0.4rem; }
+.t { font-family: var(--font-serif); font-size: 1.02rem; line-height: 1.9; max-width: 94%; }
+.aside { font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding-left: 0.8rem; margin: 0.35rem 0; }
+.u { max-width: 82%; background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.95rem; line-height: 1.75; }
+.dim { opacity: 0.35; }
+
+.input { flex: none; display: flex; align-items: flex-end; gap: 0.8rem; margin: 0 1.4rem; padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
+.input .field { flex: 1; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.5; min-height: 1.5em; }
+.field.empty { color: var(--text-muted); opacity: 0.7; }
+.input svg.i { color: var(--text-muted); }
+.input .send.ready svg.i { color: var(--text-main); }
+.foot { flex: none; height: 19px; }
+.caret { display: inline-block; width: 2px; height: 1.15em; background: #3478f6; vertical-align: -0.2em; margin-right: 1px; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Camera button placement (control: left / right) */
+.phone.cam-right .cam-l { display: none; }
+.phone.cam-left .cam-r { display: none; }
+
+/* ── The photo itself: a menu, drawn ── */
+.photo { position: relative; overflow: hidden; background: linear-gradient(160deg, #e9dcc3 0%, #dcc9a6 55%, #c9b28a 100%); }
+.photo .paper { position: absolute; inset: 9% 12% 7% 10%; background: #f7f1e3; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(60,40,10,0.25); padding: 9% 9%; display: flex; flex-direction: column; gap: 6%; font-family: var(--font-serif); color: #3a2c1a; }
+.photo .paper .ttl { font-size: 1.05em; font-weight: 600; text-align: center; letter-spacing: 0.15em; border-bottom: 1px solid #b9a27a; padding-bottom: 4%; }
+.photo .paper .ln { display: flex; justify-content: space-between; font-size: 0.72em; }
+.photo .glare { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.28) 50%, transparent 60%); }
+
+/* Attach preview: above the input line, before sending */
+.attach { flex: none; display: flex; align-items: flex-end; gap: 0.7rem; margin: 0 1.4rem 0.6rem; }
+.attach .photo { width: 76px; height: 96px; border-radius: 12px; font-size: 7px; }
+.attach .x { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 50%; background: rgba(45,45,45,0.55); color: #fff; display: flex; align-items: center; justify-content: center; z-index: 2; }
+.attach .x svg.i { width: 11px; height: 11px; stroke-width: 2.4; }
+.attach .note { font-size: 0.72rem; color: var(--text-muted); line-height: 1.5; padding-bottom: 0.2rem; }
+
+/* Sent: the photo sits above your bubble, right-aligned */
+.sent-photo { width: 170px; height: 214px; border-radius: 16px; font-size: 12px; }
+
+/* After reload: what's left is her transcript */
+.chip { display: inline-flex; align-items: center; gap: 0.45rem; background: var(--bg-card); border-radius: 100px; padding: 0.3rem 0.8rem 0.3rem 0.65rem; font-size: 0.78rem; color: var(--text-muted); max-width: 82%; }
+.chip svg.i { width: 15px; height: 15px; }
+.chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ghost { width: 170px; border-radius: 16px; border: 1px dashed var(--border-light); background: var(--bg-card); padding: 0.8rem 0.9rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.ghost .k { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); }
+.ghost .k svg.i { width: 14px; height: 14px; }
+.ghost .d { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; }
+.transcript { max-width: 82%; font-size: 0.78rem; line-height: 1.65; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding-left: 0.8rem; text-align: left; display: none; }
+.transcript b { font-family: var(--font-serif); font-weight: 500; color: var(--text-main); font-size: 0.88rem; }
+.open .transcript { display: block; }
+.phone.re-chip :is(.re-ghost, .re-thumb), .phone.re-ghost :is(.re-chip, .re-thumb), .phone.re-thumb :is(.re-chip, .re-ghost) { display: none !important; }
+/* C: the on-device thumbnail, smaller and softer than the live photo; tap shows the transcript */
+.thumb { width: 120px; height: 150px; border-radius: 14px; font-size: 9px; padding: 0; }
+
+/* Fake typing dots (her reply about to start) */
+.dots { display: flex; gap: 5px; padding: 0.6rem 0; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); opacity: 0.25; animation: breathe 1.2s infinite; }
+.dots i:nth-child(2) { animation-delay: 0.2s; } .dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes breathe { 40% { opacity: 0.8; } }
+
+/* Scenario (control: menu / hike) */
+.phone.sc-menu .s-hike, .phone.sc-hike .s-menu { display: none !important; }
+.photo.hike { background: none; }
+.photo.hike .sky { position: absolute; inset: 0; background: linear-gradient(180deg, #8fb3d4 0%, #c7d9e6 55%, #e9e2cf 100%); }
+.photo.hike .m { position: absolute; left: 0; right: 0; bottom: 0; }
+.photo.hike .m1 { top: 30%; background: #7f8f9e; clip-path: polygon(0 55%, 22% 20%, 40% 42%, 62% 5%, 82% 35%, 100% 22%, 100% 100%, 0 100%); }
+.photo.hike .m2 { top: 52%; background: #6d7a4a; clip-path: polygon(0 30%, 30% 10%, 55% 28%, 80% 8%, 100% 25%, 100% 100%, 0 100%); }
+.photo.hike .trees { position: absolute; left: 0; right: 0; bottom: 12%; height: 30%; }
+.photo.hike .trees i { position: absolute; bottom: 0; width: 26%; aspect-ratio: 1; border-radius: 50%; }
+.photo.hike .trees i:nth-child(1) { left: -6%; background: #c0502e; bottom: 10%; }
+.photo.hike .trees i:nth-child(2) { left: 12%; background: #d98a2b; }
+.photo.hike .trees i:nth-child(3) { left: 30%; background: #b8432a; bottom: 20%; width: 18%; }
+.photo.hike .trees i:nth-child(4) { left: 58%; background: #e0a530; bottom: 15%; width: 20%; }
+.photo.hike .trees i:nth-child(5) { left: 72%; background: #c0502e; }
+.photo.hike .trees i:nth-child(6) { left: 88%; background: #d98a2b; bottom: 8%; }
+.photo.hike .trees i:nth-child(7) { left: 44%; background: #8a6a2a; bottom: -6%; width: 16%; }
+.photo.hike .path { position: absolute; left: 0; right: 0; bottom: 0; height: 22%; background: #b59c74; clip-path: polygon(38% 0, 52% 0, 80% 100%, 18% 100%); }
+
+.notes { max-width: 900px; margin: 3rem auto 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; }
+.notes h3 { font-family: var(--font-serif); font-weight: 500; color: var(--text-main); font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+.notes li { margin-left: 1.2rem; }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · ハルカ</div>
+  <h1>Photos for ハルカ</h1>
+  <p>She sees the photo only on the turn you send it. After that, the saved conversation keeps her transcript (the Japanese word for word, plus a short description), and the image is gone.</p>
+</header>
+
+<div class="controls">
+  <div class="ctl"><span class="lbl">PHOTO</span>
+    <div class="pill-seg" data-ctl="sc"><button data-v="menu" class="on">Menu</button><button data-v="hike">Hike</button></div>
+  </div>
+  <div class="ctl"><span class="lbl">CAMERA</span>
+    <div class="pill-seg" data-ctl="cam"><button data-v="left">Left of field</button><button data-v="right" class="on">By send · chosen</button></div>
+  </div>
+  <div class="ctl"><span class="lbl">AFTER RELOAD</span>
+    <div class="pill-seg" data-ctl="re"><button data-v="chip">A · Chip</button><button data-v="ghost">B · Card</button><button data-v="thumb" class="on">C · Thumbnail on phone · chosen</button></div>
+  </div>
+</div>
+
+<div class="stage">
+
+  <!-- 1 · Attached, not sent -->
+  <div class="phone-wrap">
+    <div class="phone-label">1 · ATTACHED</div>
+    <div class="phone cam-right re-thumb sc-menu">
+      <div class="screen">
+        <div class="app dim"><h2>今日</h2><div class="row"><span class="k">CONTINUE</span>Super El Niño is here</div></div>
+        <div class="backdrop"></div>
+        <div class="panel">
+          <div class="grab"></div>
+          <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><button class="link">終わる</button></div>
+          <div class="thread">
+            <div class="turn"><div class="t">おかえり！夜ごはんはもう決めた？</div></div>
+          </div>
+          <div class="attach">
+            <div class="photo s-menu"><div class="paper"><div class="ttl">品書</div><div class="ln"><span>醤油</span><span>900</span></div><div class="ln"><span>味噌</span><span>950</span></div><div class="ln"><span>塩</span><span>900</span></div><div class="ln"><span>替玉</span><span>150</span></div></div><div class="glare"></div><button class="x" aria-label="Remove"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+            <div class="photo hike s-hike"><div class="sky"></div><div class="m m1"></div><div class="m m2"></div><div class="trees"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="path"></div><button class="x" aria-label="Remove"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          </div>
+          <div class="input">
+            <button class="cam-l" aria-label="Photo"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
+            <div class="field"><span class="s-menu">これ読める？</span><span class="s-hike">今日、山に行った！</span><span class="caret"></span></div>
+            <button class="cam-r" aria-label="Photo"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
+            <button class="send ready" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+          <div class="foot"></div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-note">The camera opens iOS's own choice: Take Photo or Photo Library. The thumbnail sits above the line, with ✕ to drop it. A photo alone can be sent; it doesn't need words.</div>
+  </div>
+
+  <!-- 2 · Just sent -->
+  <div class="phone-wrap">
+    <div class="phone-label">2 · SENT</div>
+    <div class="phone cam-right re-thumb sc-menu">
+      <div class="screen">
+        <div class="app dim"><h2>今日</h2><div class="row"><span class="k">CONTINUE</span>Super El Niño is here</div></div>
+        <div class="backdrop"></div>
+        <div class="panel">
+          <div class="grab"></div>
+          <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><button class="link">終わる</button></div>
+          <div class="thread">
+            <div class="turn"><div class="t">おかえり！夜ごはんはもう決めた？</div></div>
+            <div class="turn me">
+              <div class="photo sent-photo s-menu"><div class="paper"><div class="ttl">品書</div><div class="ln"><span>醤油</span><span>900</span></div><div class="ln"><span>味噌</span><span>950</span></div><div class="ln"><span>塩</span><span>900</span></div><div class="ln"><span>替玉</span><span>150</span></div></div><div class="glare"></div></div><div class="photo sent-photo hike s-hike"><div class="sky"></div><div class="m m1"></div><div class="m m2"></div><div class="trees"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="path"></div></div>
+              <div class="u"><span class="s-menu">これ読める？</span><span class="s-hike">今日、山に行った！</span></div>
+            </div>
+            <div class="turn s-hike">
+              <div class="t">わあ、紅葉がきれい！頂上まで登ったの？</div>
+              <div class="aside">紅葉 (こうよう) is autumn leaves; 頂上 (ちょうじょう) is the summit.</div>
+              <div class="t">何時間ぐらい歩いた？</div>
+            </div>
+            <div class="turn s-menu">
+              <div class="t">ラーメン屋さんのメニューだね！醤油、味噌、塩があって、替玉は150円。</div>
+              <div class="aside">替玉 (かえだま) is a refill of noodles for the soup you have left.</div>
+              <div class="t">どれにする？</div>
+            </div>
+          </div>
+          <div class="input">
+            <button class="cam-l" aria-label="Photo"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
+            <div class="field empty">ハルカに話しかける…</div>
+            <button class="cam-r" aria-label="Photo"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
+            <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+          <div class="foot"></div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-note">Your photo sits above your bubble, radius 16 like the bubble, about 170px wide. It's held on the phone only while the panel is open.</div>
+  </div>
+
+  <!-- 3 · After reload -->
+  <div class="phone-wrap">
+    <div class="phone-label">3 · AFTER RELOAD</div>
+    <div class="phone cam-right re-thumb sc-menu">
+      <div class="screen">
+        <div class="app dim"><h2>今日</h2><div class="row"><span class="k">CONTINUE</span>Super El Niño is here</div></div>
+        <div class="backdrop"></div>
+        <div class="panel">
+          <div class="grab"></div>
+          <div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><button class="link">終わる</button></div>
+          <div class="thread">
+            <div class="turn"><div class="t">おかえり！夜ごはんはもう決めた？</div></div>
+            <div class="turn me" id="gone">
+              <button class="chip re-chip" onclick="document.getElementById('gone').classList.toggle('open')"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg><span class="s-menu">写真 · ramen shop menu, 4 items</span><span class="s-hike">写真 · a mountain trail in autumn</span></button>
+              <button class="photo thumb hike s-hike re-thumb" onclick="document.getElementById('gone').classList.toggle('open')"><div class="sky"></div><div class="m m1"></div><div class="m m2"></div><div class="trees"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="path"></div></button>
+              <button class="photo thumb s-menu re-thumb" onclick="document.getElementById('gone').classList.toggle('open')"><div class="paper"><div class="ttl">品書</div><div class="ln"><span>醤油</span><span>900</span></div><div class="ln"><span>味噌</span><span>950</span></div><div class="ln"><span>塩</span><span>900</span></div><div class="ln"><span>替玉</span><span>150</span></div></div><div class="glare"></div></button>
+              <button class="ghost re-ghost" onclick="document.getElementById('gone').classList.toggle('open')" style="text-align:left">
+                <span class="k"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg>写真</span>
+                <span class="d s-menu">A ramen shop menu, handwritten, 4 items with prices.</span><span class="d s-hike">A mountain trail in autumn, red and yellow trees, clear sky.</span>
+              </button>
+              <div class="transcript s-hike">No text. A view from a mountain trail in autumn: red and yellow trees along the path, a ridge beyond, clear blue sky, late afternoon light.</div><div class="transcript s-menu"><b>品書　醤油 900・味噌 950・塩 900・替玉 150</b><br>A handwritten ramen menu on cream paper, prices in yen.</div>
+              <div class="u"><span class="s-menu">これ読める？</span><span class="s-hike">今日、山に行った！</span></div>
+            </div>
+            <div class="turn s-hike">
+              <div class="t">わあ、紅葉がきれい！頂上まで登ったの？</div>
+              <div class="aside">紅葉 (こうよう) is autumn leaves; 頂上 (ちょうじょう) is the summit.</div>
+              <div class="t">何時間ぐらい歩いた？</div>
+            </div>
+            <div class="turn s-menu">
+              <div class="t">ラーメン屋さんのメニューだね！醤油、味噌、塩があって、替玉は150円。</div>
+              <div class="aside">替玉 (かえだま) is a refill of noodles for the soup you have left.</div>
+              <div class="t">どれにする？</div>
+            </div>
+          </div>
+          <div class="input">
+            <button class="cam-l" aria-label="Photo"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
+            <div class="field empty">ハルカに話しかける…</div>
+            <button class="cam-r" aria-label="Photo"><svg class="i" viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
+            <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+          <div class="foot"></div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-note">The image is gone; what's left is what she saved. Tap it to see the transcript (the Japanese text, then the description). A: a small chip. B: a placeholder card. C: a small thumbnail kept on the phone for today's conversation (after it ends, or on another device, it falls back to A).</div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <h3>What happens to the photo</h3>
+  <ul>
+    <li>The phone shrinks it to about 1500px on the long side as a JPEG before sending (also turns HEIC into JPEG).</li>
+    <li>ハルカ sees the real image on that one turn. Alongside her reply, Haiku writes the transcript: any text word for word, then a description. A document gets one line; a scene (a hike, a meal) gets two or three sentences with what matters for talking about it: place, season, weather, what stands out.</li>
+    <li>She answers the way the photo asks. A document: she reads it and helps. Something from your life: she reacts like a friend, names what's in it in Japanese, and saves a note ("went hiking on 2026-10-17").</li>
+    <li>Option: a small thumbnail (about 30KB) kept on the phone only, for today's conversation, so a hike photo doesn't turn into a chip on reload. Cleared when the conversation ends.</li>
+    <li>The saved conversation keeps only the transcript, fenced as untrusted text like an article. Later turns, reloads and the overnight memory all read that.</li>
+    <li>Nothing goes to storage: no bucket, no migration, no photo cleanup.</li>
+  </ul>
+</div>
+
+<script>
+document.querySelectorAll('.pill-seg').forEach((seg) => {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    const ctl = seg.dataset.ctl, v = b.dataset.v;
+    document.querySelectorAll('.phone').forEach((p) => {
+      [...p.classList].filter((c) => c.startsWith(ctl + '-')).forEach((c) => p.classList.remove(c));
+      p.classList.add(`${ctl}-${v}`);
+    });
+  });
+});
+</script>
+</body>
+</html>

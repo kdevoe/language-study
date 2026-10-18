@@ -3,6 +3,7 @@
 // the Home card's opener are plain requests.
 import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
 import { invokeEdgeFn } from './api';
+import type { PhotoUpload } from './tutorPhotos';
 
 /** What the screen behind the panel shows (each screen registers one). */
 export interface ScreenContext {
@@ -19,7 +20,8 @@ export interface TutorMessage {
   id: string;
   role: 'user' | 'assistant' | 'context';
   text: string | null;
-  context?: ScreenContext | null;
+  /** Screen notes, or on your messages the photo you sent (its transcript, never the image). */
+  context?: (ScreenContext & { photo?: undefined }) | { photo: { id: string; label?: string; transcript?: string } } | null;
 }
 
 export type TutorAction =
@@ -35,6 +37,7 @@ export type TutorEvent =
   | { type: 'text'; text: string }
   | { type: 'tool'; name: string }
   | { type: 'action'; action: TutorAction }
+  | { type: 'photo'; id: string; label: string; transcript: string }
   | { type: 'done'; text: string }
   | { type: 'error'; error: string };
 
@@ -66,7 +69,7 @@ export async function endTutorThread(threadId: string | null): Promise<TutorReca
 
 /** Send a message and stream the reply. Resolves when the stream ends. */
 export async function streamTutor(
-  input: { message: string; context?: ScreenContext; opener?: string; newThread?: boolean },
+  input: { message: string; context?: ScreenContext; opener?: string; newThread?: boolean; image?: PhotoUpload },
   onEvent: (e: TutorEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {

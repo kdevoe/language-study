@@ -405,13 +405,15 @@ async function renderActivity(admin: SupabaseClient, evs: { at: string; kind: st
 
 async function renderThreads(admin: SupabaseClient, ids: string[]): Promise<string> {
   if (!ids.length) return '';
-  const { data } = await admin.from('tutor_messages').select('thread_id, role, text, created_at')
+  const { data } = await admin.from('tutor_messages').select('thread_id, role, text, context, created_at')
     .in('thread_id', ids).in('role', ['user', 'assistant']).order('created_at').limit(600);
   const byThread = new Map<string, string[]>();
   for (const m of (data ?? []) as any[]) {
-    if (!m.text) continue;
+    // A photo is kept only as its transcript (tutor-chat never stores the image).
+    const photo = m.context?.photo?.transcript ? `[sent a photo: ${String(m.context.photo.transcript).replace(/\s+/g, ' ').slice(0, 400)}] ` : '';
+    if (!m.text && !photo) continue;
     const arr = byThread.get(m.thread_id) ?? [];
-    arr.push(`${m.role === 'user' ? 'Learner' : 'ハルカ'}: ${m.text}`);
+    arr.push(`${m.role === 'user' ? 'Learner' : 'ハルカ'}: ${photo}${m.text ?? ''}`);
     byThread.set(m.thread_id, arr);
   }
   return [...byThread.entries()].map(([id, lines]) => {
