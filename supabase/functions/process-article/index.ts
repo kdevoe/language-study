@@ -7,6 +7,7 @@ import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
 import { actingUserId, resolveCaller } from '../_shared/auth.ts';
 import { dataRule, fence, fenceInline } from '../_shared/untrusted.ts';
 import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon } from '../_shared/readerVocab.ts';
+import { JINA_CLEAN_HEADERS, cleanExtract } from '../_shared/extractClean.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
@@ -113,10 +114,10 @@ interface RewriteUsage {
  *  sometimes stops early: 2 of 5 paragraphs from a full 4.6k source, 2026-10-18);
  *  if every attempt is short, the longest one is kept rather than failing. */
 async function runRewriteWithRetry(
-  ai: GoogleGenAI, prompt: string, minParagraphs = 1,
+  ai: GoogleGenAI, prompt: string, minParagraphs = 1, minChars = 0,
 ): Promise<{ blocks: any; usage: RewriteUsage }> {
   let lastErr: unknown;
-  let best: { blocks: any; usage: RewriteUsage; paragraphs: number } | null = null;
+  let best: { blocks: any; usage: RewriteUsage; chars: number } | null = null;
   for (let attempt = 0; attempt < REWRITE_MAX_ATTEMPTS; attempt++) {
     try {
       const result = await ai.models.generateContent({
@@ -143,10 +144,13 @@ async function runRewriteWithRetry(
           attempts: attempt + 1,
         },
       };
-      const paragraphs = (parsed as any[]).filter((b) => b?.type === 'paragraph').length;
-      if (paragraphs >= minParagraphs) return out;
-      console.warn(`[process-article] rewrite attempt ${attempt + 1}/${REWRITE_MAX_ATTEMPTS} too short: ${paragraphs} of at least ${minParagraphs} paragraphs`);
-      if (!best || paragraphs > best.paragraphs) best = { ...out, paragraphs };
+      // Length is paragraphs AND their text: four one-sentence paragraphs passed a
+      // paragraph-count check (2026-10-18).
+      const paras = (parsed as any[]).filter((b) => b?.type === 'paragraph');
+      const chars = paras.reduce((a, b) => a + String(b.text ?? '').length, 0);
+      if (paras.length >= minParagraphs && chars >= minChars) return out;
+      console.warn(`[process-article] rewrite attempt ${attempt + 1}/${REWRITE_MAX_ATTEMPTS} too short: ${paras.length} paragraphs (min ${minParagraphs}), ${chars} chars (min ${minChars})`);
+      if (!best || chars > best.chars) best = { ...out, chars };
       if (attempt === REWRITE_MAX_ATTEMPTS - 1) break;
       continue;
     } catch (err) {
@@ -389,13 +393,15 @@ async function extractOnce(url: string, jinaKey: string | undefined, timeoutMs: 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const headers: Record<string, string> = { 'User-Agent': 'YugenStudy/1.0', 'Accept': 'text/plain' };
+    const headers: Record<string, string> = { 'User-Agent': 'YugenStudy/1.0', 'Accept': 'text/plain', ...JINA_CLEAN_HEADERS };
     if (jinaKey) headers['Authorization'] = `Bearer ${jinaKey}`;
     const res = await fetch(JINA_READER_URL + url, { headers, signal: ctrl.signal });
     if (!res.ok) return '';
     const txt = await res.text();
-    // Jina prepends a "Title:/URL Source:/Markdown Content:" header — keep the body.
-    return (txt.split(/Markdown Content:\s*/i).pop() || txt).trim();
+    // Jina prepends a "Title:/URL Source:/Markdown Content:" header — keep the
+    // body, then only its prose: the length bars (full at 1500, the 4500 lead
+    // cap) must measure the story, not menus and tracking links.
+    return cleanExtract(txt.split(/Markdown Content:\s*/i).pop() || txt);
   } catch {
     return '';
   } finally {
@@ -1218,8 +1224,11 @@ Deno.serve(async (req) => {
     // Retries transient Gemini overload/rate-limit and malformed-JSON blips with
     // backoff (see runRewriteWithRetry) so one upstream hiccup no longer surfaces
     // as "the server may be busy."
-    // Under 60% of the target length is an early stop, not a style choice: regenerate.
-    const { blocks: rawBlocks, usage } = await runRewriteWithRetry(ai, prompt1, Math.max(1, Math.ceil(targetParagraphs * 0.6)));
+    // Under 60% of the target length is an early stop, not a style choice:
+    // regenerate. From a full source that also means text: good rewrites run
+    // about 110 chars a paragraph, the early stops 30-40.
+    const minChars = !isLongform && sourceKind === 'full' ? targetParagraphs * 60 : 0;
+    const { blocks: rawBlocks, usage } = await runRewriteWithRetry(ai, prompt1, Math.max(1, Math.ceil(targetParagraphs * 0.6)), minChars);
 
     // 1.3 (path-forward): real prompt size + token counts, per article. One
     // greppable line for the function logs, and persisted into metadata below
@@ -1288,6 +1297,10 @@ Deno.serve(async (req) => {
           // Where the article came from, so a fullness audit can see which
           // outlets failed extraction (database/20_source_fullness.sql).
           ...(sourceUrls.length ? { sourceUrls } : {}),
+          // What the rewrite was built from (the start of it): an extraction can
+          // pass the length bar on page chrome alone (2026-10-18), and without
+          // this there's no way to tell a thin source from a terse rewrite.
+          ...(!isLongform && sourceText ? { sourcePreview: sourceText.slice(0, 1500) } : {}),
           // Queryable per-article cost telemetry (metadata is jsonb):
           //   select metadata->'usage' from processed_news order by created_at desc;
           usage: {
