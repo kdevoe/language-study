@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity Axis</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-color: #f5f5f0; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-progress: #8fb0c4; --border-light: #e0e0d8;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e8e8e2; font-family: var(--font-sans); color: var(--text-main); padding: 24px 16px 60px; }
+h1 { font-family: var(--font-serif); font-weight: 600; font-size: 1.5rem; margin: 0 0 4px; }
+.lede { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 18px; max-width: 760px; line-height: 1.5; }
+.controls { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+.controls button { font: inherit; font-size: 0.8rem; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-light); background: var(--bg-color); color: var(--text-muted); cursor: pointer; }
+.controls button.on { background: var(--text-main); color: var(--bg-color); border-color: var(--text-main); }
+.row { display: flex; gap: 22px; flex-wrap: wrap; }
+.variant { width: 390px; max-width: 100%; }
+.variant h2 { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 4px; }
+.variant p { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 10px; line-height: 1.45; min-height: 3.4em; }
+.phone { background: var(--bg-color); border-radius: 28px; padding: 22px 16px; }
+
+/* The app's minutes card (index.css .act-*) */
+.act-card { background: var(--bg-card); border-radius: 16px; padding: 1.2rem 1.3rem; }
+.act-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.act-kick { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); }
+.act-app { font-size: 0.72rem; color: var(--text-muted); }
+.act-app b { color: var(--text-main); font-weight: 600; }
+.plot { position: relative; height: 150px; margin-top: 0.8rem; }
+.act-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.act-bar { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
+.act-bar > span { font-size: 0.66rem; color: var(--text-muted); line-height: 1; min-height: 0.66rem; }
+.act-bar.now > span { color: var(--text-main); font-weight: 700; }
+.act-stack { width: 100%; max-width: 30px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.act-stack i { display: block; flex-basis: 0; }
+.act-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; margin-top: 0.9rem; font-size: 0.7rem; color: var(--text-muted); }
+.act-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.act-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* Axis layer: ticks sit in the bar area (above the 1.1rem label row) */
+.axis { position: absolute; left: 0; right: 0; top: 0; bottom: 1.1rem; pointer-events: none; }
+.tick { position: absolute; left: 0; right: 0; height: 0; }
+.tick em { font-style: normal; font-size: 0.58rem; color: var(--text-muted); opacity: 0.75; line-height: 1; position: absolute; transform: translateY(-50%); }
+
+/* A · hairlines: faint dotted lines across, labels on the left in a gutter */
+.A .plot { padding-left: 0; }
+.A .act-bars { left: 28px; }
+.A .tick::after { content: ''; position: absolute; left: 28px; right: 0; border-top: 1px dotted rgba(102,102,102,0.28); }
+.A .tick em { left: 0; }
+
+/* B · top line only: one hairline at the round top, its label at the right end */
+.B .act-bars { right: 26px; }
+.B .tick.top::after { content: ''; position: absolute; left: 0; right: 26px; border-top: 1px solid rgba(102,102,102,0.14); }
+.B .tick em { right: 0; }
+.B .tick:not(.top) em { opacity: 0.5; }
+
+/* C · ticks only: labels in a left gutter with a short mark, no lines across */
+.C .act-bars { left: 30px; }
+.C .tick::after { content: ''; position: absolute; left: 22px; width: 4px; border-top: 1px solid rgba(102,102,102,0.35); }
+.C .tick em { left: 0; }
+
+.notes { margin-top: 28px; max-width: 820px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.55; }
+.notes b { color: var(--text-main); }
+</style>
+</head>
+<body>
+<h1>Activity Axis</h1>
+<p class="lede">A rough y-axis for the 進捗 minutes card: two or three round marks (30m, 1h, 2h…) so a bar reads as "about an hour", not a precise value. Bars now scale to the round top, not the tallest bar.</p>
+<div class="controls" id="periods">
+  <button data-p="week" class="on">週 · minutes per day</button>
+  <button data-p="month">月 · minutes per week</button>
+  <button data-p="all">全部 · minutes per month</button>
+</div>
+
+<div class="row">
+  <div class="variant A"><h2>A · HAIRLINES</h2><p>Faint dotted lines across the card at each mark, small labels in a left gutter.</p><div class="phone"><div class="act-card" data-v="A"></div></div></div>
+  <div class="variant B"><h2>B · ONE LINE</h2><p>A single quiet line at the round top, its label at the right end; the middle mark is only a label.</p><div class="phone"><div class="act-card" data-v="B"></div></div></div>
+  <div class="variant C"><h2>C · TICKS ONLY</h2><p>No lines across: labels on the left with a short tick mark, like a ruler's edge.</p><div class="phone"><div class="act-card" data-v="C"></div></div></div>
+</div>
+
+<div class="notes">
+  <p><b>Scale rule (all variants):</b> pick a round step from 5m, 10m, 15m, 30m, 1h, 2h, 3h, 5h, 10h, 20h… so the tallest bar fits in at most three steps; the top of the plot is the last step. Labels read 15m, 30m, 1h, 2h; never 1h 30m.</p>
+</div>
+
+<script>
+const KINDS = [
+  { label: 'Reading', color: '#8fb0c4' }, { label: 'Listening', color: '#4a5d23' },
+  { label: 'Reviews', color: '#c79a3f' }, { label: 'ハルカ', color: '#5b8c5a' },
+];
+// Minutes per bucket, [read, listen, review, chat]
+const DATA = {
+  week: { kick: 'MINUTES PER DAY', app: '6h 12m', labels: ['月','火','水','木','金','土','日'], now: 6,
+    rows: [[22,10,8,0],[35,12,9,6],[18,0,12,4],[40,20,10,14],[12,8,6,0],[28,15,11,9],[30,6,10,18]] },
+  month: { kick: 'MINUTES PER WEEK', app: '24h 40m', labels: ['9/29','10/6','10/13','10/20','10/27'], now: 2,
+    rows: [[180,60,70,0],[240,95,80,30],[260,90,72,85],[0,0,0,0],[0,0,0,0]] },
+  all: { kick: 'MINUTES PER MONTH', app: '61h', labels: ['6月','7月','8月','9月','10月'], now: 4,
+    rows: [[300,120,200,0],[620,240,260,0],[900,300,310,0],[1020,410,330,40],[760,280,240,130]] },
+};
+const STEPS = [5, 10, 15, 30, 60, 120, 180, 300, 600, 1200, 1800, 3000, 6000];
+function scale(max) {
+  const step = STEPS.find((s) => Math.ceil(max / s) <= 3) ?? STEPS[STEPS.length - 1];
+  const n = Math.max(1, Math.ceil(max / step));
+  return { top: step * n, ticks: Array.from({ length: n }, (_, i) => step * (i + 1)) };
+}
+const label = (m) => (m < 60 ? `${m}m` : `${m / 60}h`);
+
+function render(period) {
+  const d = DATA[period];
+  const totals = d.rows.map((r) => r.reduce((a, b) => a + b, 0));
+  const { top, ticks } = scale(Math.max(1, ...totals));
+  document.querySelectorAll('.act-card').forEach((card) => {
+    const v = card.dataset.v;
+    const shown = v === 'B' ? ticks.filter((t, i) => i === ticks.length - 1 || ticks.length > 1) : ticks;
+    card.innerHTML = `
+      <div class="act-head"><span class="act-kick">${d.kick}</span><span class="act-app"><b>${d.app}</b> in Yugen</span></div>
+      <div class="plot">
+        <div class="axis">${shown.map((t) => `<div class="tick${t === top ? ' top' : ''}" style="bottom:${(t / top * 100).toFixed(2)}%"><em>${label(t)}</em></div>`).join('')}</div>
+        <div class="act-bars">${d.rows.map((r, i) => `
+          <div class="act-bar${i === d.now ? ' now' : ''}">
+            <div class="act-stack" style="height: calc((100% - 1.1rem) * ${(totals[i] / top).toFixed(3)})">
+              ${r.map((p, k) => (p > 0 ? `<i style="flex-grow:${p};background:${KINDS[k].color}"></i>` : '')).join('')}
+            </div><span>${d.labels[i]}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="act-legend">${KINDS.map((k) => `<span><i style="background:${k.color}"></i>${k.label}</span>`).join('')}</div>`;
+  });
+}
+document.getElementById('periods').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#periods button').forEach((x) => x.classList.toggle('on', x === b));
+  render(b.dataset.p);
+});
+render('week');
+</script>
+</body>
+</html>
