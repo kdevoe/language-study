@@ -615,8 +615,13 @@
   - [ ] Check read-past refunds (~Nov 1): next flashcard grade of refunded words; many Again → one-tap 知ってる? check card
   - [ ] APPLY (your step): database/39_intake_v2.sql (RPCs + NULL intake_status backfill)
   - [x] New words / day stays 3 (Settings stepper)
-  - [ ] Change 5: grammar "got it / unsure" tap (mockup first)
-  - [ ] Change 6: per-level solid line in 進捗 (mockup first; data from intake_level_progress)
+  - [x] Change 5: grammar signal, built as an implicit rating (first open → medium, 3 days of opens → hard; a hand rating wins), since the slider already existed
+  - [-] Change 6: dropped. 進捗's level donuts already show solid share per level; nightly level_snapshots keep the history
+  - [x] Overnight prep: daily-prep edge fn + crons (08:30 UTC intake, 09:40 UTC digest podcast); intake runs server-side in the learner's timezone before the news refill, so articles carry the new words; the client adopts server promotions
+  - [x] ハルカ struggle rule: a word marked wrong in ≥2 tutor threads in 30 days gets chosen (max 3 a night). No UI and no undo (decided Oct 18): a word you already know gets graded Easy and refunds its slot
+  - [x] Target words in podcasts (script prompt) and songs (first review words)
+  - [ ] APPLY (your step): database/40_overnight_prep.sql, deploy daily-prep, process-article, generate-podcast, generate-song
+  - [ ] Later: grammar points scheduled like words (needs design: what's a grammar "card"?)
   - [ ] Re-audit ~Nov 1 against the spec's acceptance criteria
 - [ ] Tutorial mode: first-run hints for non-obvious gestures (tap the card to move on, the thinking-time default, swipe to dismiss in the feed)
 - [/] ハルカ agent: tutor + learner memory + news editor (branch feat/haruka-agent; docs/tutor-agent-design.md,

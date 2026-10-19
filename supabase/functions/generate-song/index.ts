@@ -34,7 +34,7 @@ import {
   type SongPlan,
   type SongStyle,
 } from '../_shared/songPrompt.ts';
-import { buildLexicon, pickReviewWords, LEXICON_MIN_WORDS } from '../_shared/readerVocab.ts';
+import { buildLexicon, pickReviewWords, pickTargetWords, LEXICON_MIN_WORDS } from '../_shared/readerVocab.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
@@ -123,9 +123,11 @@ async function runWriteStage(supabase: SupabaseClient, songId: string) {
   if (!song) return;
   try {
     const { data: prefs } = await supabase.from('user_preferences').select('jlpt_level').eq('user_id', song.user_id).maybeSingle();
-    const [lexicon, review, recentTitles, history] = await Promise.all([
+    const [lexicon, review, targets, recentTitles, history] = await Promise.all([
       buildLexicon(supabase, song.user_id).catch((e) => { console.warn('[generate-song] lexicon failed:', e); return [] as string[]; }),
       pickReviewWords(supabase, song.user_id, REVIEW_WORDS).catch((e) => { console.warn('[generate-song] review words failed:', e); return []; }),
+      // This week's new cards (intake v2 target words): two lead the review list.
+      pickTargetWords(supabase, song.user_id, 2).catch(() => []),
       song.theme ? Promise.resolve([] as string[]) : recentReadTitles(supabase, song.user_id),
       songHistory(supabase, song.user_id, song.id),
     ]);
@@ -137,7 +139,7 @@ async function runWriteStage(supabase: SupabaseClient, songId: string) {
       request: song.request ?? undefined,
       theme: song.theme ?? undefined,
       lexicon: lexicon.length >= LEXICON_MIN_WORDS ? lexicon : undefined,
-      reviewWords: review.map((r) => r.word),
+      reviewWords: [...new Set([...targets.map((t) => t.word), ...review.map((r) => r.word)])],
       recentTitles,
       history,
     };

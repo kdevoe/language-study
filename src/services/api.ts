@@ -867,6 +867,8 @@ export async function fetchUserWordProgress(userId: string): Promise<Record<stri
         // Intake queue (#68) — 'queued' waits; 'active' is on the FSRS schedule.
         intakeStatus: row.intake_status ?? null,
         promotedTs: row.promoted_at ? new Date(row.promoted_at).getTime() : null,
+        chosenTs: row.chosen_at ? new Date(row.chosen_at).getTime() : null,
+        chosenBy: row.chosen_by ?? null,
       };
     });
 
@@ -915,6 +917,8 @@ export async function upsertWordProgressToSupabase(
     // difficulty (a normal grade) omits these, so an upsert never nulls a word's
     // intake_status/promoted_at. Set them only when promoting (queued → active).
     & { intakeStatus?: string | null; promotedTs?: number | null }
+    // Chosen marker (database/40), present-only like the intake fields.
+    & { chosenTs?: number | null; chosenBy?: string | null }
 ) {
   const row = {
     user_id: userId,
@@ -928,6 +932,9 @@ export async function upsertWordProgressToSupabase(
     ...(progress.intakeStatus !== undefined ? { intake_status: progress.intakeStatus } : {}),
     ...(progress.promotedTs !== undefined
       ? { promoted_at: progress.promotedTs == null ? null : new Date(progress.promotedTs).toISOString() }
+      : {}),
+    ...(progress.chosenTs !== undefined
+      ? { chosen_at: progress.chosenTs == null ? null : new Date(progress.chosenTs).toISOString(), chosen_by: progress.chosenBy ?? null }
       : {}),
   };
   // One retry: a dropped write here loses a grade silently (a card rated Again
@@ -1143,7 +1150,9 @@ export async function upsertUserPreferences(
     podcast_cast?: string[];
     podcast_personas?: Record<string, string>;
     song_cover_style?: string | null;
-    grammar_progress?: Record<string, { mastery: 'hard' | 'medium' | 'easy' }>;
+    grammar_progress?: Record<string, { mastery: 'hard' | 'medium' | 'easy'; auto?: boolean; days?: string[] }>;
+    /** IANA zone, so overnight jobs know the learner's "today" (database/40). */
+    timezone?: string;
     tutor_hand?: 'right' | 'left';
     tutor_prefs?: { correction?: string; asides?: string };
   }

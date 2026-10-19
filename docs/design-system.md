@@ -9,6 +9,8 @@ Interactive reference: `docs/mockups/podcast-create.html` shows the slider toggl
 ## 1. Principles
 The look comes from Japanese and Scandinavian minimalism. The ideas below (ma, kanso, shibui) come from that tradition.
 
+- **Every addition must be necessary. The default is no new UI.** Adding things is easy, and every addition makes the app busier, which is exactly what we're fighting. Before you add a card, line, notice, badge, stat or control, answer three questions. Can the feature work with no UI at all (a background job, a signal the app already collects, a control that already exists)? Does an existing element already carry this information? Would the learner miss it if it weren't there? If the feature works without UI, ship it without UI. Never add a surface just to show that a feature exists or to explain what it did. Home's space is the most precious (§6.12). Example: ハルカ's nightly added words have no notice and no undo, because an Easy grade already refunds a word's slot.
+
 - **Typography first.** Hierarchy comes from type size, weight and the serif/sans contrast, not from boxes, borders or colour. A screen should still read in greyscale.
   
 - **Ma (間), meaningful empty space.** Spacing does the organising. Keep gaps tight inside a group and generous between groups, so the structure is readable without dividers or labels. Equal gaps everywhere means no grouping, and that reads as crowded.
@@ -231,6 +233,8 @@ Source of truth: `src/components/Today.tsx`, mockups `docs/mockups/home-today.ht
 - Section kickers are 0.7rem sans, 600, `--text-muted`, 2rem above their block. **No stats, streaks or charts**: those belong in 進捗.
   
 - No date beside the title.
+  
+- **Nothing extra on Home:** no notices, no added-word lists, no stats. Home stays a set of shortcuts.
 
 ### 6.13 音楽 (songs)
 Source of truth: `src/components/Music.tsx`, `SongSheet.tsx`, `SongPlayer.tsx`, `PlaylistPage.tsx`, `AddToListSheet.tsx`; mockups `docs/mockups/music.html`, `music-playlists.html` (option 3), `music-lists.html`.
@@ -283,6 +287,8 @@ Source of truth: `src/components/WordModal.tsx` (grammar mode), `src/services/gr
   
 - **Height:** the panel's cap rises from 52% to 70% when it shows grammar (an open point, PATTERNS rows, or a sentence's points), and still never covers the tapped word.
   
+- **Implicit rating:** opening a point you haven't rated sets it to MEDIUM. Opening it on 3 different days sets it to HARD. A hand-set rating always wins and is never overwritten. The slider simply shows the result; there is no extra "got it / unsure" control.
+  
 ### 6.16 Flashcards: deck rows, the study card and the grade slider
 Source of truth: `src/components/Review.tsx`, `Flashcards.tsx`, `KanjiFlashcards.tsx`, `StudyCard.tsx`, `GradeSlider.tsx`, the `.study-*` rules in `index.css`, mockups `docs/mockups/kanji-deck.html` and `flashcard-feel-2.html` (variant C).
 
@@ -328,6 +334,7 @@ Mockup `docs/mockups/progress-stats.html`, B without the sentence. At the top of
 - **Rough y-axis** (mockup `docs/mockups/activity-axis.html`, C · ticks only): two or three round marks (15m, 30m, 1h, 1.5h, 5h…) in a 30px left gutter, sans 0.58rem `--text-muted` at 75% with a 4px tick. Nothing crosses the bars. The step is the smallest round one that fits the tallest bar in three; bars scale to the top mark. It's for "about an hour", not exact values.
 - **Tap a bar for its numbers.** The others drop to 35%, its label goes bold, and the header (`木 10/15 · 17m in Yugen`), legend and counts grid show that bar alone. Tap it again for the period. Changing the period clears it.
 - **Counts card:** a 3×3 grid of serif numbers over small sans labels: articles opened, podcasts, songs, cards and kanji reviewed, lookups, ハルカ turns, days active, streak.
+- **No per-level solid card:** the level donuts below already show each level's Easy share. A weekly-gain card was built and dropped (Oct 18, §1). daily-prep's nightly `level_snapshots` keep the history in case it's ever missed.
 - **Data:** `daily_activity` (database/37) holds time on screen, reading, listening, decks and ハルカ, plus turns, added to about once a minute by `services/activity.ts`. Counts come from the event tables via `progress_activity()`.
 
 ## 7. Copy

@@ -42,6 +42,8 @@ export interface PodcastPromptInput {
   dateLabel?: string;
   /** Optional free-text request from the listener (focus, tone, pace…). */
   instructions?: string;
+  /** The listener's newest flashcards (readerVocab.pickTargetWords), to hear in context. */
+  targetWords?: string[];
 }
 
 export interface PodcastTurn {
@@ -119,13 +121,23 @@ Listening rules:
 - Keep each speaker in character (personality above) for the whole episode.
 - LENGTH MATTERS: write at least ${input.targetChars} Japanese characters of dialogue in total (aim for ${Math.round(input.targetChars * 1.1)}), ${minTurns}–${maxTurns} turns, speakers alternate. This is a ${Math.round(input.targetChars / CHARS_PER_MINUTE)}-minute episode — keep the conversation going with examples, questions and follow-ups rather than wrapping up early.
 
-Also pick 3–5 key words from the episode for a "words in this episode" list (dictionary form, with kana reading and a short English meaning).
+${targetBlock(input)}Also pick 3–5 key words from the episode for a "words in this episode" list (dictionary form, with kana reading and a short English meaning).
 
 Output JSON only:
 {"title": "<short Japanese episode title>", "turns": [{"speaker": "host" | "guest", "text": "<Japanese>"}], "vocab": [{"word": "<word>", "reading": "<kana>", "meaning": "<English>"}]}
 Turn text is plain spoken Japanese only — no furigana, romaji, stage directions, sound effects, speaker names, or markdown.
 
 ${sourceBlock(input)}${requestBlock(input)}`;
+}
+
+/** Target words (docs/intake-v2-spec.md, Change 4): the listener's new cards this week,
+ *  heard in context. Empty string when there are none (default prompts unchanged). */
+function targetBlock(input: PodcastPromptInput): string {
+  const t = (input.targetWords ?? []).slice(0, 8);
+  if (!t.length) return '';
+  return `TARGET WORDS — the listener is learning these right now: ${t.join('、')}. Work 2 of them into the conversation where they fit the stories naturally, say each one you use twice, and put it in the "words in this episode" list. Never bend the facts to fit one.
+
+`;
 }
 
 /** The listener's own request, appended only when present (so default prompts
