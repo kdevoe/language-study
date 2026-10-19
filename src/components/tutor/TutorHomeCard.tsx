@@ -6,7 +6,7 @@ import { fetchOpener, fetchTutorHistory, localDay } from '../../services/tutor';
 // night's brief (something real — a finished article, a plan you mentioned), and
 // tapping opens the panel with it as her first message. Once today's conversation
 // is going: her last line (usually the question she left you with), and tapping
-// picks the conversation back up. After 終わる it falls back to the opener.
+// picks the conversation back up. A new day starts a new thread, and the opener again.
 
 const FALLBACK = '今日は何について話そうか？';
 const OPENER_KEY = 'yugen-tutor-opener';

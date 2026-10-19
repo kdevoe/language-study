@@ -451,7 +451,7 @@ body.song-mode {
 /* A tapped recast's note: what they wrote and why, styled like an aside. */
 .tutor-fixnote { display: block; margin-top: 0.5rem; font-family: var(--font-sans); font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; white-space: normal; }
 /* Yours: white on the warm grey (the study card's lift), so your turns register at a glance. */
-.tutor-u { align-self: flex-end; max-width: 82%; background: var(--bg-pure); border-radius: 20px; padding: 0.6rem 1rem; font-family: var(--font-chat); font-weight: 500; font-size: 0.98rem; line-height: 1.75; white-space: pre-wrap; }
+.tutor-u { align-self: flex-end; max-width: 82%; background: var(--bg-pure); border-radius: 20px; padding: 0.6rem 1rem; font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; white-space: pre-wrap; }
 /* Your turn: a photo (docs/mockups/tutor-photo.html) sits above your bubble. */
 .tutor-me { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
 .tutor-photo { position: relative; display: block; width: 170px; padding: 0; border: none; background: var(--bg-card); border-radius: 16px; overflow: hidden; cursor: pointer; }
@@ -488,31 +488,13 @@ body.song-mode {
    shape at the end of the thread, so iOS's form bar is the only band under it. */
 .tutor-panel.kb .tutor-input { justify-content: flex-end; border-bottom: none; padding: 0.8rem 0 0.6rem; }
 .tutor-panel.kb .tutor-draft { flex: 0 1 auto; max-width: 82%; min-width: 2.5rem; background: var(--bg-pure); border-radius: 20px; }
-.tutor-panel.kb .tutor-draft::after, .tutor-panel.kb .tutor-draft textarea { font-family: var(--font-chat); font-weight: 500; font-size: 1rem; line-height: 1.75; padding: 0.6rem 1rem; }
+.tutor-panel.kb .tutor-draft::after, .tutor-panel.kb .tutor-draft textarea { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; padding: 0.6rem 1rem; }
 .tutor-panel.kb .tutor-draft::after { max-height: calc(7.5rem + 1.1rem); }
 .tutor-panel.kb .tutor-draft textarea { max-height: calc(7.5rem + 1.1rem); }
 .tutor-panel.kb .tutor-input button { padding-bottom: 0.65rem; }
 .tutor-input button { background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; padding: 0.2rem 0; }
 .tutor-input button:disabled { opacity: 0.35; cursor: default; }
-/* 終わる, moved here from the removed header: muted serif text, left of the camera. */
-.tutor-input .tutor-end { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); white-space: nowrap; padding: 0.2rem 0 0.15rem; }
-.tutor-input .tutor-end:disabled { opacity: 1; }
 .tutor-foot { flex: none; height: max(1.2rem, env(safe-area-inset-bottom)); }
-.tutor-recap { flex: 1; overflow-y: auto; padding: 0.6rem 18px 1.4rem; scrollbar-width: none; animation: fadeIn 0.3s ease-out; }
-.tutor-recap h3 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin: 0.4rem 0 1.4rem; }
-.tutor-rk { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; color: var(--text-muted); margin: 1.6rem 0 0.6rem; }
-.tutor-fixrow { font-family: var(--font-serif); font-size: 1rem; line-height: 1.8; margin-bottom: 0.2rem; }
-.tutor-fixrow s { color: var(--text-muted); text-decoration-color: rgba(0, 0, 0, 0.35); }
-.tutor-fixrow small { display: block; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.7rem; }
-.tutor-wrow { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.9rem; border-radius: 16px; margin-bottom: 0.45rem; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-.tutor-wrow .jp { font-family: var(--font-serif); font-size: 1.05rem; }
-.tutor-wrow .jp small { font-family: var(--font-sans); font-size: 0.72rem; color: var(--text-muted); margin-left: 0.5rem; }
-.tutor-wrow button { background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; }
-.tutor-wrow.added { background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
-.tutor-wrow.added button { color: var(--text-main); }
-.tutor-used { font-family: var(--font-serif); font-size: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; }
-.tutor-used span::after { content: ' ✓'; font-family: var(--font-sans); font-size: 0.75rem; color: var(--accent-progress); }
-.tutor-done { display: block; margin: 2rem 0 0 auto; height: 45px; padding: 0 1.4rem; border: none; border-radius: 100px; background: var(--bg-pure); color: var(--text-main); font-family: var(--font-serif); font-weight: 700; font-size: 1rem; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1); cursor: pointer; }
 .tutor-suggestion { display: flex; gap: 1.2rem; margin-top: 0.4rem; }
 .tutor-suggestion button { background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-main); padding: 0; }
 .tutor-suggestion button + button { color: var(--text-muted); }

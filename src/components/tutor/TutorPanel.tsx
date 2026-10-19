@@ -7,14 +7,13 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 import { useWordLookup } from '../../hooks/useWordLookup';
 import { WordModal } from '../WordModal';
 import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
-import { lookupWord as jmdictLookup } from '../../services/jmdict';
 import {
-  endTutorThread, fetchTutorHistory, localDay, pollResearch, streamTutor,
-  type ScreenContext, type TutorAction, type TutorRecap,
+  fetchTutorHistory, localDay, pollResearch, streamTutor,
+  type ScreenContext, type TutorAction,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
 import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
-import { clearThumbs, keepThumb, preparePhoto, thumbsFor, type PreparedPhoto } from '../../services/tutorPhotos';
+import { keepThumb, preparePhoto, thumbsFor, type PreparedPhoto } from '../../services/tutorPhotos';
 
 // ハルカ's side panel (docs/mockups/tutor.html, design-system §6.17). Slides in
 // from the hand side over any screen; the screen stays visible beside it. One
@@ -37,7 +36,6 @@ const RESEARCH_GIVE_UP_MS = 120_000;
 export function TutorPanel() {
   const { open, drag, options, openSeq, closeTutor, snapshot } = useTutor();
   const hand = useAppStore((s) => s.tutorHand);
-  const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
   const setGrammarMastery = useAppStore((s) => s.setGrammarMastery);
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -51,9 +49,6 @@ export function TutorPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);   // null idle · '' replying · tool label
   const [actions, setActions] = useState<TutorAction[]>([]);
-  const [recap, setRecap] = useState<TutorRecap | null>(null);
-  const [ending, setEnding] = useState(false);
-  const [added, setAdded] = useState<Set<string>>(new Set());
   const [opener, setOpener] = useState<string | null>(null);
   // Background lookups ハルカ started (research tool): polled until they land,
   // then she shares them, in a followup turn if the chat is quiet.
@@ -84,7 +79,6 @@ export function TutorPanel() {
       setActions([]);
       setResearching([]);
       setLanded([]);
-      setRecap(null);
       setLoaded(false);
       setHistoryOk(false);
     }
@@ -232,7 +226,7 @@ export function TutorPanel() {
 
   // Poll the lookups in flight; drop any that never land.
   useEffect(() => {
-    if (!researching.length || !threadId || recap) return;
+    if (!researching.length || !threadId) return;
     const t = setTimeout(async () => {
       const ids = researching.map((r) => r.id);
       const done = await pollResearch(threadId, ids).catch(() => [] as string[]);
@@ -241,57 +235,17 @@ export function TutorPanel() {
       if (done.length) setLanded((prev) => [...prev, ...done]);
     }, RESEARCH_POLL_MS);
     return () => clearTimeout(t);
-  }, [researching, threadId, recap]);
+  }, [researching, threadId]);
 
   // A lookup landed while ハルカ isn't replying: she brings it up herself. The
   // server skips it if the learner spoke since (she already saw it then).
   useEffect(() => {
     // Not while they're typing: their next message carries it instead.
-    if (!landed.length || busy !== null || !threadId || recap || ending || draft.trim()) return;
+    if (!landed.length || busy !== null || !threadId || draft.trim()) return;
     const researchId = landed[landed.length - 1];
     setLanded([]);
     void streamReply({ action: 'followup', threadId, researchId }, []);
-  }, [landed, busy, threadId, recap, ending, draft, streamReply]);
-
-  const end = async () => {
-    if (ending) return;
-    setEnding(true);
-    abortRef.current?.abort();
-    const r = await endTutorThread(threadId).catch(() => null);
-    setEnding(false);
-    const offered = actions.filter((a): a is Extract<TutorAction, { type: 'add_to_deck' }> => a.type === 'add_to_deck');
-    setRecap(r ?? { corrections: [], newWords: offered.map(({ word, reading, meaning }) => ({ word, reading, meaning })), usedWords: [] });
-  };
-
-  const finish = () => {
-    // The thread is over: next open starts a new one.
-    setRecap(null);
-    setLines([]);
-    setThreadId(null);
-    setActions([]);
-    setResearching([]);
-    setLanded([]);
-    setAdded(new Set());
-    setPhoto(null);
-    clearThumbs();
-    closeTutor();
-  };
-
-  const addWord = async (w: { word: string; reading: string; meaning: string }) => {
-    if (added.has(w.word)) return;
-    setAdded((prev) => new Set(prev).add(w.word));
-    try {
-      const hit = (await jmdictLookup(w.word))[0];
-      if (!hit) return;
-      gradeDiscoverWord({
-        entryId: hit.entryId, word: w.word, reading: hit.readings[0] ?? w.reading,
-        meaning: hit.senses[0]?.gloss.slice(0, 3).join('; ') || w.meaning,
-        jlptLevel: hit.jlptLevel, freqRank: hit.freqRank,
-      }, 'medium');
-    } catch (e) {
-      console.warn('[tutor] add to deck failed:', e);
-    }
-  };
+  }, [landed, busy, threadId, draft, streamReply]);
 
   // Swipe the open panel back toward its edge to close.
   const swipe = useRef<{ x: number; y: number; locked: boolean | null } | null>(null);
@@ -322,11 +276,10 @@ export function TutorPanel() {
   const dragging = drag !== null || closeDrag > 0;
   const backdropOn = open || (drag !== null && drag > 8);
 
-  const showChip = !!ctx?.chip && !chipOff && !recap;
+  const showChip = !!ctx?.chip && !chipOff;
   // Her opener only once we know today's thread is empty: until the history
   // loads, a fresh-looking opener would hide the conversation you're in.
   const firstLine = loaded && opener && !lines.some((l) => l.role !== 'context') ? opener : null;
-  const learnerSpoke = lines.some((l) => l.role === 'user');
 
   return (
     <>
@@ -346,7 +299,8 @@ export function TutorPanel() {
       >
         <div className="tutor-vgrab" />
         {/* No header (docs/mockups/tutor-fullheight.html, B): the thread runs to the
-            top edge. Swipe back or tap the dim to close; 終わる lives in the input row. */}
+            top edge. Swipe back or tap the dim to close. There is no 終わる: the
+            conversation rolls over each day, and the nightly dream summarises it. */}
 
         {showChip && (
           <div className="tutor-chip">
@@ -355,75 +309,65 @@ export function TutorPanel() {
           </div>
         )}
 
-        {recap ? (
-          <Recap recap={recap} added={added} onAdd={addWord} onDone={finish} />
-        ) : (
-          <>
-            <div className="tutor-thread" ref={threadRef}>
-              {!loaded && !lines.length && <div className="tutor-typing" role="status" aria-label="読み込み中"><span /><span /><span /></div>}
-              {firstLine && <div className="tutor-t"><TutorText text={firstLine} lookup={lookup} /></div>}
-              {lines.map((l) => l.role === 'context'
-                ? <div key={l.key} className="tutor-ctx">{l.text}</div>
-                : l.role === 'user'
-                  ? <UserLine key={l.key} line={l} />
-                  : <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />)}
-              {busy && <div className="tutor-busy">{busy}</div>}
-              {busy === null && researching.length > 0 && <div className="tutor-busy">ハルカが調べています…</div>}
-              {actions.map((a, i) => (
-                <ActionNote key={i} action={a} onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
-                  onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
-              ))}
-            </div>
-            {photo && (
-              <div className="tutor-attach">
-                <div className="tutor-photo">
-                  <img src={photo.thumb} alt="" />
-                  <button className="tutor-photo-x" onClick={() => setPhoto(null)} aria-label="写真を外す"><X size={11} strokeWidth={2.4} /></button>
-                </div>
+          <div className="tutor-thread" ref={threadRef}>
+            {!loaded && !lines.length && <div className="tutor-typing" role="status" aria-label="読み込み中"><span /><span /><span /></div>}
+            {firstLine && <div className="tutor-t"><TutorText text={firstLine} lookup={lookup} /></div>}
+            {lines.map((l) => l.role === 'context'
+              ? <div key={l.key} className="tutor-ctx">{l.text}</div>
+              : l.role === 'user'
+                ? <UserLine key={l.key} line={l} />
+                : <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />)}
+            {busy && <div className="tutor-busy">{busy}</div>}
+            {busy === null && researching.length > 0 && <div className="tutor-busy">ハルカが調べています…</div>}
+            {actions.map((a, i) => (
+              <ActionNote key={i} action={a} onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
+                onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
+            ))}
+          </div>
+          {photo && (
+            <div className="tutor-attach">
+              <div className="tutor-photo">
+                <img src={photo.thumb} alt="" />
+                <button className="tutor-photo-x" onClick={() => setPhoto(null)} aria-label="写真を外す"><X size={11} strokeWidth={2.4} /></button>
               </div>
-            )}
-            <div className="tutor-input">
-              {/* The wrapper's ::after holds a hidden copy of the draft and sizes the
-                  textarea to it; with the keyboard up that also fits its width, so the
-                  draft reads as the outgoing bubble forming at the end of the thread. */}
-              <div className="tutor-draft" data-value={draft || 'ハルカに話しかける…'}>
-                <textarea
-                  ref={inputRef}
-                  rows={1}
-                  value={draft}
-                  placeholder="ハルカに話しかける…"
-                  enterKeyHint="send"
-                  onFocus={() => setTyping(true)}
-                  onBlur={() => setTyping(false)}
-                  autoComplete="off"
-                  // Her job is to see your mistakes: no autocorrect, no spellcheck, no
-                  // iOS writing suggestions (Safari's writingsuggestions attribute).
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  {...({ writingsuggestions: 'false' } as Record<string, string>)}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendText(draft); }
-                  }}
-                />
-              </div>
-              {/* 終わる: once you've spoken, and not while typing (the draft is the bubble then). */}
-              {learnerSpoke && !keyboard && (
-                <button className="tutor-end" onClick={end} disabled={ending}>{ending ? 'まとめています…' : '終わる'}</button>
-              )}
-              {/* No capture attribute: iOS offers Take Photo or Photo Library. */}
-              <input ref={fileRef} type="file" accept="image/*" hidden
-                onChange={(e) => { pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />
-              <button onClick={() => fileRef.current?.click()} aria-label="写真">
-                <Camera size={21} strokeWidth={1.6} />
-              </button>
-              <button onClick={() => sendText(draft)} disabled={(!draft.trim() && !photo) || busy !== null} aria-label="送る">
-                <ArrowUp size={21} strokeWidth={1.6} />
-              </button>
             </div>
-          </>
-        )}
+          )}
+          <div className="tutor-input">
+            {/* The wrapper's ::after holds a hidden copy of the draft and sizes the
+                textarea to it; with the keyboard up that also fits its width, so the
+                draft reads as the outgoing bubble forming at the end of the thread. */}
+            <div className="tutor-draft" data-value={draft || 'ハルカに話しかける…'}>
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={draft}
+                placeholder="ハルカに話しかける…"
+                enterKeyHint="send"
+                onFocus={() => setTyping(true)}
+                onBlur={() => setTyping(false)}
+                autoComplete="off"
+                // Her job is to see your mistakes: no autocorrect, no spellcheck, no
+                // iOS writing suggestions (Safari's writingsuggestions attribute).
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                {...({ writingsuggestions: 'false' } as Record<string, string>)}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendText(draft); }
+                }}
+              />
+            </div>
+            {/* No capture attribute: iOS offers Take Photo or Photo Library. */}
+            <input ref={fileRef} type="file" accept="image/*" hidden
+              onChange={(e) => { pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+            <button onClick={() => fileRef.current?.click()} aria-label="写真">
+              <Camera size={21} strokeWidth={1.6} />
+            </button>
+            <button onClick={() => sendText(draft)} disabled={(!draft.trim() && !photo) || busy !== null} aria-label="送る">
+              <ArrowUp size={21} strokeWidth={1.6} />
+            </button>
+          </div>
         <div className="tutor-foot" />
       </aside>
       <WordModal {...lookup.modalProps} />
@@ -542,41 +486,6 @@ function ContentOffer({ action, onDismiss }: {
         <button onClick={make} disabled={state === 'making'}>{state === 'making' ? '準備中…' : '作る'}</button>
         <button onClick={onDismiss}>いいえ</button>
       </div>
-    </div>
-  );
-}
-
-function Recap({ recap, added, onAdd, onDone }: {
-  recap: TutorRecap;
-  added: Set<string>;
-  onAdd: (w: { word: string; reading: string; meaning: string }) => void;
-  onDone: () => void;
-}) {
-  const empty = !recap.corrections.length && !recap.newWords.length && !recap.usedWords.length;
-  return (
-    <div className="tutor-recap">
-      <h3>今日の会話</h3>
-      {empty && <p className="serif" style={{ color: 'var(--text-muted)' }}>また話そうね。</p>}
-      {recap.corrections.length > 0 && <>
-        <div className="tutor-rk">直したところ</div>
-        {recap.corrections.map((c, i) => (
-          <div key={i} className="tutor-fixrow"><s>{c.said}</s> → {c.better}<small>{c.note}</small></div>
-        ))}
-      </>}
-      {recap.newWords.length > 0 && <>
-        <div className="tutor-rk">新しい単語</div>
-        {recap.newWords.map((w) => (
-          <div key={w.word} className={`tutor-wrow${added.has(w.word) ? ' added' : ''}`}>
-            <span className="jp">{w.word}<small>{w.reading} · {w.meaning}</small></span>
-            <button onClick={() => onAdd(w)}>{added.has(w.word) ? '追加しました' : '＋ デッキ'}</button>
-          </div>
-        ))}
-      </>}
-      {recap.usedWords.length > 0 && <>
-        <div className="tutor-rk">使えた単語</div>
-        <div className="tutor-used">{recap.usedWords.map((w) => <span key={w}>{w}</span>)}</div>
-      </>}
-      <button className="tutor-done" onClick={onDone}>完了</button>
     </div>
   );
 }

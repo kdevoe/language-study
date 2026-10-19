@@ -91,8 +91,3 @@ export async function thumbsFor(ids: string[]): Promise<Record<string, string>> 
   } catch { /* none */ }
   return out;
 }
-
-/** The conversation ended: its photos go too. */
-export async function clearThumbs(): Promise<void> {
-  try { await withStore('readwrite', (s) => { s.clear(); }); } catch { /* nothing kept */ }
-}
