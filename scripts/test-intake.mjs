@@ -110,6 +110,12 @@ async function main() {
   check('cap 3 → one per lane', JSON.stringify(three.map((p) => p.lane)) === JSON.stringify(['S', 'M', 'Fo']), three.map((p) => p.lane).join(','));
   check('cap 0 promotes nothing', selectPromotions(queue, [], 0, 4).length === 0);
 
+  console.log('\nselectPromotions — words the learner chose (Discover / ハルカ add) go first');
+  const chosen = selectPromotions([...queue, local('紅葉', 2, 15, 0, { mastery: 'medium' })], [], 3, 4);
+  check('a chosen N2 word, never met, wins the struggle slot', chosen[0].entryId === '紅葉' && chosen[0].lane === 'S', ids(chosen).join(','));
+  const requeued = selectPromotions([local('requeued', 2, 15, 3, { mastery: 'medium' })], [], 3, 4);
+  check('a medium word met in reading (Policy F requeue) is not "chosen"', requeued.length === 0, ids(requeued).join(','));
+
   console.log('\nselectPromotions — spill and junk');
   const noStruggle = selectPromotions([local('a', 4, 1), local('b', 4, 2), local('c', 4, 3), local('d', 4, 20)], [], 3, 4);
   check('an empty struggle lane spills to the others', noStruggle.length === 3, ids(noStruggle).join(','));

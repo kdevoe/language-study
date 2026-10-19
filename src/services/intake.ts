@@ -129,13 +129,29 @@ export function compareIntakeItem(a: IntakeItem, b: IntakeItem): number {
 
 const freq = (i: IntakeItem) => i.freqRank ?? Number.POSITIVE_INFINITY;
 
-/** Lane S: met at least twice and looked up at least twice (or marked hard); any level. */
+/**
+ * A word the learner asked for: triaged medium/hard in Discover, or added from a
+ * ハルカ offer (both go through gradeDiscoverWord). Never met in reading, unlike the
+ * words Policy F requeued with a medium grade.
+ */
+export function isChosen(i: IntakeItem): boolean {
+  return i.key != null && i.timesSeen === 0 && (i.mastery === 'medium' || i.mastery === 'hard');
+}
+
+/**
+ * Lane S: words the learner chose, then words met at least twice and looked up at
+ * least twice (or marked hard); any level.
+ */
 export function isStruggle(i: IntakeItem): boolean {
-  if (i.key == null || i.timesSeen < 2) return false;
+  if (i.key == null) return false;
   if (i.jlptLevel == null && i.freqRank == null) return false;
+  if (isChosen(i)) return true;
+  if (i.timesSeen < 2) return false;
   return (i.lookupCount ?? 0) >= 2 || i.mastery === 'hard';
 }
 function compareStruggle(a: IntakeItem, b: IntakeItem): number {
+  const c = Number(isChosen(b)) - Number(isChosen(a));
+  if (c !== 0) return c; // asked-for words first
   const d = (b.lookupCount ?? 0) - (a.lookupCount ?? 0);
   if (d !== 0) return d;
   if (a.timesSeen !== b.timesSeen) return b.timesSeen - a.timesSeen;
