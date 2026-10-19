@@ -61,7 +61,8 @@ export interface RewriteInput {
     reviewWords: string[];
     /**
      * The reader's newest flashcards (docs/intake-v2-spec.md, Change 4): use 2–3
-     * where they fit, glossed. Not in the ALLOWED LIST — they're being learned.
+     * where they fit, NOT glossed: meeting them bare is the practice, and reading
+     * past one then means something. Not in the ALLOWED LIST — they're being learned.
      */
     targetWords?: string[];
     /** Max out-of-list topic words the story may use, each force-glossed. Default 3. */
@@ -155,7 +156,7 @@ export function buildRewritePrompt(input: RewriteInput): string {
     const maxTopic = lexicon.maxTopicWords ?? 3;
     const targets = lexicon.targetWords ?? [];
     const targetRule = targets.length > 0
-      ? `\n4. TARGET WORDS — the reader is learning these right now: ${targets.join('、')}. Use 2–3 of them where they fit the facts naturally, and explain each one you use in a yugen-box the first time it appears. Prefer a target word over a new topic word whenever either would do. Never bend the story to fit one.`
+      ? `\n4. TARGET WORDS — the reader is learning these right now: ${targets.join('、')}. Use 2–3 of them where they fit the facts naturally. Do NOT explain them: no yugen-box and no gloss in the text, because meeting them bare is the practice (the reader can tap any word to look it up). Prefer a target word over a new topic word whenever either would do. Never bend the story to fit one.`
       : '';
     palettePrompt = `
 CONTROLLED VOCABULARY — THE MOST IMPORTANT RULE OF THIS TASK:
