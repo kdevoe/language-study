@@ -609,6 +609,10 @@
   - [x] Easy first-grade refund + same-day top-up (budget 4× cap); deck admits JLPT-unrated ranked words
   - [x] Hygiene: seen/lookup sync sends intake_status; progress upsert retries once
   - [x] Target words: newest cards offered to lexicon rewrites (EVAL-013: 2 used, known share 55% vs 56% baseline)
+  - [x] Target words unglossed (Oct 19): no yugen-box for this week's new cards, so reading past one means something
+  - [x] Read-past refund (Oct 19, Change 3b): a new card read past without a lookup frees its slot like an Easy
+        first grade; logged as mastery_change refund 'read_past'
+  - [ ] Check read-past refunds (~Nov 1): next flashcard grade of refunded words; many Again → one-tap 知ってる? check card
   - [ ] APPLY (your step): database/39_intake_v2.sql (RPCs + NULL intake_status backfill)
   - [x] New words / day stays 3 (Settings stepper)
   - [ ] Change 5: grammar "got it / unsure" tap (mockup first)

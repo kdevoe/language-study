@@ -733,6 +733,16 @@ export const useAppStore = create<AppState>()(
           // first time; thereafter the stored SRS state drives everything.
           const now = Date.now();
           const rating = ratingForReaderEvent(event);
+          // Read-past refund (docs/intake-v2-spec.md, Change 3b): a new card (promoted,
+          // never graded) read past in an article without a lookup was likely known, so
+          // like an Easy first grade it gives back its daily slot and a replacement is
+          // promoted. Target words are no longer glossed in rewrites, so reading past one
+          // means something. Logged (mastery_change, refund: 'read_past') so its next
+          // flashcard grade can show whether the signal holds.
+          const refund = event === 'skip' && current.promotedTs != null && (current.reps ?? 0) === 0;
+          if (refund && refundTally(state, now).count <= REFUND_BUDGET_X * (state.newWordsPerDay ?? 3)) {
+            setTimeout(() => { void get().promoteIntakeQueue(now, { topUp: true }); }, 0);
+          }
           const priorSrs: SrsState =
             current.stability != null && current.dueAt != null
               ? {
@@ -750,6 +760,7 @@ export const useAppStore = create<AppState>()(
 
           const updatedWord: WordData = {
             ...current,
+            ...(refund ? { promotedTs: null } : {}),
             difficulty,
             mastery,
             lastAdjustedDay: today,
@@ -781,8 +792,10 @@ export const useAppStore = create<AppState>()(
                   reps: sched.reps,
                   lapses: sched.lapses,
                   srsStatus: sched.status,
+                  ...(refund ? { promotedTs: null } : {}),
                 });
-                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change', { difficulty, mastery, event });
+                m.logStudyEventToSupabase(uid, updatedWord.jmdictEntryId!, 'mastery_change',
+                  { difficulty, mastery, event, ...(refund ? { refund: 'read_past' } : {}) });
                 m.logSrsReviewToSupabase(uid, updatedWord.jmdictEntryId!, {
                   rating,
                   source: event === 'click' ? 'reader_click' : 'reader_skip',
@@ -805,6 +818,7 @@ export const useAppStore = create<AppState>()(
             // #73: this read advanced the schedule (the daily gate above passed), so
             // it counts as one review event for the dashboard's activity history.
             reviewsByDay: bumpReviewDay(state.reviewsByDay, today),
+            ...(refund ? { intakeRefunds: refundTally(state, now) } : {}),
           };
         }),
 
