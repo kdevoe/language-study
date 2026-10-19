@@ -41,6 +41,11 @@ const corsHeaders = {
 
 const MAX_TOOL_ROUNDS = 4;
 const API_TIMEOUT_MS = 90_000;   // one model call; the app's watchdog gives up after 60 s of silence
+// She sometimes drafts her whole reply in thinking, calls a tool, then ends the
+// turn after the tool result as if the reply had gone out: nothing reaches the
+// learner (2026-10-18: a research followup and the next turn both went silent).
+// One nudge, this turn only, never stored.
+const SILENT_TURN_NUDGE = 'You ended your turn without writing anything to the learner. Your thinking and tool calls are invisible to them, so nothing has been shown yet. Write your reply to them now.';
 // A tool call written out as text instead of a tool_use block (cut from there on).
 const LEAKED_CALL_RE = /<\/?(?:antml:)?(?:invoke|function_calls|parameter)\b[\s\S]*$/;
 const MAX_HISTORY_MESSAGES = 80;   // older turns drop off (the dream already has them)
@@ -564,6 +569,7 @@ async function runTurn(opts: {
       { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } });
   }
   let finalText = '';
+  let nudged = false;
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     // Cache the whole conversation so far: the next turn reads it back cheaply.
@@ -608,7 +614,16 @@ async function runTurn(opts: {
     // Keep every block (thinking included): a tool loop must hand back the
     // assistant turn exactly as it came. A turn left with nothing to say isn't
     // stored (an assistant message of only thinking is invalid next turn).
-    if (!text.trim() && ended) break;
+    if (!text.trim() && ended) {
+      // ...but a whole turn with nothing said gets one more try (SILENT_TURN_NUDGE),
+      // appended to the last user-side message in memory only.
+      if (finalText.trim() || nudged) break;
+      nudged = true;
+      console.warn('[tutor-chat] silent turn, nudging', JSON.stringify({ round, followup }));
+      messages[messages.length - 1].content.push({ type: 'text', text: SILENT_TURN_NUDGE });
+      round--;   // the retry doesn't spend a tool round (it happens at most once)
+      continue;
+    }
     await admin.from('tutor_messages').insert({
       thread_id: threadId, user_id: userId, role: 'assistant', content,
       text: text.trim() || null, usage: ended ? usage : null,
