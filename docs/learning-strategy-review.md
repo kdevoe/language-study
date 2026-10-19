@@ -21,22 +21,18 @@ The issues so far, roughly in order:
 
 The pattern underneath:
 
-1. **No single owner of "what you know and what's next".** Six systems each decide part of it, with their own definitions:
-   - reader auto-credit;
-   - Discover;
-   - flashcards;
-   - the lexicon (what articles may use);
-   - Policy F;
-   - ハルカ.
+1. **The single scorer only reached articles.** `_shared/wordPriority.ts` (#69) was designed as the one place that ranks words, from difficulty (the source of truth for "known"), JLPT level, frequency and recency. Only process-article calls it.
+   - Intake and the deck run client-side on small "mirror" copies of its ordering (`intake.ts`, `deck.ts`).
+   - The intake rule that fed the rare N5 tail lived in that copy, with none of the scorer's other signals. Recency never reached intake.
+   - Each copy then got patched separately (Policy F's flood fix created the parking problem).
+2. **One "known" signal, many writers with uneven evidence.** `difficulty` (1–10, mastery derived from it) is the source of truth, but:
+   - reading past a word nudges it −1 a day, a lookup +2;
+   - flashcard grades move it ±1–2, and manual sets and Discover set it outright;
+   - the July rebalance moved words by it in bulk.
 
-   A fix in one moves the problem to another. Policy F's flood fix created the parking problem.
-2. **Proxy signals stand in for knowledge.** "Easy" can mean:
-   - you read past it once;
-   - an FSRS difficulty nudge;
-   - a kanji-guessed JLPT level;
-   - you actually recalled it.
+   Reading past a word a few times can make it "easy" without it ever being recalled. 98% of review events were read-past credit.
 
-   Garbage in compounds. 98% of "reviews" were read-past credit.
+   Scheduling meanwhile runs on a second state (FSRS stability, due date and FSRS's own difficulty), so "due" and "known" can disagree.
 3. **The client is the source of truth.** The word DB lives in localStorage and syncs both ways. That one choice caused:
    - quota failures;
    - rehydrate drops;
@@ -67,9 +63,13 @@ The pattern underneath:
 
 Principles:
 
-- **Sources only nominate; one planner decides.** Each source adds evidence to a candidate: met, looked up, got wrong in chat, asked for. Only the planner spends the daily budget. #211 is the first version of this planner.
+- **Sources only nominate; one planner decides.** Each source adds evidence to a candidate: met, looked up, got wrong in chat, asked for. Only the planner spends the daily budget.
+  - #211 is the first version of this planner, but it's still a client-side copy.
+  - The end state is wordPriority.ts as originally intended: one scorer that intake, the deck and generation all call.
 - **Evidence beats curriculum position.** Words you meet and stumble on come first, ordered by how common they are, at your working level. Bottom-up filling is a minority lane, not the engine.
-- **One honest definition of "known".** Only recall counts toward "solid": a flashcard grade or correct use in chat. Exposure is evidence of *familiarity*, not knowledge.
+- **Keep difficulty as the one "known" signal, but weigh its evidence.**
+  - Recall (a flashcard grade, correct use in chat) moves it fully.
+  - Exposure (reading past a word) moves it only a little, and can't make a word "easy" on its own.
 - **Content follows the plan.** Whatever the planner picked this week shows up in articles, podcasts and ハルカ's conversation. A new word is met in context within days.
 - **Measure outcomes, in the app.** Show new solid words per level per week, plus planner health (refund rate, junk rate, target usage). Look at them weekly.
 - **Server owns the state.** The client is a view and a cache.
