@@ -44,12 +44,6 @@ export type TutorEvent =
   | { type: 'done'; text: string }
   | { type: 'error'; error: string };
 
-export interface TutorRecap {
-  corrections: { said: string; better: string; note: string }[];
-  newWords: { word: string; reading: string; meaning: string }[];
-  usedWords: string[];
-}
-
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 /** The learner's local calendar day: a thread lasts one day (design §4). */
@@ -62,12 +56,6 @@ export async function fetchTutorHistory(): Promise<{ threadId: string | null; me
   if (DEV_MODE) return { threadId: null, messages: [] };
   const res = await invokeEdgeFn<{ thread: { id: string } | null; messages: TutorMessage[] }>('tutor-chat', { action: 'history', day: localDay() });
   return { threadId: res.thread?.id ?? null, messages: res.messages ?? [] };
-}
-
-export async function endTutorThread(threadId: string | null): Promise<TutorRecap | null> {
-  if (DEV_MODE) return null;
-  const res = await invokeEdgeFn<{ recap: TutorRecap | null }>('tutor-chat', { action: 'end', threadId, day: localDay() });
-  return res.recap;
 }
 
 /** Which of these background lookups have landed in the thread. */
