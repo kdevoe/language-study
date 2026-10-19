@@ -132,6 +132,18 @@ When a new card's first-ever grade is Easy (`isNewCard && rating === 4`):
 
 The replacement card appears in the same session. Top-ups are budgeted at 4×cap per calendar day. With the working level and junk gate, refunds should become rare. October's rate was 29%.
 
+## Change 3b: read-past refund (added 2026-10-19)
+
+A new card (promoted, never graded) read past in an article without a lookup also gives back its daily slot, the same way as an Easy first grade:
+- the same top-up and the same 4×cap daily budget
+- the read still counts as a Good review
+
+This depends on Change 4's target words being unglossed. A word with a yugen-box beside it gets read past whether it's known or not.
+
+The signal is weaker than Easy. Words read past before their first flashcard were first-graded Easy 65% of the time, against 59% for the rest. So each refund is logged (`study_history` `mastery_change` with `refund: 'read_past'`) to be checked against that word's next flashcard grade:
+- **Mostly Good/Easy:** keep it.
+- **Many Again:** replace it with a one-tap "知ってる?" check card that doesn't use a slot.
+
 ## Change 4: Articles teach the target words (new)
 
 **Where:**
@@ -145,7 +157,7 @@ Add a **TARGET WORDS** slot to the lexicon prompt, next to REVIEW WORDS.
 
 **Prompt rule:**
 - Use 2–3 target words where they fit the facts naturally.
-- Gloss each in a yugen-box the first time it appears.
+- Don't gloss them (no yugen-box): meeting a new word bare is the practice, and it makes reading past one meaningful. Changed 2026-10-19; the reader can still tap to look one up.
 - Never distort the story to fit one. Same golden rule as now.
 
 **Topic words** stay, capped at 3. Prefer a topic word at level W or W−1 when the story allows a choice: "if a simpler word in TARGET or ALLOWED expresses it, use that."
@@ -183,7 +195,7 @@ An earlier draft proposed limiting `reader_skip` credit. Dropped (2026-10-18). R
 - ≥ 80% of retained promotions are words met in reading or chosen (not never-met dictionary words). **Zero** N5 words without a frequency rank.
 - First-grade-Easy rate < 15%, and every Easy first grade gets a same-day replacement.
 - Zero fragment or date/number promotions.
-- Lexicon articles average ≥ 2 target words glossed, with no drop in the known-word share (eval + prod sample).
+- Lexicon articles average ≥ 2 target words (unglossed), with no drop in the known-word share (eval + prod sample).
 - N4 solid count rises ≥ 25 words/week. Words maturing at N4/N3 recover toward July levels within a month.
 - `lookup_count` matches `study_history` for the top 20 words after backfill.
 
