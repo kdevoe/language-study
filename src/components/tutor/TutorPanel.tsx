@@ -345,12 +345,8 @@ export function TutorPanel() {
         onTouchEnd={onTouchEnd}
       >
         <div className="tutor-vgrab" />
-        <div className="tutor-head">
-          <div className="tutor-who"><div className="tutor-av">ハ</div><b>ハルカ</b></div>
-          {recap ? null : learnerSpoke
-            ? <button className="tutor-link" onClick={end} disabled={ending}>{ending ? 'まとめています…' : '終わる'}</button>
-            : <button className="tutor-link" onClick={closeTutor} aria-label="閉じる"><X size={20} strokeWidth={1.5} /></button>}
-        </div>
+        {/* No header (docs/mockups/tutor-fullheight.html, B): the thread runs to the
+            top edge. Swipe back or tap the dim to close; 終わる lives in the input row. */}
 
         {showChip && (
           <div className="tutor-chip">
@@ -400,12 +396,22 @@ export function TutorPanel() {
                   onFocus={() => setTyping(true)}
                   onBlur={() => setTyping(false)}
                   autoComplete="off"
+                  // Her job is to see your mistakes: no autocorrect, no spellcheck, no
+                  // iOS writing suggestions (Safari's writingsuggestions attribute).
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  {...({ writingsuggestions: 'false' } as Record<string, string>)}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendText(draft); }
                   }}
                 />
               </div>
+              {/* 終わる: once you've spoken, and not while typing (the draft is the bubble then). */}
+              {learnerSpoke && !keyboard && (
+                <button className="tutor-end" onClick={end} disabled={ending}>{ending ? 'まとめています…' : '終わる'}</button>
+              )}
               {/* No capture attribute: iOS offers Take Photo or Photo Library. */}
               <input ref={fileRef} type="file" accept="image/*" hidden
                 onChange={(e) => { pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />

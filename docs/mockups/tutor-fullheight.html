@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — full-height chat</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500&text=%EF%BC%81&display=swap');
+/* Tokens copied from src/index.css. */
+:root {
+  --bg-color: #f5f5f0; --bg-pure: #ffffff; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-primary: #d4e0e8; --border-light: #e0e0d8; --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+  --font-chat: 'Noto Serif JP', 'Shippori Mincho', serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.88rem; max-width: 800px; margin: 0 auto 0.5rem; text-align: left; }
+.mock-header b { color: var(--text-main); }
+.stage { display: flex; justify-content: center; gap: 1.8rem; flex-wrap: wrap; align-items: flex-start; }
+.wrap { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 390px; }
+.label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.note { font-size: 0.76rem; color: var(--text-muted); text-align: center; min-height: 4.8em; }
+
+/* 390 × 844. The status bar (default style: an opaque band, tinted by the dim) is the top 54px. */
+.phone { width: 390px; height: 844px; background: #b9b9b2; border-radius: 44px; overflow: hidden; position: relative; box-shadow: 0 30px 60px rgba(0,0,0,0.22); }
+.sb { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0 40px; font-size: 0.95rem; font-weight: 600; color: #111; z-index: 3; }
+.panel { position: absolute; right: 0; top: 60px; bottom: 0; width: 366px; background: var(--bg-color); border-radius: 28px 0 0 28px; display: flex; flex-direction: column; box-shadow: -10px 0 40px rgba(0,0,0,0.15); overflow: hidden; }
+.grab { position: absolute; top: 50%; left: 8px; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
+.head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 1.6rem 18px 0.4rem; }
+.who { display: flex; align-items: center; gap: 0.6rem; }
+.who b { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 500; }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.95rem; }
+.link { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); }
+.thread { flex: 1; overflow: hidden; padding: 0.9rem 18px 1rem; display: flex; flex-direction: column; justify-content: flex-end; }
+/* No header: the thread runs to the panel's top edge and fades out under its corner. */
+.bare .thread { padding-top: 0; -webkit-mask-image: linear-gradient(transparent, #000 2.2rem); mask-image: linear-gradient(transparent, #000 2.2rem); }
+.input { flex: none; display: flex; align-items: flex-end; gap: 0.8rem; margin: 0 18px; padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
+.input .field { flex: 1; font-family: var(--font-chat); font-weight: 500; font-size: 1.1rem; line-height: 1.5; color: var(--text-muted); opacity: 0.7; }
+.input svg { width: 21px; height: 21px; fill: none; stroke: var(--text-muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.input .end { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); padding-bottom: 0.1rem; white-space: nowrap; }
+.foot { flex: none; height: 22px; }
+
+/* A1 thread, as shipped (#214) */
+.t { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; max-width: 94%; }
+.fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; }
+.u { align-self: flex-end; max-width: 82%; background: var(--bg-pure); border-radius: 20px; padding: 0.6rem 1rem; font-family: var(--font-chat); font-weight: 500; font-size: 0.98rem; line-height: 1.75; }
+.a { font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); max-width: 92%; border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; }
+.thread > * + * { margin-top: 2.8rem; }
+.thread > .t + .t, .thread > .t + .a, .thread > .a + .t { margin-top: 0.9rem; }
+/* A: 終わる at the head of the conversation, as content: it scrolls away with the thread. */
+.thread > .endrow { align-self: center; font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+.thread > .endrow + * { margin-top: 1.4rem; }
+.ruler { position: absolute; right: -10px; width: 8px; border-right: 2px solid #c77b4a; }
+</style>
+</head>
+<body>
+<div class="mock-header">
+  <div class="kicker">MOCKUP · ハルカ</div>
+  <h1>Full-height chat</h1>
+  <p><b>The header goes.</b> Without the ハ / ハルカ / 終わる row the thread runs to the panel's top edge and fades out under the rounded corner. That gains about 70px, roughly two lines of her text. Closing needs no button: swipe back or tap the dim. <b>終わる needs a new home</b>, since it's what ends the conversation and shows the recap. A and B are the two places it could go; neither adds anything new.</p>
+  <p><b>Over the status bar: not worth it.</b> The app runs with iOS's <code>default</code> status bar, an opaque band the page can't draw into. The only way under it is <code>black-translucent</code>, which forces the clock and battery to <b>white</b> (unreadable on our cream) and pushes every page in the app under the clock, not just the chat. In a Safari tab it isn't possible at all.</p>
+</div>
+<div class="stage" id="stage"></div>
+
+<template id="conv">
+  <div class="u">残念けど、見に行かないんです。普通にユーチューブで見る。実際にレースに行ったことがない</div>
+  <div class="t">調べた結果が届いたよ。formula1.comとESPNによると、今週末はレースがなくて、次は10月23日からのアメリカGPだって。</div>
+  <div class="t"><span class="fix">残念だけど</span>、ユーチューブで見るのもいいね。「行ったことがない」の言い方も、とても自然だよ。</div>
+  <div class="a">残念けど is missing だ: 残念だけど (or 残念ですが). けど follows a plain form, and な-adjectives and nouns need だ.</div>
+  <div class="t">いつか、実際に見に行きたい？音がすごく大きいらしいよ！</div>
+  <div class="u">行きたいです！フェルスタッペンのドライビングが好きです</div>
+  <div class="t">なるほど！<span class="fix">ドラマを起こさずに</span>、上手に運転するように一生懸命<span class="fix">集中しているところが</span>好きなんだね。「〜ように」の使い方、とても自然だよ！</div>
+  <div class="a">Use either 集中するのが好き or 集中することが好き, never both の and こと together.</div>
+  <div class="t">ミスが少ないドライバーは、見ていて安心するよね。</div>
+</template>
+
+<script>
+const ICONS = `<svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg><svg viewBox="0 0 24 24" style="opacity:.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+const VARIANTS = [
+  { label: '現状 (#214)', head: true, note: 'Today: the header row takes about 70px above the thread.' },
+  { label: 'A · 終わる AT THE TOP OF THE THREAD', endTop: true, note: '終わる sits where the conversation begins, as content: it scrolls away as the thread grows and comes back when you scroll up. The most space, but it\'s out of sight in a long conversation.' },
+  { label: 'B · 終わる IN THE INPUT ROW', endInput: true, note: '終わる sits in the input row, left of the camera, so it\'s always in reach. It hides while you type (keyboard up), so the row stays the same width as today in that state.' },
+];
+const stage = document.getElementById('stage');
+for (const v of VARIANTS) {
+  const wrap = document.createElement('div'); wrap.className = 'wrap';
+  wrap.innerHTML = `<div class="label">${v.label}</div>
+    <div class="phone"><div class="sb"><span>8:15</span><span>▮▮▮ ◠ ▭</span></div>
+      <div class="panel ${v.head ? '' : 'bare'}"><div class="grab"></div>
+        ${v.head ? '<div class="head"><div class="who"><div class="av">ハ</div><b>ハルカ</b></div><span class="link">終わる</span></div>' : ''}
+        <div class="thread"></div>
+        <div class="input"><div class="field">ハルカに話しかける…</div>${v.endInput ? '<span class="end">終わる</span>' : ''}${ICONS}</div>
+        <div class="foot"></div>
+      </div></div>
+    <div class="note">${v.note}</div>`;
+  const th = wrap.querySelector('.thread');
+  th.appendChild(document.getElementById('conv').content.cloneNode(true));
+  if (v.endTop) {
+    // A short thread shows it; in this long one it has scrolled away above the fade.
+    const e = document.createElement('button'); e.className = 'endrow'; e.textContent = '終わる';
+    th.prepend(e);
+  }
+  stage.appendChild(wrap);
+}
+</script>
+</body>
+</html>
