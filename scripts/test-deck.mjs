@@ -106,15 +106,17 @@ async function main() {
   check('appears exactly once', dual.length === 1);
   check('classified as a review (already scheduled + urgent)', dual[0].kind === 'review');
 
-  console.log('\nselectDeck — level-less words are excluded (un-enriched junk)');
+  console.log('\nselectDeck — words with no level and no frequency rank are excluded (un-enriched junk)');
   const withJunk = selectDeck([
     due('good', 2),
-    due('nolevel_due', 2, { jlptLevel: null }),   // due but no JLPT → excluded
-    fresh('nolevel_new', { jlptLevel: null }),      // new but no JLPT → excluded
+    due('nolevel_due', 2, { jlptLevel: null, freqRank: null }),   // no JLPT, no rank → excluded
+    fresh('nolevel_new', { jlptLevel: null, freqRank: null }),      // no JLPT, no rank → excluded
+    fresh('unrated_ranked', { jlptLevel: null, freqRank: 3 }),      // JLPT-unrated real word → kept
   ], NOW);
-  check('a due word with no JLPT is dropped', !withJunk.some((c) => c.key === 'nolevel_due'));
-  check('a new word with no JLPT is dropped', !withJunk.some((c) => c.key === 'nolevel_new'));
-  check('the JLPT-rated word survives', withJunk.length === 1 && withJunk[0].key === 'good');
+  check('a due word with no JLPT or rank is dropped', !withJunk.some((c) => c.key === 'nolevel_due'));
+  check('a new word with no JLPT or rank is dropped', !withJunk.some((c) => c.key === 'nolevel_new'));
+  check('a JLPT-unrated word with a frequency rank is kept', withJunk.some((c) => c.key === 'unrated_ranked'));
+  check('the JLPT-rated word survives', withJunk.some((c) => c.key === 'good') && withJunk.length === 2);
 
   console.log('\nselectDeck — empty deck when nothing is due or new');
   check('all-future/studied → empty', selectDeck([entry('a'), entry('b')], NOW).length === 0);
@@ -126,7 +128,7 @@ async function main() {
     fresh('n1'), fresh('n2'), fresh('n3'),            // 3 new
     entry('l1'), entry('l2'),                         // 2 learning (active, scheduled, not due/new)
     entry('q1', { intakeStatus: 'queued' }),          // queued → not counted
-    due('junk', 1, { jlptLevel: null }),              // level-less → excluded
+    due('junk', 1, { jlptLevel: null, freqRank: null }), // no level, no rank → excluded
   ], NOW);
   check('due count', dc.due === 2, JSON.stringify(dc));
   check('new count', dc.new === 3, JSON.stringify(dc));

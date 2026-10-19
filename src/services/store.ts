@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
 import { decidePacing, isActiveForPacing } from './pacing';
 import { alignReading, hasKanji, loadReadingData } from './furigana';
-import { selectPromotions, type IntakeItem, type IntakeCandidate } from './intake';
+import { selectPromotions, workingLevel, type IntakeItem, type IntakeCandidate, type LevelProgress } from './intake';
 import { TOMBSTONED_WORD_IDS, RECOVERABLE_WORD_IDS } from './vocabCleanup';
 
 export type MasteryLevel = 'unseen' | 'hard' | 'medium' | 'easy';
@@ -156,6 +156,17 @@ function sameLocalDay(a: number, b: number): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
+// Easy-refund top-ups per local day, as a multiple of the daily cap: a queue full of
+// already-known words can't turn one session into a marathon.
+const REFUND_BUDGET_X = 4;
+
+/** Today's refund tally after one more refund (resets on a new local calendar day). */
+function refundTally(state: { intakeRefunds: { day: string; count: number } | null }, now: number) {
+  const day = new Date(now).toDateString();
+  const prev = state.intakeRefunds?.day === day ? state.intakeRefunds.count : 0;
+  return { day, count: prev + 1 };
+}
+
 export interface WordData {
   reading: string;
   meaning: string;
@@ -217,6 +228,9 @@ interface AppState {
   // the queue into active study, and when the last promotion pass ran (daily gate).
   newWordsPerDay: number;
   lastIntakePromotionTs: number | null;
+  // Intake v2 Easy refunds (docs/intake-v2-spec.md, Change 3): how many top-ups a
+  // first-grade Easy has bought today, capped at 4× the daily cap.
+  intakeRefunds: { day: string; count: number } | null;
   // 聞く (docs/music-design.md): how often an automatic song is made, which styles
   // it draws from and which podcast hosts rotate (null = all), plus the reader's
   // own rewrites of host personalities (persona id → text; absent = original).
@@ -312,7 +326,7 @@ interface AppState {
   gradeDiscoverWord: (candidate: IntakeCandidate, level: Exclude<MasteryLevel, 'unseen'>) => void;
   mergeWordRecords: (fromKey: string, toKey: string) => void;
   checkDailyKanji: () => void;
-  promoteIntakeQueue: (now: number) => Promise<void>;
+  promoteIntakeQueue: (now: number, opts?: { topUp?: boolean }) => Promise<void>;
   syncSrsWithSupabase: (userId: string) => Promise<void>;
   backfillWordProgress: () => Promise<void>;
 }
@@ -368,6 +382,7 @@ export const useAppStore = create<AppState>()(
       songCoverStyle: null,
       sandboxMode: false,
       lastIntakePromotionTs: null,
+      intakeRefunds: null,
       reviewsByDay: {},
       wordDatabase: {},
       studyKanji: [],
@@ -639,7 +654,11 @@ export const useAppStore = create<AppState>()(
                   difficulty: updatedWord.difficulty ?? null,
                   timesSeen: updatedWord.timesSeen,
                   streak: updatedWord.streak,
-                  lastSeenTs: updatedWord.lastSeenTs
+                  lastSeenTs: updatedWord.lastSeenTs,
+                  // This path creates most rows; without a status they landed NULL and
+                  // fell out of the intake queue (955 rows by Oct 2026).
+                  intakeStatus: updatedWord.intakeStatus
+                    ?? (updatedWord.stability != null || updatedWord.difficulty != null ? 'active' : 'queued'),
                 };
                 m.upsertWordProgressToSupabase(uid, updatedWord.jmdictEntryId!, syncData);
                 // A lookup carries the word and the article it happened in, so
@@ -1055,8 +1074,18 @@ export const useAppStore = create<AppState>()(
           const mastery = bucketForDifficulty(difficulty);
 
           const today = new Date(now).toISOString().split('T')[0];
+          // Easy refund (intake v2, Change 3): Easy on a new card's first-ever grade
+          // means it was already known, so it gives back its daily slot (promotedTs
+          // cleared → the cross-device cap count drops) and a replacement is promoted
+          // below. The grade itself stands.
+          const refund = isNewCard && rating === 4;
+          if (refund && refundTally(state, now).count <= REFUND_BUDGET_X * (state.newWordsPerDay ?? 3)) {
+            // After this set lands, so the top-up sees the cleared stamp.
+            setTimeout(() => { void get().promoteIntakeQueue(now, { topUp: true }); }, 0);
+          }
           const updatedWord: WordData = {
             ...current,
+            ...(refund ? { promotedTs: null } : {}),
             difficulty,
             mastery,
             lastAdjustedDay: today,
@@ -1089,6 +1118,7 @@ export const useAppStore = create<AppState>()(
                   reps: sched.reps,
                   lapses: sched.lapses,
                   srsStatus: sched.status,
+                  ...(refund ? { promotedTs: null } : {}),
                 });
                 m.logSrsReviewToSupabase(uid, updatedWord.jmdictEntryId!, {
                   rating,
@@ -1111,6 +1141,7 @@ export const useAppStore = create<AppState>()(
             },
             // #73: a flashcard grade always advances the schedule → one review event.
             reviewsByDay: bumpReviewDay(state.reviewsByDay, today),
+            ...(refund ? { intakeRefunds: refundTally(state, now) } : {}),
           };
         }),
 
@@ -1743,11 +1774,15 @@ export const useAppStore = create<AppState>()(
       // DAY: a rolling 24h gate ratchets the promotion time later every day (it only
       // fires while the app is open), so a morning open kept finding yesterday's stamp
       // too fresh and produced no cards. Call it on app open, AFTER syncSrsWithSupabase.
-      promoteIntakeQueue: async (now: number) => {
+      promoteIntakeQueue: async (now: number, opts: { topUp?: boolean } = {}) => {
         const state = get();
-        if (state.lastIntakePromotionTs && sameLocalDay(state.lastIntakePromotionTs, now)) return;
-        // Stamp immediately so a re-entrant call (e.g. a double mount) can't double-promote.
-        set({ lastIntakePromotionTs: now });
+        // A top-up (an Easy refund freed a slot) skips the once-a-day gate but keeps
+        // every other guard: it can only refill up to today's cap.
+        if (!opts.topUp) {
+          if (state.lastIntakePromotionTs && sameLocalDay(state.lastIntakePromotionTs, now)) return;
+          // Stamp immediately so a re-entrant call (e.g. a double mount) can't double-promote.
+          set({ lastIntakePromotionTs: now });
+        }
 
         const capPref = state.newWordsPerDay ?? 3;
         if (capPref <= 0) return; // 0 = new words paused
@@ -1761,43 +1796,66 @@ export const useAppStore = create<AppState>()(
         const cap = capPref - promotedToday;
         if (cap <= 0) return;
 
-        // Source 1: words already encountered and waiting in the local queue. Only
-        // deck-eligible words (JLPT level known — mirrors deck.isEligible) may compete:
-        // a level-less fragment that wins a slot becomes an *invisible* active word,
-        // silently burning the day's cap on cards the deck refuses to show.
-        const queuedItems: IntakeItem[] = Object.entries(state.wordDatabase)
-          .filter(([, w]) => w.intakeStatus === 'queued' && w.jlptLevel != null)
-          .map(([key, w]) => ({
-            key,
-            entryId: w.jmdictEntryId ?? key,
-            jlptLevel: w.jlptLevel ?? null,
-            freqRank: w.freqRank ?? null,
-            timesSeen: w.timesSeen ?? 0,
-          }));
-
-        // Source 2: important unseen-foundation words (virtual, server-sourced). Needs a
-        // session + a known level; skipped in dev/no-auth (queue then = local words only).
-        let candidateItems: IntakeItem[] = [];
+        // Intake v2 (docs/intake-v2-spec.md): the dictionary's own level + frequency
+        // and lookup counts for the queue, and per-level progress for the working
+        // level. Both need a session; without them (dev/no-auth, or migration 39 not
+        // applied) fall back to the local record minus kanji-guessed levels, and to
+        // the user's own level.
         const uid = await currentUserId();
+        let signals = new Map<string, { level: number | null; freq: number | null; lookups: number }>();
+        let progress: LevelProgress[] = [];
+        if (uid) {
+          try {
+            const api = await import('./api');
+            [signals, progress] = await Promise.all([api.fetchIntakeSignals(), api.fetchLevelProgress()]);
+          } catch (e) {
+            console.warn('[store] intake signals unavailable, using local data:', e);
+          }
+        }
+        const working = workingLevel(progress, state.jlptLevel);
+
+        // Source 1: words met while reading (or triaged in Discover) and waiting in the
+        // local queue. Entry-linked only: an entry-less record can't sync, and those
+        // are the kuromoji fragments.
+        const queuedItems: IntakeItem[] = Object.entries(state.wordDatabase)
+          .filter(([, w]) => w.intakeStatus === 'queued' && !!w.jmdictEntryId)
+          .map(([key, w]) => {
+            const sig = signals.get(w.jmdictEntryId!);
+            return {
+              key,
+              entryId: w.jmdictEntryId!,
+              jlptLevel: sig ? sig.level : (w.jlptDerived ? null : w.jlptLevel ?? null),
+              freqRank: sig ? sig.freq : w.freqRank ?? null,
+              timesSeen: w.timesSeen ?? 0,
+              lookupCount: sig?.lookups ?? 0,
+              mastery: w.mastery,
+              surface: w.surface ?? key,
+              pos: w.pos,
+            };
+          });
+
+        // Source 2: never-met words (virtual, server-sourced) — they only fill what
+        // the queue above can't (cold start), at the working level.
+        let candidateItems: IntakeItem[] = [];
         const userJlpt = state.jlptLevel;
         if (uid && userJlpt != null) {
-          // A failed fetch silently erases the day's unseen-foundation slots (this
-          // pass runs once per calendar day — there is no later attempt). Retry once
-          // after a short pause before giving up, and log the give-up as an error so
-          // it surfaces once error monitoring lands (path-forward §0.3).
+          // A failed fetch silently erases the day's cold-start slots (this pass runs
+          // once per calendar day — there is no later attempt). Retry once after a
+          // short pause before giving up, and log the give-up as an error.
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
               const seenIds = Object.values(get().wordDatabase)
                 .map((w) => w.jmdictEntryId)
                 .filter((id): id is string => !!id);
               const { fetchIntakeCandidates } = await import('./jmdict');
-              const cands = await fetchIntakeCandidates(userJlpt, seenIds, cap + 20);
+              const cands = await fetchIntakeCandidates(Math.min(userJlpt, working), seenIds, cap + 20);
               candidateItems = cands.map((c) => ({
                 key: null,
                 entryId: c.entryId,
                 jlptLevel: c.jlptLevel,
                 freqRank: c.freqRank,
                 timesSeen: 0,
+                surface: c.word,
                 candidate: c,
               }));
               break;
@@ -1806,14 +1864,16 @@ export const useAppStore = create<AppState>()(
                 console.warn('[store] intake candidate fetch failed, retrying once:', e);
                 await new Promise((r) => setTimeout(r, 1500));
               } else {
-                console.error('[store] intake candidate fetch failed after retry — no unseen-foundation words today:', e);
+                console.error('[store] intake candidate fetch failed after retry — no cold-start words today:', e);
               }
             }
           }
         }
 
-        const winners = selectPromotions(queuedItems, candidateItems, cap);
+        const winners = selectPromotions(queuedItems, candidateItems, cap, working);
         if (winners.length === 0) return;
+        console.info(`[store] intake: working level N${working}, promoting`,
+          winners.map((w) => `${w.surface ?? w.entryId} (${w.lane})`).join(', '));
 
         const toSync: WordData[] = [];
         set((s) => {
@@ -1845,6 +1905,9 @@ export const useAppStore = create<AppState>()(
               continue;
             }
             if (record.intakeStatus === 'active') continue; // already promoted; skip
+            // The deck needs a level or a frequency rank to show a card (deck.isEligible);
+            // a JLPT-unrated struggle word carries the dictionary's rank.
+            if (record.freqRank == null && win.freqRank != null) record = { ...record, freqRank: win.freqRank };
             const difficulty = record.difficulty ?? clampDifficulty(seedDifficulty(record.jlptLevel ?? null, s.jlptLevel));
             const activated = activateWord(record, difficulty, now);
             db[key] = activated;
@@ -1940,6 +2003,7 @@ export const useAppStore = create<AppState>()(
         // guard; the Settings toggle shows a clear warning while it's on.
         sandboxMode: state.sandboxMode,
         lastIntakePromotionTs: state.lastIntakePromotionTs,
+        intakeRefunds: state.intakeRefunds,
         reviewsByDay: state.reviewsByDay,
         wordDatabase: state.wordDatabase,
         studyKanji: state.studyKanji,

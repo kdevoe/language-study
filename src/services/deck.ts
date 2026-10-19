@@ -88,15 +88,14 @@ function compareDue(a: DeckCard, b: DeckCard): number {
 }
 
 /**
- * A word is deck-eligible only if it has a JLPT level. Words with no JLPT rating
- * are the un-enriched long tail (kuromoji-parsed fragments, particles, junk that
- * never resolved to a JMDict entry) — showing them as flashcards is noise. Since
- * foundation-first ordering is JLPT-based anyway, a level-less word has no place
- * in the ordering. (Coarse gate for now; a fuller fix would enrich or prune those
- * rows at the source — see docs/flashcard-ui-design-70.md.)
+ * A word is deck-eligible if it has a JLPT level or a JMDict frequency rank. Words
+ * with neither are the un-enriched long tail (kuromoji-parsed fragments, particles,
+ * junk that never resolved to a JMDict entry) — showing them as flashcards is noise.
+ * A frequency rank lets in real words JLPT never rated, which intake v2's struggle
+ * lane promotes (支援, 遺伝子 — docs/intake-v2-spec.md).
  */
 export function isEligible(e: DeckEntry): boolean {
-  return e.jlptLevel != null;
+  return e.jlptLevel != null || e.freqRank != null;
 }
 
 /**

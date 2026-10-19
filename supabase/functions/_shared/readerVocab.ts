@@ -127,6 +127,37 @@ export interface ReviewWord {
 }
 
 /**
+ * TARGET words (docs/intake-v2-spec.md, Change 4): the learner's newest flashcards —
+ * promoted in the last week and still early (≤ 3 reps) — newest first. An article
+ * that uses a couple of them, glossed, puts this week's new cards in context, so
+ * reading and the deck reinforce each other. (Easy-refunded cards lose their
+ * promoted_at stamp, so already-known words never come back as targets.)
+ */
+export async function pickTargetWords(supabase: SupabaseClient, userId: string, limit = 8): Promise<ReviewWord[]> {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const { data: rows, error } = await supabase.from('user_word_progress')
+    .select('word_id, promoted_at')
+    .eq('user_id', userId).eq('intake_status', 'active')
+    .gte('promoted_at', since).lte('reps', 3)
+    .order('promoted_at', { ascending: false }).limit(limit * 2);
+  if (error) throw error;
+  const ids = ((rows ?? []) as { word_id: string }[]).map((r) => r.word_id);
+  if (!ids.length) return [];
+  const { data: entries, error: e2 } = await supabase
+    .from('jmdict_entries').select('id, jmdict_kanji(text, common), jmdict_kana(text, common)').in('id', ids);
+  if (e2) throw e2;
+  const surface = new Map(((entries ?? []) as EmbeddedEntry[]).map((e) => [e.id, pickSurface(e)]));
+  const out: ReviewWord[] = [];
+  for (const id of ids) {
+    const word = surface.get(id);
+    if (!word || KATAKANA_ONLY_RE.test(word)) continue;
+    out.push({ entryId: id, word });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
  * Up to `limit` review words: struggling (hard/medium) words in their pre-due
  * window or overdue, most urgent first — the same floor articles reserve slots
  * for — topped up with any-mastery words due within a week. Still-queued intake
