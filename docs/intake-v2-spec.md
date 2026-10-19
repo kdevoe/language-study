@@ -214,7 +214,7 @@ An earlier draft proposed limiting `reader_skip` credit. Dropped (2026-10-18). R
 1. Migration (lookup_count + backfill) and the intake_status backfill. Applied by hand; ask before running.
 2. Ship Changes 1–3 + the junk gate (client).
 3. Ship Change 4 (edge functions; deploy process-article), with the eval run first.
-4. Bump `new_words_per_day` 3 → 5. With 2/2/1 lanes that's ~35 useful words/week, against ~14 today (21 minus a third wasted).
+4. Keep `new_words_per_day` at 3 (adjustable in Settings). With 1/1/1 lanes and Easy refunds, all ~21 words a week are ones you need, against ~14 useful today.
 5. Ship Changes 5–6.
 6. Re-run the audit after two weeks against the criteria above.
 

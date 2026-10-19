@@ -610,7 +610,7 @@
   - [x] Hygiene: seen/lookup sync sends intake_status; progress upsert retries once
   - [x] Target words: newest cards offered to lexicon rewrites (EVAL-013: 2 used, known share 55% vs 56% baseline)
   - [ ] APPLY (your step): database/39_intake_v2.sql (RPCs + NULL intake_status backfill)
-  - [ ] Raise new words / day 3 → 5 in Settings
+  - [x] New words / day stays 3 (Settings stepper; lanes 1/1/1)
   - [ ] Change 5: grammar "got it / unsure" tap (mockup first)
   - [ ] Change 6: per-level solid line in 進捗 (mockup first; data from intake_level_progress)
   - [ ] Re-audit ~Nov 1 against the spec's acceptance criteria
