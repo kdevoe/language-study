@@ -1828,14 +1828,15 @@ export const useAppStore = create<AppState>()(
               freqRank: sig ? sig.freq : w.freqRank ?? null,
               timesSeen: w.timesSeen ?? 0,
               lookupCount: sig?.lookups ?? 0,
+              lastSeenTs: w.lastSeenTs || 0,
               mastery: w.mastery,
               surface: w.surface ?? key,
               pos: w.pos,
             };
           });
 
-        // Source 2: never-met words (virtual, server-sourced) — they only fill what
-        // the queue above can't (cold start), at the working level.
+        // Source 2: never-met words at the working level (virtual, server-sourced). They
+        // compete in the same ranking, with no lookup or exposure points.
         let candidateItems: IntakeItem[] = [];
         const userJlpt = state.jlptLevel;
         if (uid && userJlpt != null) {
@@ -1870,10 +1871,10 @@ export const useAppStore = create<AppState>()(
           }
         }
 
-        const winners = selectPromotions(queuedItems, candidateItems, cap, working);
+        const winners = selectPromotions(queuedItems, candidateItems, cap, working, now);
         if (winners.length === 0) return;
         console.info(`[store] intake: working level N${working}, promoting`,
-          winners.map((w) => `${w.surface ?? w.entryId} (${w.lane})`).join(', '));
+          winners.map((w) => `${w.surface ?? w.entryId} (${w.score.toFixed(1)})`).join(', '));
 
         const toSync: WordData[] = [];
         set((s) => {

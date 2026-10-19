@@ -605,12 +605,12 @@
 - [x] Flashcard feel: the study card as lifted paper with a pile underneath, a quiet press / flip / lift-away, bigger kanji, slider raised and caption removed (both decks; StudyCard.tsx, mockups docs/mockups/flashcard-feel.html → flashcard-feel-2.html variant C)
 - [/] Intake v2: learn the words you meet, one level up (docs/intake-v2-spec.md; July audit docs/srs-usage-audit-2026-07-18.md)
   - [x] Diagnosis (Oct 18): N5 89% solid, but intake spent Jul–Oct on the rare N5 tail; 88 of 222 new cards first-graded Easy; 771 N4/N3 words met in reading parked; lexicon articles had no new-words slot
-  - [x] Lanes around a working level (struggle / met-at-level / foundation), never-met words only as cold start, junk gate (dictionary's own level, no dates/affixes/unranked katakana); scripts/test-intake.mjs 32 checks
+  - [x] One score per word (need, exposure, usefulness, level fit around a working level), top N win, no quotas; junk gate (dictionary's own level, no dates/affixes/unranked katakana); scripts/test-intake.mjs 35 checks
   - [x] Easy first-grade refund + same-day top-up (budget 4× cap); deck admits JLPT-unrated ranked words
   - [x] Hygiene: seen/lookup sync sends intake_status; progress upsert retries once
   - [x] Target words: newest cards offered to lexicon rewrites (EVAL-013: 2 used, known share 55% vs 56% baseline)
   - [ ] APPLY (your step): database/39_intake_v2.sql (RPCs + NULL intake_status backfill)
-  - [x] New words / day stays 3 (Settings stepper; lanes 1/1/1)
+  - [x] New words / day stays 3 (Settings stepper)
   - [ ] Change 5: grammar "got it / unsure" tap (mockup first)
   - [ ] Change 6: per-level solid line in 進捗 (mockup first; data from intake_level_progress)
   - [ ] Re-audit ~Nov 1 against the spec's acceptance criteria

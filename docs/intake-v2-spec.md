@@ -76,39 +76,32 @@ Since the controlled-vocabulary lexicon (#210 made it reliable), a rewrite may u
 
 * * *
 
-## Change 1: Lane-based promotion with a working level
+## Change 1: One score per word, ranked against each other
 
 **Where:**
-- `src/services/intake.ts` (`compareIntakeItem`, `selectPromotions`)
-- `src/services/store.ts` (`promoteIntakeQueue` builds the `IntakeItem`s)
-- `supabase/functions/_shared/wordPriority.ts` (mirror; keep it in sync)
+- `src/services/intake.ts`: `intakeScore`, `selectPromotions`, `workingLevel`
+- `src/services/store.ts`: `promoteIntakeQueue` builds the items
 
 ### Working level
 
-The **working level** W is the easiest JLPT level that is < 80% solid (easy mastery) among its frequency-ranked words. Words with no frequency rank don't count toward the threshold and come last within a level.
+The **working level** W is the easiest JLPT level under 80% solid (easy mastery), counted over all of the level's words. Today N5 is 89% solid, so W = N4. It's computed each pass from `intake_level_progress()`.
 
-Today: N5 is 89% solid, so W = N4. W is computed per promotion pass from the local word database plus the level totals. Those totals come from a small RPC, or are cached once a day.
+### The score
 
-### Lanes
+Every eligible word gets one score, and the top N win. N is `new_words_per_day`, 3 by default, set in Settings. There are no lanes and no quotas: a day can be three N3 words, or three N4 words.
 
-Cap N = `new_words_per_day`. Recommend 5 (see Rollout).
+| Part | Points |
+|---|---|
+| **Need** | chosen by you (Discover, ハルカ add): +8, so an explicit ask outranks anything inferred · each lookup +0.6 (up to 3) · marked hard +1.5 |
+| **Exposure** | times met (log scale, up to 1.5) · met in the last week +1, last month +0.5 |
+| **Usefulness** | frequency band, most common = 3 |
+| **Level fit** (×3) | W = 1 · one level up 0.7 · easier than W 0.5 · two up 0.3 · three up 0.1 · JLPT-unrated 0.4 |
 
-| Lane | Share | Eligible | Order |
-|---|---|---|---|
-| **S: struggle** | 40% | queued, `timesSeen ≥ 2`, and `lookupCount ≥ 2` or mastery hard; any level | `lookupCount` desc → `timesSeen` desc → `freqRank` asc |
-| **M: met at level** | 40% | queued, `timesSeen ≥ 1`, JLPT W or W−1 (today N4 or N3), `freqRank ≤ 12` | `freqRank` asc → level (W first) |
-| **Fo: foundation** | remainder (≥1 when cap ≥ 3) | level W only, has a `freqRank`; never-met words allowed, but only via Discover triage (Change 2) | current `compareIntakeItem` |
+**Eligible:** a frequency rank is required, unless you chose the word. Junk is out (1b). Never-met dictionary words compete too, with no need or exposure points, so they only win when nothing you've met is as useful.
 
-How slots are shared:
-- Cap 5 → S:2, M:2, Fo:1. Cap 3 → 1/1/1.
-- An empty lane spills to the next (S → M → Fo → S).
-- De-dup by `entryId`: the first lane wins.
+**Ties:** the more common word, then entry id.
 
-**What changed from July:**
-- Lane F is now "M", tied to the working level instead of a fixed "user level −1..5". The July version would have kept feeding N5.
-- Lane M also requires `timesSeen ≥ 1`. Words you've met beat dictionary words.
-- Foundation drops words with no frequency rank. That alone stops the 字引/伯父さん tail.
-- Below W, words enter only through lane S (you struggled with them) or Discover. A known-level word you keep looking up still gets in.
+**Dry run (Oct 18, real queue):** the top picks are the words you keep looking up: 機関, 逮捕, 流行, 組織, 権利, 治療. These have 4–7 lookups each, 10–18 encounters, and are mostly N3. Of the next 63 picks, about 4 are N4. The N4 words still queued are ones you read past without looking up, i.e. likely known. If N4 should get more weight, change the level-fit numbers.
 
 ### 1a: Lookup counting
 
@@ -124,11 +117,11 @@ Eligibility today is meant to be "has a JLPT level", yet October promoted 見, �
   - number + counter or date forms;
   - katakana compounds;
   - phrase entries.
-- **Unrated words:** relax `isEligible` (July 1b) so frequency-ranked JMDict words with no JLPT level can enter through lane S. 支援, 奴隷 and 遺伝子 were top struggle words.
+- **Unrated words:** relax `isEligible` (July 1b) so frequency-ranked JMDict words with no JLPT level can compete. 支援, 奴隷 and 遺伝子 were top struggle words.
 
-## Change 2: Triage gate on never-met words (unchanged from July)
+## Change 2: Never-met words compete on equal terms
 
-Virtual candidates (`fetchIntakeCandidates`: never met, never triaged) can't win a slot while the evidence pool can fill the cap. Discover is how never-met words come in: grade one medium or hard and it joins the queue. Cold-start fallback: if the evidence pool is short, fill Fo slots from virtual candidates at level W.
+**As built:** folded into the score. Virtual candidates (`fetchIntakeCandidates`) are ranked with everything else, but have no need or exposure points, so a met word of similar frequency beats them. Discover and ハルカ adds count as *chosen* and lead.
 
 ## Change 3: Easy first-grade refund + top-up (unchanged from July)
 
@@ -148,7 +141,7 @@ The replacement card appears in the same session. Top-ups are budgeted at 4×cap
 
 Add a **TARGET WORDS** slot to the lexicon prompt, next to REVIEW WORDS.
 
-**Source:** the learner's newest cards, promoted in the last 7 days and still at reps ≤ 3. If there are fewer than 8, top up with the head of lane M (queued, met, level W).
+**Source:** the learner's newest cards, promoted in the last 7 days and still at reps ≤ 3. Newest first, up to 8.
 
 **Prompt rule:**
 - Use 2–3 target words where they fit the facts naturally.
@@ -161,7 +154,7 @@ Add a **TARGET WORDS** slot to the lexicon prompt, next to REVIEW WORDS.
 
 **Why:** a new card read in context the same week is how reading and flashcards were meant to reinforce each other. Today they're decoupled.
 
-> **Build status (2026-10-18):** Changes 1–4 and the hygiene fixes are built (PR: intake v2). The junk gate uses the dictionary's own level (`jlptDerived` levels guessed from kanji were the leak), plus filters for digits, affixes and unranked katakana. Target words are the newest cards only, with no lane-M top-up. Changes 5–6 are UI and follow mockup-first.
+> **Build status (2026-10-18):** Changes 1–4 and the hygiene fixes are built (PR: intake v2). The junk gate uses the dictionary's own level (`jlptDerived` levels guessed from kanji were the leak), plus filters for digits, affixes and unranked katakana. Target words are the newest cards only, with no top-up. Change 1 became a single score (no lanes) after review. Changes 5–6 are UI and follow mockup-first.
 
 ## Change 5: Grammar gets a signal (new, small)
 
@@ -185,9 +178,9 @@ An earlier draft proposed limiting `reader_skip` credit. Dropped (2026-10-18). R
 1. `intake_status` NULL on 955 rows: send `'queued'` from every write path that creates a row, then re-run the `24_intake_queue.sql` backfill.
 2. Unpersisted flashcard grades: add retry and loud logging in `reviewWord`.
 
-## Acceptance criteria (first two weeks after ship, cap 5)
+## Acceptance criteria (first two weeks after ship, 3 a day)
 
-- ≥ 80% of retained promotions are level W or W−1, or come from lane S. **Zero** N5 words without a frequency rank.
+- ≥ 80% of retained promotions are words met in reading or chosen (not never-met dictionary words). **Zero** N5 words without a frequency rank.
 - First-grade-Easy rate < 15%, and every Easy first grade gets a same-day replacement.
 - Zero fragment or date/number promotions.
 - Lexicon articles average ≥ 2 target words glossed, with no drop in the known-word share (eval + prod sample).
@@ -198,9 +191,9 @@ An earlier draft proposed limiting `reader_skip` credit. Dropped (2026-10-18). R
 
 - **`scripts/test-intake.mjs`:**
   - working-level computation at the 80% boundary;
-  - lane allocation and spill (cap 3/5);
+  - one score: each signal moves it; no quotas;
   - struggle eligibility;
-  - lane M requires met + freq ≤ 12;
+  - chosen words lead; met beats never-met;
   - Fo excludes no-freq words;
   - virtual-candidate gate + cold start;
   - junk gate cases (見, 屋, １２月, 上と下).
@@ -214,13 +207,13 @@ An earlier draft proposed limiting `reader_skip` credit. Dropped (2026-10-18). R
 1. Migration (lookup_count + backfill) and the intake_status backfill. Applied by hand; ask before running.
 2. Ship Changes 1–3 + the junk gate (client).
 3. Ship Change 4 (edge functions; deploy process-article), with the eval run first.
-4. Keep `new_words_per_day` at 3 (adjustable in Settings). With 1/1/1 lanes and Easy refunds, all ~21 words a week are ones you need, against ~14 useful today.
+4. Keep `new_words_per_day` at 3 (adjustable in Settings). With the score and Easy refunds, all ~21 words a week are ones you need, against ~14 useful today.
 5. Ship Changes 5–6.
 6. Re-run the audit after two weeks against the criteria above.
 
 ## Open questions
 
-1. **Working-level threshold:** 80% solid of freq-ranked words, or a fixed count of unseen-common words remaining? 80% moves W to N3 sooner, and N4 stragglers still come in via lanes S and M.
+1. **Working-level threshold:** 80% solid of freq-ranked words, or a fixed count of unseen-common words remaining? 80% moves W to N3 sooner, and N4 stragglers still compete on the score.
 2. **Cap:** 5, or more? At 5 the N4 + common-N3 pool (~500 words met in reading) takes ~3.5 months.
 3. **Target-word source:** strictly the newest cards, or also due-soon N4 reviews? (Review words already have their own slot.)
 4. **Rename the Settings copy?** `new_words_per_day` would count *retained* words ("new words to learn per day").

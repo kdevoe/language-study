@@ -48,7 +48,7 @@ The pattern underneath:
  ─────────────────               ─────────────────            ──────────────────
  reading: met / looked up   ┐                                 ┌ flashcards (new + due)
  ハルカ: struggles, asks     ├─▶  candidate pool + evidence ─▶ ├ articles (target words)
- Discover: triage           │    working level, lanes, cap    ├ podcasts / songs (targets)
+ Discover: triage           │    working level, one score, cap├ podcasts / songs (targets)
  grammar panel: first meets ┘    one definition of "solid"     └ ハルカ (practise targets)
                                            │
                                   outcome metrics ◀── everything above
@@ -59,7 +59,7 @@ Principles:
 - **Sources only nominate; one planner decides.** Each source adds evidence to a candidate: met, looked up, got wrong in chat, asked for. Only the planner spends the daily budget.
   - #211 is the first version of this planner, but it's still a client-side copy.
   - The end state is wordPriority.ts as originally intended: one scorer that intake, the deck and generation all call.
-- **Evidence beats curriculum position.** Words you meet and stumble on come first, ordered by how common they are, at your working level. Bottom-up filling is a minority lane, not the engine.
+- **Evidence beats curriculum position.** Words you meet and stumble on come first, ordered by how common they are, at your working level. Every candidate is scored on the same terms; bottom-up filling is no longer the engine.
 - **Keep difficulty as the one "known" signal.** Reading past a word, lookups, flashcard grades, and (next) ハルカ's evidence all feed it.
 - **Content follows the plan.** Whatever the planner picked this week shows up in articles, podcasts and ハルカ's conversation. A new word is met in context within days.
 - **Measure outcomes, in the app.** Show new solid words per level per week, plus planner health (refund rate, junk rate, target usage). Look at them weekly.
@@ -69,10 +69,10 @@ Principles:
 
 | Piece | State |
 |---|---|
-| Planner with lanes + working level | **#211** (merge pending) |
+| Planner: one score + working level | **#211** (merge pending) |
 | Easy refund, junk gate | **#211** |
 | Articles use target words | **#211**: articles only, newest cards only |
-| Words you choose (Discover, ハルカ tap) actually get promoted | **#211**: they lead the struggle lane. Before this, a tapped ハルカ word never got promoted |
+| Words you choose (Discover, ハルカ tap) actually get promoted | **#211**: they get the biggest boost. Before this, a tapped ハルカ word never got promoted |
 | ハルカ nominates from conversation | **Missing**: `record_usage` misses go to notes; the dream's "study focus" only shapes ハルカ's own prompts |
 | Grammar in the plan | **Missing**: points are detected and shown; none rated, none scheduled |
 | Outcome metrics in 進捗 | **Missing** (data exists: `intake_level_progress`) |
@@ -91,7 +91,7 @@ None of these feeds the planner automatically.
 
 1. **Evidence.** Every time she records a word or grammar point you got wrong, or that you asked about ("what's the word for…?"), it's logged with the item, kind and thread. `record_usage` already does this.
 2. **Rule (server, deterministic).** The nightly dream counts the evidence:
-   - an item missed **twice across separate conversations**, or asked about and then missed, is queued automatically as a *chosen* word, so it leads the struggle lane;
+   - an item missed **twice across separate conversations**, or asked about and then missed, is queued automatically as a *chosen* word, so it gets the chosen boost;
    - a grammar point is moved to *hard*.
 
    No tap needed: it only enters the queue, and the daily cap still governs what becomes a card.
@@ -109,7 +109,7 @@ Article or transcript text must never count as evidence. Only your messages do, 
 **Grammar, the same way:**
 - the panel's first-meet tap (spec Change 5) gives the signal;
 - ハルカ's evidence moves points to hard;
-- a small grammar lane puts one point a day into the plan: an example sentence card, and articles and ハルカ asked to use it.
+- grammar points get scored the same way, and one a day goes into the plan: an example sentence card, and articles and ハルカ asked to use it.
 
 ## 5. Roadmap
 
@@ -126,7 +126,7 @@ Article or transcript text must never count as evidence. Only your messages do, 
 **Later**
 
 7. Planner server-side, as one edge function or RPC. Client promotion and grading become calls. That removes the cross-device and rehydrate bug classes.
-8. Grammar lane in the planner; target grammar point in articles and podcasts.
+8. Grammar points in the planner; target grammar point in articles and podcasts.
 9. Targets in podcasts and songs, not just articles.
 10. Fit FSRS parameters to your own review log once there are enough real recalls.
 
