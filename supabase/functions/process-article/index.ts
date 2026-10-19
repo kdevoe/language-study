@@ -6,7 +6,7 @@ import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, ty
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
 import { actingUserId, resolveCaller } from '../_shared/auth.ts';
 import { dataRule, fence, fenceInline } from '../_shared/untrusted.ts';
-import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon } from '../_shared/readerVocab.ts';
+import { KATAKANA_ONLY_RE, LEXICON_MIN_WORDS, buildLexicon, pickTargetWords } from '../_shared/readerVocab.ts';
 import { JINA_CLEAN_HEADERS, cleanExtract } from '../_shared/extractClean.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
@@ -917,6 +917,11 @@ Deno.serve(async (req) => {
     // SRS + assumed-known N5/N4, minus words the reader graded medium/hard) makes the
     // allowed list itself the level: measured 39% → ~10% struggling share net of
     // glossed topic words. See docs/vocab-palette-redesign.md (live-check + phase 2).
+    // Target words (intake v2, Change 4): this week's new flashcards, fetched alongside.
+    const targetsPromise = pickTargetWords(supabase, userId).catch((e) => {
+      console.warn('[process-article] target words unavailable (continuing without):', e instanceof Error ? e.message : e);
+      return [];
+    });
     let lexicon: { words: string[] } | undefined;
     try {
       const words = await buildLexicon(supabase, userId);
@@ -925,6 +930,8 @@ Deno.serve(async (req) => {
     } catch (lexErr) {
       console.error('[process-article] Lexicon build failed (falling back to clusters):', lexErr);
     }
+    const targetWords = (await targetsPromise).map((t) => t.word);
+    if (targetWords.length) console.log(`[process-article] Target words: ${targetWords.join(', ')}`);
 
     // 2b. Story concepts — topics + actions with sense-appropriate synonyms.
     const conceptsResult = await conceptsPromise;
@@ -1212,7 +1219,7 @@ Deno.serve(async (req) => {
       vocabTargets,
       clusters,
       // Review words ride the lexicon block: the (katakana-filtered) pre-due floor.
-      lexicon: lexicon ? { words: lexicon.words, reviewWords: reviewPalette } : undefined,
+      lexicon: lexicon ? { words: lexicon.words, reviewWords: reviewPalette, targetWords } : undefined,
       // Long-form (§3–4): fidelity-leaning adapt-don't-summarize variant, with
       // continuity injected for parts after the first.
       longform: isLongform
@@ -1311,6 +1318,7 @@ Deno.serve(async (req) => {
             attempts: usage.attempts,
             promptChars: prompt1.length,
             lexiconWords: lexicon?.words.length ?? 0,
+            targetWords: lexicon ? targetWords : [],
           },
         },
       }, { onConflict: 'user_id,id' });

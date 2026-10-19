@@ -59,6 +59,11 @@ export interface RewriteInput {
     words: string[];
     /** Pre-due SRS review words to weave in (~targetReview of them). */
     reviewWords: string[];
+    /**
+     * The reader's newest flashcards (docs/intake-v2-spec.md, Change 4): use 2–3
+     * where they fit, glossed. Not in the ALLOWED LIST — they're being learned.
+     */
+    targetWords?: string[];
     /** Max out-of-list topic words the story may use, each force-glossed. Default 3. */
     maxTopicWords?: number;
   };
@@ -148,12 +153,16 @@ export function buildRewritePrompt(input: RewriteInput): string {
   let palettePrompt = '';
   if (lexicon && lexicon.words.length > 0) {
     const maxTopic = lexicon.maxTopicWords ?? 3;
+    const targets = lexicon.targetWords ?? [];
+    const targetRule = targets.length > 0
+      ? `\n4. TARGET WORDS — the reader is learning these right now: ${targets.join('、')}. Use 2–3 of them where they fit the facts naturally, and explain each one you use in a yugen-box the first time it appears. Prefer a target word over a new topic word whenever either would do. Never bend the story to fit one.`
+      : '';
     palettePrompt = `
 CONTROLLED VOCABULARY — THE MOST IMPORTANT RULE OF THIS TASK:
 The reader knows ONLY the words in the ALLOWED LIST below. Every content word you write (nouns, verbs, adjectives, adverbs) MUST come from the ALLOWED LIST, with exactly these exceptions:
 1. Proper nouns and katakana loanwords — always fine.
-2. TOPIC WORDS: if the story cannot be told without a specific word that is not in the list, you may use up to ${maxTopic} such words TOTAL — and you MUST explain each one in a yugen-box.
-3. REVIEW WORDS — work about ${targetReview} of these in where they fit the facts naturally: ${lexicon.reviewWords.join('、') || '(none)'}
+2. TOPIC WORDS: if the story cannot be told without a specific word that is not in the list, you may use up to ${maxTopic} such words TOTAL — and you MUST explain each one in a yugen-box. When you have a choice, pick the plainest, most common word that works.
+3. REVIEW WORDS — work about ${targetReview} of these in where they fit the facts naturally: ${lexicon.reviewWords.join('、') || '(none)'}${targetRule}
 When an idea's precise word is not allowed, REPHRASE the idea with allowed words (e.g. 費用→お金を払う, 民間の→普通の, 幼い→小さい). Simpler, longer phrasing built from allowed words ALWAYS beats one precise disallowed word. Grammar particles and auxiliaries are unrestricted; keep grammar at ${jlptStr}.
 
 ALLOWED LIST:

@@ -916,24 +916,51 @@ export async function upsertWordProgressToSupabase(
     // intake_status/promoted_at. Set them only when promoting (queued → active).
     & { intakeStatus?: string | null; promotedTs?: number | null }
 ) {
-  const { error } = await supabase
-    .from('user_word_progress')
-    .upsert({
-      user_id: userId,
-      word_id: wordId,
-      mastery_level: progress.mastery,
-      difficulty: progress.difficulty ?? null,
-      times_seen: progress.timesSeen,
-      streak: progress.streak,
-      last_seen_at: new Date(progress.lastSeenTs).toISOString(),
-      ...srsColumns(progress),
-      ...(progress.intakeStatus !== undefined ? { intake_status: progress.intakeStatus } : {}),
-      ...(progress.promotedTs !== undefined
-        ? { promoted_at: progress.promotedTs == null ? null : new Date(progress.promotedTs).toISOString() }
-        : {}),
-    });
+  const row = {
+    user_id: userId,
+    word_id: wordId,
+    mastery_level: progress.mastery,
+    difficulty: progress.difficulty ?? null,
+    times_seen: progress.timesSeen,
+    streak: progress.streak,
+    last_seen_at: new Date(progress.lastSeenTs).toISOString(),
+    ...srsColumns(progress),
+    ...(progress.intakeStatus !== undefined ? { intake_status: progress.intakeStatus } : {}),
+    ...(progress.promotedTs !== undefined
+      ? { promoted_at: progress.promotedTs == null ? null : new Date(progress.promotedTs).toISOString() }
+      : {}),
+  };
+  // One retry: a dropped write here loses a grade silently (a card rated Again
+  // stayed unscheduled server-side and vanished on the next rehydrate).
+  let { error } = await supabase.from('user_word_progress').upsert(row);
+  if (error) {
+    await new Promise((r) => setTimeout(r, 2000));
+    ({ error } = await supabase.from('user_word_progress').upsert(row));
+  }
+  if (error) console.error(`Error syncing progress for ${wordId} (after retry):`, error);
+}
 
-  if (error) console.error(`Error syncing progress for ${wordId}:`, error);
+/** Per-JLPT-level progress (intake_level_progress RPC, database/39). */
+export interface LevelProgressRow { level: number; total: number; solid: number; met: number }
+
+export async function fetchLevelProgress(): Promise<LevelProgressRow[]> {
+  const { data, error } = await supabase.rpc('intake_level_progress');
+  if (error) throw error;
+  return (data as LevelProgressRow[] | null) ?? [];
+}
+
+/**
+ * The dictionary's own level, frequency band and the learner's lookup count for
+ * each word waiting in the intake queue (intake_queue_signals RPC, database/39).
+ */
+export async function fetchIntakeSignals(): Promise<Map<string, { level: number | null; freq: number | null; lookups: number }>> {
+  const { data, error } = await supabase.rpc('intake_queue_signals');
+  if (error) throw error;
+  const out = new Map<string, { level: number | null; freq: number | null; lookups: number }>();
+  for (const r of (data as Array<{ id: string; level: number | null; freq: number | null; lookups: number }> | null) ?? []) {
+    out.set(r.id, { level: r.level ?? null, freq: r.freq ?? null, lookups: r.lookups ?? 0 });
+  }
+  return out;
 }
 
 /**

@@ -316,6 +316,9 @@ function scoreDeterministic(raw, fx, tokenizer) {
     knownTokenShare: Number(knownTokenShare.toFixed(3)),
     reviewWords: reviewHit,
     newWords: newHit,
+    // Intake v2 target words (lexicon fixtures with `targetWords`): aim 2–3 used.
+    targetUsed: hits(fx.palette.lexicon?.targetWords).length,
+    targetWords: hits(fx.palette.lexicon?.targetWords),
   };
 
   // Regression assertions — mustNotContain over ALL output text.
