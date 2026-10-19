@@ -13,7 +13,7 @@ The issues so far, roughly in order:
 | Jul | Policy F (#98) fixed the flood… | …by pushing ~1,900 medium+ words back into the queue, where they sat for 3 months |
 | Jul | Mornings with no new cards | Rolling 24h gate drifted later each day; per-device stamps |
 | Jul | Promoted words vanished | Rehydrate dropped schedule fields (#75) |
-| Jul | Audit: deck starved, reader credit = 98% of reviews | Spec written, **never shipped** |
+| Jul | Audit: deck starved, intake wasting slots | Spec written, **never shipped** |
 | Aug | Wrong JLPT levels on 800+ words | Tags retagged in #130 |
 | Sep | Taps silently failing | localStorage quota (whole word DB in the persist blob) |
 | Oct | Articles at N2/N1 | Lexicon silently fell back to the loose prompt (#210) |
@@ -25,14 +25,7 @@ The pattern underneath:
    - Intake and the deck run client-side on small "mirror" copies of its ordering (`intake.ts`, `deck.ts`).
    - The intake rule that fed the rare N5 tail lived in that copy, with none of the scorer's other signals. Recency never reached intake.
    - Each copy then got patched separately (Policy F's flood fix created the parking problem).
-2. **One "known" signal, many writers with uneven evidence.** `difficulty` (1–10, mastery derived from it) is the source of truth, but:
-   - reading past a word nudges it −1 a day, a lookup +2;
-   - flashcard grades move it ±1–2, and manual sets and Discover set it outright;
-   - the July rebalance moved words by it in bulk.
-
-   Reading past a word a few times can make it "easy" without it ever being recalled. 98% of review events were read-past credit.
-
-   Scheduling meanwhile runs on a second state (FSRS stability, due date and FSRS's own difficulty), so "due" and "known" can disagree.
+2. **One "known" signal, working as intended.** `difficulty` (1–10, mastery derived from it) is the source of truth. Reading past a word (−1 a day) is the highest-volume feedback the app gets, and it holds up. Words read past before their first flashcard were first-graded Easy 65% of the time, against 59% for words never read past, with the same 10% Again rate. Scheduling runs on a second state (FSRS stability and due date), which is normal for spaced repetition. The breakage was in *which words got introduced*, not in how "known" was measured.
 3. **The client is the source of truth.** The word DB lives in localStorage and syncs both ways. That one choice caused:
    - quota failures;
    - rehydrate drops;
@@ -67,9 +60,7 @@ Principles:
   - #211 is the first version of this planner, but it's still a client-side copy.
   - The end state is wordPriority.ts as originally intended: one scorer that intake, the deck and generation all call.
 - **Evidence beats curriculum position.** Words you meet and stumble on come first, ordered by how common they are, at your working level. Bottom-up filling is a minority lane, not the engine.
-- **Keep difficulty as the one "known" signal, but weigh its evidence.**
-  - Recall (a flashcard grade, correct use in chat) moves it fully.
-  - Exposure (reading past a word) moves it only a little, and can't make a word "easy" on its own.
+- **Keep difficulty as the one "known" signal.** Reading past a word, lookups, flashcard grades, and (next) ハルカ's evidence all feed it.
 - **Content follows the plan.** Whatever the planner picked this week shows up in articles, podcasts and ハルカ's conversation. A new word is met in context within days.
 - **Measure outcomes, in the app.** Show new solid words per level per week, plus planner health (refund rate, junk rate, target usage). Look at them weekly.
 - **Server owns the state.** The client is a view and a cache.
@@ -84,7 +75,6 @@ Principles:
 | Words you choose (Discover, ハルカ tap) actually get promoted | **#211**: they lead the struggle lane. Before this, a tapped ハルカ word never got promoted |
 | ハルカ nominates from conversation | **Missing**: `record_usage` misses go to notes; the dream's "study focus" only shapes ハルカ's own prompts |
 | Grammar in the plan | **Missing**: points are detected and shown; none rated, none scheduled |
-| Honest "known" | **Missing**: read-past credit still counts as a review |
 | Outcome metrics in 進捗 | **Missing** (data exists: `intake_level_progress`) |
 | Server-side state | **Partial**: rows sync, but promotion and grading run client-side |
 
@@ -132,7 +122,6 @@ Article or transcript text must never count as evidence. Only your messages do, 
 3. 進捗: per-level solid line + weekly "new words learned" (mockup first).
 4. ハルカ struggle → queue rule (section 4), with the 今日 notice and undo.
 5. Grammar first-meet tap, and ハルカ evidence moving ratings.
-6. Honest "known": read-past credit stops graduating words never recalled (own spec).
 
 **Later**
 

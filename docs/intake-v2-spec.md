@@ -53,7 +53,6 @@ Since the controlled-vocabulary lexicon (#210 made it reliable), a rewrite may u
 
 ### 6. Smaller distortions
 
-- **Reader credit.** `reader_skip` auto-credit (98% of review events in the July audit) marks a word reviewed whenever you read past it, which inflates "known".
 - **Grammar.** No grammar point has ever been rated, so grammar progress is invisible to every system.
 - **Intake rate.** At 3/day the ceiling is about 1,100 words a year, before waste. N4 + N3 is roughly 2,500 words.
 
@@ -177,13 +176,9 @@ Full grammar SRS is out of scope.
 
 In 進捗, add one line per level, N5 / N4 / N3: solid / total, plus the change this week. A Settings toggle isn't needed. It's the number that answers "am I advancing?", and today that takes a database query.
 
-## Follow-up (separate design): reader credit
+## Reader credit: no change
 
-`reader_skip` credit marks words reviewed just by reading past them. Proposal for its own spec:
-- Count it only for words with stability ≥ 21 days.
-- Never let it graduate a word that has never been flashcard-graded.
-
-Until then, "solid" counts stay somewhat optimistic.
+An earlier draft proposed limiting `reader_skip` credit. Dropped (2026-10-18). Reading past a word is the app's highest-volume feedback, and the data supports it: words read past before their first flashcard were first-graded Easy 65% of the time (59% for words never read past), with the same 10% Again rate.
 
 ## Hygiene (unchanged from July)
 
