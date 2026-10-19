@@ -14,6 +14,10 @@
   --border-light: #e0e0d8;
 
   --font-serif: 'Shippori Mincho', serif;
+  /* ハルカ's chat: Shippori, except ！, which Shippori draws slanted. The
+     'Noto Serif JP' loaded in index.html is subset to that ONE glyph (text=！),
+     so every other character falls through to Shippori. */
+  --font-chat: 'Noto Serif JP', 'Shippori Mincho', serif;
   --font-sans: 'Inter', sans-serif;
 }
 
@@ -435,18 +439,21 @@ body.song-mode {
 .tutor-thread::-webkit-scrollbar { display: none; }
 /* Messages sit on the input like a chat, so the reply you're answering stays just above it. */
 .tutor-thread > :first-child { margin-top: auto; }
-/* 間: a full pause between speakers, a short one between the lines of one turn. */
-.tutor-thread > * + * { margin-top: 2.2rem; }
-.tutor-thread > .tutor-t + .tutor-t, .tutor-thread > .tutor-t + .tutor-a { margin-top: 0.55rem; }
+/* 間 (docs/mockups/tutor-calm.html, A1): a full pause between speakers, a clear
+   but smaller one between the paragraphs of one turn, both well above the line
+   spacing, so the gaps group instead of all looking alike. */
+.tutor-thread > * + * { margin-top: 2.8rem; }
+.tutor-thread > .tutor-t + .tutor-t, .tutor-thread > .tutor-t + .tutor-a,
 .tutor-thread > .tutor-a + .tutor-t, .tutor-thread > .tutor-a + .tutor-a { margin-top: 0.9rem; }
 .tutor-thread > .tutor-ctx + *, .tutor-thread > * + .tutor-busy { margin-top: 1rem; }
-.tutor-t { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.95; max-width: 94%; color: var(--text-main); white-space: pre-wrap; }
+.tutor-t { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; max-width: 94%; color: var(--text-main); white-space: pre-wrap; }
 .tutor-t .fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; border: none; margin: 0; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tutor-t .fix:disabled { cursor: default; }
 .tutor-t .fix.on { text-decoration: underline; text-decoration-color: var(--text-muted); text-underline-offset: 0.25em; }
 /* A tapped recast's note: what they wrote and why, styled like an aside. */
 .tutor-fixnote { display: block; margin-top: 0.5rem; font-family: var(--font-sans); font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; white-space: normal; }
-.tutor-u { align-self: flex-end; max-width: 82%; background: var(--bg-card); border-radius: 16px; padding: 0.55rem 0.9rem; font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.75; white-space: pre-wrap; }
+/* Yours: white on the warm grey (the study card's lift), so your turns register at a glance. */
+.tutor-u { align-self: flex-end; max-width: 82%; background: var(--bg-pure); border-radius: 20px; padding: 0.6rem 1rem; font-family: var(--font-chat); font-weight: 500; font-size: 0.98rem; line-height: 1.75; white-space: pre-wrap; }
 /* Your turn: a photo (docs/mockups/tutor-photo.html) sits above your bubble. */
 .tutor-me { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
 .tutor-photo { position: relative; display: block; width: 170px; padding: 0; border: none; background: var(--bg-card); border-radius: 16px; overflow: hidden; cursor: pointer; }
@@ -482,8 +489,8 @@ body.song-mode {
 /* Keyboard up: the compose row goes and the draft is the outgoing bubble taking
    shape at the end of the thread, so iOS's form bar is the only band under it. */
 .tutor-panel.kb .tutor-input { justify-content: flex-end; border-bottom: none; padding: 0.8rem 0 0.6rem; }
-.tutor-panel.kb .tutor-draft { flex: 0 1 auto; max-width: 82%; min-width: 2.5rem; background: var(--bg-card); border-radius: 16px; }
-.tutor-panel.kb .tutor-draft::after, .tutor-panel.kb .tutor-draft textarea { font-size: 1rem; line-height: 1.75; padding: 0.55rem 0.9rem; }
+.tutor-panel.kb .tutor-draft { flex: 0 1 auto; max-width: 82%; min-width: 2.5rem; background: var(--bg-pure); border-radius: 20px; }
+.tutor-panel.kb .tutor-draft::after, .tutor-panel.kb .tutor-draft textarea { font-family: var(--font-chat); font-weight: 500; font-size: 1rem; line-height: 1.75; padding: 0.6rem 1rem; }
 .tutor-panel.kb .tutor-draft::after { max-height: calc(7.5rem + 1.1rem); }
 .tutor-panel.kb .tutor-draft textarea { max-height: calc(7.5rem + 1.1rem); }
 .tutor-panel.kb .tutor-input button { padding-bottom: 0.65rem; }
