@@ -426,16 +426,14 @@ body.song-mode {
 .tutor-vgrab { position: absolute; top: 50%; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
 .tutor-panel.r .tutor-vgrab { left: 8px; }
 .tutor-panel.l .tutor-vgrab { right: 8px; }
-.tutor-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 18px 0.4rem; }
-.tutor-who { display: flex; align-items: center; gap: 0.6rem; }
-.tutor-who b { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 500; }
 .tutor-av { width: 32px; height: 32px; flex: none; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-main); }
 .tutor-av.sm { width: 24px; height: 24px; font-size: 0.75rem; }
-.tutor-link { background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); padding: 0.3rem 0; }
 .tutor-chip { align-self: flex-start; margin: 0.3rem 18px 0.2rem; display: inline-flex; align-items: center; gap: 0.4rem; background: var(--bg-card); border-radius: 100px; padding: 0.3rem 0.5rem 0.3rem 0.75rem; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); max-width: calc(100% - 36px); }
 .tutor-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tutor-chip button { display: flex; background: none; border: none; padding: 0 0.15rem; color: var(--text-muted); cursor: pointer; }
-.tutor-thread { flex: 1; overflow-y: auto; padding: 0.9rem 18px 1rem; display: flex; flex-direction: column; scrollbar-width: none; overscroll-behavior: contain; }
+/* No header (mockup tutor-fullheight.html, B): the thread runs to the panel's top
+   edge and fades out under the rounded corner instead of ending on a hard line. */
+.tutor-thread { flex: 1; overflow-y: auto; padding: 0.6rem 18px 1rem; -webkit-mask-image: linear-gradient(transparent, #000 2.2rem); mask-image: linear-gradient(transparent, #000 2.2rem); display: flex; flex-direction: column; scrollbar-width: none; overscroll-behavior: contain; }
 .tutor-thread::-webkit-scrollbar { display: none; }
 /* Messages sit on the input like a chat, so the reply you're answering stays just above it. */
 .tutor-thread > :first-child { margin-top: auto; }
@@ -496,6 +494,9 @@ body.song-mode {
 .tutor-panel.kb .tutor-input button { padding-bottom: 0.65rem; }
 .tutor-input button { background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; padding: 0.2rem 0; }
 .tutor-input button:disabled { opacity: 0.35; cursor: default; }
+/* 終わる, moved here from the removed header: muted serif text, left of the camera. */
+.tutor-input .tutor-end { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); white-space: nowrap; padding: 0.2rem 0 0.15rem; }
+.tutor-input .tutor-end:disabled { opacity: 1; }
 .tutor-foot { flex: none; height: max(1.2rem, env(safe-area-inset-bottom)); }
 .tutor-recap { flex: 1; overflow-y: auto; padding: 0.6rem 18px 1.4rem; scrollbar-width: none; animation: fadeIn 0.3s ease-out; }
 .tutor-recap h3 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin: 0.4rem 0 1.4rem; }
