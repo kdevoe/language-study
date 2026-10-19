@@ -50,8 +50,38 @@ export function pickSurface(e: EmbeddedEntry): string | null {
   );
 }
 
-/** The reader's known lexicon, known-first. Throws on a query error. */
-export async function buildLexicon(supabase: SupabaseClient, userId: string): Promise<string[]> {
+// The lexicon build reads ~1.4k dictionary entries with their spellings plus
+// every progress row. When two articles processed in the same second it often
+// failed, and the article silently fell back to the looser cluster prompt: 19 of
+// 62 articles read in October 2026, at ~14 unknown words each (N2/N1 included)
+// against ~4 with the lexicon. So: one shared build per user for a few minutes
+// (concurrent calls wait on the same promise), and retries before giving up.
+const LEXICON_TTL_MS = 10 * 60_000;
+const LEXICON_RETRY_MS = [1000, 3000];
+const lexiconCache = new Map<string, { at: number; words: Promise<string[]> }>();
+
+/** The reader's known lexicon, known-first: cached per user, retried. Throws if every attempt fails. */
+export function buildLexicon(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  const hit = lexiconCache.get(userId);
+  if (hit && Date.now() - hit.at < LEXICON_TTL_MS) return hit.words;
+  const words = (async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await buildLexiconOnce(supabase, userId);
+      } catch (e) {
+        if (attempt >= LEXICON_RETRY_MS.length) throw e;
+        console.warn(`[lexicon] build attempt ${attempt + 1} failed, retrying:`, e instanceof Error ? e.message : JSON.stringify(e));
+        await new Promise((r) => setTimeout(r, LEXICON_RETRY_MS[attempt]));
+      }
+    }
+  })();
+  lexiconCache.set(userId, { at: Date.now(), words });
+  words.catch(() => { if (lexiconCache.get(userId)?.words === words) lexiconCache.delete(userId); });
+  return words;
+}
+
+/** One build of the lexicon. Throws on a query error. */
+async function buildLexiconOnce(supabase: SupabaseClient, userId: string): Promise<string[]> {
   const [srsRows, n54Entries] = await Promise.all([
     fetchAllRows<{ word_id: string; mastery_level: string }>((from, to) =>
       supabase.from('user_word_progress').select('word_id, mastery_level').eq('user_id', userId).range(from, to)),
@@ -65,10 +95,11 @@ export async function buildLexicon(supabase: SupabaseClient, userId: string): Pr
   const missingEasy = easyIds.filter((id) => !n54ById.has(id));
   const easyById = new Map<string, EmbeddedEntry>();
   for (let i = 0; i < missingEasy.length; i += 200) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jmdict_entries')
       .select('id, jmdict_kanji(text, common), jmdict_kana(text, common)')
       .in('id', missingEasy.slice(i, i + 200));
+    if (error) throw error;   // a silently missing batch made a short, wrong list
     for (const e of (data ?? []) as EmbeddedEntry[]) easyById.set(e.id, e);
   }
   // Known-first order: confirmed-easy leads, then assumed-known N5/N4 — minus words
