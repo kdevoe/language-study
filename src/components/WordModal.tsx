@@ -89,6 +89,14 @@ export function WordModal({
 
   useScrollLock(isOpen);
 
+  // Opening a point is its lookup (store.noteGrammarOpen): met → medium, opened on
+  // three separate days → hard, unless the learner rated it on the slider.
+  const noteGrammarOpen = useAppStore(state => state.noteGrammarOpen);
+  const openPointId = isOpen && grammar && GRAMMAR_POINTS[grammar.id] ? grammar.id : null;
+  useEffect(() => {
+    if (openPointId) noteGrammarOpen(openPointId);
+  }, [openPointId, noteGrammarOpen]);
+
   useEffect(() => {
     if (isOpen && anchor === 'top' && !isLoading && scrollRef.current) {
       setTimeout(() => {

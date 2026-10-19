@@ -25,6 +25,7 @@ import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, ELEVEN_DIALOGUE_MODEL, RESEARCH_MODEL } from '../_shared/models.ts';
 import { emptyUsage } from '../_shared/claude.ts';
 import { research } from '../_shared/research.ts';
+import { pickTargetWords } from '../_shared/readerVocab.ts';
 import { CAST, STANDARD, pickPairing, personaById, type PairHistory, type Persona } from '../_shared/podcastCast.ts';
 import {
   buildPodcastPrompt,
@@ -220,6 +221,8 @@ async function runScriptStage(supabase: SupabaseClient, episodeId: string) {
     if (!host || !guest) throw new Error('episode has no valid cast');
     const items = await loadSources(supabase, ep);
     const looked = ep.source_kind === 'topic' ? await researchTopic(ep.source_ref ?? '', ep.source_payload?.instructions) : null;
+    // This week's new cards, to hear in context (intake v2, target words).
+    const targetWords = (await pickTargetWords(supabase, ep.user_id).catch(() => [])).map((t) => t.word);
     const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')!, httpOptions: { apiVersion: 'v1beta' } });
     const t0 = Date.now();
     const { script, usage } = await generateScript(ai, {
@@ -233,6 +236,7 @@ async function runScriptStage(supabase: SupabaseClient, episodeId: string) {
       dateLabel: ep.source_kind === 'digest' ? dateLabel(ep.source_ref) : undefined,
       instructions: ep.source_payload?.instructions,
       researchNotes: looked?.notes,
+      targetWords,
     });
     await supabase.from('podcast_episodes').update({
       script,

@@ -113,6 +113,8 @@ async function main() {
   console.log('\nselectPromotions — chosen words and junk');
   const chosen = pick([...queue, local('紅葉', 2, 15, 0, { mastery: 'medium' })], 1);
   check('a chosen N2 word, never met, wins', chosen[0].entryId === '紅葉', ids(chosen).join(','));
+  const flagged = intakeScore(local('辞書', 4, 20, 5, { chosen: true }), 4, NOW);
+  check('an explicit chosen flag counts even for a word met in reading', flagged > intakeScore(local('辞書', 4, 20, 5), 4, NOW) + 7);
   const requeued = intakeScore(local('requeued', 2, 15, 3, { mastery: 'medium' }), 4, NOW);
   check('a medium word met in reading gets no chosen boost', requeued < intakeScore(local('紅葉', 2, 15, 0, { mastery: 'medium' }), 4, NOW));
   const junky = pick([local('１２月', 4, 1), local('西アフリカ', 4, null), local('良', 4, 5)], 3);

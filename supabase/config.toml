@@ -34,3 +34,7 @@ verify_jwt = false
 # Auth is checked in code via auth.getUser. The gateway check rejects the
 # project's ES256 user tokens, so it must stay off for user-called functions.
 verify_jwt = false
+
+[functions.daily-prep]
+# Cron or service-role only, checked in code (resolveCaller).
+verify_jwt = false

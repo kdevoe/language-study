@@ -156,6 +156,10 @@ function sameLocalDay(a: number, b: number): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
+export type GrammarRating = { mastery: 'hard' | 'medium' | 'easy'; auto?: boolean; days?: string[] };
+// Opening an unrated grammar point on this many separate days marks it hard.
+const GRAMMAR_HARD_DAYS = 3;
+
 // Easy-refund top-ups per local day, as a multiple of the daily cap: a queue full of
 // already-known words can't turn one session into a marathon.
 const REFUND_BUDGET_X = 4;
@@ -206,6 +210,11 @@ export interface WordData {
   freqRank?: number | null;       // JMDict freq_rank (1 = most common); for compareIntake
   intakeStatus?: 'queued' | 'active';
   promotedTs?: number | null;     // ms epoch — when it entered active study
+  // Asked for (user_word_progress.chosen_at/by): picked in Discover or from a ハルカ
+  // offer ('learner'), or queued by ハルカ's nightly struggle rule ('haruka').
+  // Chosen words lead the intake ranking; 今日 lists ハルカ's with an undo.
+  chosenTs?: number | null;
+  chosenBy?: 'learner' | 'haruka' | null;
 }
 
 export type UiLanguage = 'english' | 'adaptive' | 'japanese';
@@ -266,8 +275,11 @@ interface AppState {
   // Grammar points (#43): the EASY/MEDIUM/HARD set in the grammar panel, by
   // point id. Synced to user_preferences.grammar_progress so ハルカ and the
   // nightly dream can read it (database/36).
-  grammarProgress: Record<string, { mastery: 'hard' | 'medium' | 'easy' }>;
+  // `auto` = set by opening the point (noteGrammarOpen), not by the slider; `days` =
+  // the distinct days it was opened.
+  grammarProgress: Record<string, GrammarRating>;
   setGrammarMastery: (id: string, level: 'hard' | 'medium' | 'easy') => void;
+  noteGrammarOpen: (id: string) => void;
   // Which screen edge opens ハルカ (left for left-handed use).
   tutorHand: 'right' | 'left';
   setTutorHand: (hand: 'right' | 'left') => void;
@@ -550,6 +562,26 @@ export const useAppStore = create<AppState>()(
       setReaderFontWeight: (weight) => set({ readerFontWeight: weight }),
       setGrammarMastery: (id, level) => {
         set((state) => ({ grammarProgress: { ...state.grammarProgress, [id]: { mastery: level } } }));
+        const grammar_progress = get().grammarProgress;
+        currentUserId().then((uid) => {
+          if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { grammar_progress }));
+        });
+      },
+      // Opening a grammar point is its lookup, the way tapping a word is: the first
+      // open marks it met (medium); opens on GRAMMAR_HARD_DAYS separate days mark it
+      // hard. Only for points the learner hasn't rated themselves (`auto`) — the
+      // slider always wins.
+      noteGrammarOpen: (id) => {
+        const state = get();
+        if (state.sandboxMode) return;
+        const cur = state.grammarProgress[id];
+        if (cur && !cur.auto) return; // rated by hand
+        const today = new Date().toDateString();
+        const days = cur?.days ?? [];
+        if (days.includes(today)) return;
+        const nextDays = [...days, today].slice(-GRAMMAR_HARD_DAYS);
+        const mastery = nextDays.length >= GRAMMAR_HARD_DAYS ? 'hard' : 'medium';
+        set((s) => ({ grammarProgress: { ...s.grammarProgress, [id]: { mastery, auto: true, days: nextDays } } }));
         const grammar_progress = get().grammarProgress;
         currentUserId().then((uid) => {
           if (uid) import('./api').then(m => m.upsertUserPreferences(uid, { grammar_progress }));
@@ -1000,7 +1032,9 @@ export const useAppStore = create<AppState>()(
               srsStatus: srs.status,
             };
           } else {
-            updatedWord = seen; // stays queued; the daily cap seeds its schedule later
+            // Stays queued, marked CHOSEN: an explicit ask leads the intake ranking
+            // (the tap above counts as a sighting, so "never seen" can't mark it).
+            updatedWord = { ...seen, chosenTs: now, chosenBy: 'learner' };
           }
           updatedWord = { ...updatedWord, mastery: level, difficulty, lastAdjustedDay: today, lastAdjustReason: 'manual' };
 
@@ -1025,7 +1059,7 @@ export const useAppStore = create<AppState>()(
                   reps: updatedWord.reps,
                   lapses: updatedWord.lapses,
                   srsStatus: updatedWord.srsStatus,
-                } : {}),
+                } : { chosenTs: updatedWord.chosenTs, chosenBy: updatedWord.chosenBy }),
               });
               m.logStudyEventToSupabase(uid, key, 'mastery_change', { level, difficulty, source: 'discover' });
             });
@@ -1323,6 +1357,14 @@ export const useAppStore = create<AppState>()(
               ? { ...state.grammarProgress, ...remotePrefs.grammar_progress }
               : state.grammarProgress,
           }));
+          // The learner's time zone, so overnight jobs (daily-prep) know their "today".
+          try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (tz && remotePrefs.timezone !== tz) {
+              const { upsertUserPreferences } = await import('./api');
+              upsertUserPreferences(userId, { timezone: tz });
+            }
+          } catch { /* Intl unavailable: server falls back to UTC */ }
           // Ratings made before sync existed live only here: push them up once.
           const local = get().grammarProgress;
           if (!remotePrefs.grammar_progress && Object.keys(local).length > 0) {
@@ -1354,6 +1396,27 @@ export const useAppStore = create<AppState>()(
               const localData = newDatabase[wordKey];
               if (remoteData.lastSeenTs > localData.lastSeenTs) {
                 newDatabase[wordKey] = { ...localData, ...remoteData };
+                changed = true;
+              } else if (remoteData.intakeStatus === 'active' && remoteData.promotedTs != null
+                && localData.intakeStatus !== 'active') {
+                // Promoted on the server (the overnight daily-prep pass) without
+                // touching last_seen_at, so the LWW gate above can't see it. Adopt the
+                // promotion; otherwise the on-open pass would promote a second batch.
+                newDatabase[wordKey] = {
+                  ...localData,
+                  intakeStatus: 'active',
+                  promotedTs: remoteData.promotedTs,
+                  difficulty: localData.difficulty ?? remoteData.difficulty,
+                  mastery: localData.difficulty != null ? localData.mastery : remoteData.mastery,
+                  reps: remoteData.reps ?? 0,
+                  chosenTs: remoteData.chosenTs ?? localData.chosenTs ?? null,
+                  chosenBy: remoteData.chosenBy ?? localData.chosenBy ?? null,
+                };
+                changed = true;
+              } else if ((remoteData.chosenTs ?? null) !== (localData.chosenTs ?? null)
+                && (remoteData.chosenTs ?? 0) > (localData.chosenTs ?? 0)) {
+                // Chosen on the server (ハルカ's struggle rule) — adopt the marker.
+                newDatabase[wordKey] = { ...localData, chosenTs: remoteData.chosenTs, chosenBy: remoteData.chosenBy };
                 changed = true;
               } else if (localData.difficulty == null && remoteData.difficulty != null) {
                 // Local never graded this word but the server has a grade — from
@@ -1422,6 +1485,8 @@ export const useAppStore = create<AppState>()(
                     srsStatus: r.srsStatus ?? null,
                     intakeStatus: r.intakeStatus ?? undefined,
                     promotedTs: r.promotedTs ?? null,
+                    chosenTs: r.chosenTs ?? null,
+                    chosenBy: r.chosenBy ?? null,
                   };
                 });
                 return { wordDatabase: newDatabase };
@@ -1463,6 +1528,8 @@ export const useAppStore = create<AppState>()(
                     srsStatus: r.srsStatus ?? null,
                     intakeStatus: r.intakeStatus ?? undefined,
                     promotedTs: r.promotedTs ?? null,
+                    chosenTs: r.chosenTs ?? null,
+                    chosenBy: r.chosenBy ?? null,
                   };
                   added++;
                 }
@@ -1843,6 +1910,7 @@ export const useAppStore = create<AppState>()(
               timesSeen: w.timesSeen ?? 0,
               lookupCount: sig?.lookups ?? 0,
               lastSeenTs: w.lastSeenTs || 0,
+              chosen: w.chosenTs != null,
               mastery: w.mastery,
               surface: w.surface ?? key,
               pos: w.pos,

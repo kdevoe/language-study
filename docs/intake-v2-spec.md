@@ -177,9 +177,19 @@ Grammar points have been tracked since #169/#170, but none has ever been rated.
 
 Full grammar SRS is out of scope.
 
+> **Build status:** built as an implicit signal rather than a new tap, because the grammar panel already has an EASY / MEDIUM / HARD slider. Opening an unrated point marks it MEDIUM, opening it on 3 different days marks it HARD, and a hand rating always wins (`noteGrammarOpen` in store.ts). Ratings sync through `grammar_progress`.
+
+## Overnight prep (added after review)
+
+Intake runs at 08:30 UTC in `daily-prep`, in the learner's timezone, before the 09:00 news refill, so new articles carry the new words. The app's own promotion pass stays as a fallback, and it adopts server promotions so it can't promote a second batch. At 09:40 the same function asks `generate-podcast` for the morning digest. `level_snapshots` records solid counts per level each night (history only, no UI yet).
+
+**ハルカ's struggle rule:** a word or pattern she marked wrong (`learner_notes` usage, `correct: false`) in at least 2 different conversations in the last 30 days becomes a chosen word (`chosen_by = 'haruka'`), at most 3 a night. It then competes in the same score with the +8 chosen bonus. There's no UI for it and no undo: Home stays shortcuts only, and a word you already know gets graded Easy, which refunds its slot. Queueing a word without the learner asking in the moment is justified because the evidence is the learner's own Japanese, queueing costs nothing, the daily cap still applies, and an Easy grade undoes it.
+
 ## Change 6: Show progress by level (new, small)
 
 In 進捗, add one line per level, N5 / N4 / N3: solid / total, plus the change this week. A Settings toggle isn't needed. It's the number that answers "am I advancing?", and today that takes a database query.
+
+> **Build status:** dropped after review. 進捗's level donuts already show each level's solid share, and a separate card only added the weekly gain (design-system §1: every addition must be necessary). daily-prep still writes nightly `level_snapshots`, so the gain can be shown later if it's missed.
 
 ## Reader credit: no change
 
