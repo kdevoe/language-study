@@ -8,7 +8,9 @@
 //     · tomorrow's brief (editor brief, study focus, openers, content ideas)
 //     · a summary on each of the day's tutor threads
 // weekly (Sonnet, Sundays): reread the week's digests, notes and thread summaries,
-//   re-check every profile line's evidence and prune. Writes a profile version only.
+//   re-check every profile line's evidence and prune. Writes a profile version.
+//   Beside it, the weekly recap of recurring mistakes (recap.ts, database/41);
+//   Sunday's nightly pass then puts the recap's teaser first in the openers.
 //
 // Guards instead of review: a new profile is accepted only if it is within the
 // size budget, every line cites evidence, it drops at most a few lines, and it
@@ -24,6 +26,7 @@ import { CLAUDE_SONNET, DREAM_MODEL, RESEARCH_MODEL } from '../_shared/models.ts
 import { research } from '../_shared/research.ts';
 import { hasContact } from '../_shared/researchFilter.ts';
 import { dataRule, fence } from '../_shared/untrusted.ts';
+import { writeRecap } from './recap.ts';
 import { callTool, emptyUsage, type Usage } from '../_shared/claude.ts';
 import {
   type LearnerBrief, type LearnerProfile, type ProfileItem,
@@ -142,7 +145,14 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: 'userId required' }, 400);
     const mode = body.mode === 'weekly' ? 'weekly' : 'nightly';
 
-    const result = mode === 'weekly' ? await weekly(admin, userId) : await nightly(admin, userId);
+    // The recap runs beside the profile pass (both are long Sonnet calls) and
+    // neither's failure costs the other.
+    const result = mode === 'weekly'
+      ? await Promise.all([
+        weekly(admin, userId),
+        writeRecap(admin, userId).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
+      ]).then(([profile, recap]) => ({ ...profile, recap }))
+      : await nightly(admin, userId);
     console.log(JSON.stringify({ fn: 'learner-dream', userId, mode, ...result }));
     return json({ ok: true, mode, ...result });
   } catch (err) {
@@ -265,10 +275,18 @@ Call write_memory with:
   const researchUsage = emptyUsage(RESEARCH_MODEL);
   const brief = await researchForBrief(out.brief as LearnerBrief & { lookups?: unknown }, prefs.data?.jlpt_level, waitingList, researchUsage, usage, today, knownSummary);
   const stats = activityStats(evs);
+  // Sunday: the weekly pass (an hour earlier) wrote a recap. Its teaser is the
+  // first opener, so the Home card's line is the recap and the chat shows it.
+  const { data: recap } = await admin.from('weekly_recaps').select('id, teaser').eq('user_id', userId)
+    .gt('created_at', new Date(Date.now() - 20 * 3600_000).toISOString())
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const briefOut: LearnerBrief = recap
+    ? { ...brief, openers: [recap.teaser, ...(brief.openers ?? [])].slice(0, 3), recap: { id: recap.id } }
+    : brief;
 
   await Promise.all([
     admin.from('learner_digests').upsert({ user_id: userId, day: digestDay, text: out.digest, stats }),
-    admin.from('learner_briefs').upsert({ user_id: userId, day: today, brief }),
+    admin.from('learner_briefs').upsert({ user_id: userId, day: today, brief: briefOut }),
     insertVersion(admin, userId, prev?.version ?? 0, 'nightly', profile, out.changes, guard, usage),
     ...(out.threadSummaries ?? []).map((t) =>
       admin.from('tutor_threads').update({ summary: t.summary }).eq('user_id', userId).eq('id', t.threadId)),

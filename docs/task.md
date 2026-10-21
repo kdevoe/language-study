@@ -643,6 +643,11 @@
   - [ ] Deploy learner-dream, tutor-chat, fetch-raw-news, ensure-buffer, process-article; test edge swipe in the
         installed PWA; read real conversations before merge
   - [ ] Later: level check on replies, request_content long reads, voice (tutor doc §9)
+  - [x] Weekly recap (Oct 20; mockup docs/mockups/weekly-recap.html, A): the Sunday dream writes 2-3 recurring
+        patterns from her recasts + flashcard misses (learner-dream/recap.ts, database/41 weekly_recaps; examples
+        checked against what the learner wrote). Sunday's opener is the teaser; the chat shows one block that
+        opens the report in a sheet; ハルカ has it in memory for the week
+  - [ ] Weekly recap: apply migration 41, deploy learner-dream + tutor-chat, read the first one (Sun Oct 25)
 - [x] Edge-function auth hardening (2026-10-17): `_shared/auth.ts` resolves the caller (service role / cron
       via x-cron-secret / signed-in user); a user acts only for themselves, body.userId only from service or
       cron. Closed: process-article, dictionary-lookup, fetch-raw-news open to anyone with the anon key (and

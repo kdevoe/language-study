@@ -14,6 +14,8 @@ export interface ScreenContext {
   detail: string;
   /** Home only: ハルカ's first line for a fresh thread (the card's line). */
   opener?: string;
+  /** Home on Sunday: the weekly recap the opener announces (shown under it). */
+  recapId?: string;
 }
 
 export interface TutorMessage {
@@ -21,7 +23,28 @@ export interface TutorMessage {
   role: 'user' | 'assistant' | 'context';
   text: string | null;
   /** Screen notes, or on your messages the photo you sent (its transcript, never the image). */
-  context?: (ScreenContext & { photo?: undefined }) | { photo: { id: string; label?: string; transcript?: string } } | null;
+  context?: (ScreenContext & { photo?: undefined; recap?: undefined })
+    | { photo: { id: string; label?: string; transcript?: string } }
+    | { recap: RecapRef }
+    | null;
+}
+
+/** The weekly recap's block in the thread: enough to draw it, the report loads on tap. */
+export interface RecapRef { id: string; title: string }
+
+/** ハルカ's weekly recap (learner-dream/recap.ts, database/41). */
+export interface WeeklyRecap {
+  id: string;
+  week_start: string;
+  week_end: string;
+  title: string;
+  report: {
+    intro: string;
+    lede: string;
+    patterns: { title: string; short: string; count: number; examples: { was: string; now: string; fix?: string }[]; explain: string[]; tip: string }[];
+    words: { word: string; meaning: string }[];
+    solid: string;
+  };
 }
 
 export type TutorAction =
@@ -73,7 +96,7 @@ export async function pollResearch(threadId: string, ids: string[]): Promise<str
  */
 export async function streamTutor(
   input:
-    | { action?: 'send'; message: string; context?: ScreenContext; opener?: string; newThread?: boolean; image?: PhotoUpload }
+    | { action?: 'send'; message: string; context?: ScreenContext; opener?: string; recapId?: string; newThread?: boolean; image?: PhotoUpload }
     | { action: 'followup'; threadId: string; researchId: string },
   onEvent: (e: TutorEvent) => void,
   signal?: AbortSignal,
@@ -169,13 +192,51 @@ async function devReply(input: Parameters<typeof streamTutor>[0], onEvent: (e: T
   onEvent({ type: 'done', text });
 }
 
-/** ハルカ's line for the Home card: last night's first opener, else a quiet default. */
-export async function fetchOpener(): Promise<string | null> {
-  if (DEV_MODE) return null;
+/** ハルカ's line for the Home card: last night's first opener (null = keep a quiet
+ *  default). On Sunday it announces the weekly recap, and recapId names it. */
+export async function fetchOpener(): Promise<{ line: string; recapId?: string } | null> {
+  if (DEV_MODE) return DEV_RECAP_ON ? { line: DEV_RECAP_TEASER, recapId: DEV_RECAP.id } : null;
   const { data } = await supabase.from('learner_briefs').select('brief').order('day', { ascending: false }).limit(1).maybeSingle();
-  const line = (data?.brief as { openers?: string[] } | undefined)?.openers?.[0];
-  return typeof line === 'string' && line.trim() ? line.trim() : null;
+  const brief = data?.brief as { openers?: string[]; recap?: { id?: string } } | undefined;
+  const line = brief?.openers?.[0];
+  if (typeof line !== 'string' || !line.trim()) return null;
+  return { line: line.trim(), ...(typeof brief?.recap?.id === 'string' && { recapId: brief.recap.id }) };
 }
+
+export async function fetchRecap(id: string): Promise<WeeklyRecap | null> {
+  if (DEV_MODE) return id === DEV_RECAP.id ? DEV_RECAP : null;
+  const { data } = await supabase.from('weekly_recaps').select('id, week_start, week_end, title, report').eq('id', id).maybeSingle();
+  return (data as WeeklyRecap | null) ?? null;
+}
+
+// Dev mode (no session): a sample recap on the Home card, from real data
+// (docs/mockups/weekly-recap.html). Turn it off with localStorage yugen-dev-recap = 'off'.
+const DEV_RECAP_ON = (() => { try { return localStorage.getItem('yugen-dev-recap') !== 'off'; } catch { return true; } })();
+const DEV_RECAP_TEASER = '今週のまとめができたよ。い形容詞とな形容詞が、まだちょっと混ざってるね。';
+const DEV_RECAP: WeeklyRecap = {
+  id: '00000000-0000-4000-8000-00000000dev1', week_start: '2026-10-12', week_end: '2026-10-18',
+  title: 'い / な adjectives · で vs に · nouns after particles',
+  report: {
+    intro: '今週もいっぱい話せたね！三つだけ、何回も出てきたことがあるよ。',
+    lede: "Most of what you wrote this week was natural. These three slips came up again and again. They're all small, and fixing them will make everything you say sound cleaner.",
+    patterns: [
+      { title: 'い and な adjectives get mixed up', short: 'い / な adjectives', count: 7,
+        examples: [{ was: '若いなのに', now: '若いのに', fix: '若いのに' }, { was: '古いな杉', now: '古い杉', fix: '古い' }, { was: '好きので', now: '好きなので', fix: '好きな' }, { was: '大事と思う', now: '大事だと思う', fix: '大事だ' }, { was: '強いで', now: '強くて', fix: '強くて' }],
+        explain: ['い-adjectives (若い・古い・強い) work on their own: no な before a noun, no だ before と思う, and the て-form is い→くて.', 'な-adjectives (好き・大事・残念) behave like nouns. They need な before a noun or ので, and だ before と思う or けど.'],
+        tip: 'Before ので, のに, けど or と思う, stop for a second and ask: い or な?' },
+      { title: "で where it doesn't belong", short: 'で vs に', count: 4,
+        examples: [{ was: '旅館で泊まります', now: '旅館に泊まります', fix: 'に' }, { was: '本社で大きな公園があって', now: '本社に大きな公園があって', fix: 'に' }, { was: 'ゆっくりで散歩する', now: 'ゆっくり散歩する', fix: 'ゆっくり' }],
+        explain: ['で marks where an action happens (食べる・働く). に marks where something is, or where you end up (ある・いる・住む・泊まる). Adverbs like ゆっくり take no particle at all.'],
+        tip: 'With ある, いる, 住む or 泊まる, the place takes に.' },
+      { title: 'A verb where a noun belongs', short: 'nouns after particles', count: 4,
+        examples: [{ was: '打ち上げる', now: '打ち上げ', fix: '打ち上げ' }, { was: '話す', now: '昨日の話', fix: '話' }, { was: '集中するのことが', now: '集中しているところが', fix: '集中しているところ' }],
+        explain: ['について, の and が need a noun in front. Use the noun form (話・打ち上げ) or add の or こと, but never both.'],
+        tip: 'When a particle follows a verb, check whether it wants a noun.' },
+    ],
+    words: [{ word: '字引', meaning: 'dictionary' }, { word: '浸ける', meaning: 'to soak' }, { word: '講堂', meaning: 'auditorium' }, { word: '被る', meaning: 'to wear (a hat)' }, { word: 'ずつ', meaning: 'each' }, { word: '屋上', meaning: 'rooftop' }],
+    solid: '〜ように and 行ったことがない came out natural, with no help. Your sentences are getting longer, too.',
+  },
+};
 
 // ── "What ハルカ knows" (Settings) ───────────────────────────────────────────
 
@@ -237,5 +298,6 @@ export async function forgetEverything(): Promise<void> {
     supabase.from('learner_briefs').delete().eq('user_id', uid),
     supabase.from('learner_notes').delete().eq('user_id', uid),
     supabase.from('tutor_threads').delete().eq('user_id', uid),
+    supabase.from('weekly_recaps').delete().eq('user_id', uid),
   ]);
 }

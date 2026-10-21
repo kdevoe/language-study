@@ -12,6 +12,8 @@ export interface OpenOptions {
   ask?: ScreenContext;
   /** The Home card's line, shown as ハルカ's first message of a fresh thread. */
   opener?: string;
+  /** Sunday: the weekly recap that line announces, shown under it. */
+  recapId?: string;
 }
 
 interface TutorState {
