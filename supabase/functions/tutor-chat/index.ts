@@ -128,7 +128,7 @@ const TOOLS: any[] = [
   },
   {
     name: 'add_to_deck',
-    description: "Offer a word for the learner's flashcard deck. It appears in the recap with a one-tap add; it isn't added until they tap.",
+    description: "Offer a word for the learner's flashcard deck. It appears as a chip under your reply; it isn't added until they tap it.",
     input_schema: {
       type: 'object',
       properties: { word: { type: 'string' }, reading: { type: 'string' }, meaning: { type: 'string', description: 'short English gloss' } },
@@ -691,7 +691,7 @@ async function runTool(
         user_id: userId, kind: 'usage', source: 'tutor', text: `offered ${input.word} (${input.meaning}) for the deck`,
         ref: { threadId, offer: { word: input.word, reading: input.reading, meaning: input.meaning } },
       });
-      return 'Offered in the recap with a one-tap add.';
+      return 'Offered as a chip under your reply; added only if they tap it.';
     }
     case 'record_usage': {
       await admin.from('learner_notes').insert({

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, Plus, X } from 'lucide-react';
 import { useTutor } from './TutorProvider';
 import { TutorText } from './TutorText';
 import { RecapBlock, RecapSheet } from './RecapSheet';
@@ -8,6 +8,7 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 import { useWordLookup } from '../../hooks/useWordLookup';
 import { WordModal } from '../WordModal';
 import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
+import { lookupWord as jmdictLookup } from '../../services/jmdict';
 import {
   fetchRecap, fetchTutorHistory, localDay, pollResearch, streamTutor,
   type RecapRef, type ScreenContext, type TutorAction,
@@ -478,11 +479,49 @@ function ActionNote({ action, onRate, onDismiss }: {
       </div>
     );
   }
+  if (action.type === 'add_to_deck') return <DeckOffer action={action} />;
   if (action.type === 'content_queued') {
     return <div className="tutor-ctx">番組「{action.topic}」を作っています · 聞くに届きます</div>;
   }
   if (action.type === 'content_offer') return <ContentOffer action={action} onDismiss={onDismiss} />;
   return null;
+}
+
+/** ハルカ offers a word for the deck: a chip under her reply, added only when the
+ *  learner taps it (CLAUDE.md › Security: side effects need their confirmation).
+ *  It goes in like a word graded from reading, through the daily intake. */
+function DeckOffer({ action }: { action: Extract<TutorAction, { type: 'add_to_deck' }> }) {
+  const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
+  const [state, setState] = useState<'offer' | 'adding' | 'added' | 'had' | 'error'>('offer');
+  const add = async () => {
+    if (state !== 'offer' && state !== 'error') return;
+    setState('adding');
+    try {
+      const hit = (await jmdictLookup(action.word))[0];
+      if (!hit) { setState('error'); return; }
+      const had = useAppStore.getState().wordDatabase[hit.entryId];
+      if (had && (had.intakeStatus === 'active' || had.stability != null)) { setState('had'); return; }
+      gradeDiscoverWord({
+        entryId: hit.entryId, word: action.word, reading: hit.readings[0] ?? action.reading,
+        meaning: hit.senses[0]?.gloss.slice(0, 3).join('; ') || action.meaning,
+        jlptLevel: hit.jlptLevel, freqRank: hit.freqRank,
+      }, 'medium');
+      setState('added');
+    } catch (e) {
+      console.warn('[tutor] add to deck failed:', e);
+      setState('error');
+    }
+  };
+  const done = state === 'added' || state === 'had';
+  return (
+    <button className={`tutor-deck${done ? ' on' : ''}`} onClick={add} disabled={state === 'adding' || done}>
+      {done ? <Check size={15} strokeWidth={2} /> : <Plus size={15} strokeWidth={1.8} />}
+      <span className="tutor-deck-w">{action.word}</span>
+      <span className="tutor-deck-m">
+        {state === 'added' ? 'デッキに入れました' : state === 'had' ? 'もうデッキにあります' : state === 'error' ? '見つかりませんでした' : action.meaning}
+      </span>
+    </button>
+  );
 }
 
 /** The tutor offers a podcast; it's made only when the learner taps 作る, with
