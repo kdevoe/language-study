@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — weekly recap</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500&text=%EF%BC%81&display=swap');
+/* Tokens copied from src/index.css. */
+:root {
+  --bg-color: #f5f5f0; --bg-pure: #ffffff; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-primary: #d4e0e8; --border-light: #e0e0d8; --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+  --font-chat: 'Noto Serif JP', 'Shippori Mincho', serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+.mock-header { max-width: 900px; margin: 0 auto 1.6rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.88rem; max-width: 800px; margin: 0 auto 0.5rem; text-align: left; }
+.mock-header b { color: var(--text-main); }
+.row-title { max-width: 1700px; margin: 2.4rem auto 1rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text-muted); text-align: center; }
+.stage { display: flex; justify-content: center; gap: 1.8rem; flex-wrap: wrap; align-items: flex-start; }
+.wrap { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 390px; }
+.label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.note { font-size: 0.76rem; color: var(--text-muted); text-align: center; min-height: 4.8em; }
+
+/* 390 × 844, status bar is the top 54px. */
+.phone { width: 390px; height: 844px; background: var(--bg-color); border-radius: 44px; overflow: hidden; position: relative; box-shadow: 0 30px 60px rgba(0,0,0,0.22); }
+.sb { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0 40px; font-size: 0.95rem; font-weight: 600; color: #111; z-index: 5; }
+.dim { position: absolute; inset: 0; background: rgba(45,45,45,0.35); }
+
+/* ── Home (今日), Sunday ── */
+.home { position: absolute; inset: 54px 0 0; padding: 1.2rem 22px; }
+.home h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; margin-bottom: 1.2rem; }
+.hcard { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 24px; padding: 1.1rem 1.2rem 1.2rem; }
+.hwho { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+.av { width: 26px; height: 26px; border-radius: 50%; background: var(--bg-color); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 0.8rem; color: var(--text-main); }
+.hline { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.6; }
+.ghost { margin-top: 1.6rem; display: flex; flex-direction: column; gap: 1rem; opacity: 0.45; }
+.ghost div { background: var(--bg-card); border-radius: 24px; height: 120px; }
+.ghost div:nth-child(2) { height: 200px; }
+.nav { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; display: flex; justify-content: space-around; padding-top: 14px; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); background: var(--bg-color); }
+.nav b { color: var(--text-main); font-weight: 600; }
+
+/* ── Chat panel (as shipped, §6.17) ── */
+.under { position: absolute; inset: 54px 0 0; padding: 1.2rem 22px; }
+.panel { position: absolute; right: 0; top: 60px; bottom: 0; width: 366px; background: var(--bg-color); border-radius: 28px 0 0 28px; display: flex; flex-direction: column; box-shadow: -10px 0 40px rgba(0,0,0,0.15); overflow: hidden; }
+.grab { position: absolute; top: 50%; left: 8px; width: 4px; height: 36px; margin-top: -18px; border-radius: 2px; background: var(--border-light); }
+.thread { flex: 1; overflow: hidden; padding: 0 18px 1rem; display: flex; flex-direction: column; justify-content: flex-end; -webkit-mask-image: linear-gradient(transparent, #000 2.2rem); mask-image: linear-gradient(transparent, #000 2.2rem); }
+.thread > * + * { margin-top: 2.8rem; }
+.thread > .t + .t, .thread > .t + .rc, .thread > .rc + .t { margin-top: 0.9rem; }
+.t { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; max-width: 94%; }
+.u { align-self: flex-end; max-width: 82%; background: var(--bg-pure); border-radius: 20px; padding: 0.6rem 1rem; font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; }
+.input { flex: none; display: flex; align-items: flex-end; gap: 0.8rem; margin: 0 18px; padding: 0.5rem 0 0.6rem; border-bottom: 1px solid var(--border-light); }
+.input .field { flex: 1; font-family: var(--font-chat); font-weight: 500; font-size: 1.1rem; line-height: 1.5; color: var(--text-muted); opacity: 0.7; }
+.input svg { width: 21px; height: 21px; fill: none; stroke: var(--text-muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.foot { flex: none; height: 22px; }
+
+/* The recap in the thread: one tappable block, like a sent photo. White, like the study card's lift. */
+.rc { background: var(--bg-pure); border-radius: 16px; padding: 0.9rem 1rem 0.95rem; max-width: 94%; cursor: pointer; box-shadow: 0 4px 25px rgba(0,0,0,0.03); transition: transform 0.1s; }
+.rc:active { transform: scale(0.98); }
+.rc .k { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.17em; color: var(--text-muted); }
+.rc .h { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0.15rem; }
+.rc .s { font-size: 0.8rem; line-height: 1.5; color: var(--text-muted); }
+.rc .open { display: flex; justify-content: space-between; align-items: center; }
+.rc .open span { font-family: var(--font-serif); font-size: 1.1rem; color: var(--text-muted); }
+
+/* ── The report itself (shared by A and B) ── */
+.rep { padding: 0 24px 3rem; }
+.rep .kick { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.rep h1 { font-family: var(--font-serif); font-weight: 500; font-size: 1.6rem; line-height: 1.3; margin: 0.3rem 0 0.9rem; }
+.page .rep h1 { font-size: 2rem; }
+.rep .her { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; line-height: 1.7; }
+.rep .lede { font-size: 0.92rem; line-height: 1.65; margin-top: 0.6rem; }
+.pat { margin-top: 2.6rem; }
+.pat .k { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.17em; color: var(--text-muted); }
+.pat h2 { font-family: var(--font-serif); font-size: 1.25rem; font-weight: 600; line-height: 1.4; margin: 0.2rem 0 0.7rem; }
+.ex { display: grid; grid-template-columns: auto 1fr; column-gap: 0.9rem; row-gap: 0.35rem; align-items: baseline; margin: 0.2rem 0 0.9rem; }
+.ex .was { font-family: var(--font-chat); font-weight: 500; font-size: 0.92rem; color: var(--text-muted); }
+.ex .now { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; }
+.ex .now::before { content: '→'; font-family: var(--font-sans); color: var(--border-light); margin-right: 0.7rem; font-size: 0.9rem; }
+.fix { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; }
+.pat p { font-size: 0.92rem; line-height: 1.65; }
+.pat p + p { margin-top: 0.6rem; }
+.pat p .jp { font-family: var(--font-chat); font-weight: 500; }
+.try { margin-top: 0.9rem; font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); border-left: 2px solid var(--accent-primary); padding: 0.1rem 0 0.1rem 0.8rem; }
+.try b { color: var(--text-main); font-weight: 600; }
+.prac { margin-top: 0.8rem; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); }
+.words { margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; }
+.words div { font-family: var(--font-chat); font-weight: 500; font-size: 1.05rem; }
+.words small { display: block; font-family: var(--font-sans); font-weight: 400; font-size: 0.72rem; color: var(--text-muted); }
+.close { margin-top: 2.6rem; }
+
+/* A · sheet over everything, from the bottom (§6.2), nearly full height */
+.sheet { position: absolute; left: 0; right: 0; top: 66px; bottom: 0; background: var(--bg-color); border-radius: 28px 28px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+.sheet .bar { flex: none; height: 26px; display: flex; justify-content: center; align-items: center; }
+.sheet .bar i { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); }
+.scroll { flex: 1; overflow-y: auto; scrollbar-width: none; padding-top: 0.6rem; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* B · a page of its own: no nav, back link top left */
+.page { position: absolute; inset: 54px 0 0; display: flex; flex-direction: column; background: var(--bg-color); }
+.page .top { flex: none; display: flex; align-items: center; padding: 0.6rem 18px 0.2rem; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); gap: 0.3rem; }
+.page .top svg { width: 18px; height: 18px; fill: none; stroke: var(--text-muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.page .scroll { padding-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="mock-header">
+  <div class="kicker">MOCKUP · ハルカ</div>
+  <h1>Weekly recap</h1>
+  <p><b>The content is real.</b> It's built from last week's data: her <code>&lt;fix&gt;</code> recasts in chat (46) and your flashcard Agains and Hards (19 and 35 out of 101). Three patterns really do recur: い/な adjectives (7 slips), で where it doesn't belong (4), and a verb where a noun belongs (4). A weekly job would write this on Sunday morning, after the nightly dream.</p>
+  <p><b>Getting there adds no UI.</b> On Sunday, her Home card line is the recap teaser. In the chat, the recap is one tappable block in the thread, like a sent photo. Tapping it opens the report. <b>A and B are the two ways the report could open</b>, with the same content, so compare the feel. Both scroll: try it.</p>
+</div>
+
+<div class="row-title">HOW YOU GET THERE</div>
+<div class="stage" id="entry"></div>
+<div class="row-title">WHERE IT OPENS</div>
+<div class="stage" id="open"></div>
+
+<template id="report">
+  <div class="rep">
+    <div class="kick">OCT 13 – 19</div>
+    <h1>今週のまとめ</h1>
+    <div class="her">今週もいっぱい話せたね！三つだけ、何回も出てきたことがあるよ。</div>
+    <p class="lede">Most of what you wrote this week was natural. These three slips came up again and again. They're all small, and fixing them will make everything you say sound cleaner.</p>
+
+    <div class="pat">
+      <div class="k">1 · 7 TIMES</div>
+      <h2>い and な adjectives get mixed up</h2>
+      <div class="ex">
+        <span class="was">若いなのに</span><span class="now"><span class="fix">若いのに</span></span>
+        <span class="was">古いな杉</span><span class="now"><span class="fix">古い</span>杉</span>
+        <span class="was">好きので</span><span class="now"><span class="fix">好きな</span>ので</span>
+        <span class="was">大事と思う</span><span class="now"><span class="fix">大事だ</span>と思う</span>
+        <span class="was">強いで</span><span class="now"><span class="fix">強くて</span></span>
+      </div>
+      <p>い-adjectives (<span class="jp">若い・古い・強い</span>) work on their own: no な before a noun, no だ before と思う, and the て-form is い→くて.</p>
+      <p>な-adjectives (<span class="jp">好き・大事・残念</span>) behave like nouns. They need な before a noun or ので, and だ before と思う or けど.</p>
+      <div class="try"><b>This week:</b> before ので, のに, けど or と思う, stop for a second and ask: い or な?</div>
+      <div class="prac">ハルカと練習する →</div>
+    </div>
+
+    <div class="pat">
+      <div class="k">2 · 4 TIMES</div>
+      <h2>で where it doesn't belong</h2>
+      <div class="ex">
+        <span class="was">旅館で泊まります</span><span class="now">旅館<span class="fix">に</span>泊まります</span>
+        <span class="was">本社で公園があって</span><span class="now">本社<span class="fix">に</span>公園があって</span>
+        <span class="was">ゆっくりで散歩する</span><span class="now"><span class="fix">ゆっくり</span>散歩する</span>
+      </div>
+      <p>で marks where an action happens (<span class="jp">食べる・働く</span>). に marks where something <i>is</i> or where you end up (<span class="jp">ある・いる・住む・泊まる</span>). Adverbs like ゆっくり take no particle at all.</p>
+      <div class="try"><b>This week:</b> with ある, いる, 住む or 泊まる, the place takes に.</div>
+      <div class="prac">ハルカと練習する →</div>
+    </div>
+
+    <div class="pat">
+      <div class="k">3 · 4 TIMES</div>
+      <h2>A verb where a noun belongs</h2>
+      <div class="ex">
+        <span class="was">打ち上げるについて</span><span class="now"><span class="fix">打ち上げ</span>について</span>
+        <span class="was">昨日の話す</span><span class="now">昨日の<span class="fix">話</span></span>
+        <span class="was">集中するのことが</span><span class="now"><span class="fix">集中しているところ</span>が</span>
+      </div>
+      <p>について, の and が need a noun in front. Use the noun form (<span class="jp">話・打ち上げ</span>) or add の or こと, but never both.</p>
+      <div class="try"><b>This week:</b> when a particle follows a verb, check whether it wants a noun.</div>
+      <div class="prac">ハルカと練習する →</div>
+    </div>
+
+    <div class="pat">
+      <div class="k">WORDS THAT KEPT SLIPPING</div>
+      <div class="words">
+        <div>字引<small>dictionary</small></div>
+        <div>浸ける<small>to soak</small></div>
+        <div>講堂<small>auditorium</small></div>
+        <div>被る<small>to wear (a hat)</small></div>
+        <div>ずつ<small>each</small></div>
+        <div>屋上<small>rooftop</small></div>
+      </div>
+      <p style="margin-top:0.8rem;color:var(--text-muted);font-size:0.85rem">I'll use these in our chats this week.</p>
+    </div>
+
+    <div class="pat close">
+      <div class="k">WHAT GOT SOLID</div>
+      <p>〜ように and 行ったことがない came out natural, with no help. You're also writing longer sentences than you were a month ago.</p>
+    </div>
+  </div>
+</template>
+
+<script>
+const ICONS = `<svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg><svg viewBox="0 0 24 24" style="opacity:.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+const SB = '<div class="sb"><span>8:15</span><span>▮▮▮ ◠ ▭</span></div>';
+const HOME = `<div class="home"><h2>今日</h2>
+  <div class="hcard"><div class="hwho"><div class="av">ハ</div>ハルカ</div>
+    <div class="hline">今週のまとめができたよ。い形容詞とな形容詞が、まだちょっと混ざってるね。</div></div>
+  <div class="ghost"><div></div><div></div></div></div>
+  <div class="nav"><b>今日</b><span>読む</span><span>聞く</span><span>復習</span></div>`;
+const PANEL = `<div class="panel"><div class="grab"></div><div class="thread">
+    <div class="u">おはよう！</div>
+    <div class="t">おはよう！今週のまとめができたよ。</div>
+    <div class="rc" onclick="document.getElementById('open').scrollIntoView({behavior:'smooth'})">
+      <div class="k">WEEKLY RECAP · OCT 13–19</div>
+      <div class="open"><div class="h">今週のまとめ</div><span>›</span></div>
+      <div class="s">い / な adjectives · で vs に · nouns after particles</div>
+    </div>
+    <div class="t">特に一つ目は、すぐ直せると思う。読んでみて、気になったら聞いてね。</div>
+  </div>
+  <div class="input"><div class="field">ハルカに話しかける…</div>${ICONS}</div><div class="foot"></div></div>`;
+
+const report = () => document.getElementById('report').innerHTML;
+const phone = (inner, label, note) => {
+  const w = document.createElement('div'); w.className = 'wrap';
+  w.innerHTML = `<div class="label">${label}</div><div class="phone">${SB}${inner}</div><div class="note">${note}</div>`;
+  return w;
+};
+
+const entry = document.getElementById('entry');
+entry.appendChild(phone(HOME, '1 · HOME ON SUNDAY',
+  'Her card already sits here. On Sunday the line is the recap teaser instead of the usual opener. Nothing new on Home. Tapping it opens the chat with the recap block waiting.'));
+entry.appendChild(phone(`<div class="under">${HOME}</div><div class="dim"></div>${PANEL}`, '2 · IN THE CHAT',
+  'The recap is one block in the thread: white, like your bubbles, with a kicker, the title and the three pattern names. It stays in that day\'s thread. Tap it to open (here it scrolls to the row below).'));
+
+const open = document.getElementById('open');
+open.appendChild(phone(`<div class="under">${HOME}</div><div class="dim"></div>${PANEL}<div class="dim" style="background:rgba(45,45,45,0.25)"></div>
+  <div class="sheet"><div class="bar"><i></i></div><div class="scroll">${report()}</div></div>`,
+  'A · SHEET OVER THE CHAT',
+  'It rises from the bottom over everything, full width, nearly full height. The dimmed chat peeks above it, so you know where you\'ll land: swipe down and you\'re back in her chat, ready to ask about it.'));
+open.appendChild(phone(`<div class="page"><div class="top"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>ハルカ</div><div class="scroll">${report()}</div></div>`,
+  'B · A PAGE OF ITS OWN',
+  'It replaces the screen, with no nav and a back link to ハルカ. You get about 40px more and a bigger title, and it feels like a document more than a moment in the conversation. Back returns to the chat.'));
+</script>
+</body>
+</html>

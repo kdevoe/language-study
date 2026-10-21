@@ -30,6 +30,8 @@ export interface LearnerBrief {
   ideas: { kind: 'longform' | 'podcast'; topic: string; why: string }[];
   /** Looked up overnight for tomorrow's chat (learner-dream → _shared/research.ts); checked facts only. */
   research?: { question: string; facts: { fact: string; source: string }[] }[];
+  /** Sunday: this week's recap (weekly_recaps); openers[0] is its teaser. */
+  recap?: { id: string };
 }
 
 export interface Memory {
@@ -43,6 +45,14 @@ export interface Memory {
   feedTopics: string[] | null;
   grammar: Record<string, { mastery: 'hard' | 'medium' | 'easy' }>;
   tutorPrefs: { correction?: string; asides?: string };
+  /** This week's recap (weekly_recaps, at most 8 days old). */
+  recap: { weekEnd: string; report: WeeklyRecapReport } | null;
+}
+
+export interface WeeklyRecapReport {
+  lede: string;
+  patterns: { title: string; examples: { was: string; now: string }[]; tip: string }[];
+  words: { word: string; meaning: string }[];
 }
 
 /** Budget for the profile (guards in learner-dream; design §2 "size budget"). */
@@ -60,7 +70,7 @@ export async function latestProfile(admin: SupabaseClient, userId: string) {
 }
 
 export async function loadMemory(admin: SupabaseClient, userId: string, digestDays = 7): Promise<Memory> {
-  const [prof, digests, brief, prefs] = await Promise.all([
+  const [prof, digests, brief, prefs, recap] = await Promise.all([
     latestProfile(admin, userId),
     admin.from('learner_digests').select('day, text').eq('user_id', userId)
       .order('day', { ascending: false }).limit(digestDays),
@@ -68,6 +78,9 @@ export async function loadMemory(admin: SupabaseClient, userId: string, digestDa
       .order('day', { ascending: false }).limit(1).maybeSingle(),
     admin.from('user_preferences').select('jlpt_level, feed_topics, grammar_progress, tutor_prefs')
       .eq('user_id', userId).maybeSingle(),
+    admin.from('weekly_recaps').select('week_end, report').eq('user_id', userId)
+      .gt('created_at', new Date(Date.now() - 8 * 86400_000).toISOString())
+      .order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
   return {
     profile: prof?.profile ?? null,
@@ -80,6 +93,7 @@ export async function loadMemory(admin: SupabaseClient, userId: string, digestDa
     feedTopics: prefs.data?.feed_topics ?? null,
     grammar: prefs.data?.grammar_progress ?? {},
     tutorPrefs: prefs.data?.tutor_prefs ?? {},
+    recap: recap.data ? { weekEnd: recap.data.week_end, report: recap.data.report as WeeklyRecapReport } : null,
   };
 }
 
@@ -122,6 +136,15 @@ Ideas to offer: ${b.ideas.map((i) => `${i.kind} on ${i.topic}`).join('; ') || 'n
       parts.push(`LOOKED UP OVERNIGHT\n${fence('research', looked.map((r) =>
         `${r.question}\n${r.facts.map((f) => `- ${f.fact} (${f.source})`).join('\n')}`).join('\n\n'))}`);
     }
+  }
+  // The weekly recap they were shown (or will be, from the Home card): she can
+  // talk it through, and weave its patterns into the week's conversations.
+  if (opts.brief && m.recap) {
+    const r = m.recap.report;
+    parts.push(`THIS WEEK'S RECAP (week to ${m.recap.weekEnd}; the learner can open it as a report from your chat)
+${r.lede}
+${(r.patterns ?? []).map((p, i) => `${i + 1}. ${p.title}: ${(p.examples ?? []).map((e) => `${e.was} → ${e.now}`).join('; ')}. Tip: ${p.tip}`).join('\n')}
+${r.words?.length ? `Words that kept slipping: ${r.words.map((w) => `${w.word} (${w.meaning})`).join(', ')}` : ''}`.trim());
   }
   // Memory is built from the learner's activity, notes the tutor saved and
   // overnight summaries, all of which can echo text from articles. Fenced, so a

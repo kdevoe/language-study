@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Camera, X } from 'lucide-react';
 import { useTutor } from './TutorProvider';
 import { TutorText } from './TutorText';
+import { RecapBlock, RecapSheet } from './RecapSheet';
 import { useAppStore } from '../../services/store';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { useWordLookup } from '../../hooks/useWordLookup';
 import { WordModal } from '../WordModal';
 import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
 import {
-  fetchTutorHistory, localDay, pollResearch, streamTutor,
-  type ScreenContext, type TutorAction,
+  fetchRecap, fetchTutorHistory, localDay, pollResearch, streamTutor,
+  type RecapRef, type ScreenContext, type TutorAction,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
 import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
@@ -27,6 +28,8 @@ interface Line {
   pending?: boolean;
   /** A photo you sent: the thumbnail kept on this phone (if any), and what she saved of it. */
   photo?: { id: string; thumb?: string; label?: string; transcript?: string; live?: boolean };
+  /** Her Sunday opener: the weekly recap's block goes under it. */
+  recap?: RecapRef;
 }
 
 const COMMIT_PX = 70;
@@ -50,6 +53,10 @@ export function TutorPanel() {
   const [busy, setBusy] = useState<string | null>(null);   // null idle · '' replying · tool label
   const [actions, setActions] = useState<TutorAction[]>([]);
   const [opener, setOpener] = useState<string | null>(null);
+  // The weekly recap the opener announces (Sunday), and the one open in the sheet.
+  const [openerRecapId, setOpenerRecapId] = useState<string | null>(null);
+  const [openerRecap, setOpenerRecap] = useState<RecapRef | null>(null);
+  const [sheetRecap, setSheetRecap] = useState<string | null>(null);
   // Background lookups ハルカ started (research tool): polled until they land,
   // then she shares them, in a followup turn if the chat is quiet.
   const [researching, setResearching] = useState<{ id: string; at: number }[]>([]);
@@ -85,6 +92,7 @@ export function TutorPanel() {
     staleRef.current = false;
     fetchTutorHistory().then(async ({ threadId: id, messages }) => {
       const photoOf = (m: (typeof messages)[number]) => (m.context && 'photo' in m.context ? m.context.photo : undefined);
+      const recapOf = (m: (typeof messages)[number]) => (m.context && 'recap' in m.context ? m.context.recap : undefined);
       const thumbs = await thumbsFor(messages.map((m) => photoOf(m)?.id).filter((x): x is string => !!x));
       if (busyRef.current !== null) return;   // a reply started meanwhile: keep what's on screen
       historyDayRef.current = today;
@@ -95,6 +103,7 @@ export function TutorPanel() {
           key: m.id, role: m.role,
           text: m.role === 'context' ? (m.context && 'chip' in m.context ? m.context.chip ?? '' : '') : (m.text ?? ''),
           ...(p && { photo: { ...p, thumb: thumbs[p.id] } }),
+          ...(recapOf(m) && { recap: recapOf(m) }),
         };
       }).filter((l) => l.text || l.photo));
       setLoaded(true);
@@ -110,9 +119,19 @@ export function TutorPanel() {
     setCtx(screen?.detail ? screen : null);
     setChipOff(false);
     setOpener(options.opener ?? screen?.opener ?? null);
+    setOpenerRecapId((options.opener ? options.recapId : screen?.recapId) ?? null);
     if (busy === null && (!historyOk || staleRef.current || historyDayRef.current !== localDay())) syncHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, openSeq]);
+
+  // The recap's block needs its title; the report itself loads when it's opened.
+  useEffect(() => {
+    if (!openerRecapId) { setOpenerRecap(null); return; }
+    if (openerRecap?.id === openerRecapId) return;
+    fetchRecap(openerRecapId).then((r) => setOpenerRecap(r ? { id: r.id, title: r.title } : null)).catch(() => setOpenerRecap(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openerRecapId]);
+  useEffect(() => { if (!open) setSheetRecap(null); }, [open]);
 
   // Coming back to the app with the panel open counts the same as opening it.
   useEffect(() => {
@@ -200,20 +219,22 @@ export function TutorPanel() {
     if (sentPhoto) keepThumb(sentPhoto.upload.id, localDay(), sentPhoto.thumb);
     const sentCtx = ctx && !chipOff ? ctx : undefined;
     const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;
+    const sentRecap = sentOpener && openerRecap ? openerRecap : undefined;
     const before: Line[] = [
       ...(sentCtx?.chip && !lines.some((l) => l.role === 'context' && l.text === sentCtx.chip)
         ? [{ key: `c-${Date.now()}`, role: 'context' as const, text: sentCtx.chip }] : []),
-      ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener }] : []),
+      ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener, ...(sentRecap && { recap: sentRecap }) }] : []),
       { key: `u-${Date.now()}`, role: 'user', text: message,
         ...(sentPhoto && { photo: { id: sentPhoto.upload.id, thumb: sentPhoto.thumb, live: true } }) },
     ];
     setOpener(null);
+    setOpenerRecapId(null);
     // Anything that landed is in the thread now: she sees it in this turn.
     setLanded([]);
-    const ok = await streamReply({ message, context: sentCtx, opener: sentOpener, image: sentPhoto?.upload }, before);
+    const ok = await streamReply({ message, context: sentCtx, opener: sentOpener, recapId: sentRecap?.id, image: sentPhoto?.upload }, before);
     // Nothing got through: hand the message back so it isn't lost (a photo isn't re-attached).
     if (!ok && message) setDraft((d) => d || message);
-  }, [busy, ctx, chipOff, opener, lines, photo, streamReply]);
+  }, [busy, ctx, chipOff, opener, openerRecap, lines, photo, streamReply]);
 
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return;
@@ -312,11 +333,15 @@ export function TutorPanel() {
           <div className="tutor-thread" ref={threadRef}>
             {!loaded && !lines.length && <div className="tutor-typing" role="status" aria-label="読み込み中"><span /><span /><span /></div>}
             {firstLine && <div className="tutor-t"><TutorText text={firstLine} lookup={lookup} /></div>}
+            {firstLine && openerRecap && <RecapBlock recap={openerRecap} onOpen={() => setSheetRecap(openerRecap.id)} />}
             {lines.map((l) => l.role === 'context'
               ? <div key={l.key} className="tutor-ctx">{l.text}</div>
               : l.role === 'user'
                 ? <UserLine key={l.key} line={l} />
-                : <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />)}
+                : [
+                  <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />,
+                  l.recap && <RecapBlock key={`${l.key}-recap`} recap={l.recap} onOpen={() => setSheetRecap(l.recap!.id)} />,
+                ])}
             {busy && <div className="tutor-busy">{busy}</div>}
             {busy === null && researching.length > 0 && <div className="tutor-busy">ハルカが調べています…</div>}
             {actions.map((a, i) => (
@@ -370,6 +395,8 @@ export function TutorPanel() {
           </div>
         <div className="tutor-foot" />
       </aside>
+      <RecapSheet id={sheetRecap} onClose={() => setSheetRecap(null)}
+        onPractice={(pattern) => { setSheetRecap(null); void sendText(`「${pattern}」を練習したい！`); }} />
       <WordModal {...lookup.modalProps} />
     </>
   );

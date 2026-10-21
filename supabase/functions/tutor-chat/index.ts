@@ -311,8 +311,14 @@ Deno.serve(async (req) => {
           });
         }
         const opener = body.opener.trim().slice(0, 300);
+        // Sunday's opener carries the weekly recap: the panel shows it under her
+        // line as a block that opens the report (her memory already holds it).
+        const { data: recap } = typeof body.recapId === 'string' && /^[0-9a-f-]{36}$/.test(body.recapId)
+          ? await admin.from('weekly_recaps').select('id, title').eq('user_id', userId).eq('id', body.recapId).maybeSingle()
+          : { data: null };
         await admin.from('tutor_messages').insert({
           thread_id: threadId, user_id: userId, role: 'assistant', text: opener, content: [{ type: 'text', text: opener }],
+          ...(recap && { context: { recap: { id: recap.id, title: recap.title } } }),
         });
       }
     }
