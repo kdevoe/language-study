@@ -536,6 +536,16 @@ body.song-mode {
 .tutor-suggestion { display: flex; gap: 1.2rem; margin-top: 0.4rem; }
 .tutor-suggestion button { background: none; border: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.85rem; color: var(--text-main); padding: 0; }
 .tutor-suggestion button + button { color: var(--text-muted); }
+/* A word she offers for the deck: a pill under her reply, a hairline at rest;
+   tapped, it takes the slider thumb's white + shadow (§2: selected = white). */
+.tutor-thread > .tutor-t + .tutor-deck, .tutor-thread > .tutor-a + .tutor-deck, .tutor-thread > .tutor-deck + .tutor-deck { margin-top: 0.9rem; }
+.tutor-deck { align-self: flex-start; display: inline-flex; align-items: baseline; gap: 0.5rem; max-width: 94%; padding: 0.4rem 0.95rem 0.45rem 0.8rem; border: 1px solid var(--border-light); border-radius: 100px; background: none; color: var(--text-muted); cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); -webkit-tap-highlight-color: transparent; }
+.tutor-deck svg { flex: none; align-self: center; }
+.tutor-deck:active { transform: scale(0.98); }
+.tutor-deck-w { font-family: var(--font-chat); font-weight: 500; font-size: 1rem; color: var(--text-main); white-space: nowrap; }
+.tutor-deck-m { font-family: var(--font-sans); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tutor-deck.on { background: var(--bg-pure); border-color: transparent; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); cursor: default; }
+.tutor-deck.on svg { color: var(--text-main); }
 /* Edge swipe: a narrow zone on the hand side, and a faint mark showing it's there. */
 .tutor-edge { position: fixed; top: 12%; bottom: 14%; width: 16px; z-index: 30; touch-action: pan-y; }
 .tutor-edge.r { right: 0; }
