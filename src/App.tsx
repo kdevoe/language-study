@@ -831,6 +831,15 @@ function App() {
           {actionError}
         </div>
       )}
+      {/* Frosted top edge: whatever scrolls under the status bar blurs and fades,
+          on every screen. iOS 26 adds a similar blur only some of the time, so
+          we draw our own. On reading screens it grows to sit behind the back row
+          while that row is out, so the row floats on frosted glass. */}
+      <div aria-hidden className="top-veil" style={{
+        height: isReading && (showNav || songPlayerOpen)
+          ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 5rem)'
+          : 'calc(env(safe-area-inset-top) + 1.75rem)',
+      }} />
       {/* Tab pages carry their own heading (PageHeading); only reading
           surfaces get this fixed row, and it holds just the way back. */}
       {isReading && (
@@ -844,7 +853,9 @@ function App() {
             top: 0,
             left: 0,
             right: 0,
-            backgroundColor: 'var(--chrome-bg, var(--bg-color))',
+            // Clear over the frosted veil; the song player keeps a solid row
+            // because its cover and title are pinned into it.
+            backgroundColor: songPlayerOpen ? 'var(--chrome-bg, var(--bg-color))' : 'transparent',
             zIndex: 10,
             // The song player pins its cover and title into this row, so it stays put there.
             transform: showNav || songPlayerOpen ? 'translateY(0)' : 'translateY(-100%)',
