@@ -169,6 +169,7 @@ Source of truth: `src/components/ArchiveList.tsx`, mockup `docs/mockups/archive-
 ### 6.9 Page heading (tab pages)
 Source of truth: `src/components/PageHeading.tsx`, mockup `docs/mockups/top-row.html` (見出しに統合).
 
+- **Frosted top edge** (`.top-veil`, App.tsx). Content scrolling under the status bar blurs (10px) and fades back to sharp over about 1.75rem below it, on every screen. iOS 26 adds a similar blur only some of the time, so the app draws its own. On reading screens, while the back row is out, the band grows to sit behind it, and the row itself has no background. The song player keeps a solid row, because its cover and title are pinned there.
 - **No global header on tab pages.** Each tab opens with one serif title (2rem) in one language. Nothing sits above it but the status bar.
   
 - The **settings mark** sits only on Home (§6.12), at the right of its title: thin slider lines (stroke 1.25, `--text-muted`, 44px hit area), not a gear or ⋮. The other tabs show no settings mark.
