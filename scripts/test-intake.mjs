@@ -110,6 +110,27 @@ async function main() {
   const fourN4 = pick([local('a', 4, 1), local('b', 4, 2), local('c', 4, 3), local('d', 4, 20)], 3);
   check('three from one level is fine — no quota pushes others in', JSON.stringify(ids(fourN4)) === JSON.stringify(['a', 'b', 'c']), ids(fourN4).join(','));
 
+  console.log('\nselectPromotions — the working level keeps one slot');
+  const lookedUpN3 = [
+    local('機関', 3, 1, 12, { lookupCount: 6 }),
+    local('組織', 3, 1, 10, { lookupCount: 8 }),
+    local('治療', 3, 2, 9, { lookupCount: 7 }),
+    local('逮捕', 3, 2, 8, { lookupCount: 5 }),
+  ];
+  const withN4 = [...lookedUpN3, local('受付', 4, 12, 2)];
+  const floored = pick(withN4, 3);
+  check('an N4 word takes one of 3 slots when N3 lookups would take them all', ids(floored).includes('受付'), ids(floored).join(','));
+  check('the other slots stay the top-scored N3 words', JSON.stringify(ids(floored).slice(0, 2)) === JSON.stringify(ids(pick(lookedUpN3, 2))), ids(floored).join(','));
+  check('only one slot is held', floored.filter((p) => p.jlptLevel === 4).length === 1);
+  check('a single-slot top-up stays pure score', pick(withN4, 1)[0].entryId === pick(lookedUpN3, 1)[0].entryId, ids(pick(withN4, 1)).join(','));
+  const already = pick([...lookedUpN3.slice(0, 2), local('着物', 4, 1, 5, { lookupCount: 4 }), local('受付', 4, 12, 2)], 3);
+  check('no extra slot when an N4 word wins on score', already.filter((p) => p.jlptLevel === 4).length === 1, ids(already).join(','));
+  check('no N4 word to give → slots stay with score', ids(pick(lookedUpN3, 3)).length === 3);
+  const allChosen = pick([...lookedUpN3.slice(0, 2).map((w) => ({ ...w, chosen: true })), local('受付', 4, 12, 2)], 2);
+  check('a chosen word is never displaced', JSON.stringify(ids(allChosen).sort()) === JSON.stringify(['機関', '組織']), ids(allChosen).join(','));
+  const coldN4 = pick(lookedUpN3, 3, 4, [virtual('cFour', 4, 3)]);
+  check('a never-met N4 word can fill the slot when none is queued', ids(coldN4).includes('cFour'), ids(coldN4).join(','));
+
   console.log('\nselectPromotions — chosen words and junk');
   const chosen = pick([...queue, local('紅葉', 2, 15, 0, { mastery: 'medium' })], 1);
   check('a chosen N2 word, never met, wins', chosen[0].entryId === '紅葉', ids(chosen).join(','));

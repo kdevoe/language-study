@@ -161,9 +161,20 @@ export interface PromotionPick extends IntakeItem {
 }
 
 /**
+ * The working-level floor: with this many slots or more, one goes to the best
+ * working-level word if none made the cut on score. Lookups pull the score toward the
+ * harder words actually met in articles (N3 took every slot the week of Oct 19 while
+ * the working level was N4), and that's fine for most slots, but the level being
+ * filled should still be represented. Single-slot top-ups stay pure score.
+ */
+export const WORKING_LEVEL_FLOOR_MIN_CAP = 2;
+
+/**
  * Choose up to `cap` words to promote this cycle: every eligible word — met in
  * reading, chosen, or a never-met candidate — scored against the others, top `cap`
- * win. De-dupes by entryId (a local record beats a candidate naming the same entry).
+ * win, except that one slot is held for the working level (see
+ * WORKING_LEVEL_FLOOR_MIN_CAP); it displaces the lowest-scoring pick that isn't
+ * chosen. De-dupes by entryId (a local record beats a candidate naming the same entry).
  * Ties fall back to the more common word, then the stable entry id. Returns [] for cap<=0.
  */
 export function selectPromotions(
@@ -179,12 +190,18 @@ export function selectPromotions(
     const existing = byId.get(item.entryId);
     if (!existing || (existing.key == null && item.key != null)) byId.set(item.entryId, item);
   }
-  return Array.from(byId.values())
+  const ranked = Array.from(byId.values())
     .filter(isEligible)
     .map((i) => ({ ...i, score: intakeScore(i, working, now) }))
     .sort((a, b) =>
       b.score - a.score
       || (a.freqRank ?? Infinity) - (b.freqRank ?? Infinity)
-      || (a.entryId < b.entryId ? -1 : a.entryId > b.entryId ? 1 : 0))
-    .slice(0, cap);
+      || (a.entryId < b.entryId ? -1 : a.entryId > b.entryId ? 1 : 0));
+  const picks = ranked.slice(0, cap);
+  if (cap < WORKING_LEVEL_FLOOR_MIN_CAP || picks.some((p) => p.jlptLevel === working)) return picks;
+  const floor = ranked.slice(cap).find((p) => p.jlptLevel === working);
+  const out = picks.map((p) => isChosen(p)).lastIndexOf(false);
+  if (!floor || out < 0) return picks;
+  picks.splice(out, 1);
+  return [...picks, floor];
 }
