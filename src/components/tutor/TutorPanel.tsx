@@ -52,7 +52,9 @@ export function TutorPanel() {
   const [photo, setPhoto] = useState<PreparedPhoto | null>(null);   // attached, not sent yet
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);   // null idle · '' replying · tool label
-  const [actions, setActions] = useState<TutorAction[]>([]);
+  // Offers under her latest reply, keyed so dropping one keeps the others' state.
+  const [actions, setActions] = useState<{ key: number; action: TutorAction }[]>([]);
+  const actionKeyRef = useRef(0);
   const [opener, setOpener] = useState<string | null>(null);
   // The weekly recap the opener announces (Sunday), and the one open in the sheet.
   const [openerRecapId, setOpenerRecapId] = useState<string | null>(null);
@@ -162,6 +164,8 @@ export function TutorPanel() {
     let bubbleText = '';
     let failed = false;   // the connection failed before she said anything
     setLines((prev) => [...prev, ...before, { key: pendingKey, role: 'assistant', text: '', pending: true }]);
+    // Word offers belong to the reply they came with: a new turn clears the untapped ones.
+    setActions((prev) => prev.filter((x) => x.action.type !== 'add_to_deck'));
     setBusy('');
     const ac = new AbortController();
     abortRef.current = ac;
@@ -188,7 +192,7 @@ export function TutorPanel() {
               { key: next, role: 'assistant' as const, text: '', pending: true }]);
           }
         } else if (e.type === 'research') setResearching((prev) => [...prev, { id: e.id, at: Date.now() }]);
-        else if (e.type === 'action') setActions((prev) => [...prev, e.action]);
+        else if (e.type === 'action') setActions((prev) => [...prev, { key: ++actionKeyRef.current, action: e.action }]);
         else if (e.type === 'error') {
           const key = pendingKey;
           setLines((prev) => prev.map((l) => (l.key === key ? { ...l, text: l.text || e.error } : l)));
@@ -345,8 +349,8 @@ export function TutorPanel() {
                 ])}
             {busy && <div className="tutor-busy">{busy}</div>}
             {busy === null && researching.length > 0 && <div className="tutor-busy">ハルカが調べています…</div>}
-            {actions.map((a, i) => (
-              <ActionNote key={i} action={a} onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
+            {actions.map((a) => (
+              <ActionNote key={a.key} action={a.action} onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
                 onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
             ))}
           </div>
@@ -479,7 +483,7 @@ function ActionNote({ action, onRate, onDismiss }: {
       </div>
     );
   }
-  if (action.type === 'add_to_deck') return <DeckOffer action={action} />;
+  if (action.type === 'add_to_deck') return <DeckOffer action={action} onDone={onDismiss} />;
   if (action.type === 'content_queued') {
     return <div className="tutor-ctx">番組「{action.topic}」を作っています · 聞くに届きます</div>;
   }
@@ -490,9 +494,17 @@ function ActionNote({ action, onRate, onDismiss }: {
 /** ハルカ offers a word for the deck: a chip under her reply, added only when the
  *  learner taps it (CLAUDE.md › Security: side effects need their confirmation).
  *  It goes in like a word graded from reading, through the daily intake. */
-function DeckOffer({ action }: { action: Extract<TutorAction, { type: 'add_to_deck' }> }) {
+function DeckOffer({ action, onDone }: { action: Extract<TutorAction, { type: 'add_to_deck' }>; onDone: () => void }) {
   const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
   const [state, setState] = useState<'offer' | 'adding' | 'added' | 'had' | 'error'>('offer');
+  // Once it's in (or was already), the confirmation shows a moment, then the chip goes.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    if (state !== 'added' && state !== 'had') return;
+    const t = setTimeout(() => onDoneRef.current(), 1800);
+    return () => clearTimeout(t);
+  }, [state]);
   const add = async () => {
     if (state !== 'offer' && state !== 'error') return;
     setState('adding');
