@@ -16,6 +16,8 @@ export interface OpenOptions {
   recapId?: string;
   /** After a long-read night: the long read that line announces, shown under it. */
   work?: WorkRef;
+  /** Said for the learner as soon as the panel is ready (ハルカと練習する from 進捗's recaps). */
+  send?: string;
 }
 
 interface TutorState {

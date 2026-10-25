@@ -1,4 +1,4 @@
-// Last-loaded lists (本棚 works, 番組 episodes, 音楽 songs and lists, 今日's news picks), so a page shows its
+// Last-loaded lists (本棚 works, 番組 episodes, 音楽 songs and lists, 今日's news picks, 進捗's recaps), so a page shows its
 // cards the moment it mounts and refreshes them in the background, instead of
 // a skeleton on every visit. Tabs unmount when you switch away, and a fresh
 // load waits on getSession() (which may refresh an expired token first), so
@@ -12,7 +12,7 @@
 const PREFIX = 'yugen-list-cache:';
 const MAX_ROWS = 50;
 
-export type ListCacheKey = 'works' | 'episodes' | 'news' | 'songs' | 'playlists';
+export type ListCacheKey = 'works' | 'episodes' | 'news' | 'songs' | 'playlists' | 'recaps';
 
 const memory = new Map<ListCacheKey, unknown[]>();
 
@@ -74,7 +74,7 @@ export function writeValueCache<T>(key: ValueCacheKey, value: T): void {
 export function clearListCaches(): void {
   memory.clear();
   values.clear();
-  for (const key of ['works', 'episodes', 'news', 'songs', 'playlists', ...VALUE_KEYS]) {
+  for (const key of ['works', 'episodes', 'news', 'songs', 'playlists', 'recaps', ...VALUE_KEYS]) {
     try { localStorage.removeItem(PREFIX + key); } catch { /* storage blocked */ }
   }
 }

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — grammar cards</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@500;600&display=swap');
+
+/* Tokens copied from src/index.css */
+:root {
+  --bg-color: #f5f5f0;
+  --bg-pure: #ffffff;
+  --bg-card: #f0f0e8;
+  --text-main: #2d2d2d;
+  --text-muted: #666666;
+  --accent-primary: #d4e0e8;
+  --accent-progress: #8fb0c4;
+  --border-light: #e0e0d8;
+  --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-chat: 'Noto Serif JP', 'Shippori Mincho', serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+button { font-family: inherit; color: inherit; }
+
+.mock-header { max-width: 900px; margin: 0 auto 2rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 390px; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 370px; }
+.phone-note b { color: var(--text-main); font-weight: 600; }
+/* Real phone size: 390 × 844 */
+.phone { width: 410px; height: 864px; background: var(--bg-color); border-radius: 48px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; flex-shrink: 0; }
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 3rem 1.25rem 6rem; }
+.screen.scroll { overflow-y: auto; scrollbar-width: none; display: block; }
+.screen.scroll::-webkit-scrollbar { display: none; }
+
+.page-h { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; min-height: 2.75rem; display: flex; align-items: center; margin-bottom: 1rem; gap: 0.35rem; }
+.page-h .back { font-size: 1.4rem; color: var(--text-muted); border: none; background: none; font-family: var(--font-serif); }
+.seg-row { height: 4.4rem; display: flex; align-items: flex-start; justify-content: space-between; }
+.seg { display: inline-flex; background: var(--bg-card); border-radius: 100px; padding: 3px; }
+.seg button { border: none; border-radius: 100px; padding: 0.3rem 0.95rem; font-family: var(--font-serif); font-size: 0.95rem; font-weight: 500; color: var(--text-muted); background: transparent; }
+.seg button.on { font-weight: 700; color: var(--text-main); background: var(--bg-pure); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.95rem; }
+
+/* Session progress row */
+.prog { margin-bottom: 0.4rem; flex: none; }
+.prog .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.4rem; }
+.prog .k { font-size: 0.7rem; letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase; }
+.prog .n { font-size: 0.75rem; color: var(--text-muted); }
+.track { height: 3px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent-progress); transition: width 0.35s var(--ease); }
+
+/* Card: StudyCard's 296/470 aspect, max 340 wide, capped at 62vh of 844 */
+.card-area { flex: 1; display: flex; align-items: center; justify-content: center; perspective: 1600px; padding: 0.6rem 0.2rem 22px; }
+.card { width: 100%; max-width: 330px; aspect-ratio: 296 / 470; max-height: 523px; position: relative; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.45, 0, 0.2, 1); }
+.card.flipped { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--bg-pure); border-radius: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.8rem 1.5rem; text-align: center; }
+.face.back { transform: rotateY(180deg); padding-bottom: 5.4rem; }
+.chev { position: absolute; bottom: 1.5rem; color: var(--text-muted); opacity: 0.35; font-size: 1.1rem; }
+.vocab-word { font-family: var(--font-serif); font-size: 3rem; line-height: 1.1; }
+.reading { font-weight: 700; color: var(--text-muted); font-size: 0.95rem; }
+.meaning { font-size: 1.1rem; margin-top: 1.5rem; }
+.jlpt { margin-top: 1.5rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; color: var(--olive); opacity: 0.85; }
+
+/* Grammar card */
+.g-k { position: absolute; top: 1.3rem; left: 0; right: 0; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.17em; color: var(--text-muted); opacity: 0.8; }
+.sent { font-family: var(--font-chat); font-weight: 500; font-size: 1.25rem; line-height: 1.9; max-width: 16em; }
+.blank { display: inline-block; min-width: 1.8em; border-bottom: 1.5px solid var(--text-muted); margin: 0 0.15em; line-height: 1.2; vertical-align: baseline; }
+.fill { background: var(--accent-primary); border-radius: 3px; padding: 0 0.12em; }
+/* 1: choices under the sentence */
+.choices { display: flex; gap: 0.8rem; margin-top: 2.4rem; }
+.choice { min-width: 5.2rem; padding: 0.55rem 1.1rem 0.6rem; border: 1px solid var(--border-light); border-radius: 100px; background: var(--bg-pure); font-family: var(--font-chat); font-weight: 500; font-size: 1.15rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+.choice:active { transform: scale(0.97); }
+.choice.picked { border-color: transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+/* 2: choices inside the blank */
+.slot { display: inline-flex; flex-direction: column; vertical-align: middle; margin: 0 0.2em; gap: 4px; }
+.slot button { font-family: var(--font-chat); font-weight: 500; font-size: 1.15rem; line-height: 1.35; padding: 0.05rem 0.6rem; border: 1px solid var(--border-light); border-radius: 10px; background: var(--bg-pure); cursor: pointer; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+.slot button.picked { border-color: transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.pick-hint { position: absolute; bottom: 1.5rem; left: 0; right: 0; font-size: 0.68rem; color: var(--text-muted); opacity: 0.7; }
+/* back */
+.verdict { margin-top: 0.9rem; font-size: 0.78rem; color: var(--text-muted); min-height: 1.2rem; }
+.verdict .jp { font-family: var(--font-chat); font-weight: 500; color: var(--text-main); }
+.explain { margin-top: 1.1rem; font-size: 0.88rem; line-height: 1.65; color: var(--text-main); max-width: 30ch; }
+.explain .jp { font-family: var(--font-chat); font-weight: 500; }
+
+/* GradeSlider (design-system §6.1) along the back's bottom edge */
+.gctl { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 1rem 1.1rem; }
+.stog { position: relative; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; display: flex; }
+.stog .thumb { position: absolute; top: 4px; bottom: 4px; width: calc((100% - 8px) / 4); left: calc(4px + var(--i, 2) * (100% - 8px) / 4); background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+.stog button { position: relative; z-index: 1; flex: 1; border: none; background: none; cursor: pointer; font-family: var(--font-serif); font-size: 0.9rem; font-weight: 600; color: var(--text-muted); transition: color 0.4s; }
+.stog button.on { color: var(--text-main); font-weight: 700; }
+
+/* Bottom nav */
+.nav { position: absolute; bottom: 0; left: 0; right: 0; background: var(--bg-pure); border-top: 1px solid var(--border-light); display: flex; justify-content: space-around; padding: 0.8rem 0.6rem 1.6rem; z-index: 5; }
+.nav div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.58rem; letter-spacing: 0.05em; color: var(--text-muted); text-transform: uppercase; }
+.nav i { width: 46px; height: 28px; border-radius: 100px; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 0.95rem; }
+.nav .on { color: var(--text-main); font-weight: 600; }
+.nav .on i { background: var(--accent-primary); }
+
+/* 進捗 (abridged above the new section) */
+.ghost { background: var(--bg-card); border-radius: 16px; margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.12em; font-weight: 700; }
+.words-row { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border-light); font-family: var(--font-serif); font-size: 1.05rem; }
+.words-row small { font-family: var(--font-sans); font-size: 0.72rem; color: var(--text-muted); }
+.sec-k { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--text-muted); margin: 2.4rem 0 0.4rem; }
+.recap-row { display: block; width: 100%; text-align: left; border: none; background: none; padding: 0.85rem 0; border-bottom: 1px solid var(--border-light); cursor: pointer; }
+.recap-row .d { display: block; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.15em; color: var(--text-muted); }
+.recap-row .t { display: block; font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.45; margin-top: 0.15rem; }
+.new-tag { display: inline-block; font-size: 0.55rem; font-weight: 800; letter-spacing: 0.1em; color: var(--olive); border: 1px solid var(--olive); border-radius: 100px; padding: 0 0.4rem; margin-left: 0.4rem; vertical-align: 2px; }
+
+/* Recap sheet (RecapSheet, abridged) */
+.dim { position: absolute; inset: 0; background: rgba(45,45,45,0.25); opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 8; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 2.6rem; background: var(--bg-color); border-radius: 28px 28px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); transform: translateY(105%); transition: transform 0.45s var(--ease); z-index: 9; overflow-y: auto; scrollbar-width: none; padding: 0 24px 3rem; }
+.sheet::-webkit-scrollbar { display: none; }
+.open .dim { opacity: 1; pointer-events: auto; }
+.open .sheet { transform: none; }
+.bar { height: 26px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+.bar i { width: 36px; height: 4px; border-radius: 2px; background: var(--border-light); }
+.r-k { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.17em; color: var(--text-muted); }
+.r-title { font-family: var(--font-serif); font-weight: 500; font-size: 1.6rem; margin: 0.3rem 0 0.9rem; }
+.r-h { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 600; line-height: 1.4; margin: 0.2rem 0 0.6rem; }
+.r-pat { margin-top: 2rem; }
+.r-ex { display: grid; grid-template-columns: auto 1fr; column-gap: 0.8rem; row-gap: 0.3rem; font-family: var(--font-chat); font-weight: 500; }
+.r-ex .was { color: var(--text-muted); font-size: 0.9rem; }
+.r-ex .now::before { content: '→'; font-family: var(--font-sans); color: var(--border-light); margin-right: 0.6rem; }
+.r-p { font-size: 0.9rem; line-height: 1.65; margin-top: 0.7rem; }
+.r-prac { display: block; margin-top: 0.8rem; border: none; background: none; font-family: var(--font-serif); font-size: 0.95rem; color: var(--text-muted); }
+
+.notes { max-width: 820px; margin: 3.5rem auto 0; background: var(--bg-pure); border-radius: 20px; padding: 1.6rem 1.8rem; font-size: 0.88rem; color: var(--text-muted); }
+.notes h2 { font-family: var(--font-serif); font-weight: 500; font-size: 1.15rem; color: var(--text-main); margin-bottom: 0.6rem; }
+.notes ol { padding-left: 1.2rem; }
+.notes li { margin: 0.45rem 0; }
+.notes b { color: var(--text-main); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION</div>
+  <h1>文法カード · 今週のまとめ</h1>
+  <p>Grammar cards from the weekly recap, mixed into the 単語 session, and the recap list at the bottom of 進捗. The phones are clickable: pick a choice to flip the card, then tap the card (or a grade) to move on. The sentences come from this week's real recap (Oct 19–25); a vocab card sits between them as in a real session.</p>
+</header>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone-label">1 · CHOICES UNDER THE SENTENCE</div>
+    <div class="phone"><div class="screen" id="A"></div></div>
+    <div class="phone-note"><b>Two pills under the sentence.</b> Big, easy targets, and the sentence stays whole to read. The blank is a plain line.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">2 · CHOICES IN THE BLANK</div>
+    <div class="phone"><div class="screen" id="B"></div></div>
+    <div class="phone-note"><b>The two choices stacked in the gap.</b> You read them in place, but long choices (勝つチャンス / 勝つのチャンス) push the sentence apart and the targets are smaller.</div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone-label">3 · 進捗 · WEEKLY RECAPS</div>
+    <div class="phone"><div class="screen scroll" id="P"></div><div class="dim" id="dim"></div><div class="sheet" id="sheet"></div></div>
+    <div class="phone-note"><b>The bottom of 進捗, scrolled down.</b> One row per week, newest first. A tap opens the same sheet as in her chat; swipe it down (or tap the bar) to close. The earlier weeks are made up to show the list.</div>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>Notes</h2>
+  <ol>
+    <li><b>Grading.</b> A wrong pick starts the slider on もう一度; a right one starts it from your thinking time, as on word cards. One tap moves on: the card keeps the suggested grade, a grade tap slides and commits. Try picking wrong on 旅館＿泊まります.</li>
+    <li><b>The back</b> shows the sentence again with the answer filled in and marked (the recap's fix colour), "You picked で" only when you were wrong, and the explanation. No ✓ / ✗ icons, no colours for right and wrong.</li>
+    <li><b>The kicker</b> on a grammar card names the recap pattern (PARTICLES WITH VERBS), so it doesn't read as a vocab card. The progress row says GRAMMAR instead of NEW / REVIEW.</li>
+    <li><b>A "nothing" choice</b> becomes two whole phrases (勝つチャンス / 勝つのチャンス), never an empty pill.</li>
+    <li><b>進捗:</b> the list sits under the word list and only appears once there's a recap. The NEW tag marks a recap you haven't opened yet; drop it if it's one thing too many.</li>
+  </ol>
+</div>
+
+<script>
+// Real recap material (Oct 19–25); the fresh sentences are what ハルカ would write.
+const CARDS = [
+  { type: 'g', pat: 'PARTICLES WITH VERBS', before: '今夜は旅館', after: '泊まります。', answer: 'に', wrong: 'で', explain: '<span class="jp">泊まる</span> marks the place you stay with <span class="jp">に</span>. <span class="jp">で</span> is for where an action happens: <span class="jp">旅館で食べる</span>.' },
+  { type: 'v', w: '影響', r: 'えいきょう', m: 'influence', n: 'N3' },
+  { type: 'g', pat: 'だ / な / で', before: 'この仕事は大事', after: '思う。', answer: 'だと', wrong: 'と', explain: 'A な-adjective or noun needs <span class="jp">だ</span> before <span class="jp">と思う</span>: <span class="jp">大事だと思う</span>, <span class="jp">明日だと思った</span>. An い-adjective goes straight on: <span class="jp">高いと思う</span>.' },
+  { type: 'g', pat: 'EXTRA の', before: 'まだ', after: 'はある。', answer: '勝つチャンス', wrong: '勝つのチャンス', explain: 'A verb goes straight before the noun it describes, with no <span class="jp">の</span>: <span class="jp">勝つチャンス</span>, <span class="jp">作るとき</span>.' },
+  { type: 'g', pat: 'PARTICLES WITH VERBS', before: '窓から富士山', after: '見えた。', answer: 'が', wrong: 'を', explain: '<span class="jp">見える</span> takes <span class="jp">が</span>: what can be seen is the subject. <span class="jp">見る</span> takes <span class="jp">を</span>.' },
+];
+const GRADES = ['もう一度', '難しい', '正解', '簡単'];
+const nav = `<div class="nav">${[['⌂', 'today'], ['▤', 'read'], ['♫', 'listen'], ['❐', 'review', 1], ['⚙', 'settings']].map(([i, l, on]) => `<div class="${on ? 'on' : ''}"><i>${i}</i>${l}</div>`).join('')}</div>`;
+
+function session(id, mode) {
+  const el = document.getElementById(id);
+  const st = { i: 0, picked: null, flipped: false, grade: 2, shownAt: Date.now() };
+  // Each card's choices in a fixed random-looking order.
+  const order = CARDS.map((c, i) => (i % 2 ? [c.wrong, c.answer] : [c.answer, c.wrong]));
+
+  function front(c, i) {
+    if (c.type === 'v') return `<div class="face"><div class="vocab-word">${c.w}</div><div class="chev">⌄</div></div>`;
+    const opts = order[i];
+    if (mode === 'below') {
+      return `<div class="face"><div class="g-k">${c.pat}</div>
+        <div class="sent">${c.before}<span class="blank">&nbsp;</span>${c.after}</div>
+        <div class="choices">${opts.map((o) => `<button class="choice${st.picked === o ? ' picked' : ''}" data-pick="${o}">${o}</button>`).join('')}</div></div>`;
+    }
+    return `<div class="face"><div class="g-k">${c.pat}</div>
+      <div class="sent">${c.before}<span class="slot">${opts.map((o) => `<button class="${st.picked === o ? 'picked' : ''}" data-pick="${o}">${o}</button>`).join('')}</span>${c.after}</div>
+      <div class="pick-hint">どちら？</div></div>`;
+  }
+  function back(c) {
+    const slider = `<div class="gctl"><div class="stog" style="--i:${st.grade}"><div class="thumb"></div>${GRADES.map((g, j) => `<button data-g="${j}" class="${j === st.grade ? 'on' : ''}">${g}</button>`).join('')}</div></div>`;
+    if (c.type === 'v') return `<div class="face back"><div class="reading">${c.r}</div><div class="vocab-word">${c.w}</div><div class="meaning">${c.m}</div><div class="jlpt">${c.n}</div>${slider}</div>`;
+    const wrong = st.picked != null && st.picked !== c.answer;
+    return `<div class="face back"><div class="g-k">${c.pat}</div>
+      <div class="sent">${c.before}<span class="fill">${c.answer}</span>${c.after}</div>
+      <div class="verdict">${wrong ? `You picked <span class="jp">${st.picked}</span>` : ''}</div>
+      <div class="explain">${c.explain}</div>${slider}</div>`;
+  }
+  function draw() {
+    const i = st.i % CARDS.length, c = CARDS[i];
+    const kind = c.type === 'g' ? 'Grammar' : 'Review';
+    el.innerHTML = `<div class="page-h"><button class="back">‹</button>単語</div>
+      <div class="prog"><div class="top"><span class="k">${kind}</span><span class="n">${i + 1} / 14</span></div><div class="track"><i style="width:${(i / 14) * 100}%"></i></div></div>
+      <div class="card-area"><div class="card${st.flipped ? ' flipped' : ''}">${front(c, i)}${back(c)}</div></div>` + nav;
+    const card = el.querySelector('.card');
+    card.addEventListener('click', (e) => {
+      const p = e.target.closest('[data-pick]');
+      const g = e.target.closest('[data-g]');
+      if (!st.flipped) {
+        if (c.type === 'v') { flip(c, null); return; }
+        if (p) flip(c, p.dataset.pick);
+        return; // a grammar card flips only from a choice
+      }
+      if (g) {
+        st.grade = +g.dataset.g;
+        const tog = el.querySelector('.stog');
+        tog.style.setProperty('--i', st.grade);
+        tog.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === st.grade));
+        setTimeout(next, 260);
+        return;
+      }
+      next();
+    });
+  }
+  function flip(c, pick) {
+    const secs = (Date.now() - st.shownAt) / 1000;
+    st.picked = pick;
+    const wrong = c.type === 'g' && pick !== c.answer;
+    // Sentences take longer to read than a word: grammar thresholds are looser.
+    st.grade = wrong ? 0 : (c.type === 'g' ? (secs < 5 ? 3 : secs < 15 ? 2 : 1) : (secs < 3 ? 3 : secs < 10 ? 2 : 1));
+    // Mark the pick, then flip a beat later so the press registers.
+    el.querySelectorAll('[data-pick]').forEach((b) => b.classList.toggle('picked', b.dataset.pick === pick));
+    setTimeout(() => { st.flipped = true; draw(); }, pick ? 180 : 0);
+  }
+  function next() {
+    st.i++; st.picked = null; st.flipped = false; st.grade = 2; st.shownAt = Date.now();
+    draw();
+  }
+  draw();
+}
+session('A', 'below');
+session('B', 'blank');
+
+// ── 進捗, scrolled to the bottom ──
+const RECAPS = [
+  { d: 'OCT 19 – 25', t: 'だ, な and で get mixed up around adjectives and nouns', fresh: true },
+  { d: 'OCT 12 – 18', t: 'に and で: where you are, where you do things' },
+  { d: 'OCT 5 – 11', t: 'Plain form before のに and ので' },
+];
+{
+  const el = document.getElementById('P');
+  el.innerHTML = `<div class="page-h">復習</div>
+    <div class="seg-row"><div class="seg"><button>復習</button><button class="on">進捗</button></div><span class="hint">1,842 語</span></div>
+    <div class="ghost" style="height:150px">ACTIVITY</div>
+    <div class="ghost" style="height:120px">JLPT LEVELS</div>
+    ${[['経済', 'economy'], ['影響', 'influence'], ['泊まる', 'to stay the night'], ['見える', 'to be visible']].map(([w, m]) => `<div class="words-row">${w}<small>${m}</small></div>`).join('')}
+    <div class="sec-k">WEEKLY RECAPS</div>
+    ${RECAPS.map((r, i) => `<button class="recap-row" data-r="${i}"><span class="d">${r.d}${r.fresh ? '<span class="new-tag">NEW</span>' : ''}</span><span class="t">${r.t}</span></button>`).join('')}
+    <div style="height:2rem"></div>`;
+  el.insertAdjacentHTML('afterend', nav);
+  // Start scrolled to the new section.
+  requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  const phone = el.parentElement;
+  const sheet = document.getElementById('sheet');
+  const close = () => phone.classList.remove('open');
+  document.getElementById('dim').addEventListener('click', close);
+  el.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => {
+    const r = RECAPS[+b.dataset.r];
+    b.querySelector('.new-tag')?.remove();
+    sheet.innerHTML = `<div class="bar" id="bar"><i></i></div>
+      <div class="r-k">${r.d}</div><h1 class="r-title">今週のまとめ</h1>
+      <div style="font-family:var(--font-chat);font-weight:500;font-size:1.02rem;line-height:1.7">今週もたくさん話したね！よく出てきたことを三つまとめたよ。</div>
+      <section class="r-pat"><div class="r-k">1 · 11 TIMES</div><h2 class="r-h">${r.t}</h2>
+        <div class="r-ex"><span class="was">若いなのに</span><span class="now">若い<span class="fill">のに</span></span><span class="was">好きので</span><span class="now"><span class="fill">好きなので</span></span><span class="was">大事と思う</span><span class="now">大事<span class="fill">だと</span>思う</span></div>
+        <p class="r-p">い-adjectives never take だ or な. な-adjectives and nouns need な before ので/のに and だ before と思う.</p>
+        <button class="r-prac">ハルカと練習する →</button></section>
+      <section class="r-pat"><div class="r-k">2 · 7 TIMES</div><h2 class="r-h">The place or object particle does not match the verb</h2>
+        <div class="r-ex"><span class="was">旅館で泊まります</span><span class="now">旅館<span class="fill">に</span>泊まります</span><span class="was">返事を見えなかった</span><span class="now">返事<span class="fill">が</span>見えなかった</span></div>
+        <p class="r-p">Some verbs choose their own particle. 泊まる and ある mark the place with に; 見える takes が.</p>
+        <button class="r-prac">ハルカと練習する →</button></section>`;
+    sheet.scrollTop = 0;
+    sheet.querySelector('#bar').addEventListener('click', close);
+    phone.classList.add('open');
+  }));
+}
+</script>
+</body>
+</html>

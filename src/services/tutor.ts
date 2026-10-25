@@ -34,6 +34,9 @@ export interface TutorMessage {
 /** The weekly recap's block in the thread: enough to draw it, the report loads on tap. */
 export interface RecapRef { id: string; title: string }
 
+/** A row in 進捗's list of weekly recaps. */
+export type RecapListItem = Pick<WeeklyRecap, 'id' | 'week_start' | 'week_end' | 'title'>;
+
 /** A long read ハルカ wrote, as a block in the thread that opens it (write-longread). */
 export interface WorkRef { id: string; title: string }
 
@@ -249,6 +252,23 @@ export async function longreadErrorMessage(error: unknown): Promise<string> {
     case 'day_limit': return '今日はここまで。また明日ね。';
   }
   return '記事を書き始められませんでした。もう一度試してください。';
+}
+
+/** What ハルカと練習する says for you, from the chat or from 進捗. */
+export const practiceLine = (pattern: string) => `「${pattern}」を練習したい！`;
+
+export const recapRange = (r: Pick<WeeklyRecap, 'week_start' | 'week_end'>) => {
+  const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  return `${fmt(r.week_start)} – ${fmt(r.week_end)}`;
+};
+
+/** Every weekly recap, newest first (進捗's list); the reports load when one is opened. */
+export async function fetchRecaps(): Promise<RecapListItem[]> {
+  if (DEV_MODE) return DEV_RECAP_ON ? [{ id: DEV_RECAP.id, week_start: DEV_RECAP.week_start, week_end: DEV_RECAP.week_end, title: DEV_RECAP.title }] : [];
+  const { data, error } = await supabase.from('weekly_recaps').select('id, week_start, week_end, title')
+    .order('week_end', { ascending: false }).limit(100);
+  if (error) throw error;
+  return (data ?? []) as RecapListItem[];
 }
 
 export async function fetchRecap(id: string): Promise<WeeklyRecap | null> {
