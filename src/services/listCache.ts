@@ -41,10 +41,40 @@ export function writeListCache<T>(key: ListCacheKey, items: T[]): void {
   }
 }
 
+// Last-loaded values the same way (進捗's activity stats per period, the JLPT level
+// totals), so 進捗 draws at once and refreshes behind it.
+export type ValueCacheKey = 'activity:week' | 'activity:month' | 'activity:all' | 'jlpt-totals';
+const VALUE_KEYS: ValueCacheKey[] = ['activity:week', 'activity:month', 'activity:all', 'jlpt-totals'];
+const values = new Map<ValueCacheKey, unknown>();
+
+/** The last value stored for this key, or null if there isn't one yet. */
+export function readValueCache<T>(key: ValueCacheKey): T | null {
+  if (values.has(key)) return values.get(key) as T;
+  try {
+    const raw = localStorage.getItem(PREFIX + key);
+    if (!raw) return null;
+    const v: unknown = JSON.parse(raw);
+    values.set(key, v);
+    return v as T;
+  } catch {
+    return null;
+  }
+}
+
+export function writeValueCache<T>(key: ValueCacheKey, value: T): void {
+  values.set(key, value);
+  try {
+    localStorage.setItem(PREFIX + key, JSON.stringify(value));
+  } catch {
+    // Quota or storage blocked: the in-memory copy still covers this session.
+  }
+}
+
 /** Sign-out (or a session that ends): another account must never see these cards. */
 export function clearListCaches(): void {
   memory.clear();
-  for (const key of ['works', 'episodes', 'news', 'songs', 'playlists'] as const) {
+  values.clear();
+  for (const key of ['works', 'episodes', 'news', 'songs', 'playlists', ...VALUE_KEYS]) {
     try { localStorage.removeItem(PREFIX + key); } catch { /* storage blocked */ }
   }
 }

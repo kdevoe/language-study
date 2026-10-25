@@ -8,6 +8,7 @@
 
 import { supabase } from './supabase';
 import { alignReading, hasKanji } from './furigana';
+import { readValueCache, writeValueCache } from './listCache';
 import type { CoarsePos } from './tokenizer';
 import type { IntakeCandidate } from './intake';
 
@@ -453,10 +454,18 @@ export function jmdictToWordDetails(
 // count per level.
 
 let jlptTotalsCache: Record<number, number> | null = null;
+const JLPT_TOTALS_TTL_MS = 7 * 86_400_000;
 
-/** Number of JMDict entries at each JLPT level. Cached for the session. */
+/** The last JLPT totals fetched, from this session or an earlier one (they barely change). */
+export function cachedJlptTotals(): Record<number, number> | null {
+  return jlptTotalsCache ?? readValueCache<{ at: number; totals: Record<number, number> }>('jlpt-totals')?.totals ?? null;
+}
+
+/** Number of JMDict entries at each JLPT level. Cached for the session, and kept a week across launches. */
 export async function fetchJlptTotals(): Promise<Record<number, number>> {
   if (jlptTotalsCache) return jlptTotalsCache;
+  const kept = readValueCache<{ at: number; totals: Record<number, number> }>('jlpt-totals');
+  if (kept && Date.now() - kept.at < JLPT_TOTALS_TTL_MS) return (jlptTotalsCache = kept.totals);
 
   const totals: Record<number, number> = {};
   await Promise.all(
@@ -470,7 +479,10 @@ export async function fetchJlptTotals(): Promise<Record<number, number>> {
   );
 
   // Only cache a successful fetch so a transient/offline failure can be retried.
-  if (Object.keys(totals).length > 0) jlptTotalsCache = totals;
+  if (Object.keys(totals).length > 0) {
+    jlptTotalsCache = totals;
+    writeValueCache('jlpt-totals', { at: Date.now(), totals });
+  }
   return totals;
 }
 
