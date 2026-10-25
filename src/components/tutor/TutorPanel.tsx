@@ -11,7 +11,7 @@ import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
 import { lookupWord as jmdictLookup } from '../../services/jmdict';
 import {
   fetchRecap, fetchTutorHistory, localDay, longreadErrorMessage, pollResearch, startLongread, streamTutor,
-  type RecapRef, type ScreenContext, type TutorAction, type WorkRef,
+  practiceLine, type RecapRef, type ScreenContext, type TutorAction, type WorkRef,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
 import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
@@ -76,6 +76,8 @@ export function TutorPanel() {
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // A line to say for the learner once the thread is loaded (OpenOptions.send).
+  const pendingSendRef = useRef<string | null>(null);
   const lookup = useWordLookup();
 
   // A long read's block: the Reader opens it (App), and the panel steps aside.
@@ -142,6 +144,7 @@ export function TutorPanel() {
     setOpenerRecapId((options.opener ? options.recapId : screen?.recapId) ?? null);
     setOpenerWork((options.opener ? options.work : screen?.work) ?? null);
     if (busy === null && (!historyOk || staleRef.current || historyDayRef.current !== localDay())) syncHistory();
+    pendingSendRef.current = options.send ?? null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, openSeq]);
 
@@ -266,6 +269,14 @@ export function TutorPanel() {
     // Nothing got through: hand the message back so it isn't lost (a photo isn't re-attached).
     if (!ok && message) setDraft((d) => d || message);
   }, [busy, ctx, chipOff, opener, openerRecap, openerWork, lines, photo, streamReply]);
+
+  // ハルカと練習する from 進捗: send it once today's thread is on screen, so it lands after it.
+  useEffect(() => {
+    const line = pendingSendRef.current;
+    if (!open || !loaded || busy !== null || !line) return;
+    pendingSendRef.current = null;
+    void sendText(line);
+  }, [open, loaded, busy, sendText]);
 
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return;
@@ -431,7 +442,7 @@ export function TutorPanel() {
         <div className="tutor-foot" />
       </aside>
       <RecapSheet id={sheetRecap} onClose={() => setSheetRecap(null)}
-        onPractice={(pattern) => { setSheetRecap(null); void sendText(`「${pattern}」を練習したい！`); }} />
+        onPractice={(pattern) => { setSheetRecap(null); void sendText(practiceLine(pattern)); }} />
       <WordModal {...lookup.modalProps} />
     </>
   );

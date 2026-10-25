@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
-import { fetchRecap, type RecapRef, type WeeklyRecap } from '../../services/tutor';
+import { fetchRecap, recapRange, type RecapRef, type WeeklyRecap } from '../../services/tutor';
 
 // ハルカ's weekly recap (docs/mockups/weekly-recap.html, A; design-system §6.17).
 // In the thread it's one block under her Sunday opener; a tap opens the report
@@ -32,11 +32,6 @@ function Fixed({ now, fix }: { now: string; fix?: string }) {
   if (!fix || at < 0) return <>{now}</>;
   return <>{now.slice(0, at)}<span className="recap-fix">{fix}</span>{now.slice(at + fix.length)}</>;
 }
-
-const range = (r: WeeklyRecap) => {
-  const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
-  return `${fmt(r.week_start)} – ${fmt(r.week_end)}`;
-};
 
 export function RecapSheet({ id, onClose, onPractice }: {
   id: string | null;
@@ -88,7 +83,7 @@ export function RecapSheet({ id, onClose, onPractice }: {
               {failed && <p className="recap-p recap-muted">まとめを開けませんでした。</p>}
               {r && recap && (
                 <div className="recap">
-                  <div className="recap-k">{range(recap)}</div>
+                  <div className="recap-k">{recapRange(recap)}</div>
                   <h1 className="recap-title">今週のまとめ</h1>
                   <div className="recap-her">{r.intro}</div>
                   <p className="recap-p recap-lede"><Mixed text={r.lede} /></p>

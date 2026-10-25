@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { cachedJlptTotals, fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
 import { ActivityStats } from './ActivityStats';
+import { WeeklyRecaps } from './WeeklyRecaps';
 
 // Mastery palette mirrors the generated vocab-summary report so the in-app
 // dashboard shares the same earthy, muted language as the rest of Yūgen.
@@ -588,6 +589,8 @@ export function Progress({ embedded = false }: { embedded?: boolean } = {}) {
             </div>
           ))}
       </div>
+
+      <WeeklyRecaps />
     </div>
   );
 }
