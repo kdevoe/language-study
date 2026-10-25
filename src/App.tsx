@@ -16,7 +16,8 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { useKanjiStore, hasKanjiDeck } from './services/kanjiStore'
 import { useGrammarStore } from './services/grammarStore'
-import { supabase } from './services/supabase'
+import { supabase, storedSession } from './services/supabase'
+import { checkApproval, forgetApproval } from './services/approval'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
 import { loadActivity } from './components/ActivityStats'
 import { fetchJlptTotals } from './services/jmdict'
@@ -313,6 +314,23 @@ function App() {
         return;
       }
 
+      // Offline or slow to answer: open on the session saved on the device. An
+      // expired token can't refresh without a network, and auth-js retries that
+      // refresh with backoff for longer than the timeout below, then reports null.
+      // The approval check doesn't block the app (it remembers 'approved').
+      const openSaved = () => {
+        const saved = storedSession();
+        if (!saved) return false;
+        setSession(saved);
+        if (saved.user.email) checkApproval(saved.user.id, saved.user.email).then(setApprovalStatus);
+        return true;
+      };
+
+      if (!navigator.onLine && openSaved()) {
+        setIsInitializing(false);
+        return;
+      }
+
       try {
         // 8s timeout only prevents a blank screen on a slow/hung network. It must
         // NOT force-logout: on timeout we leave the session untouched and let the
@@ -323,20 +341,21 @@ function App() {
           setTimeout(() => reject(new Error("Supabase initialization timed out")), 8000)
         );
 
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        // Offline with an expired token, auth-js reports null but keeps the session saved.
+        const session = data.session ?? storedSession();
         setSession(session);
 
         if (session?.user?.email) {
-          const { data: status, error } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
-          if (error) console.error("Whitelist check error:", error);
-          setApprovalStatus(status || 'not_joined');
+          setApprovalStatus(await checkApproval(session.user.id, session.user.email));
         } else {
           setApprovalStatus(null);
         }
       } catch (err) {
-        // Slow/transient init — do NOT clear the session. The auth listener will
-        // populate it from persisted storage once getSession resolves.
-        console.warn("Session init slow; deferring to auth listener:", err);
+        // Slow/transient init — do NOT clear the session. Open on the saved one;
+        // the auth listener replaces it once getSession resolves.
+        console.warn("Session init slow; opening the saved session:", err);
+        openSaved();
       } finally {
         setIsInitializing(false);
       }
@@ -344,9 +363,11 @@ function App() {
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, reported) => {
+      // INITIAL_SESSION arrives null when an expired token can't be refreshed offline.
+      const session = reported ?? (event === 'INITIAL_SESSION' ? storedSession() : null);
       setSession(session);
-      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); }
+      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); forgetApproval(); }
       // IMPORTANT: this callback runs while GoTrue still holds its navigator
       // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
       // inside it would re-enter the lock and deadlock — hanging every later
@@ -354,12 +375,7 @@ function App() {
       // is released first. (Keep the callback itself synchronous.)
       setTimeout(async () => {
         if (session?.user?.email) {
-          try {
-            const { data: status } = await supabase.rpc('check_is_approved', { p_email: session.user.email });
-            setApprovalStatus(status || 'not_joined');
-          } catch (e) {
-            console.error("Auth change status check error:", e);
-          }
+          setApprovalStatus(await checkApproval(session.user.id, session.user.email));
         } else {
           setApprovalStatus(null);
         }
