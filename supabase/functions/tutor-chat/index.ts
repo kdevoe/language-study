@@ -49,6 +49,9 @@ const API_TIMEOUT_MS = 90_000;   // one model call; the app's watchdog gives up 
 const SILENT_TURN_NUDGE = 'You ended your turn without writing anything to the learner. Your thinking and tool calls are invisible to them, so nothing has been shown yet. Write your reply to them now.';
 // A tool call written out as text instead of a tool_use block (cut from there on).
 const LEAKED_CALL_RE = /<\/?(?:antml:)?(?:invoke|function_calls|parameter)\b[\s\S]*$/;
+// A reply of only a dash or dots is a turn with nothing to say: after a tool
+// round she sometimes writes "-" (2026-10-25), which showed as a stray line.
+const BLANK_RE = /^[\s\-–—―・.。…]*$/;
 const MAX_HISTORY_MESSAGES = 80;   // older turns drop off (the dream already has them)
 const MAX_USER_CHARS = 2000;
 const RESEARCH_PER_DAY = Number(Deno.env.get('TUTOR_RESEARCH_PER_DAY') ?? '') || 50;   // rolling 24 hours
@@ -638,7 +641,11 @@ async function runTurn(opts: {
         .filter((b: any) => b.type !== 'text' || b.text);
     }
     const ended = msg.stop_reason !== 'tool_use' || calls.length === 0;
-    const text = content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
+    let text = content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
+    if (BLANK_RE.test(text)) {
+      text = '';
+      content = content.filter((b: any) => b.type !== 'text');
+    }
     finalText += text;
     // Keep every block (thinking included): a tool loop must hand back the
     // assistant turn exactly as it came. A turn left with nothing to say isn't
