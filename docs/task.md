@@ -692,3 +692,8 @@
         `[research] withheld:` logs
   - [ ] Follow-ups: audit RLS + storage policies; api/news.ts is an unused, unauthenticated NewsAPI proxy (remove);
         local dev against functions needs DEV_ALLOW_ANON=true in the functions env file
+- [x] Provider fallback (2026-10-24): Gemini's prepaid credits ran out and every article and podcast script
+      failed (402 RESOURCE_EXHAUSTED). `_shared/llm.ts`: Gemini jobs (rewrite, continuity, podcast script) fall
+      back to Claude Sonnet; Claude helpers (callTool, complete, quickHaiku, grammar insight) fall back to Gemini
+      Flash. Failed article rows now keep `metadata.error` (ensure-buffer, long-read parts)
+  - [ ] Not covered yet: ハルカ's chat turns, web research, song cover art

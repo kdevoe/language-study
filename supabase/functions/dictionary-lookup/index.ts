@@ -1,7 +1,7 @@
 import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CLAUDE_HAIKU } from '../_shared/models.ts';
-import { parseJsonObject, quickHaiku } from '../_shared/claude.ts';
+import { parseJsonObject, quickHaiku, withGeminiFallback } from '../_shared/claude.ts';
 import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
 import { resolveCaller } from '../_shared/auth.ts';
 import { dataRule, fenceInline } from '../_shared/untrusted.ts';
@@ -196,17 +196,15 @@ Be extremely concise. Write plain text (no markdown) and do not include romanize
             ? `\nThe word is part of this grammar pattern: ${points.slice(0, 4).map(named).join('; ')}. If you mention it, use that name.`
             : ''}`;
 
-      const message = await anthropic.messages.create({
-        model: CLAUDE_HAIKU,
-        max_tokens: 2048, // covers adaptive thinking + the one-sentence answer
-        messages: [{ role: 'user', content: prompt }],
-      });
-      if (message.stop_reason === 'refusal') throw new Error('grammar insight declined by model');
-      const insight = message.content
-        .filter((b) => b.type === 'text')
-        .map((b) => b.text)
-        .join('')
-        .trim();
+      const insight = (await withGeminiFallback(async () => {
+        const message = await anthropic.messages.create({
+          model: CLAUDE_HAIKU,
+          max_tokens: 2048, // covers adaptive thinking + the one-sentence answer
+          messages: [{ role: 'user', content: prompt }],
+        });
+        if (message.stop_reason === 'refusal') throw new Error('grammar insight declined by model');
+        return message.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+      }, prompt, { maxTokens: 2048 })).trim();
 
       return new Response(JSON.stringify({ insight }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

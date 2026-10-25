@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH } from '../_shared/models.ts';
+import { geminiJsonOrClaude, isOut, markOut, providerDown } from '../_shared/llm.ts';
 import { parseJsonObject, quickHaiku } from '../_shared/claude.ts';
 import { classifyBucket, compareByProximity, compareKnown, selectPreDueFloor, type WordSignal } from '../_shared/wordPriority.ts';
 import { buildRewritePrompt } from '../_shared/rewritePrompt.ts';
@@ -102,6 +103,8 @@ function isTransientLlmError(err: unknown): boolean {
 // real numbers makes lexicon creep and cost regressions visible in production
 // instead of theoretical. `attempts` counts generations actually paid for.
 interface RewriteUsage {
+  /** Gemini, or Claude when Gemini was out (_shared/llm.ts). */
+  model: string;
   promptTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
@@ -120,12 +123,8 @@ async function runRewriteWithRetry(
   let best: { blocks: any; usage: RewriteUsage; chars: number } | null = null;
   for (let attempt = 0; attempt < REWRITE_MAX_ATTEMPTS; attempt++) {
     try {
-      const result = await ai.models.generateContent({
-        model: GEMINI_FLASH,
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
-      });
-      const rawText = (result.text ?? '')
+      const result = await geminiJson(ai, prompt);
+      const rawText = result.text
         .replace(/^```(json)?[\s\n]*/i, '')
         .replace(/[\s\n]*```$/i, '')
         .trim();
@@ -134,13 +133,14 @@ async function runRewriteWithRetry(
       const scrubbed = Array.isArray(parsed) ? scrubLinks(parsed) : 0;
       validateBlocks(parsed);
       if (scrubbed > 0) console.warn(`[process-article] removed ${scrubbed} link(s)/address(es) from the generation`);
-      const meta = result.usageMetadata;
+      const u = result.usage;
       const out = {
         blocks: parsed,
         usage: {
-          promptTokens: meta?.promptTokenCount ?? null,
-          outputTokens: meta?.candidatesTokenCount ?? null,
-          totalTokens: meta?.totalTokenCount ?? null,
+          model: u.model,
+          promptTokens: u.inputTokens,
+          outputTokens: u.outputTokens,
+          totalTokens: u.inputTokens != null && u.outputTokens != null ? u.inputTokens + u.outputTokens : null,
           attempts: attempt + 1,
         },
       };
@@ -160,6 +160,12 @@ async function runRewriteWithRetry(
         `[process-article] rewrite attempt ${attempt + 1}/${REWRITE_MAX_ATTEMPTS} failed (transient=${transient}):`,
         err instanceof Error ? err.message : err,
       );
+      // Gemini still overloaded on the last attempt: one more, on Claude.
+      if (attempt === REWRITE_MAX_ATTEMPTS - 1 && !best && !isOut('gemini') && providerDown(err)) {
+        markOut('gemini', err);
+        attempt--;
+        continue;
+      }
       if (!transient || attempt === REWRITE_MAX_ATTEMPTS - 1) {
         if (best) break;   // an earlier, short rewrite beats none
         throw err;
@@ -169,6 +175,23 @@ async function runRewriteWithRetry(
   }
   if (best) return { blocks: best.blocks, usage: { ...best.usage, attempts: REWRITE_MAX_ATTEMPTS } };
   throw lastErr;
+}
+
+/** One JSON generation on Gemini, or on Claude when Gemini is out (credits ran
+ *  out on 2026-10-24 and every article failed). Same prompt either way. */
+function geminiJson(ai: GoogleGenAI, prompt: string, maxTokens = 32000) {
+  return geminiJsonOrClaude(async () => {
+    const result = await ai.models.generateContent({
+      model: GEMINI_FLASH,
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const meta = result.usageMetadata;
+    return {
+      text: result.text ?? '',
+      usage: { model: GEMINI_FLASH, inputTokens: meta?.promptTokenCount ?? null, outputTokens: meta?.candidatesTokenCount ?? null },
+    };
+  }, prompt, maxTokens);
 }
 
 // ── Opportunistic full-text extraction ──────────────────────────────────────
@@ -343,12 +366,8 @@ ${fence('part', prevPartText.slice(0, 8000))}
 
 ${dataRule(['part'])}`;
   try {
-    const result = await ai.models.generateContent({
-      model: GEMINI_FLASH,
-      contents: prompt,
-      config: { responseMimeType: 'application/json' },
-    });
-    const parsed = JSON.parse((result.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim());
+    const result = await geminiJson(ai, prompt, 4000);
+    const parsed = JSON.parse(result.text.replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim());
     return {
       summaryJa: typeof parsed.summary_ja === 'string' ? parsed.summary_ja : undefined,
       properNouns: parsed.proper_nouns && typeof parsed.proper_nouns === 'object' ? parsed.proper_nouns : undefined,
@@ -553,8 +572,9 @@ Deno.serve(async (req) => {
   }
 
   // Set by the JIT-part path so the outer catch can flip its claimed `pending`
-  // part row to `failed` (freeing the retry affordance) on any thrown error.
-  let failClaim: (() => Promise<unknown>) | null = null;
+  // part row to `failed` (freeing the retry affordance) on any thrown error,
+  // with the reason in metadata.
+  let failClaim: ((reason?: string) => Promise<unknown>) | null = null;
 
   try {
     const body = await req.json();
@@ -805,8 +825,9 @@ Deno.serve(async (req) => {
         work_id: workRow.id,
         part_index: jitPartIndex,
       }, { onConflict: 'user_id,id' });
-      failClaim = () => supabase.from('processed_news')
-        .update({ status: 'failed' }).eq('user_id', userId).eq('id', partId);
+      failClaim = (reason?: string) => supabase.from('processed_news')
+        .update({ status: 'failed', metadata: { error: (reason ?? 'unknown').slice(0, 500), failedAt: new Date().toISOString() } })
+        .eq('user_id', userId).eq('id', partId);
 
       jitWork = { id: workRow.id, title: workRow.title, source_type: workRow.source_type };
       title = workRow.title;
@@ -1311,7 +1332,7 @@ Deno.serve(async (req) => {
           // Queryable per-article cost telemetry (metadata is jsonb):
           //   select metadata->'usage' from processed_news order by created_at desc;
           usage: {
-            model: GEMINI_FLASH,
+            model: usage.model,
             promptTokens: usage.promptTokens,
             outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens,
@@ -1326,7 +1347,7 @@ Deno.serve(async (req) => {
     if (saveError) {
       console.error('[process-article] Save error:', saveError);
       // The part's pending claim flips to failed so the retry affordance works.
-      if (failClaim) await failClaim().catch(() => {});
+      if (failClaim) await failClaim(`save: ${saveError.message}`).catch(() => {});
       return new Response(JSON.stringify({ error: saveError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -1361,7 +1382,7 @@ Deno.serve(async (req) => {
     console.error(`[process-article] Error (busy=${busy}):`, err);
     // A JIT part that died mid-generation must not strand its pending claim —
     // failed frees the slot for the reader's retry affordance.
-    if (failClaim) await failClaim().catch(() => {});
+    if (failClaim) await failClaim(err instanceof Error ? err.message : String(err)).catch(() => {});
     return new Response(
       JSON.stringify({
         error: err instanceof Error ? err.message : String(err),

@@ -24,6 +24,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, ELEVEN_DIALOGUE_MODEL, RESEARCH_MODEL } from '../_shared/models.ts';
 import { emptyUsage } from '../_shared/claude.ts';
+import { geminiJsonOrClaude, isOut, markOut, providerDown } from '../_shared/llm.ts';
 import { research } from '../_shared/research.ts';
 import { pickTargetWords } from '../_shared/readerVocab.ts';
 import { CAST, STANDARD, pickPairing, personaById, type PairHistory, type Persona } from '../_shared/podcastCast.ts';
@@ -102,19 +103,24 @@ async function generateScript(ai: GoogleGenAI, input: PodcastPromptInput) {
   let lastErr: unknown;
   for (let attempt = 0; attempt < SCRIPT_MAX_ATTEMPTS; attempt++) {
     try {
-      const result = await ai.models.generateContent({
-        model: GEMINI_FLASH,
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
-      });
-      const raw = (result.text ?? '').replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
+      // Gemini, or Claude when Gemini is out (_shared/llm.ts; credits ran out 2026-10-24).
+      const result = await geminiJsonOrClaude(async () => {
+        const r = await ai.models.generateContent({
+          model: GEMINI_FLASH,
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        const meta = r.usageMetadata;
+        return { text: r.text ?? '', usage: { model: GEMINI_FLASH, inputTokens: meta?.promptTokenCount ?? null, outputTokens: meta?.candidatesTokenCount ?? null } };
+      }, prompt, 32000);
+      const raw = result.text.replace(/^```(json)?[\s\n]*/i, '').replace(/[\s\n]*```$/i, '').trim();
       const script = normalizeScript(JSON.parse(raw), input);
-      const meta = result.usageMetadata;
       return {
         script,
         usage: {
-          promptTokens: meta?.promptTokenCount ?? null,
-          outputTokens: meta?.candidatesTokenCount ?? null,
+          model: result.usage.model,
+          promptTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
           attempts: attempt + 1,
         },
       };
@@ -122,6 +128,12 @@ async function generateScript(ai: GoogleGenAI, input: PodcastPromptInput) {
       lastErr = err;
       const transient = isTransientLlmError(err);
       console.warn(`[generate-podcast] script attempt ${attempt + 1}/${SCRIPT_MAX_ATTEMPTS} failed (transient=${transient}):`, err instanceof Error ? err.message : err);
+      // Gemini still overloaded on the last attempt: one more, on Claude.
+      if (attempt === SCRIPT_MAX_ATTEMPTS - 1 && !isOut('gemini') && providerDown(err)) {
+        markOut('gemini', err);
+        attempt--;
+        continue;
+      }
       if (!transient || attempt === SCRIPT_MAX_ATTEMPTS - 1) throw err;
       await new Promise((r) => setTimeout(r, SCRIPT_BACKOFF_MS[attempt]));
     }

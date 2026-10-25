@@ -27,6 +27,8 @@ Edge Functions live in `supabase/functions/` and run on Deno. They are deployed 
 
 **Stack**: React 18 + TypeScript + Vite (frontend), Supabase Postgres + Edge Functions (backend), Gemini 3.8-flash (article rewriting), Claude Haiku 5.5 (grammar insights, translation, readings, dictionary fallback, article concepts). Model identifiers are centralized in `supabase/functions/_shared/models.ts` (single bump point per model).
 
+**Provider fallback** (`supabase/functions/_shared/llm.ts`): each provider backs up the other. When Gemini is out (credits, billing or key refused) or still overloaded after a job's retries, the article rewrite, long-read continuity and podcast script go to Claude Sonnet. When Claude is out, `callTool`, `complete`, `quickHaiku` and the grammar insight go to Gemini Flash. A provider found out is skipped in that instance for 10 minutes (2 for an overload). Not covered: ハルカ's chat turns (a streamed tool loop), web research (Claude's `web_search`) and song cover art (Gemini image). Article usage metadata records the model that actually wrote it, and a failed article row carries `metadata.error`.
+
 ### Frontend (`src/`)
 
 - **State**: Zustand store in `services/store.ts`, persisted to localStorage under key `yugen-storage`. All user preferences (JLPT level, RTK level, study/vocab/furigana modes) and word progress live here, with async sync to Supabase.
