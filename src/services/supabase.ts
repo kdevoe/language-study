@@ -1,8 +1,11 @@
-import { createClient, processLock } from '@supabase/supabase-js';
+import { createClient, processLock, type Session } from '@supabase/supabase-js';
 
 // The env values may carry literal quotes (the production ones do): use these, not import.meta.env.
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/['"]/g, '') || 'https://placeholder.supabase.co';
 export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.replace(/['"]/g, '') || 'placeholder';
+
+// supabase-js's default key, named so storedSession() can read it.
+const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`;
 
 // Create a single supabase client for interacting with your database.
 // Auth options are explicit so session persistence + token refresh behaviour is
@@ -13,6 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
+    storageKey,
     // Use the in-memory process lock instead of the default navigator.locks lock.
     // In a long-lived iOS standalone PWA, a token auto-refresh that starts just as
     // iOS suspends the WebView can leave the navigator.locks lock held and never
@@ -23,6 +27,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     lock: processLock,
   },
 });
+
+/**
+ * The signed-in session as saved on the device, even if its access token has
+ * expired. Offline, an expired token can't be refreshed: auth-js keeps the
+ * session saved (a network failure isn't a sign-out) but reports null, which
+ * would show the landing page mid-flight. The app uses this to stay signed in;
+ * the 'online' recovery below refreshes the token when the network is back.
+ * A real sign-out or a rejected refresh removes the saved copy, so this is null then.
+ */
+export function storedSession(): Session | null {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const session = raw ? (JSON.parse(raw) as Session) : null;
+    return session?.user?.id && session.refresh_token ? session : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Session recovery on tab return ────────────────────────────────────────────
 // Browsers throttle/pause timers in backgrounded tabs (and the OS pauses them on
