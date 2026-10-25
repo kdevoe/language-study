@@ -3,6 +3,7 @@
 // dictionary-lookup and process-article.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.132.1';
 import { CLAUDE_HAIKU, CLAUDE_PRICES, CLAUDE_SONNET, WEB_SEARCH_USD } from './models.ts';
+import { geminiText, isOut, jsonPart, markOut, providerDown } from './llm.ts';
 
 export const anthropic = new Anthropic();
 
@@ -106,7 +107,7 @@ function missingRequired(schema: Record<string, unknown>, value: unknown, path =
  * call, not cut off at max_tokens, every required field present, nested ones too) and
  * regenerated once if it fails, as on a transient error (429/5xx/overloaded).
  */
-export async function callTool<T>(opts: {
+interface ToolCall {
   model: string;
   system?: string;
   prompt: string | unknown[];   // a string, or content blocks (e.g. an image then text)
@@ -115,7 +116,49 @@ export async function callTool<T>(opts: {
   schema: Record<string, unknown>;
   maxTokens: number;
   usage: Usage;
-}): Promise<T> {
+}
+
+/**
+ * callTool with Gemini behind it: when Claude is out (credits, key, or still
+ * overloaded after a retry), a text prompt goes to Gemini in JSON mode with the
+ * schema spelled out, and the reply gets the same required-field check. Prompts
+ * with images stay on Claude.
+ */
+export async function callTool<T>(opts: ToolCall): Promise<T> {
+  const textOnly = typeof opts.prompt === 'string';
+  if (!textOnly || !isOut('claude')) {
+    try {
+      return await callToolClaude<T>(opts);
+    } catch (e) {
+      if (!textOnly || !providerDown(e)) throw e;
+      markOut('claude', e);
+    }
+  }
+  return await callToolGemini<T>(opts);
+}
+
+async function callToolGemini<T>(opts: ToolCall): Promise<T> {
+  const prompt = `${opts.prompt}
+
+Answer with only a JSON object: the input for "${opts.name}" (${opts.description}). It must match this JSON Schema, with every required field:
+${JSON.stringify(opts.schema)}`;
+  let retried = false;
+  for (;;) {
+    const { text } = await geminiText(prompt, { json: true, system: opts.system, maxTokens: Math.max(opts.maxTokens, 8000) });
+    try {
+      const input = JSON.parse(jsonPart(text)) as Record<string, unknown>;
+      const missing = missingRequired(opts.schema, input);
+      if (missing.length) throw new BadToolOutput(`${opts.name} (gemini): missing ${missing.join(', ')}`);
+      return input as T;
+    } catch (e) {
+      if (retried) throw e;
+      retried = true;
+      console.warn(`[claude] ${opts.name} gemini fallback: retrying after: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
+    }
+  }
+}
+
+async function callToolClaude<T>(opts: ToolCall): Promise<T> {
   let retried = false;
   for (;;) {
     const forced = !NO_FORCED_TOOL.has(opts.model);
@@ -168,8 +211,28 @@ export async function callTool<T>(opts: {
   }
 }
 
+/**
+ * A Claude text call with Gemini behind it: when Claude is out (or marked out),
+ * the same prompt goes to Gemini. `claude` makes the call and returns the text.
+ */
+export async function withGeminiFallback(claude: () => Promise<string>, prompt: string, opts: { json?: boolean; maxTokens?: number } = {}): Promise<string> {
+  if (!isOut('claude')) {
+    try {
+      return await claude();
+    } catch (e) {
+      if (!providerDown(e)) throw e;
+      markOut('claude', e);
+    }
+  }
+  return (await geminiText(prompt, { json: opts.json, maxTokens: opts.maxTokens ? Math.max(opts.maxTokens, 2048) : undefined })).text;
+}
+
 /** Plain text completion (the editor's writer step). */
-export async function complete(opts: { model: string; prompt: string; maxTokens: number; usage: Usage }): Promise<string> {
+export function complete(opts: { model: string; prompt: string; maxTokens: number; usage: Usage }): Promise<string> {
+  return withGeminiFallback(() => completeClaude(opts), opts.prompt, { maxTokens: opts.maxTokens });
+}
+
+async function completeClaude(opts: { model: string; prompt: string; maxTokens: number; usage: Usage }): Promise<string> {
   const msg = await anthropic.messages.create({
     model: opts.model,
     max_tokens: opts.maxTokens,
@@ -185,7 +248,12 @@ export async function complete(opts: { model: string; prompt: string; maxTokens:
  * thinks at medium effort by default; disabling it is allowed at effort high or
  * below. Returns the reply text; throws on a refusal or an empty reply.
  */
-export async function quickHaiku(prompt: string, maxTokens = 1024): Promise<string> {
+export function quickHaiku(prompt: string, maxTokens = 1024): Promise<string> {
+  // Gemini thinks too, so its fallback gets room for that beside the answer.
+  return withGeminiFallback(() => quickHaikuClaude(prompt, maxTokens), prompt, { maxTokens: Math.max(maxTokens, 2048) });
+}
+
+async function quickHaikuClaude(prompt: string, maxTokens: number): Promise<string> {
   const msg = await anthropic.messages.create({
     model: CLAUDE_HAIKU,
     max_tokens: maxTokens,

@@ -158,8 +158,10 @@ Deno.serve(async (req) => {
 
     // ── Produce each claimed slot (slow Gemini work, OUTSIDE the lock). ───────
     let produced = 0, failed = 0, thin = 0, claimedTotal = 0;
-    const markFailed = (id: string) => admin.from('processed_news')
-      .update({ status: 'failed', retry_count: 1 })
+    // The reason goes in metadata (the pending row has none yet), so a bad day
+    // can be read from the table: 2026-10-24's failures left no trace.
+    const markFailed = (id: string, reason: string) => admin.from('processed_news')
+      .update({ status: 'failed', retry_count: 1, metadata: { error: reason.slice(0, 500), failedAt: new Date().toISOString() } })
       .eq('user_id', userId).eq('id', id).eq('status', 'pending');
 
     // Returns the topics whose story was refused as too thin.
@@ -169,6 +171,7 @@ Deno.serve(async (req) => {
         const card = byId.get(slot.id);
         const snippet = card?.blocks?.[0]?.content?.[0]?.text || slot.title;
         let ok = false;
+        let reason = 'unknown';
         try {
           const resp = await fetch(`${supabaseUrl}/functions/v1/process-article`, {
             method: 'POST',
@@ -189,6 +192,7 @@ Deno.serve(async (req) => {
           ok = resp.ok; // process-article upserts the pending row → status='ready'
           if (!ok) {
             const text = await resp.text();
+            reason = `process-article ${resp.status}: ${text}`;
             if (resp.status === 422 && text.includes('thin_source')) {
               thin++;
               thinTopics.push(card?.category ?? '');
@@ -197,6 +201,7 @@ Deno.serve(async (req) => {
             }
           }
         } catch (e) {
+          reason = `process-article threw: ${e instanceof Error ? e.message : String(e)}`;
           console.error(`[ensure-buffer] process-article threw for ${slot.id}:`, e instanceof Error ? e.message : e);
         }
 
@@ -207,7 +212,7 @@ Deno.serve(async (req) => {
           // Guardrail #4: failures don't revert into a deficit and don't loop — mark
           // the claimed-but-unproduced row failed (still counts toward the daily cap)
           // so the slot frees and the headline isn't retried indefinitely.
-          await markFailed(slot.id);
+          await markFailed(slot.id, reason);
         }
       }
       return thinTopics;
