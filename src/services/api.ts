@@ -97,6 +97,7 @@ import { captureError } from './monitoring'
 import type { SearchCorpus } from './archiveSearch'
 import { writeListCache } from './listCache'
 import { addActivity } from './activity'
+import { registerReplay, send, type SendResult } from './outbox'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -183,9 +184,9 @@ export async function joinWaitlist(email: string): Promise<{ success: boolean; m
 export async function recordArticleReading(articleId: string, seconds: number, finished: boolean): Promise<void> {
   addActivity('read', seconds);
   if (import.meta.env.VITE_DEV_MODE === 'true') return;
-  const { error } = await supabase.rpc('record_article_reading', {
+  const { error } = await send({ t: 'rpc', fn: 'record_article_reading', args: {
     p_id: articleId, p_seconds: Math.round(seconds), p_finished: finished,
-  });
+  } });
   if (error) console.warn('[api] recordArticleReading failed:', error.message);
 }
 
@@ -194,11 +195,21 @@ export async function markArticleConsumed(
   userId: string,
   kind: 'read' | 'dismissed',
 ): Promise<boolean> {
-  const now = new Date().toISOString();
+  // Queued when offline (outbox.ts); a queued move refills nothing now.
+  const { data } = await send({ t: 'call', name: 'markArticleConsumed', args: [articleId, userId, kind, new Date().toISOString()] });
+  return data === true;
+}
+
+async function consumeNow(
+  articleId: string,
+  userId: string,
+  kind: 'read' | 'dismissed',
+  now: string,
+): Promise<SendResult> {
   const patch = kind === 'read'
     ? { status: 'read', read_at: now }
     : { status: 'dismissed', dismissed_at: now };
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('processed_news')
     .update(patch)
     .eq('user_id', userId)
@@ -207,9 +218,9 @@ export async function markArticleConsumed(
     .select('id');
   if (error) {
     console.error(`[api] markArticleConsumed(${kind}) failed:`, error);
-    return false;
+    return { error, status };
   }
-  if ((data?.length ?? 0) > 0) return true; // a live buffer row moved → caller refills
+  if ((data?.length ?? 0) > 0) return { error: null, status, data: true }; // a live buffer row moved → caller refills
 
   // No live buffer row matched: this was a RAW feed card swiped/read before it was
   // ever processed, so the only record of it was in localStorage. Write a tombstone
@@ -225,8 +236,9 @@ export async function markArticleConsumed(
     .from('processed_news')
     .upsert(tombstone, { onConflict: 'user_id,id', ignoreDuplicates: true });
   if (tombErr) console.warn(`[api] markArticleConsumed(${kind}) tombstone failed:`, tombErr.message);
-  return false;
+  return { error: null, status: 200, data: false };
 }
+registerReplay('markArticleConsumed', consumeNow);
 
 /** Ask the server to top up this user's ready-article buffer. Idempotent and
  *  fire-and-forget: no-ops when the buffer is full or the kill switch is off, and
@@ -533,11 +545,10 @@ export async function saveWorkReadingPosition(
   userId: string,
   position: WorkReadingPosition,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('long_form_works')
-    .update({ reading_position: position })
-    .eq('id', workId)
-    .eq('user_id', userId);
+  const { error } = await send({
+    t: 'update', table: 'long_form_works', patch: { reading_position: position },
+    match: { id: workId, user_id: userId }, key: `reading_position:${workId}`,
+  });
   if (error) console.warn('[api] saveWorkReadingPosition failed:', error.message);
 }
 
@@ -591,11 +602,7 @@ export async function updateWorkStatus(
   userId: string,
   status: 'active' | 'finished' | 'archived',
 ): Promise<void> {
-  const { error } = await supabase
-    .from('long_form_works')
-    .update({ status })
-    .eq('id', workId)
-    .eq('user_id', userId);
+  const { error } = await send({ t: 'update', table: 'long_form_works', patch: { status }, match: { id: workId, user_id: userId } });
   if (error) console.error('[api] updateWorkStatus failed:', error);
 }
 
@@ -938,14 +945,11 @@ export async function upsertWordProgressToSupabase(
       ? { chosen_at: progress.chosenTs == null ? null : new Date(progress.chosenTs).toISOString(), chosen_by: progress.chosenBy ?? null }
       : {}),
   };
-  // One retry: a dropped write here loses a grade silently (a card rated Again
-  // stayed unscheduled server-side and vanished on the next rehydrate).
-  let { error } = await supabase.from('user_word_progress').upsert(row);
-  if (error) {
-    await new Promise((r) => setTimeout(r, 2000));
-    ({ error } = await supabase.from('user_word_progress').upsert(row));
-  }
-  if (error) console.error(`Error syncing progress for ${wordId} (after retry):`, error);
+  // Through the outbox: a dropped write here loses a grade silently (a card rated
+  // Again stayed unscheduled server-side and vanished on the next rehydrate), so a
+  // network failure queues it until the connection is back.
+  const { error } = await send({ t: 'upsert', table: 'user_word_progress', rows: row });
+  if (error) console.error(`Error syncing progress for ${wordId}:`, error);
 }
 
 /** Per-JLPT-level progress (intake_level_progress RPC, database/39). */
@@ -990,7 +994,7 @@ export async function logSrsReviewToSupabase(
     elapsedDays?: number | null;
   }
 ) {
-  const { error } = await supabase.from('srs_review_log').insert({
+  const { error } = await send({ t: 'insert', table: 'srs_review_log', row: {
     user_id: userId,
     word_id: wordId,
     rating: entry.rating,
@@ -1001,7 +1005,7 @@ export async function logSrsReviewToSupabase(
     difficulty_after: entry.difficultyAfter ?? null,
     scheduled_days: entry.scheduledDays ?? null,
     elapsed_days: entry.elapsedDays ?? null,
-  });
+  } });
 
   if (error) console.error(`Error logging SRS review for ${wordId}:`, error);
 }
@@ -1034,7 +1038,7 @@ export async function upsertWordProgressBatch(
     });
   if (payload.length === 0) return;
 
-  const { error } = await supabase.from('user_word_progress').upsert(payload);
+  const { error } = await send({ t: 'upsert', table: 'user_word_progress', rows: payload });
 
   if (error) console.error('Error batch-syncing word progress:', error);
 }
@@ -1095,7 +1099,7 @@ export async function resetStudyPacingBatch(userId: string, rows: PacingResetRow
         };
       });
     if (payload.length === 0) continue;
-    const { error } = await supabase.from('user_word_progress').upsert(payload);
+    const { error } = await send({ t: 'upsert', table: 'user_word_progress', rows: payload });
     if (error) { console.error('Error syncing study-pacing reset:', error); return; }
   }
 }
@@ -1106,14 +1110,12 @@ export async function logStudyEventToSupabase(
   action: 'seen' | 'lookup' | 'mastery_change',
   metadata?: any
 ) {
-  const { error } = await supabase
-    .from('study_history')
-    .insert({
-      user_id: userId,
-      word_id: wordId,
-      action,
-      metadata
-    });
+  const { error } = await send({ t: 'insert', table: 'study_history', row: {
+    user_id: userId,
+    word_id: wordId,
+    action,
+    metadata,
+  } });
     
   if (error) console.error(`Error logging study event for ${wordId}:`, error);
 }
@@ -1158,9 +1160,7 @@ export async function upsertUserPreferences(
     tutor_prefs?: { correction?: string; asides?: string };
   }
 ) {
-  const { error } = await supabase
-    .from('user_preferences')
-    .upsert({ user_id: userId, ...prefs });
+  const { error } = await send({ t: 'upsert', table: 'user_preferences', rows: { user_id: userId, ...prefs } });
   if (error) console.error('Error upserting preferences:', error);
 }
 

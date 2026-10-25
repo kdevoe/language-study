@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { supabase } from './supabase';
+import { send as sendWrite } from './outbox';
 import { isUnlockClip, sharedAudio } from './sharedAudio';
 
 // Daily activity for 進捗 (database/37_daily_activity.sql): seconds on screen,
@@ -45,14 +45,12 @@ async function flush() {
     pending[k] -= send[k];   // keep the fractions for next time
   }
   if (!Object.values(send).some((v) => v > 0) || DEV_MODE) return;
-  const { error } = await supabase.rpc('bump_daily_activity', {
+  // Offline, the outbox keeps it (with today's date) until the connection is back.
+  const { error } = await sendWrite({ t: 'rpc', fn: 'bump_daily_activity', args: {
     p_day: localDay(), p_app: send.app, p_read: send.read, p_listen: send.listen,
     p_review: send.review, p_chat: send.chat, p_turns: send.turns,
-  });
-  if (error) {
-    for (const k of Object.keys(send) as Kind[]) pending[k] += send[k];   // try again next flush
-    console.warn('[activity] flush failed:', error.message);
-  }
+  } });
+  if (error) console.warn('[activity] flush failed:', error.message);
 }
 
 /** Start counting: once, from App. */

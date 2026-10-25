@@ -10,7 +10,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
-import { supabase } from './supabase';
+import { sessionUserId } from './supabase';
 import { useAppStore } from './store';
 import { scheduleKanji, type Rating } from './srs';
 import {
@@ -31,8 +31,7 @@ interface KanjiState {
 }
 
 async function currentUserId(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  return sessionUserId();
 }
 
 // Keep the app-wide RTK level on the deck's frontier (article rewriting reads it).

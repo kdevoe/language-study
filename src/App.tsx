@@ -18,6 +18,7 @@ import { useKanjiStore, hasKanjiDeck } from './services/kanjiStore'
 import { useGrammarStore } from './services/grammarStore'
 import { supabase, storedSession } from './services/supabase'
 import { checkApproval, forgetApproval } from './services/approval'
+import { clearOutbox, flushOutbox } from './services/outbox'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
 import { loadActivity } from './components/ActivityStats'
 import { fetchJlptTotals } from './services/jmdict'
@@ -368,7 +369,7 @@ function App() {
       // INITIAL_SESSION arrives null when an expired token can't be refreshed offline.
       const session = reported ?? (event === 'INITIAL_SESSION' ? storedSession() : null);
       setSession(session);
-      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); forgetApproval(); }
+      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); forgetApproval(); void clearOutbox(); }
       // IMPORTANT: this callback runs while GoTrue still holds its navigator
       // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
       // inside it would re-enter the lock and deadlock — hanging every later
@@ -431,7 +432,9 @@ function App() {
       // SRS sync because that sync's preference pull sets rtkLevel, and the deck's
       // level has to win.
       const uid = session.user.id;
-      useAppStore.getState().syncSrsWithSupabase(uid)
+      // Writes queued offline go up first, so the sync's pull can't overwrite them.
+      flushOutbox()
+        .then(() => useAppStore.getState().syncSrsWithSupabase(uid))
         .then(() => useAppStore.getState().promoteIntakeQueue(Date.now()))
         .catch((e) => console.warn('[app] SRS sync / intake promotion failed:', e))
         .then(() => useKanjiStore.getState().sync(uid))
@@ -459,9 +462,8 @@ function App() {
 
   useEffect(() => {
     const handleOnline = () => {
-      if (session?.user?.id) {
-        useAppStore.getState().syncSrsWithSupabase(session.user.id);
-      }
+      const uid = session?.user?.id;
+      if (uid) flushOutbox().then(() => useAppStore.getState().syncSrsWithSupabase(uid));
     };
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);

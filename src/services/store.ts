@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { rtkKanjiList } from '../data/rtkKanji';
 import { captureError } from './monitoring';
 import { NewsArticle } from './api';
-import { supabase } from './supabase';
+import { sessionUserId, supabase } from './supabase';
 import { schedule, ratingForReaderEvent, readerEventMayAdvance, seedSrsFromDifficulty, type SrsState, type SrsStatus, type Rating, type AdjustReason } from './srs';
 import { decidePacing, isActiveForPacing } from './pacing';
 import { alignReading, hasKanji, loadReadingData } from './furigana';
@@ -87,8 +87,7 @@ function activateWord(w: WordData, difficulty: number, now: number): WordData {
  * cheaper and avoids a storm of auth network calls on load and on every action.
  */
 async function currentUserId(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  return sessionUserId();
 }
 
 /** Fire-and-forget: persist read/dismissed state server-side and, only when a

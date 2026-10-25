@@ -46,6 +46,17 @@ export function storedSession(): Session | null {
   }
 }
 
+/**
+ * The signed-in user's id, also offline. getSession() can't refresh an expired
+ * token without a network and reports null after its retries, which made every
+ * progress write on a long flight skip itself before reaching the outbox.
+ */
+export async function sessionUserId(): Promise<string | null> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return storedSession()?.user.id ?? null;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id ?? storedSession()?.user.id ?? null;
+}
+
 // ── Session recovery on tab return ────────────────────────────────────────────
 // Browsers throttle/pause timers in backgrounded tabs (and the OS pauses them on
 // sleep), so the auto-refresh tick can miss the ~1h access-token expiry. When the

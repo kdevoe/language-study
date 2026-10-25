@@ -11,6 +11,7 @@
 // import just means lookups stay online-only, as before.
 
 import type { JMDictResult } from './jmdict';
+import { done, openDb as open, req } from './idb';
 
 const DB_NAME = 'yugen-jmdict';
 const BASE = '/jmdict/';
@@ -48,42 +49,13 @@ let dbPromise: Promise<IDBDatabase | null> | null = null;
 let meta: Meta | null | undefined; // undefined = not read yet
 let installing: Promise<void> | null = null;
 
-function req<T>(r: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
-  });
-}
-
-function done(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
-}
-
 function openDb(): Promise<IDBDatabase | null> {
-  if (!dbPromise) {
-    dbPromise = new Promise((resolve) => {
-      try {
-        if (typeof indexedDB === 'undefined') return resolve(null);
-        const open = indexedDB.open(DB_NAME, 1);
-        open.onupgradeneeded = () => {
-          const db = open.result;
-          const entries = db.createObjectStore('entries', { keyPath: 'id' });
-          entries.createIndex('k', 'k', { multiEntry: true });
-          entries.createIndex('r', 'r', { multiEntry: true });
-          db.createObjectStore('meta');
-        };
-        open.onsuccess = () => resolve(open.result);
-        open.onerror = () => resolve(null);
-        open.onblocked = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
-    });
-  }
+  dbPromise ??= open(DB_NAME, 1, (db) => {
+    const entries = db.createObjectStore('entries', { keyPath: 'id' });
+    entries.createIndex('k', 'k', { multiEntry: true });
+    entries.createIndex('r', 'r', { multiEntry: true });
+    db.createObjectStore('meta');
+  });
   return dbPromise;
 }
 
