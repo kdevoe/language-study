@@ -40,6 +40,9 @@ const RESEARCH_POLL_MS = 3000;
 const RESEARCH_GIVE_UP_MS = 120_000;
 const LONGREAD_GIVE_UP_MS = 20 * 60_000;   // a long read takes a few minutes
 
+// A line of only a dash or dots says nothing (she once ended a tool round with "-").
+const BLANK_RE = /^[\s\-–—―・.。…]*$/;
+
 /** Open a long read from the chat: App owns the Reader, so it listens for this. */
 export const OPEN_WORK_EVENT = 'yugen:open-work';
 
@@ -127,7 +130,7 @@ export function TutorPanel() {
           ...(recapOf(m) && { recap: recapOf(m) }),
           ...(workOf(m) && { work: workOf(m) }),
         };
-      }).filter((l) => l.text || l.photo));
+      }).filter((l) => !BLANK_RE.test(l.text) || l.photo));
       setLoaded(true);
       setHistoryOk(true);
     }).catch(() => setLoaded(true)); // still talkable; the next open tries again
@@ -234,7 +237,7 @@ export function TutorPanel() {
           ? { ...l, text: l.text || `接続できませんでした。もう一度どうぞ。${code ? `（${code}）` : ''}` } : l)));
       }
     } finally {
-      setLines((prev) => prev.map((l) => (l.pending ? { ...l, pending: false } : l)).filter((l) => l.text || l.photo));
+      setLines((prev) => prev.map((l) => (l.pending ? { ...l, pending: false } : l)).filter((l) => !BLANK_RE.test(l.text) || l.photo));
       setBusy(null);
       abortRef.current = null;
     }
