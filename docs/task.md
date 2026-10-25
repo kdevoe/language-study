@@ -697,10 +697,3 @@
       back to Claude Sonnet; Claude helpers (callTool, complete, quickHaiku, grammar insight) fall back to Gemini
       Flash. Failed article rows now keep `metadata.error` (ensure-buffer, long-read parts)
   - [ ] Not covered yet: ハルカ's chat turns, web research, song cover art
-- [ ] Beginner path: English first, then Japanese, then Italian (#208, plan: docs/mixed-language-plan.md)
-  - [ ] J0 prompt test: stages 0–3 on 5 articles; loanword pool readable after 20 / 40 / all katakana
-  - [ ] J0b mockup: one article at stages 0–3 + a kana card in the main deck (390×844)
-  - [ ] J1 kana in the main deck: kana card type, new-card order katakana → hiragana → words, readable-script set
-  - [ ] J2 mixed articles: per-span language marker, stage-aware rewrite prompt, Reader rendering, eval measures
-  - [ ] J3 tutor and podcasts at early stages
-  - [ ] Italian (I0 data check, I1 reader, I2 audio and tutor) after the Japanese path ships
