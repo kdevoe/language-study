@@ -16,6 +16,8 @@ export interface ScreenContext {
   opener?: string;
   /** Home on Sunday: the weekly recap the opener announces (shown under it). */
   recapId?: string;
+  /** Home after a long-read night: the long read the opener announces (shown under it). */
+  work?: WorkRef;
 }
 
 export interface TutorMessage {
@@ -25,12 +27,15 @@ export interface TutorMessage {
   /** Screen notes, or on your messages the photo you sent (its transcript, never the image). */
   context?: (ScreenContext & { photo?: undefined; recap?: undefined })
     | { photo: { id: string; label?: string; transcript?: string } }
-    | { recap: RecapRef }
+    | { recap?: RecapRef; work?: WorkRef }
     | null;
 }
 
 /** The weekly recap's block in the thread: enough to draw it, the report loads on tap. */
 export interface RecapRef { id: string; title: string }
+
+/** A long read ハルカ wrote, as a block in the thread that opens it (write-longread). */
+export interface WorkRef { id: string; title: string }
 
 /** ハルカ's weekly recap (learner-dream/recap.ts, database/41). */
 export interface WeeklyRecap {
@@ -53,6 +58,7 @@ export type TutorAction =
   | { type: 'content_queued'; kind: 'podcast'; topic: string; episodeId?: string }
   // An offer the learner confirms: the tutor never starts paid generation itself.
   | { type: 'content_offer'; kind: 'podcast'; topic: string; angle?: string }
+  | { type: 'content_offer'; kind: 'longform'; topic: string; english?: string; angle?: string }
   | { type: 'preference'; prefs: { correction?: string; asides?: string } };
 
 export type TutorEvent =
@@ -63,6 +69,8 @@ export type TutorEvent =
   | { type: 'research'; id: string; question: string }
   | { type: 'action'; action: TutorAction }
   | { type: 'photo'; id: string; label: string; transcript: string }
+  // A long read that landed: its block goes under the line she's writing.
+  | { type: 'work'; work: WorkRef }
   | { type: 'ping' }   // server heartbeat, every 15 s (the watchdog's sign of life)
   | { type: 'done'; text: string }
   | { type: 'error'; error: string };
@@ -96,7 +104,7 @@ export async function pollResearch(threadId: string, ids: string[]): Promise<str
  */
 export async function streamTutor(
   input:
-    | { action?: 'send'; message: string; context?: ScreenContext; opener?: string; recapId?: string; newThread?: boolean; image?: PhotoUpload }
+    | { action?: 'send'; message: string; context?: ScreenContext; opener?: string; recapId?: string; workId?: string; newThread?: boolean; image?: PhotoUpload }
     | { action: 'followup'; threadId: string; researchId: string },
   onEvent: (e: TutorEvent) => void,
   signal?: AbortSignal,
@@ -161,7 +169,9 @@ export async function streamTutor(
 }
 
 /** Dev mode has no session: canned, streamed replies so the panel can be driven
- *  locally. A message with 調べ in it starts a fake lookup that lands after ~4s. */
+ *  locally. A message with 調べ in it starts a fake lookup that lands after ~4s;
+ *  one with 長い記事 offers a long read, which "lands" the same way. */
+const devLongreads = new Set<string>();
 async function devReply(input: Parameters<typeof streamTutor>[0], onEvent: (e: TutorEvent) => void) {
   const say = async (text: string) => {
     for (let i = 0; i < text.length; i += 6) {
@@ -170,6 +180,20 @@ async function devReply(input: Parameters<typeof streamTutor>[0], onEvent: (e: T
     }
   };
   onEvent({ type: 'thread', threadId: 'dev' });
+  if (input.action === 'followup' && devLongreads.has(input.researchId)) {
+    const text = 'できたよ！本棚に入れておいたから、時間があるときに読んでみてね。';
+    await say(text);
+    onEvent({ type: 'work', work: { id: '00000000-0000-4000-8000-00000000dev2', title: '宇宙ステーションの歴史' } });
+    onEvent({ type: 'done', text });
+    return;
+  }
+  if (input.action !== 'followup' && input.message.includes('長い記事')) {
+    const text = 'いいね！宇宙ステーションの歴史について書こうか。';
+    await say(text);
+    onEvent({ type: 'action', action: { type: 'content_offer', kind: 'longform', topic: '宇宙ステーションの歴史', english: 'history of space stations' } });
+    onEvent({ type: 'done', text });
+    return;
+  }
   if (input.action === 'followup') {
     const text = 'さっきの、調べたよ！NHKによると、新しい図書館は土曜日に開いたんだって。行ってみたい？';
     await say(text);
@@ -193,14 +217,38 @@ async function devReply(input: Parameters<typeof streamTutor>[0], onEvent: (e: T
 }
 
 /** ハルカ's line for the Home card: last night's first opener (null = keep a quiet
- *  default). On Sunday it announces the weekly recap, and recapId names it. */
-export async function fetchOpener(): Promise<{ line: string; recapId?: string } | null> {
+ *  default). On Sunday it announces the weekly recap, and recapId names it; after
+ *  a long-read night it may announce the long read, and work names it. */
+export async function fetchOpener(): Promise<{ line: string; recapId?: string; work?: WorkRef } | null> {
   if (DEV_MODE) return DEV_RECAP_ON ? { line: DEV_RECAP_TEASER, recapId: DEV_RECAP.id } : null;
   const { data } = await supabase.from('learner_briefs').select('brief').order('day', { ascending: false }).limit(1).maybeSingle();
-  const brief = data?.brief as { openers?: string[]; recap?: { id?: string } } | undefined;
+  const brief = data?.brief as { openers?: string[]; recap?: { id?: string }; longread?: { id?: string; title?: string } } | undefined;
   const line = brief?.openers?.[0];
   if (typeof line !== 'string' || !line.trim()) return null;
-  return { line: line.trim(), ...(typeof brief?.recap?.id === 'string' && { recapId: brief.recap.id }) };
+  const lr = brief?.longread;
+  // The block goes with the line that announces it: first unless a recap teaser leads.
+  const work = typeof lr?.id === 'string' && typeof lr.title === 'string' && !brief?.recap ? { id: lr.id, title: lr.title } : undefined;
+  return { line: line.trim(), ...(typeof brief?.recap?.id === 'string' && { recapId: brief.recap.id }), ...(work && { work }) };
+}
+
+/** Start the long read ハルカ offered (write-longread, with the learner's own
+ *  session and caps). Its note lands in the thread; poll it like a lookup. */
+export async function startLongread(input: { topic: string; angle?: string; threadId: string | null }): Promise<string> {
+  if (DEV_MODE) { const id = `dev-${Date.now()}`; devLongreads.add(id); return id; }
+  const res = await invokeEdgeFn<{ jobId: string }>('write-longread', { action: 'start', trigger: 'requested', ...input });
+  return res.jobId;
+}
+
+export async function longreadErrorMessage(error: unknown): Promise<string> {
+  const e = error as { context?: Response } | null;
+  let kind = '';
+  try { kind = (await e?.context?.clone().json())?.errorKind ?? ''; } catch { /* body wasn't JSON */ }
+  switch (kind) {
+    case 'busy': return 'いま別の記事を書いています。できたら知らせるね。';
+    case 'week_limit': return '今週はもうたくさん書きました。また来週ね。';
+    case 'day_limit': return '今日はここまで。また明日ね。';
+  }
+  return '記事を書き始められませんでした。もう一度試してください。';
 }
 
 export async function fetchRecap(id: string): Promise<WeeklyRecap | null> {
@@ -299,5 +347,6 @@ export async function forgetEverything(): Promise<void> {
     supabase.from('learner_notes').delete().eq('user_id', uid),
     supabase.from('tutor_threads').delete().eq('user_id', uid),
     supabase.from('weekly_recaps').delete().eq('user_id', uid),
+    supabase.from('longread_jobs').delete().eq('user_id', uid),
   ]);
 }

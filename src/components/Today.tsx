@@ -32,6 +32,16 @@ const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 /** The work the reader last opened, so 続きを読む picks the one they're in. */
 export const LAST_WORK_KEY = 'yugen-last-work';
+/** Works opened on this phone, so a new ハルカ long read stops being 新着 once opened. */
+export const OPENED_WORKS_KEY = 'yugen-opened-works';
+const NEW_WORK_DAYS = 7;
+
+export function markWorkOpened(id: string) {
+  try {
+    const seen: string[] = JSON.parse(localStorage.getItem(OPENED_WORKS_KEY) ?? '[]');
+    if (!seen.includes(id)) localStorage.setItem(OPENED_WORKS_KEY, JSON.stringify([id, ...seen].slice(0, 50)));
+  } catch { /* storage blocked */ }
+}
 
 async function resolveUserId(): Promise<string | null> {
   if (DEV_MODE) return 'dev-user';
@@ -39,12 +49,22 @@ async function resolveUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
-/** The active, openable work with a reading position: the last opened, else the newest. */
-function pickContinueWork(works: LongFormWork[]): LongFormWork | null {
-  const inProgress = works.filter((w) => w.status === 'active' && w.partReady && (w.readingPosition?.percent ?? 0) > 0);
+/** A long read ハルカ wrote that hasn't been opened yet (for a week), else the
+ *  active, openable work with a reading position: the last opened, else the newest. */
+function pickContinueWork(works: LongFormWork[]): { work: LongFormWork; fresh: boolean } | null {
   let lastId: string | null = null;
-  try { lastId = localStorage.getItem(LAST_WORK_KEY); } catch { /* storage blocked */ }
-  return inProgress.find((w) => w.id === lastId) ?? inProgress[0] ?? null;
+  let opened: string[] = [];
+  try {
+    lastId = localStorage.getItem(LAST_WORK_KEY);
+    opened = JSON.parse(localStorage.getItem(OPENED_WORKS_KEY) ?? '[]');
+  } catch { /* storage blocked */ }
+  const fresh = works.find((w) => w.sourceType === 'haruka' && w.status === 'active' && w.partReady
+    && !w.readingPosition && w.id !== lastId && !opened.includes(w.id)
+    && Date.now() - Date.parse(w.createdAt) < NEW_WORK_DAYS * 86400_000);
+  if (fresh) return { work: fresh, fresh: true };
+  const inProgress = works.filter((w) => w.status === 'active' && w.partReady && (w.readingPosition?.percent ?? 0) > 0);
+  const work = inProgress.find((w) => w.id === lastId) ?? inProgress[0] ?? null;
+  return work ? { work, fresh: false } : null;
 }
 
 /** A ready podcast not yet listened to. */
@@ -99,14 +119,15 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Both blocks start from the lists 本棚 and 番組 last loaded, then refresh.
-  const [work, setWork] = useState<LongFormWork | null>(() => pickContinueWork(readListCache<LongFormWork>('works') ?? []));
+  const [picked, setPicked] = useState(() => pickContinueWork(readListCache<LongFormWork>('works') ?? []));
+  const work = picked?.work ?? null;
   const [openingWork, setOpeningWork] = useState(false);
   useEffect(() => {
     resolveUserId()
       .then(async (userId) => {
         if (!userId) return;
         const works = await fetchWorks(userId);
-        if (mountedRef.current) setWork(pickContinueWork(works));
+        if (mountedRef.current) setPicked(pickContinueWork(works));
       })
       .catch((e) => console.warn('[today] works failed:', e));
   }, []);
@@ -195,7 +216,7 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
               card={{
                 status: openingWork
                   ? <CornerText compact>読み込み中</CornerText>
-                  : <PartCount work={work} />,
+                  : picked?.fresh ? <CornerText compact>新着</CornerText> : <PartCount work={work} />,
                 title: work.title,
                 openable: true,
               }}

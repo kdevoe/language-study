@@ -617,6 +617,10 @@ Deno.serve(async (req) => {
     const jitPartIndex: number = Number.isInteger(body.partIndex) ? body.partIndex : 0;
     const isPartJit = jitWorkId.length > 0 && jitPartIndex > 0;
     const isImport = importText.length > 0 || importUrl.length > 0;
+    // ハルカ's long reads (write-longread) hand their written source over as an
+    // import, from the service role only. They carry their own caps there.
+    const harukaWork = isImport && body.sourceType === 'haruka' && caller.kind === 'service';
+    const workMeta = harukaWork && body.meta && typeof body.meta === 'object' && !Array.isArray(body.meta) ? body.meta : {};
     if (!userId || (!isImport && !isPartJit && (!title || !(snippet || (Array.isArray(sources) && sources.length))))) {
       return new Response(JSON.stringify({ error: 'userId, title, and snippet or sources are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -734,10 +738,11 @@ Deno.serve(async (req) => {
           .from('long_form_works')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', userId)
+          .neq('source_type', 'haruka')
           .gt('created_at', dayCutoff),
         countParts24h(),
       ]);
-      if ((imports24h ?? 0) >= IMPORT_DAILY_CAP || parts24h >= PARTS_DAILY_CAP) {
+      if ((!harukaWork && (imports24h ?? 0) >= IMPORT_DAILY_CAP) || parts24h >= PARTS_DAILY_CAP) {
         return jsonError(429, `Daily import limit reached (${IMPORT_DAILY_CAP}/day). Try again tomorrow.`, 'import_limit');
       }
       title = deriveImportTitle(importText, title);
@@ -754,7 +759,8 @@ Deno.serve(async (req) => {
         .insert({
           user_id: userId,
           title,
-          source_type: 'import',
+          source_type: harukaWork ? 'haruka' : 'import',
+          meta: workMeta,
           origin_url: importUrl || null,
           // The FULL unchunked original — part processing re-chunks it.
           raw_text: importText,
@@ -1283,7 +1289,7 @@ Deno.serve(async (req) => {
 
     const workRef = jitWork;
     const category = isLongform
-      ? (jitWork?.source_type === 'magazine' ? '雑誌' : 'インポート')
+      ? (jitWork?.source_type === 'magazine' ? '雑誌' : jitWork?.source_type === 'haruka' ? 'ハルカ' : 'インポート')
       : (newsCategory ?? 'Recent News');
     const content = {
       id: finalArticleId,

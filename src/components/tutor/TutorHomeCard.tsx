@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useTutor, useTutorScreen } from './TutorProvider';
-import { fetchOpener, fetchTutorHistory, localDay } from '../../services/tutor';
+import { fetchOpener, fetchTutorHistory, localDay, type WorkRef } from '../../services/tutor';
 
 // Pinned to the top of 今日. Before you've talked today: ハルカ's line from last
 // night's brief (something real — a finished article, a plan you mentioned), and
 // tapping opens the panel with it as her first message. Once today's conversation
 // is going: her last line (usually the question she left you with), and tapping
 // picks the conversation back up. A new day starts a new thread, and the opener again.
-// On Sunday the opener announces the weekly recap, which the chat shows under it.
+// On Sunday the opener announces the weekly recap, which the chat shows under it;
+// after a long-read night it announces the long read, the same way.
 
 const FALLBACK = '今日は何について話そうか？';
 const OPENER_KEY = 'yugen-tutor-opener';
 const LATEST_KEY = 'yugen-tutor-latest';
 const RECAP_KEY = 'yugen-tutor-opener-recap';
+const WORK_KEY = 'yugen-tutor-opener-work';
 
 /** The last Japanese paragraph of her message: asides dropped, recast tags unwrapped. */
 function lastLine(text: string): string {
@@ -39,6 +41,7 @@ export function TutorHomeCard() {
   const [recapId, setRecapId] = useState<string | undefined>(() => {
     try { return localStorage.getItem(RECAP_KEY) || undefined; } catch { return undefined; }
   });
+  const [work, setWork] = useState<WorkRef | undefined>(() => readCache<WorkRef>(WORK_KEY) ?? undefined);
   const [latest, setLatest] = useState<string | null>(() => {
     const c = readCache<{ day: string; line: string }>(LATEST_KEY);
     return c && c.day === localDay() ? c.line : null;
@@ -46,16 +49,18 @@ export function TutorHomeCard() {
 
   // Swiping in on 今日 starts from the same place as tapping the card. No chip:
   // there's nothing specific on screen.
-  useTutorScreen(() => ({ screen: 'home', detail: '', ...(!latest && { opener, recapId }) }));
+  useTutorScreen(() => ({ screen: 'home', detail: '', ...(!latest && { opener, recapId, work }) }));
 
   useEffect(() => {
     fetchOpener().then((o) => {
       if (!o) return;
       setOpener(o.line);
       setRecapId(o.recapId);
+      setWork(o.work);
       try {
         localStorage.setItem(OPENER_KEY, o.line);
         if (o.recapId) localStorage.setItem(RECAP_KEY, o.recapId); else localStorage.removeItem(RECAP_KEY);
+        if (o.work) localStorage.setItem(WORK_KEY, JSON.stringify(o.work)); else localStorage.removeItem(WORK_KEY);
       } catch { /* quota or blocked */ }
     }).catch(() => { /* keep the cached or default line */ });
   }, []);
@@ -72,7 +77,7 @@ export function TutorHomeCard() {
   }, [open]);
 
   const line = latest ?? opener;
-  const go = () => openTutor(latest ? {} : { opener, recapId });
+  const go = () => openTutor(latest ? {} : { opener, recapId, work });
 
   return (
     <div className="tutor-card" role="button" tabIndex={0}

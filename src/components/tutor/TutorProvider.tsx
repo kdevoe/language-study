@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { ScreenContext } from '../../services/tutor';
+import type { ScreenContext, WorkRef } from '../../services/tutor';
 import { sharedAudio } from '../../services/sharedAudio';
 
 // The screen-context registry and open state for ハルカ (docs/tutor-agent-design.md §3).
@@ -14,6 +14,8 @@ export interface OpenOptions {
   opener?: string;
   /** Sunday: the weekly recap that line announces, shown under it. */
   recapId?: string;
+  /** After a long-read night: the long read that line announces, shown under it. */
+  work?: WorkRef;
 }
 
 interface TutorState {

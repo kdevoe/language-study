@@ -38,3 +38,9 @@ verify_jwt = false
 [functions.daily-prep]
 # Cron or service-role only, checked in code (resolveCaller).
 verify_jwt = false
+
+[functions.write-longread]
+# ハルカ's long reads. A signed-in user starts their own requested one; the
+# dream (service role) starts scheduled ones and the stages call themselves.
+# Checked in code (resolveCaller).
+verify_jwt = false
