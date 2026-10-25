@@ -11,6 +11,7 @@ import { alignReading, hasKanji } from './furigana';
 import { readValueCache, writeValueCache } from './listCache';
 import type { CoarsePos } from './tokenizer';
 import type { IntakeCandidate } from './intake';
+import { isOffline, localByForm, localDictReady, localEntries, localIdsByForms, localKanjiJlpt } from './localDict';
 
 export interface JMDictResult {
   entryId: string;
@@ -43,6 +44,30 @@ function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T
 }
 
 /**
+ * Ask Supabase, or the on-device copy (localDict.ts) when the device is offline
+ * or the server query fails. With no local copy yet, `noLocal` keeps each
+ * caller's old failure behaviour.
+ */
+async function orLocal<T>(server: () => Promise<T>, local: () => Promise<T>, noLocal: (e: unknown) => T): Promise<T> {
+  if (isOffline() && await localDictReady()) return local();
+  try {
+    return await server();
+  } catch (e) {
+    if (await localDictReady()) {
+      console.warn('[jmdict] server lookup failed, using the local dictionary:', e);
+      return local();
+    }
+    return noLocal(e);
+  }
+}
+
+/** Before the local copy, a timeout threw and a query error read as no rows. */
+function rethrowTimeout<T>(e: unknown, empty: T): T {
+  if (e instanceof Error && /timed out/.test(e.message)) throw e;
+  return empty;
+}
+
+/**
  * Look up a word in JMDict by its surface form (kanji or kana).
  * Tries kanji match first, falls back to kana.
  */
@@ -65,32 +90,40 @@ export async function lookupWord(text: string): Promise<JMDictResult[]> {
 }
 
 async function lookupByKanji(text: string): Promise<JMDictResult[]> {
-  const { data: kanjiRows, error } = await withTimeout(
-    supabase.from('jmdict_kanji').select('entry_id').eq('text', text).limit(10),
-    LOOKUP_TIMEOUT_MS,
-    'jmdict_kanji lookup',
-  );
+  return orLocal(async () => {
+    const { data: kanjiRows, error } = await withTimeout(
+      supabase.from('jmdict_kanji').select('entry_id').eq('text', text).limit(10),
+      LOOKUP_TIMEOUT_MS,
+      'jmdict_kanji lookup',
+    );
+    if (error) throw error;
+    if (!kanjiRows || kanjiRows.length === 0) return [];
 
-  if (error || !kanjiRows || kanjiRows.length === 0) return [];
-
-  const entryIds = [...new Set(kanjiRows.map(r => r.entry_id))];
-  return fetchEntries(entryIds);
+    const entryIds = [...new Set(kanjiRows.map(r => r.entry_id))];
+    return fetchEntries(entryIds);
+  }, () => localByForm(text, 'k'), () => []);
 }
 
 async function lookupByKana(text: string): Promise<JMDictResult[]> {
-  const { data: kanaRows, error } = await withTimeout(
-    supabase.from('jmdict_kana').select('entry_id').eq('text', text).limit(10),
-    LOOKUP_TIMEOUT_MS,
-    'jmdict_kana lookup',
-  );
+  return orLocal(async () => {
+    const { data: kanaRows, error } = await withTimeout(
+      supabase.from('jmdict_kana').select('entry_id').eq('text', text).limit(10),
+      LOOKUP_TIMEOUT_MS,
+      'jmdict_kana lookup',
+    );
+    if (error) throw error;
+    if (!kanaRows || kanaRows.length === 0) return [];
 
-  if (error || !kanaRows || kanaRows.length === 0) return [];
-
-  const entryIds = [...new Set(kanaRows.map(r => r.entry_id))];
-  return fetchEntries(entryIds);
+    const entryIds = [...new Set(kanaRows.map(r => r.entry_id))];
+    return fetchEntries(entryIds);
+  }, () => localByForm(text, 'r'), () => []);
 }
 
 export async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> {
+  return orLocal(() => fetchEntriesRemote(entryIds), () => localEntries(entryIds), (e) => rethrowTimeout(e, []));
+}
+
+async function fetchEntriesRemote(entryIds: string[]): Promise<JMDictResult[]> {
   // Fetch entries, kanji forms, kana forms, and senses in parallel
   const [entriesRes, kanjiRes, kanaRes, sensesRes] = await withTimeout(Promise.all([
     supabase.from('jmdict_entries').select('id, common, jlpt_level, freq_rank').in('id', entryIds),
@@ -99,6 +132,7 @@ export async function fetchEntries(entryIds: string[]): Promise<JMDictResult[]> 
     supabase.from('jmdict_senses').select('entry_id, pos, gloss, field, misc').in('entry_id', entryIds),
   ]), LOOKUP_TIMEOUT_MS, 'jmdict entry fetch');
 
+  if (entriesRes.error) throw entriesRes.error;
   if (!entriesRes.data) return [];
 
   return entriesRes.data.map(entry => {
@@ -178,22 +212,28 @@ export async function lookupLemmasBatch(
   const unique = [...new Set(lemmas.filter(Boolean))];
   if (unique.length === 0) return new Map();
 
-  const [kanjiRes, kanaRes] = await withTimeout(Promise.all([
-    supabase.from('jmdict_kanji').select('entry_id, text').in('text', unique),
-    supabase.from('jmdict_kana').select('entry_id, text').in('text', unique),
-  ]), LOOKUP_TIMEOUT_MS, 'lemma batch surface lookup');
-
   // lemma → candidate entry ids, kanji matches kept separate so they take priority.
-  const kanjiIds = new Map<string, Set<string>>();
-  const kanaIds = new Map<string, Set<string>>();
-  const collect = (rows: { entry_id: string; text: string }[] | null, into: Map<string, Set<string>>) => {
-    (rows || []).forEach(r => {
-      if (!into.has(r.text)) into.set(r.text, new Set());
-      into.get(r.text)!.add(r.entry_id);
-    });
-  };
-  collect(kanjiRes.data, kanjiIds);
-  collect(kanaRes.data, kanaIds);
+  type FormIds = { kanji: Map<string, Set<string>>; kana: Map<string, Set<string>> };
+  const { kanji: kanjiIds, kana: kanaIds } = await orLocal<FormIds>(async () => {
+    const [kanjiRes, kanaRes] = await withTimeout(Promise.all([
+      supabase.from('jmdict_kanji').select('entry_id, text').in('text', unique),
+      supabase.from('jmdict_kana').select('entry_id, text').in('text', unique),
+    ]), LOOKUP_TIMEOUT_MS, 'lemma batch surface lookup');
+    if (kanjiRes.error) throw kanjiRes.error;
+    if (kanaRes.error) throw kanaRes.error;
+
+    const kanji = new Map<string, Set<string>>();
+    const kana = new Map<string, Set<string>>();
+    const collect = (rows: { entry_id: string; text: string }[] | null, into: Map<string, Set<string>>) => {
+      (rows || []).forEach(r => {
+        if (!into.has(r.text)) into.set(r.text, new Set());
+        into.get(r.text)!.add(r.entry_id);
+      });
+    };
+    collect(kanjiRes.data, kanji);
+    collect(kanaRes.data, kana);
+    return { kanji, kana };
+  }, () => localIdsByForms(unique), (e) => rethrowTimeout(e, { kanji: new Map(), kana: new Map() }));
 
   const allIds = new Set<string>();
   [kanjiIds, kanaIds].forEach(m => m.forEach(set => set.forEach(id => allIds.add(id))));
@@ -239,19 +279,20 @@ async function applyJlptFallback(byLemma: Map<string, JMDictResult>): Promise<vo
 /** Look up the JLPT level for each kanji character. Empty/failed → empty map. */
 async function fetchKanjiJlpt(chars: Set<string>): Promise<Map<string, number>> {
   if (chars.size === 0) return new Map();
-  try {
-    const { data } = await withTimeout(
+  return orLocal(async () => {
+    const { data, error } = await withTimeout(
       supabase.from('kanji_jlpt').select('kanji, jlpt_level').in('kanji', [...chars]),
       LOOKUP_TIMEOUT_MS,
       'kanji_jlpt fallback',
     );
+    if (error) throw error;
     return new Map(
       ((data || []) as { kanji: string; jlpt_level: number }[]).map(r => [r.kanji, r.jlpt_level]),
     );
-  } catch (e) {
+  }, () => localKanjiJlpt(chars), (e) => {
     console.warn('kanji_jlpt fallback failed:', e);
     return new Map();
-  }
+  });
 }
 
 /**
@@ -373,6 +414,7 @@ export async function disambiguateWithLLM(
   candidates: JMDictResult[]
 ): Promise<JMDictResult> {
   if (candidates.length <= 1) return candidates[0];
+  if (isOffline()) return pickWithoutContext(word, candidates);
 
   const candidateDescriptions = candidates.map((c) => {
     const glosses = c.senses.map(s => s.gloss.join(', ')).join(' / ');
@@ -391,10 +433,20 @@ export async function disambiguateWithLLM(
       return candidates[index];
     }
   } catch (e) {
-    console.warn('LLM disambiguation failed, using first candidate:', e);
+    console.warn('LLM disambiguation failed, picking without context:', e);
   }
 
-  return candidates[0];
+  return pickWithoutContext(word, candidates);
+}
+
+/**
+ * Offline, or when the LLM fails: the rule article enrichment uses. A kana tap
+ * first narrows to entries read that way (はし → 橋/箸, not 嘴 read くちばし).
+ */
+function pickWithoutContext(word: string, candidates: JMDictResult[]): JMDictResult {
+  const kana = !hasKanji(word);
+  const readAsTyped = kana ? candidates.filter(c => c.readings[0] === word) : [];
+  return pickBestEntry(readAsTyped.length ? readAsTyped : candidates, undefined, kana);
 }
 
 /**
