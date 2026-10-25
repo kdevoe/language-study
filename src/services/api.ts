@@ -73,7 +73,8 @@ export interface WorkPartState {
 export interface LongFormWork {
   id: string;
   title: string;
-  sourceType: 'import' | 'magazine';
+  /** 'haruka': a long read ハルカ wrote (write-longread). */
+  sourceType: 'import' | 'magazine' | 'haruka';
   originUrl: string | null;
   charCount: number;
   partCount: number;
@@ -335,7 +336,7 @@ export async function fetchReadyBufferArticles(userId: string, limit = 10): Prom
 interface WorkRow {
   id: string;
   title: string;
-  source_type: 'import' | 'magazine';
+  source_type: 'import' | 'magazine' | 'haruka';
   origin_url?: string | null;
   char_count?: number;
   part_count?: number;

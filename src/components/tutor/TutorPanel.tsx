@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, Camera, Check, Plus, X } from 'lucide-react';
+import { ArrowUp, Camera, Check, ChevronRight, Plus, X } from 'lucide-react';
 import { useTutor } from './TutorProvider';
 import { TutorText } from './TutorText';
 import { RecapBlock, RecapSheet } from './RecapSheet';
@@ -10,8 +10,8 @@ import { WordModal } from '../WordModal';
 import { GRAMMAR_POINTS } from '../../services/grammar/catalogue';
 import { lookupWord as jmdictLookup } from '../../services/jmdict';
 import {
-  fetchRecap, fetchTutorHistory, localDay, pollResearch, streamTutor,
-  type RecapRef, type ScreenContext, type TutorAction,
+  fetchRecap, fetchTutorHistory, localDay, longreadErrorMessage, pollResearch, startLongread, streamTutor,
+  type RecapRef, type ScreenContext, type TutorAction, type WorkRef,
 } from '../../services/tutor';
 import { addActivity, useActivityWhile } from '../../services/activity';
 import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
@@ -31,11 +31,17 @@ interface Line {
   photo?: { id: string; thumb?: string; label?: string; transcript?: string; live?: boolean };
   /** Her Sunday opener: the weekly recap's block goes under it. */
   recap?: RecapRef;
+  /** A long read she wrote: its block goes under the line that tells you. */
+  work?: WorkRef;
 }
 
 const COMMIT_PX = 70;
 const RESEARCH_POLL_MS = 3000;
 const RESEARCH_GIVE_UP_MS = 120_000;
+const LONGREAD_GIVE_UP_MS = 20 * 60_000;   // a long read takes a few minutes
+
+/** Open a long read from the chat: App owns the Reader, so it listens for this. */
+export const OPEN_WORK_EVENT = 'yugen:open-work';
 
 export function TutorPanel() {
   const { open, drag, options, openSeq, closeTutor, snapshot } = useTutor();
@@ -60,14 +66,23 @@ export function TutorPanel() {
   const [openerRecapId, setOpenerRecapId] = useState<string | null>(null);
   const [openerRecap, setOpenerRecap] = useState<RecapRef | null>(null);
   const [sheetRecap, setSheetRecap] = useState<string | null>(null);
-  // Background lookups ハルカ started (research tool): polled until they land,
-  // then she shares them, in a followup turn if the chat is quiet.
-  const [researching, setResearching] = useState<{ id: string; at: number }[]>([]);
+  // The long read the opener announces (after a long-read night).
+  const [openerWork, setOpenerWork] = useState<WorkRef | null>(null);
+  // Background lookups ハルカ started (research tool), and long reads the learner
+  // asked for: polled until their note lands, then she shares it, in a followup
+  // turn if the chat is quiet.
+  const [researching, setResearching] = useState<{ id: string; at: number; longread?: boolean }[]>([]);
   const [landed, setLanded] = useState<string[]>([]);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const lookup = useWordLookup();
+
+  // A long read's block: the Reader opens it (App), and the panel steps aside.
+  const openWork = useCallback((work: WorkRef) => {
+    window.dispatchEvent(new CustomEvent(OPEN_WORK_EVENT, { detail: { id: work.id } }));
+    closeTutor();
+  }, [closeTutor]);
 
   useScrollLock(open);
   useActivityWhile('chat', open);
@@ -96,6 +111,7 @@ export function TutorPanel() {
     fetchTutorHistory().then(async ({ threadId: id, messages }) => {
       const photoOf = (m: (typeof messages)[number]) => (m.context && 'photo' in m.context ? m.context.photo : undefined);
       const recapOf = (m: (typeof messages)[number]) => (m.context && 'recap' in m.context ? m.context.recap : undefined);
+      const workOf = (m: (typeof messages)[number]) => (m.context && 'work' in m.context ? m.context.work : undefined);
       const thumbs = await thumbsFor(messages.map((m) => photoOf(m)?.id).filter((x): x is string => !!x));
       if (busyRef.current !== null) return;   // a reply started meanwhile: keep what's on screen
       historyDayRef.current = today;
@@ -107,6 +123,7 @@ export function TutorPanel() {
           text: m.role === 'context' ? (m.context && 'chip' in m.context ? m.context.chip ?? '' : '') : (m.text ?? ''),
           ...(p && { photo: { ...p, thumb: thumbs[p.id] } }),
           ...(recapOf(m) && { recap: recapOf(m) }),
+          ...(workOf(m) && { work: workOf(m) }),
         };
       }).filter((l) => l.text || l.photo));
       setLoaded(true);
@@ -123,6 +140,7 @@ export function TutorPanel() {
     setChipOff(false);
     setOpener(options.opener ?? screen?.opener ?? null);
     setOpenerRecapId((options.opener ? options.recapId : screen?.recapId) ?? null);
+    setOpenerWork((options.opener ? options.work : screen?.work) ?? null);
     if (busy === null && (!historyOk || staleRef.current || historyDayRef.current !== localDay())) syncHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, openSeq]);
@@ -192,6 +210,12 @@ export function TutorPanel() {
               { key: next, role: 'assistant' as const, text: '', pending: true }]);
           }
         } else if (e.type === 'research') setResearching((prev) => [...prev, { id: e.id, at: Date.now() }]);
+        else if (e.type === 'work') {
+          const key = pendingKey;
+          setLines((prev) => prev.map((l) => (l.key === key ? { ...l, work: e.work } : l)));
+          // It's here: the 書いています line has done its job.
+          setActions((prev) => prev.filter((x) => !(x.action.type === 'content_offer' && x.action.kind === 'longform')));
+        }
         else if (e.type === 'action') setActions((prev) => [...prev, { key: ++actionKeyRef.current, action: e.action }]);
         else if (e.type === 'error') {
           const key = pendingKey;
@@ -225,21 +249,23 @@ export function TutorPanel() {
     const sentCtx = ctx && !chipOff ? ctx : undefined;
     const sentOpener = opener && !lines.some((l) => l.role !== 'context') ? opener : undefined;
     const sentRecap = sentOpener && openerRecap ? openerRecap : undefined;
+    const sentWork = sentOpener && openerWork ? openerWork : undefined;
     const before: Line[] = [
       ...(sentCtx?.chip && !lines.some((l) => l.role === 'context' && l.text === sentCtx.chip)
         ? [{ key: `c-${Date.now()}`, role: 'context' as const, text: sentCtx.chip }] : []),
-      ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener, ...(sentRecap && { recap: sentRecap }) }] : []),
+      ...(sentOpener ? [{ key: `o-${Date.now()}`, role: 'assistant' as const, text: sentOpener, ...(sentRecap && { recap: sentRecap }), ...(sentWork && { work: sentWork }) }] : []),
       { key: `u-${Date.now()}`, role: 'user', text: message,
         ...(sentPhoto && { photo: { id: sentPhoto.upload.id, thumb: sentPhoto.thumb, live: true } }) },
     ];
     setOpener(null);
     setOpenerRecapId(null);
+    setOpenerWork(null);
     // Anything that landed is in the thread now: she sees it in this turn.
     setLanded([]);
-    const ok = await streamReply({ message, context: sentCtx, opener: sentOpener, recapId: sentRecap?.id, image: sentPhoto?.upload }, before);
+    const ok = await streamReply({ message, context: sentCtx, opener: sentOpener, recapId: sentRecap?.id, workId: sentWork?.id, image: sentPhoto?.upload }, before);
     // Nothing got through: hand the message back so it isn't lost (a photo isn't re-attached).
     if (!ok && message) setDraft((d) => d || message);
-  }, [busy, ctx, chipOff, opener, openerRecap, lines, photo, streamReply]);
+  }, [busy, ctx, chipOff, opener, openerRecap, openerWork, lines, photo, streamReply]);
 
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return;
@@ -257,7 +283,7 @@ export function TutorPanel() {
       const ids = researching.map((r) => r.id);
       const done = await pollResearch(threadId, ids).catch(() => [] as string[]);
       const now = Date.now();
-      setResearching((prev) => prev.filter((r) => !done.includes(r.id) && now - r.at < RESEARCH_GIVE_UP_MS));
+      setResearching((prev) => prev.filter((r) => !done.includes(r.id) && now - r.at < (r.longread ? LONGREAD_GIVE_UP_MS : RESEARCH_GIVE_UP_MS)));
       if (done.length) setLanded((prev) => [...prev, ...done]);
     }, RESEARCH_POLL_MS);
     return () => clearTimeout(t);
@@ -339,6 +365,7 @@ export function TutorPanel() {
             {!loaded && !lines.length && <div className="tutor-typing" role="status" aria-label="読み込み中"><span /><span /><span /></div>}
             {firstLine && <div className="tutor-t"><TutorText text={firstLine} lookup={lookup} /></div>}
             {firstLine && openerRecap && <RecapBlock recap={openerRecap} onOpen={() => setSheetRecap(openerRecap.id)} />}
+            {firstLine && openerWork && <WorkBlock work={openerWork} onOpen={() => openWork(openerWork)} />}
             {lines.map((l) => l.role === 'context'
               ? <div key={l.key} className="tutor-ctx">{l.text}</div>
               : l.role === 'user'
@@ -346,11 +373,14 @@ export function TutorPanel() {
                 : [
                   <AssistantLine key={l.key} text={l.text} pending={l.pending} lookup={lookup} />,
                   l.recap && <RecapBlock key={`${l.key}-recap`} recap={l.recap} onOpen={() => setSheetRecap(l.recap!.id)} />,
+                  l.work && <WorkBlock key={`${l.key}-work`} work={l.work} onOpen={() => openWork(l.work!)} />,
                 ])}
             {busy && <div className="tutor-busy">{busy}</div>}
-            {busy === null && researching.length > 0 && <div className="tutor-busy">ハルカが調べています…</div>}
+            {busy === null && researching.some((r) => !r.longread) && <div className="tutor-busy">ハルカが調べています…</div>}
             {actions.map((a) => (
-              <ActionNote key={a.key} action={a.action} onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
+              <ActionNote key={a.key} action={a.action} threadId={threadId}
+                onRate={(id, r) => { setGrammarMastery(id, r); setActions((prev) => prev.filter((x) => x !== a)); }}
+                onLongread={(jobId) => setResearching((prev) => [...prev, { id: jobId, at: Date.now(), longread: true }])}
                 onDismiss={() => setActions((prev) => prev.filter((x) => x !== a))} />
             ))}
           </div>
@@ -412,7 +442,7 @@ const TOOL_LABEL: Record<string, string> = {
   get_text: '本文を読んでいます…',
   search_history: '前のことを思い出しています…',
   research: '調べ始めています…',
-  request_content: '番組を作っています…',
+  request_content: '準備しています…',
 };
 
 /** Your turn: the photo (if any) above your bubble. Live, it's the photo as
@@ -465,9 +495,11 @@ function splitAsides(text: string): { aside: boolean; text: string }[] {
   return out.map((p) => ({ ...p, text: p.text.replace(/<\/?a?s?i?d?e?$/, '').trim() })).filter((p) => p.text);
 }
 
-function ActionNote({ action, onRate, onDismiss }: {
+function ActionNote({ action, threadId, onRate, onLongread, onDismiss }: {
   action: TutorAction;
+  threadId: string | null;
   onRate: (id: string, r: 'easy' | 'medium' | 'hard') => void;
+  onLongread: (jobId: string) => void;
   onDismiss: () => void;
 }) {
   if (action.type === 'grammar_rating') {
@@ -486,6 +518,9 @@ function ActionNote({ action, onRate, onDismiss }: {
   if (action.type === 'add_to_deck') return <DeckOffer action={action} onDone={onDismiss} />;
   if (action.type === 'content_queued') {
     return <div className="tutor-ctx">番組「{action.topic}」を作っています · 聞くに届きます</div>;
+  }
+  if (action.type === 'content_offer' && action.kind === 'longform') {
+    return <LongreadOffer action={action} threadId={threadId} onStarted={onLongread} onDismiss={onDismiss} />;
   }
   if (action.type === 'content_offer') return <ContentOffer action={action} onDismiss={onDismiss} />;
   return null;
@@ -540,7 +575,7 @@ function DeckOffer({ action, onDone }: { action: Extract<TutorAction, { type: 'a
  *  their own session (and so their own limits). The tutor never starts paid
  *  generation by itself, so text in an article can't trigger it (CLAUDE.md › Security). */
 function ContentOffer({ action, onDismiss }: {
-  action: Extract<TutorAction, { type: 'content_offer' }>;
+  action: Extract<TutorAction, { type: 'content_offer'; kind: 'podcast' }>;
   onDismiss: () => void;
 }) {
   const [state, setState] = useState<'offer' | 'making' | 'made' | 'error'>('offer');
@@ -565,6 +600,54 @@ function ContentOffer({ action, onDismiss }: {
         <button onClick={onDismiss}>いいえ</button>
       </div>
     </div>
+  );
+}
+
+/** The same for a long read: ハルカ starts writing only when the learner taps
+ *  書いて, with their own session (and so their own caps). Her note lands in the
+ *  thread when it's ready; the panel polls for it like a lookup. */
+function LongreadOffer({ action, threadId, onStarted, onDismiss }: {
+  action: Extract<TutorAction, { type: 'content_offer'; kind: 'longform' }>;
+  threadId: string | null;
+  onStarted: (jobId: string) => void;
+  onDismiss: () => void;
+}) {
+  const [state, setState] = useState<'offer' | 'starting' | 'started' | 'error'>('offer');
+  const [error, setError] = useState('');
+  const start = async () => {
+    setState('starting');
+    try {
+      const jobId = await startLongread({ topic: action.english || action.topic, angle: action.angle, threadId });
+      onStarted(jobId);
+      setState('started');
+    } catch (e) {
+      setError(await longreadErrorMessage(e));
+      setState('error');
+    }
+  };
+  if (state === 'started') return <div className="tutor-ctx">「{action.topic}」を書いています · 本棚に届きます</div>;
+  return (
+    <div className="tutor-a">
+      「{action.topic}」の長い記事を書く？
+      {state === 'error' && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.3rem' }}>{error}</div>}
+      <div className="tutor-suggestion">
+        <button onClick={start} disabled={state === 'starting'}>{state === 'starting' ? '準備中…' : '書いて'}</button>
+        <button onClick={onDismiss}>いいえ</button>
+      </div>
+    </div>
+  );
+}
+
+/** A long read she wrote, under the line that tells you: opens it in the Reader
+ *  (the recap block's shape, design-system §6.17). Built from the note's work id,
+ *  never from her text. */
+function WorkBlock({ work, onOpen }: { work: WorkRef; onOpen: () => void }) {
+  return (
+    <button className="tutor-recap" onClick={onOpen}>
+      <span className="tutor-recap-k">LONG READ</span>
+      <span className="tutor-recap-h"><span>{work.title}</span><ChevronRight size={18} strokeWidth={1.6} /></span>
+      <span className="tutor-recap-s">本棚で読む</span>
+    </button>
   );
 }
 

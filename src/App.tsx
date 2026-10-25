@@ -3,7 +3,7 @@ import { Feed } from './components/Feed'
 import { Library } from './components/Library'
 import { Onboarding } from './components/Onboarding'
 import { BottomNav, type Tab } from './components/BottomNav'
-import { Today, LAST_WORK_KEY } from './components/Today'
+import { Today, LAST_WORK_KEY, markWorkOpened } from './components/Today'
 import { Settings } from './components/Settings'
 import { Review, type ReviewSegment } from './components/Review'
 import { Listen } from './components/Listen'
@@ -22,13 +22,13 @@ import { fetchJlptTotals } from './services/jmdict'
 import { resetPlaylists } from './services/playlists'
 import { unlockSharedAudio } from './services/sharedAudio'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus } from './services/api'
+import { fetchNewsFeed, NewsArticle, LongFormWork, type WorkReadingPosition, requestArticleProcessing, fetchReadyBufferArticles, ensureBuffer, isServerBusyError, updateWorkStatus, fetchWorks, fetchWorkResumeArticle } from './services/api'
 import { ChevronLeft } from 'lucide-react'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { OpenSettingsContext, PageHeading, type TitleSwitch } from './components/PageHeading'
 import { muteChromeScroll, isChromeScrollMuted } from './services/chromeScroll'
 import { TutorProvider } from './components/tutor/TutorProvider'
-import { TutorPanel } from './components/tutor/TutorPanel'
+import { TutorPanel, OPEN_WORK_EVENT } from './components/tutor/TutorPanel'
 import { TutorEdge } from './components/tutor/TutorEdge'
 import { startActivityTracking } from './services/activity'
 
@@ -565,6 +565,7 @@ function App() {
     saveProcessedArticle(article.id, article);
     setActiveWork(work);
     try { localStorage.setItem(LAST_WORK_KEY, work.id); } catch { /* storage blocked */ }
+    markWorkOpened(work.id);
     setWorkBookmark(work.readingPosition ?? null);
     setActiveWorkArticle(article);
     setWorkResumeBlock(resumeBlockIndex);
@@ -671,6 +672,31 @@ function App() {
     handleTabChange('listen');
     handleOpenSong(queue[0], queue, context);
   };
+  // ハルカ's long-read block in the chat (TutorPanel): open that work in 本棚's
+  // Reader, or 本棚 itself while part 1 is still being prepared.
+  const openWorkById = async (id: string) => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    try {
+      const work = (await fetchWorks(userId)).find((w) => w.id === id);
+      const opened = work ? await fetchWorkResumeArticle(work, userId) : null;
+      if (work && opened) handleTodayWork(work, opened.article, opened.resumeBlock);
+      else showRead('shelf');
+    } catch (e) {
+      console.warn('[app] open work from chat failed:', e);
+      showRead('shelf');
+    }
+  };
+  const openWorkRef = useRef(openWorkById);
+  openWorkRef.current = openWorkById;
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) void openWorkRef.current(id);
+    };
+    window.addEventListener(OPEN_WORK_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_WORK_EVENT, onOpen);
+  }, []);
   const visibleArticles = (articles || []).filter(a => a && a.id && !(dismissedArticleIds || []).includes(a.id));
   // 今日's two news picks, from the last feed while this launch's feed loads
   // (NewsAPI + the ready buffer can take a while on open). Light copies: a

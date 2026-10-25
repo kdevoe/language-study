@@ -25,7 +25,7 @@ import { GoogleGenAI } from 'https://esm.sh/@google/genai';
 import { GEMINI_FLASH, ELEVEN_DIALOGUE_MODEL, RESEARCH_MODEL } from '../_shared/models.ts';
 import { emptyUsage } from '../_shared/claude.ts';
 import { geminiJsonOrClaude, isOut, markOut, providerDown } from '../_shared/llm.ts';
-import { research } from '../_shared/research.ts';
+import { lookup } from '../_shared/lookup.ts';
 import { pickTargetWords } from '../_shared/readerVocab.ts';
 import { CAST, STANDARD, pickPairing, personaById, type PairHistory, type Persona } from '../_shared/podcastCast.ts';
 import {
@@ -204,7 +204,7 @@ async function researchTopic(topic: string, instructions?: string) {
   const usage = emptyUsage(RESEARCH_MODEL);
   try {
     const focus = instructions?.trim() ? ` The listener asked for this focus: ${instructions.trim().slice(0, 200)}` : '';
-    const r = await research(`Key facts and recent developments about: ${topic.trim()}.${focus}`.slice(0, 400), usage);
+    const r = await lookup(`Key facts and recent developments about: ${topic.trim()}.${focus}`.slice(0, 400), usage);
     const notes = r.facts.map((f) => `- ${f.fact} (${f.source})`).join('\n');
     return { notes: notes || undefined, usage: { facts: r.facts.length, withheld: r.withheld.length, searches: usage.webSearches, costUsd: +usage.costUsd.toFixed(5) } };
   } catch (e) {

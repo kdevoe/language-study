@@ -26,9 +26,12 @@ export const CLAUDE_SONNET = 'claude-sonnet-5-5';
  *  measuring on real transcripts (docs/tutor-agent-design.md §8). */
 export const TUTOR_MODEL = CLAUDE_SONNET;
 
-/** Claude — ハルカ's quarantined web research (_shared/research.ts): reads raw
- *  search results with no tools but web_search and its report. */
+/** Claude — ハルカ's quarantined web search (_shared/lookup.ts, _shared/research.ts):
+ *  reads raw search results and pages with no tools but web search / fetch and its report. */
 export const RESEARCH_MODEL = CLAUDE_HAIKU;
+
+/** Claude — ハルカ's long reads (write-longread): choosing the topic and writing the source. */
+export const LONGREAD_MODEL = CLAUDE_SONNET;
 
 /** Claude — the news editor (fetch-raw-news) and the nightly dream. */
 export const NEWS_EDITOR = CLAUDE_HAIKU;

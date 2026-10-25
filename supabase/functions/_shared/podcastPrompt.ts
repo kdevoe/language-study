@@ -34,7 +34,7 @@ export interface PodcastPromptInput {
   topic?: string;
   /** 1 item for article/text/url, 2–4 for digest, none for topic. */
   items: PodcastSourceItem[];
-  /** Topic only: checked facts from web research (_shared/research.ts), one per line. */
+  /** Topic only: checked facts from web research (_shared/lookup.ts), one per line. */
   researchNotes?: string;
   /** Total Japanese characters to aim for (≈ 280 chars per minute of audio). */
   targetChars: number;

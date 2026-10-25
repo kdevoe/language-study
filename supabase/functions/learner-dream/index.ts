@@ -11,6 +11,8 @@
 //   re-check every profile line's evidence and prune. Writes a profile version.
 //   Beside it, the weekly recap of recurring mistakes (recap.ts, database/41);
 //   Sunday's nightly pass then puts the recap's teaser first in the openers.
+// long reads: after the nightly pass, on the learner's local Tuesday and Friday
+//   nights, start ハルカ's long read (write-longread), even if the pass failed.
 //
 // Guards instead of review: a new profile is accepted only if it is within the
 // size budget, every line cites evidence, it drops at most a few lines, and it
@@ -23,7 +25,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { actingUserId, resolveCaller } from '../_shared/auth.ts';
 import { CLAUDE_SONNET, DREAM_MODEL, RESEARCH_MODEL } from '../_shared/models.ts';
-import { research } from '../_shared/research.ts';
+import { lookup } from '../_shared/lookup.ts';
 import { hasContact } from '../_shared/researchFilter.ts';
 import { dataRule, fence } from '../_shared/untrusted.ts';
 import { writeRecap } from './recap.ts';
@@ -152,7 +154,7 @@ Deno.serve(async (req) => {
         weekly(admin, userId),
         writeRecap(admin, userId).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
       ]).then(([profile, recap]) => ({ ...profile, recap }))
-      : await nightly(admin, userId);
+      : await nightly(admin, userId).finally(() => chainLongread(admin, userId));
     console.log(JSON.stringify({ fn: 'learner-dream', userId, mode, ...result }));
     return json({ ok: true, mode, ...result });
   } catch (err) {
@@ -160,6 +162,40 @@ Deno.serve(async (req) => {
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
+
+// ── Long reads ───────────────────────────────────────────────────────────────
+
+/** On the learner's local Tuesday and Friday nights, start ハルカ's long read
+ *  (write-longread: it chooses, researches and writes in the background). Runs
+ *  after the nightly pass, so she chooses with yesterday already digested, and
+ *  even when that pass failed (the planner reads the last accepted profile). */
+async function chainLongread(admin: SupabaseClient, userId: string) {
+  try {
+    const { data: prefs } = await admin.from('user_preferences').select('timezone').eq('user_id', userId).maybeSingle();
+    const night = lastNight(prefs?.timezone);
+    if (night !== 2 && night !== 5) return;
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/write-longread`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start', trigger: 'scheduled', userId }),
+    });
+    console.log(JSON.stringify({ fn: 'learner-dream', userId, longread: res.status, detail: res.ok ? undefined : (await res.text()).slice(0, 200) }));
+  } catch (e) {
+    console.warn('[learner-dream] long read failed to start:', e instanceof Error ? e.message : e);
+  }
+}
+
+/** Weekday (0 = Sunday) of the night that just ended where the learner is: the
+ *  dream runs at 08:00 UTC, which is that night in the Americas and the next
+ *  afternoon further east. Before 18:00 local, last night was yesterday's. */
+function lastNight(tz: string | null | undefined, now = new Date()): number {
+  let zone = 'UTC';
+  try { if (tz) { new Intl.DateTimeFormat('en', { timeZone: tz }); zone = tz; } } catch { /* unknown zone: UTC */ }
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).formatToParts(now);
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.find((p) => p.type === 'weekday')?.value ?? '');
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+  return hour >= 18 ? day : (day + 6) % 7;
+}
 
 // ── Nightly ──────────────────────────────────────────────────────────────────
 
@@ -302,7 +338,7 @@ Call write_memory with:
 }
 
 /**
- * Look up the brief's questions (quarantined: _shared/research.ts) and write
+ * Look up the brief's questions (quarantined: _shared/lookup.ts) and write
  * openers from the checked facts. The writer sees only those facts, fenced, and
  * has no tools but its output. Best effort: on failure the brief is unchanged.
  */
@@ -330,7 +366,7 @@ async function researchForBrief(
   const found: NonNullable<LearnerBrief['research']> = [];
   for (const q of questions) {
     try {
-      const r = await research(q, usage);
+      const r = await lookup(q, usage);
       if (r.facts.length) found.push({ question: q, facts: r.facts });
     } catch (e) {
       console.warn('[learner-dream] lookup failed:', e instanceof Error ? e.message : e);
