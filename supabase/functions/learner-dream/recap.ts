@@ -30,7 +30,7 @@ export async function writeRecap(admin: SupabaseClient, userId: string) {
   const weekEnd = utcDay(new Date(Date.now() - 86400_000));
   const weekStart = utcDay(new Date(Date.now() - 7 * 86400_000));
 
-  const [hers, mine, reviews, kanji, digests, prefs] = await Promise.all([
+  const [hers, mine, reviews, kanji, digests, prefs, cardLog] = await Promise.all([
     admin.from('tutor_messages').select('text').eq('user_id', userId).eq('role', 'assistant')
       .gt('created_at', since).like('text', '%<fix%').order('created_at').limit(300),
     admin.from('tutor_messages').select('text').eq('user_id', userId).eq('role', 'user')
@@ -42,6 +42,9 @@ export async function writeRecap(admin: SupabaseClient, userId: string) {
     admin.from('learner_digests').select('day, text').eq('user_id', userId).gte('day', weekStart)
       .order('day').limit(7),
     admin.from('user_preferences').select('jlpt_level, grammar_progress').eq('user_id', userId).maybeSingle(),
+    // Last week's grammar cards (grammarCards.ts): what they picked on each.
+    admin.from('grammar_review_log').select('picked, correct, card:grammar_cards(pattern, before, answer, after)')
+      .eq('user_id', userId).gt('reviewed_at', since).limit(500),
   ]);
 
   // Recasts with what the learner wrote. A tag without was= has no evidence.
@@ -71,6 +74,7 @@ export async function writeRecap(admin: SupabaseClient, userId: string) {
   const missedSurfaces = new Set(missed.map(([id]) => names[id]).filter(Boolean));
   const kanjiAgain = [...new Set(((kanji.data ?? []) as { kanji: string; rating: number }[]).filter((r) => r.rating === 1).map((r) => r.kanji))];
   const totalReviews = (reviews.data ?? []).length;
+  const cardLines = grammarCardLines((cardLog.data ?? []) as any[]);
 
   if (fixes.length < MIN_FIXES) return { reason: 'too few corrections', fixes: fixes.length };
 
@@ -80,7 +84,7 @@ export async function writeRecap(admin: SupabaseClient, userId: string) {
 
 What it's for: show the few mistakes that keep coming back, so they can fix them. Find what the slips have in common (adjective types, particles, verb forms, word choice), not a list of every slip. Be warm and plain, never a scold.
 
-${dataRule(['corrections', 'learner', 'misses', 'days'])}
+${dataRule(['corrections', 'learner', 'misses', 'cards', 'days'])}
 
 CORRECTIONS THIS WEEK (your recasts in chat: what they wrote → what you said back, and why)
 ${fence('corrections', fixes.slice(0, MAX_FIXES).map((f) => `- ${f.was} → ${f.now}${f.why ? ` (${f.why})` : ''}`).join('\n'))}
@@ -91,6 +95,9 @@ ${fence('learner', learnerText.join('\n').slice(-8000))}
 FLASHCARD MISSES (${totalReviews} reviews this week)
 ${fence('misses', [missLines.join('\n') || '(none)', kanjiAgain.length ? `Kanji forgotten: ${kanjiAgain.slice(0, 30).join('')}` : ''].filter(Boolean).join('\n'))}
 Grammar they rated themselves: ${grammarRatings(prefs.data?.grammar_progress ?? {})}
+
+GRAMMAR CARDS (from earlier recaps' patterns: the sentence, then how they did)
+${fence('cards', cardLines || '(none this week)')}
 
 THE WEEK, DAY BY DAY
 ${fence('days', ((digests.data ?? []) as any[]).map((d) => `${d.day}: ${d.text}`).join('\n') || '(none)')}
@@ -107,7 +114,8 @@ Call write_recap with:
   - explain: 1-2 short English paragraphs on the rule, with a few Japanese words inline. No markup.
   - tip: one sentence, a concrete thing to check for this week.
 - words: 0-6 words from FLASHCARD MISSES that kept slipping (word exactly as listed, meaning in 1-3 English words).
-- solid: one or two English sentences on something that went well this week (a pattern they used naturally, longer sentences), from the evidence. Never invent.
+- solid: one or two English sentences on something that went well this week (a pattern they used naturally, longer sentences, a grammar card pattern they now get right), from the evidence. Never invent.
+A grammar card pattern they keep missing can count toward a pattern above, if the corrections show it too.
 Only use what's above. Don't count a typo as a pattern.`;
 
   const out = await callTool<RecapReport & { teaser: string }>({
@@ -155,12 +163,28 @@ Only use what's above. Don't count a typo as a pattern.`;
   if (!checked) return { reason: 'recap failed checks', costUsd: +usage.costUsd.toFixed(5) };
   const { teaser, report } = checked;
   const title = report.patterns.map((p) => p.short).join(' · ');
-  const { error } = await admin.from('weekly_recaps').upsert(
+  const { data: row, error } = await admin.from('weekly_recaps').upsert(
     { user_id: userId, week_start: weekStart, week_end: weekEnd, title, teaser, report, usage },
     { onConflict: 'user_id,week_end' },
-  );
+  ).select('id').single();
   if (error) throw error;
-  return { patterns: report.patterns.length, words: report.words.length, costUsd: +usage.costUsd.toFixed(5) };
+  return { id: row.id as string, patterns: report.patterns.length, words: report.words.length, costUsd: +usage.costUsd.toFixed(5) };
+}
+
+/** One line per grammar card reviewed this week: right/wrong counts, and the wrong picks. */
+function grammarCardLines(rows: { picked: string | null; correct: boolean; card: { pattern: string; before: string; answer: string; after: string } | null }[]): string {
+  const by = new Map<string, { pattern: string; right: number; wrong: string[] }>();
+  for (const r of rows) {
+    if (!r.card) continue;
+    const key = `${r.card.before}＿${r.card.after}`;
+    const c = by.get(key) ?? { pattern: r.card.pattern, right: 0, wrong: [] };
+    if (r.correct) c.right++;
+    else c.wrong.push(r.picked ?? '?');
+    by.set(key, c);
+  }
+  return [...by.entries()].sort((a, b) => b[1].wrong.length - a[1].wrong.length).slice(0, 30)
+    .map(([s, c]) => `- [${c.pattern}] ${s}: right ×${c.right}${c.wrong.length ? `, wrong ×${c.wrong.length} (picked ${[...new Set(c.wrong)].join(', ')})` : ''}`)
+    .join('\n');
 }
 
 // ── Checks ───────────────────────────────────────────────────────────────────

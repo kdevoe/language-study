@@ -29,6 +29,7 @@ import { lookup } from '../_shared/lookup.ts';
 import { hasContact } from '../_shared/researchFilter.ts';
 import { dataRule, fence } from '../_shared/untrusted.ts';
 import { writeRecap } from './recap.ts';
+import { writeGrammarCards } from './grammarCards.ts';
 import { callTool, emptyUsage, type Usage } from '../_shared/claude.ts';
 import {
   type LearnerBrief, type LearnerProfile, type ProfileItem,
@@ -145,14 +146,26 @@ Deno.serve(async (req) => {
     if (!caller) return json({ error: 'unauthorized', errorKind: 'unauthorized' }, 401);
     const userId = actingUserId(caller, body.userId);
     if (!userId) return json({ error: 'userId required' }, 400);
-    const mode = body.mode === 'weekly' ? 'weekly' : 'nightly';
+    const mode = body.mode === 'weekly' ? 'weekly' : body.mode === 'cards' ? 'cards' : 'nightly';
+    // Cards for an existing recap (a backfill, or a retry): internal callers only.
+    if (mode === 'cards') {
+      if (caller.kind === 'user') return json({ error: 'forbidden' }, 403);
+      const cards = await writeGrammarCards(admin, userId, typeof body.recapId === 'string' ? body.recapId : undefined);
+      console.log(JSON.stringify({ fn: 'learner-dream', userId, mode, cards }));
+      return json({ ok: true, mode, cards });
+    }
 
     // The recap runs beside the profile pass (both are long Sonnet calls) and
     // neither's failure costs the other.
     const result = mode === 'weekly'
       ? await Promise.all([
         weekly(admin, userId),
-        writeRecap(admin, userId).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
+        writeRecap(admin, userId)
+          // The recap's grammar cards (grammarCards.ts) follow it; their failure keeps the recap.
+          .then(async (recap) => ('id' in recap && recap.id
+            ? { ...recap, cards: await writeGrammarCards(admin, userId, recap.id).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })) }
+            : recap))
+          .catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
       ]).then(([profile, recap]) => ({ ...profile, recap }))
       : await nightly(admin, userId).finally(() => chainLongread(admin, userId));
     console.log(JSON.stringify({ fn: 'learner-dream', userId, mode, ...result }));
