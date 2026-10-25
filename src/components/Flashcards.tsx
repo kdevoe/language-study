@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { ChevronDown, X } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { buildDeck, type Card } from '../services/dueDeck';
+import { useGrammarStore } from '../services/grammarStore';
+import type { GrammarCard } from '../services/grammarDeck';
 import { mergeArrivals, queueRepeat, type SessionCard } from '../services/deck';
 import type { Rating } from '../services/srs';
 import { fetchIntakeCandidates } from '../services/jmdict';
@@ -11,7 +13,7 @@ import type { IntakeCandidate } from '../services/intake';
 import { seedDemoDeck } from '../services/devSeed';
 import { GradeSlider } from './GradeSlider';
 import { StudyCard, PILE_SPACE } from './StudyCard';
-import { defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
+import { deckDefaultGrade, defaultGrade, recordThinkTime, thinkHistory } from '../services/thinkTime';
 import { useTutorScreen } from './tutor/TutorProvider';
 import { useActivityWhile } from '../services/activity';
 
@@ -24,6 +26,8 @@ const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 // (tab open) so grading a card doesn't reshuffle the pile underfoot.
 // Once the deck is done, Discover mode (#113) offers a triage pass over unseen
 // foundation words — same card surface, Hard/Medium/Easy pills.
+// Grammar cards from ハルカ's weekly recap (docs/grammar-cards-plan.md) come up mixed
+// in: two choices under a sentence, and picking one flips the card (GrammarSurface).
 
 
 
@@ -80,6 +84,7 @@ export function Flashcards({
   focusKey?: number;
 }) {
   const reviewWord = useAppStore((s) => s.reviewWord);
+  const reviewGrammar = useGrammarStore((s) => s.review);
   const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
   const jlptLevel = useAppStore((s) => s.jlptLevel);
 
@@ -92,6 +97,8 @@ export function Flashcards({
   // The grade slider's position, and how long the front was looked at before the
   // flip: the slider starts on a grade guessed from that time (thinkTime.ts).
   const [pick, setPick] = useState<Rating>(3);
+  // A grammar card's choice: picking one is what flips it.
+  const [picked, setPicked] = useState<string | null>(null);
   const thinkMs = useRef<number | null>(null);
   const shownAt = useRef(Date.now());
 
@@ -142,6 +149,7 @@ export function Flashcards({
   // Whenever words change, cards that became due and aren't in this run yet (today's
   // new words) join the part still ahead, new ones spread through it (mergeArrivals).
   const wordDatabase = useAppStore((s) => s.wordDatabase);
+  const grammarCards = useGrammarStore((s) => s.cards);
   const indexRef = useRef(index);
   indexRef.current = index;
   useEffect(() => {
@@ -150,7 +158,7 @@ export function Flashcards({
     if (discoverCards != null) return;
     const fresh = buildDeck();
     setCards((cur) => mergeArrivals(cur, indexRef.current, fresh, (c) => c.key));
-  }, [wordDatabase, discoverCards]);
+  }, [wordDatabase, grammarCards, discoverCards]);
 
   // Dev-only: seed a demo deck, then rebuild the snapshot in place (no reload).
   function seedAndReload() {
@@ -165,6 +173,13 @@ export function Flashcards({
   // ハルカ sees the card; before the flip only its front, so she hints, never spoils.
   useTutorScreen(() => {
     if (!card || index >= total) return null;
+    if (card.type === 'grammar') {
+      const g = card.card;
+      const blank = `${g.before}＿＿${g.after}`;
+      return revealed
+        ? { screen: 'flashcard', chip: `文法カード · ${g.pattern}`, detail: `They are on a grammar card (${g.pattern}), flipped: ${blank}, choices ${g.answer} / ${g.wrong}. The answer is ${g.answer}${picked && picked !== g.answer ? `; they picked ${picked}` : ''}. Explanation shown: ${g.explain}` }
+        : { screen: 'flashcard', chip: '文法カード · 表だけ見えています', detail: `They are on a grammar card (${g.pattern}), NOT yet answered: ${blank}, choosing between ${g.answer} and ${g.wrong}. Give hints about the rule, never which choice is right.` };
+    }
     const front = card.word.surface ?? card.key;
     return revealed
       ? { screen: 'flashcard', chip: `カード · ${front}`, detail: `They are on a vocabulary flashcard, flipped: ${front} (${card.word.reading}; ${card.word.meaning}).` }
@@ -206,12 +221,24 @@ export function Flashcards({
   useEffect(() => {
     shownAt.current = Date.now();
     thinkMs.current = null;
+    setPicked(null);
   }, [index, card?.key]);
 
   function reveal() {
     const t = Date.now() - shownAt.current;
     thinkMs.current = t;
     setPick(defaultGrade(t, thinkHistory('vocab')));
+    setRevealed(true);
+  }
+
+  // A grammar card flips on a choice: wrong starts the slider on もう一度, right
+  // starts it from the thinking time (its own pace: a sentence takes longer).
+  function choose(choice: string) {
+    if (!card || card.type !== 'grammar' || revealed) return;
+    const t = Date.now() - shownAt.current;
+    thinkMs.current = t;
+    setPicked(choice);
+    setPick(choice === card.card.answer ? deckDefaultGrade('grammar', t) : 1);
     setRevealed(true);
   }
 
@@ -223,8 +250,14 @@ export function Flashcards({
     gradedAt.current = index;
     // A repeat is practice: the first grade already set the schedule.
     if (!card.repeat) {
-      if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
-      reviewWord(card.key, rating, Date.now());
+      if (card.type === 'grammar') {
+        // Only right answers say how fast they read; a miss isn't a pace.
+        if (thinkMs.current != null && picked === card.card.answer) recordThinkTime('grammar', thinkMs.current);
+        reviewGrammar(card.card.id, rating, picked ?? '', thinkMs.current, Date.now());
+      } else {
+        if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
+        reviewWord(card.key, rating, Date.now());
+      }
     }
     // もう一度 brings the card back a few cards later in this run.
     if (rating === 1) setCards((cur) => queueRepeat(cur, index));
@@ -439,7 +472,7 @@ export function Flashcards({
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
           <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            {card.repeat ? 'Again' : card.kind === 'new' ? 'New' : 'Review'}
+            {card.repeat ? 'Again' : card.type === 'grammar' ? 'Grammar' : card.kind === 'new' ? 'New' : 'Review'}
           </span>
           <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {index + 1} / {total}
@@ -456,18 +489,34 @@ export function Flashcards({
         </div>
       </div>
 
-      <FlipSurface
-        cardKey={`${card.key}#${index}`}
-        index={index}
-        total={total}
-        word={card.word}
-        revealed={revealed}
-        tall={focusActive}
-        onTap={() => setFocused(true)}
-        onReveal={reveal}
-        onAdvance={() => grade(pick)}
-        footer={<GradeSlider value={pick} onChange={setPick} onCommit={grade} />}
-      />
+      {card.type === 'grammar' ? (
+        <GrammarSurface
+          cardKey={`${card.key}#${index}`}
+          index={index}
+          total={total}
+          card={card.card}
+          picked={picked}
+          revealed={revealed}
+          tall={focusActive}
+          onTap={() => setFocused(true)}
+          onChoose={choose}
+          onAdvance={() => grade(pick)}
+          footer={<GradeSlider value={pick} onChange={setPick} onCommit={grade} />}
+        />
+      ) : (
+        <FlipSurface
+          cardKey={`${card.key}#${index}`}
+          index={index}
+          total={total}
+          word={card.word}
+          revealed={revealed}
+          tall={focusActive}
+          onTap={() => setFocused(true)}
+          onReveal={reveal}
+          onAdvance={() => grade(pick)}
+          footer={<GradeSlider value={pick} onChange={setPick} onCommit={grade} />}
+        />
+      )}
     </div>
   );
 }
@@ -597,6 +646,82 @@ function FlipSurface({ cardKey, index, total, word, revealed, onReveal, onAdvanc
       </div>
     </div>
   );
+}
+
+// A grammar card (docs/mockups/grammar-cards.html, 1): the pattern as a kicker, the
+// sentence with a blank, and two choices under it in a fixed order per card. A
+// choice flips it; a tap elsewhere on the front does nothing. The back shows the
+// sentence with the answer marked as the recap marks a fix, "You picked …" only
+// when the pick was wrong, then the explanation and the grade slider.
+function GrammarSurface({ cardKey, index, total, card, picked, revealed, tall, onTap, onChoose, onAdvance, footer }: {
+  cardKey: string;
+  index: number;
+  total: number;
+  card: GrammarCard;
+  picked: string | null;
+  revealed: boolean;
+  tall: boolean;
+  onTap: () => void;
+  onChoose: (choice: string) => void;
+  onAdvance: () => void;
+  footer: React.ReactNode;
+}) {
+  // Same card, same order; across cards the right one is first about half the time.
+  const answerFirst = [...card.id].reduce((n, ch) => n + ch.charCodeAt(0), 0) % 2 === 0;
+  const choices = answerFirst ? [card.answer, card.wrong] : [card.wrong, card.answer];
+  const wrong = picked != null && picked !== card.answer;
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `1rem 1rem calc(1rem + ${PILE_SPACE})`, perspective: '1600px' }}>
+      <div style={{ width: '100%', maxWidth: '340px' }}>
+        <StudyCard
+          cardKey={cardKey}
+          index={index}
+          total={total}
+          revealed={revealed}
+          maxHeight={tall ? '74vh' : '62vh'}
+          cursor={revealed ? 'pointer' : 'default'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTap();
+            if (revealed) onAdvance();
+          }}
+          front={
+            <CardFace>
+              <div className="gcard-k">{card.pattern}</div>
+              <div className="gcard-sent" translate="no">{card.before}<span className="gcard-blank" />{card.after}</div>
+              <div className="gcard-choices">
+                {choices.map((c) => (
+                  <button
+                    key={c}
+                    className={`gcard-choice${picked === c ? ' on' : ''}`}
+                    translate="no"
+                    onClick={(e) => { e.stopPropagation(); onTap(); onChoose(c); }}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </CardFace>
+          }
+          back={
+            <CardFace back footer={footer}>
+              <div className="gcard-k">{card.pattern}</div>
+              <div className="gcard-sent" translate="no">{card.before}<span className="gcard-fill">{card.answer}</span>{card.after}</div>
+              <div className="gcard-verdict">{wrong && <>You picked <span className="gcard-jp">{picked}</span></>}</div>
+              <div className="gcard-explain"><MixedText text={card.explain} /></div>
+            </CardFace>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+const JP_RUN = /([぀-ヿ㐀-鿿ｦ-ﾟ々〆ー・〜]+)/;
+
+/** English with Japanese inline: the Japanese runs go in the chat serif (as in the recap). */
+function MixedText({ text }: { text: string }) {
+  return <>{text.split(JP_RUN).map((part, i) => (i % 2 ? <span key={i} className="gcard-jp">{part}</span> : part))}</>;
 }
 
 // ── Finish card ──────────────────────────────────────────────────────────────

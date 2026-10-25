@@ -10,6 +10,7 @@ import { PartCount } from './Library';
 import { useAppStore } from '../services/store';
 import { buildDeck } from '../services/dueDeck';
 import { buildKanjiDeck, useKanjiStore } from '../services/kanjiStore';
+import { useGrammarStore } from '../services/grammarStore';
 import { fetchWorkResumeArticle, fetchWorks } from '../services/api';
 import type { LongFormWork, NewsArticle } from '../services/api';
 import { fetchEpisodes } from '../services/podcasts';
@@ -108,7 +109,8 @@ export function Today({ onStartReview, onOpenWork, onOpenArticle, onShowNews, on
   // Cards due, recounted whenever the word database changes (a sync landing).
   const wordDatabase = useAppStore((s) => s.wordDatabase);
   const libraryLabel = useAdaptiveText('library');
-  const deck = useMemo(() => buildDeck(), [wordDatabase]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grammarCards = useGrammarStore((s) => s.cards);
+  const deck = useMemo(() => buildDeck(), [wordDatabase, grammarCards]); // eslint-disable-line react-hooks/exhaustive-deps
   // With an RTK kanji deck the card shows both counts (12 単語 · 3 漢字).
   const kanjiProgress = useKanjiStore((s) => s.progress);
   const hasKanji = Object.keys(kanjiProgress).length > 0;

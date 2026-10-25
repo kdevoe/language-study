@@ -15,6 +15,7 @@ import type { PodcastEpisode } from './services/podcasts'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { useKanjiStore, hasKanjiDeck } from './services/kanjiStore'
+import { useGrammarStore } from './services/grammarStore'
 import { supabase } from './services/supabase'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
 import { loadActivity } from './components/ActivityStats'
@@ -419,6 +420,9 @@ function App() {
         .then(() => useKanjiStore.getState().sync(uid))
         .then(() => useKanjiStore.getState().introduceDaily(uid, Date.now()))
         .catch((e) => console.warn('[app] kanji sync failed:', e))
+        // Grammar cards ハルカ wrote from the weekly recap; they join the 単語 session.
+        .then(() => useGrammarStore.getState().sync(uid))
+        .catch((e) => console.warn('[app] grammar sync failed:', e))
         // Warm 進捗 once the start-up syncs are done, so its first open draws at once.
         .then(() => Promise.all([loadActivity('week'), fetchJlptTotals()]))
         .catch((e) => console.warn('[app] progress warm-up failed:', e));
