@@ -31,7 +31,7 @@ from     slip | new                    (built on the learner's own sentence, or 
 
 ### How they're made
 
-In the Sunday recap call (`learner-dream/recap.ts`, Sonnet), same context, same call: each pattern gains `cards: [{ before, answer, wrong, after, explain }]`, 2–3 of them. At least one is built on one of the learner's own slips (its `now` with the blank where `fix` is, and `was`'s version as the wrong choice). The others are fresh sentences that test the same point with words at their level.
+Right after the Sunday recap is stored, a second Sonnet call (`learner-dream/grammarCards.ts`) reads the recap's patterns and writes 2–3 cards for each. A separate call rather than part of the recap call: it can also run for a recap that already exists (`mode: 'cards'`, service or cron only, used to backfill the first recap), and the recap prompt stays focused. At least one is built on one of the learner's own slips (its `now` with the blank where `fix` is, and `was`'s version as the wrong choice). The others are fresh sentences that test the same point with words at their level.
 
 Every card is checked before it's stored:
 
