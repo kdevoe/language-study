@@ -32,6 +32,7 @@ import { TutorProvider } from './components/tutor/TutorProvider'
 import { TutorPanel, OPEN_WORK_EVENT } from './components/tutor/TutorPanel'
 import { TutorEdge } from './components/tutor/TutorEdge'
 import { startActivityTracking } from './services/activity'
+import { ensureLocalDict } from './services/localDict'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -425,7 +426,10 @@ function App() {
         .catch((e) => console.warn('[app] grammar sync failed:', e))
         // Warm 進捗 once the start-up syncs are done, so its first open draws at once.
         .then(() => Promise.all([loadActivity('week'), fetchJlptTotals()]))
-        .catch((e) => console.warn('[app] progress warm-up failed:', e));
+        .catch((e) => console.warn('[app] progress warm-up failed:', e))
+        // Last, so it never queues ahead of start-up: the on-device dictionary for
+        // offline word lookups (a one-time ~7.5 MB download, then only on a new build).
+        .then(() => ensureLocalDict());
     }
   }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
 

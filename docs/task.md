@@ -697,3 +697,14 @@
       back to Claude Sonnet; Claude helpers (callTool, complete, quickHaiku, grammar insight) fall back to Gemini
       Flash. Failed article rows now keep `metadata.error` (ensure-buffer, long-read parts)
   - [ ] Not covered yet: ハルカ's chat turns, web research, song cover art
+- [/] Offline mode (docs/offline-mode-plan.md, 2026-10-25)
+  - [x] Phase 2, the dictionary on the device (`feat/offline-dictionary`):
+    - `scripts/build-jmdict-offline.mjs` builds `public/jmdict/` (11 shards, 7.5 MB gzipped, LFS).
+    - `services/localDict.ts` imports it into IndexedDB after the start-up syncs.
+    - `jmdict.ts` falls back to it when the device is offline or Supabase fails.
+    - Offline disambiguation uses pickBestEntry, narrowed to the word's own reading for kana taps.
+    - `scripts/test-local-dict.mjs` checks it.
+    - Rerun the build after a JMDict import or a JLPT retag.
+  - [ ] Phase 1: survive an offline launch (the beta gate's `check_is_approved` shows the waitlist when offline)
+  - [ ] Phase 3: outbox + reconnect reconcile (word progress, review logs, positions)
+  - [ ] Phases 4–6: offline pack + Settings toggle, offline UI states, optional pre-translated sentences

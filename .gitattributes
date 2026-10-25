@@ -1,1 +1,2 @@
 public/kuromoji-dict/*.dat.gz filter=lfs diff=lfs merge=lfs -text
+public/jmdict/*.json.gz filter=lfs diff=lfs merge=lfs -text

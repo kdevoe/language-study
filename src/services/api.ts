@@ -624,7 +624,7 @@ export async function fetchNewsFeed(page: number = 1, topics: string[] | null = 
 
 
 export async function fetchWordDefinitionQuick(word: string, contextSentence: string, jmdictEntryId?: string): Promise<Partial<WordDetails>> {
-  // 1. Try JMDict first (instant, no network needed)
+  // 1. Try JMDict first (Supabase, or the on-device copy when offline: localDict.ts)
   try {
     let result;
 
