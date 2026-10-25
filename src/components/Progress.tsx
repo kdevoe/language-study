@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
-import { fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
+import { cachedJlptTotals, fetchJlptTotals, fetchUnseenCommonWords, UnseenWord } from '../services/jmdict';
 import { ActivityStats } from './ActivityStats';
 
 // Mastery palette mirrors the generated vocab-summary report so the in-app
@@ -111,8 +111,8 @@ export function Progress({ embedded = false }: { embedded?: boolean } = {}) {
   const [activeBucket, setActiveBucket] = useState<BucketKey | null>(null);
   const [listMode, setListMode] = useState<'seen' | 'discover'>('seen');
 
-  // Corpus totals per JLPT level (denominator for coverage). Fetched once.
-  const [levelTotals, setLevelTotals] = useState<Record<number, number>>({});
+  // Corpus totals per JLPT level (denominator for coverage): the last copy at once, then fetched.
+  const [levelTotals, setLevelTotals] = useState<Record<number, number>>(() => cachedJlptTotals() ?? {});
   useEffect(() => {
     let cancelled = false;
     fetchJlptTotals().then((t) => {

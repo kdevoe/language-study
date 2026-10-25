@@ -75,6 +75,7 @@ export async function fetchSongs(): Promise<Song[]> {
   if (error) throw error;
   const songs = (data ?? []) as Song[];
   writeListCache('songs', songs);
+  void pruneCoverCache(songs.map((x) => x.cover_path).filter((x): x is string => !!x)).catch(() => {});
   return songs;
 }
 
@@ -141,22 +142,82 @@ function loadCoverMemo() {
   return coverMemo!;
 }
 
-/** Cover URLs for these paths, signing only the ones not already held. */
+// A cover never changes under its path (a redraw gets a new one, `-v2.jpg`), so
+// the image itself is kept on the device in Cache Storage, keyed by path. After
+// the first view a cover comes from there: no signing, no download. That also
+// covers a launch where the URL map above couldn't be saved (a full
+// localStorage), which made every launch sign new URLs and fetch every cover again.
+const COVER_CACHE = 'yugen-covers-v1';
+const coverObjectUrls = new Map<string, string>(); // path → object URL, this session
+const coverKey = (path: string) => `${location.origin}/__covers/${encodeURIComponent(path)}`;
+
+async function openCoverCache(): Promise<Cache | null> {
+  try { return typeof caches === 'undefined' ? null : await caches.open(COVER_CACHE); } catch { return null; }
+}
+
+/** Covers already on the device, as object URLs. */
+async function storedCovers(paths: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const cache = await openCoverCache();
+  await Promise.all(paths.map(async (p) => {
+    const held = coverObjectUrls.get(p);
+    if (held) { out[p] = held; return; }
+    if (!cache) return;
+    try {
+      const hit = await cache.match(coverKey(p));
+      if (!hit) return;
+      const url = URL.createObjectURL(await hit.blob());
+      coverObjectUrls.set(p, url);
+      out[p] = url;
+    } catch { /* unreadable entry: sign and fetch it again */ }
+  }));
+  return out;
+}
+
+/** Keep freshly signed covers on the device for next time (in the background). */
+async function storeCovers(signed: Record<string, string>): Promise<void> {
+  const cache = await openCoverCache();
+  if (!cache) return;
+  await Promise.all(Object.entries(signed).map(async ([p, url]) => {
+    try {
+      const res = await fetch(url);
+      if (res.ok && (res.headers.get('content-type') ?? '').startsWith('image/')) await cache.put(coverKey(p), res);
+    } catch { /* offline or blocked: the signed URL still shows it */ }
+  }));
+}
+
+/** Sign-out: another account must never see these covers. */
+export function clearCoverCache(): void {
+  coverObjectUrls.clear();
+  try { if (typeof caches !== 'undefined') void caches.delete(COVER_CACHE); } catch { /* storage blocked */ }
+}
+
+/** Drop stored covers no song uses any more (a deleted song, a redrawn cover). */
+export async function pruneCoverCache(inUse: string[]): Promise<void> {
+  const cache = await openCoverCache();
+  if (!cache) return;
+  const keep = new Set(inUse.map(coverKey));
+  for (const req of await cache.keys()) if (!keep.has(req.url)) await cache.delete(req);
+}
+
+/** Cover URLs for these paths: from the device when stored, else signed (signing only the ones not already held). */
 export async function coverUrls(paths: string[]): Promise<Record<string, string>> {
   const memo = loadCoverMemo();
   const now = Date.now();
-  const out: Record<string, string> = {};
+  const out: Record<string, string> = await storedCovers(paths);
   const need: string[] = [];
+  const fresh: Record<string, string> = {};
   for (const p of paths) {
+    if (out[p]) continue;
     if (DEV_MODE && p.startsWith('/')) out[p] = p;
-    else if (memo[p] && memo[p].exp - now > 86_400_000) out[p] = memo[p].url;
+    else if (memo[p] && memo[p].exp - now > 86_400_000) out[p] = fresh[p] = memo[p].url;
     else need.push(p);
   }
   if (need.length) {
     const { data } = await supabase.storage.from('music').createSignedUrls(need, COVER_TTL_S);
     for (const d of data ?? []) {
       if (!d.signedUrl || !d.path) continue;
-      out[d.path] = d.signedUrl;
+      out[d.path] = fresh[d.path] = d.signedUrl;
       memo[d.path] = { url: d.signedUrl, exp: now + COVER_TTL_S * 1000 };
     }
     // Keep only what's still in use, so the map can't grow without bound.
@@ -164,6 +225,7 @@ export async function coverUrls(paths: string[]): Promise<Record<string, string>
     for (const k of Object.keys(memo)) if (!keep.has(k) && memo[k].exp < now) delete memo[k];
     try { localStorage.setItem(COVER_KEY, JSON.stringify(memo)); } catch { /* quota or blocked: memory covers this session */ }
   }
+  if (Object.keys(fresh).length) void storeCovers(fresh);
   return out;
 }
 

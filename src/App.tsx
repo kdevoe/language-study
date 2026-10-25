@@ -10,13 +10,15 @@ import { Listen } from './components/Listen'
 import { PodcastPlayer } from './components/PodcastPlayer'
 import { Music } from './components/Music'
 import { SongPlayer } from './components/SongPlayer'
-import type { Song } from './services/songs'
+import { clearCoverCache, type Song } from './services/songs'
 import type { PodcastEpisode } from './services/podcasts'
 import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { useKanjiStore, hasKanjiDeck } from './services/kanjiStore'
 import { supabase } from './services/supabase'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
+import { loadActivity } from './components/ActivityStats'
+import { fetchJlptTotals } from './services/jmdict'
 import { resetPlaylists } from './services/playlists'
 import { unlockSharedAudio } from './services/sharedAudio'
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -343,7 +345,7 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (event === 'SIGNED_OUT') { clearListCaches(); resetPlaylists(); }
+      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); }
       // IMPORTANT: this callback runs while GoTrue still holds its navigator
       // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
       // inside it would re-enter the lock and deadlock — hanging every later
@@ -416,7 +418,10 @@ function App() {
         .catch((e) => console.warn('[app] SRS sync / intake promotion failed:', e))
         .then(() => useKanjiStore.getState().sync(uid))
         .then(() => useKanjiStore.getState().introduceDaily(uid, Date.now()))
-        .catch((e) => console.warn('[app] kanji sync failed:', e));
+        .catch((e) => console.warn('[app] kanji sync failed:', e))
+        // Warm 進捗 once the start-up syncs are done, so its first open draws at once.
+        .then(() => Promise.all([loadActivity('week'), fetchJlptTotals()]))
+        .catch((e) => console.warn('[app] progress warm-up failed:', e));
     }
   }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
 

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SliderToggle } from './SliderToggle';
 import { supabase } from '../services/supabase';
 import { localDay } from '../services/activity';
+import { readValueCache, writeValueCache } from '../services/listCache';
 
 // 進捗's activity block (docs/mockups/progress-stats.html, B without the
 // sentence): minutes per day (week), per week (month) or per month (all time),
@@ -82,25 +83,43 @@ function counts(rows: Day[], streak: number): { n: number | string; l: string }[
   ];
 }
 
+/**
+ * Fetch one period's stats and keep them as the last-loaded copy. 進捗 draws that
+ * copy at once and calls this behind it; App also calls it once after start-up so
+ * the first open of a session isn't left waiting on the network.
+ */
+export async function loadActivity(period: Period): Promise<Stats | null> {
+  const today = parse(localDay());
+  const s = spans(period, today);
+  const from = iso(s.prevStart ?? s.start);
+  const data: Stats | null = DEV_MODE
+    ? devStats(from, today)
+    : await Promise.resolve(supabase.rpc('progress_activity', { p_from: from, p_tz: Intl.DateTimeFormat().resolvedOptions().timeZone }))
+      .then(({ data, error }) => { if (error) throw error; return data as Stats | null; });
+  if (data) writeValueCache(`activity:${period}`, data);
+  return data;
+}
+
 export function ActivityStats() {
   const [period, setPeriod] = useState<Period>('week');
-  const [stats, setStats] = useState<Record<Period, Stats | null>>({ week: null, month: null, all: null });
+  const [stats, setStats] = useState<Record<Period, Stats | null>>(() => ({
+    week: readValueCache<Stats>('activity:week'),
+    month: readValueCache<Stats>('activity:month'),
+    all: readValueCache<Stats>('activity:all'),
+  }));
+  // Each period refreshes once per visit, cached copy or not.
+  const refreshed = useRef(new Set<Period>());
 
   useEffect(() => {
-    if (stats[period]) return;
-    const today = parse(localDay());
-    const s = spans(period, today);
-    const from = iso(s.prevStart ?? s.start);
-    let live = true;
-    const load: Promise<Stats | null> = DEV_MODE
-      ? Promise.resolve(devStats(from, today))
-      : Promise.resolve(supabase.rpc('progress_activity', { p_from: from, p_tz: Intl.DateTimeFormat().resolvedOptions().timeZone }))
-        .then(({ data, error }) => { if (error) throw error; return data as Stats | null; });
-    load
-      .then((data) => { if (live && data) setStats((prev) => ({ ...prev, [period]: data })); })
-      .catch((e: Error) => console.warn('[progress] activity failed:', e.message));
-    return () => { live = false; };
-  }, [period, stats]);
+    if (refreshed.current.has(period)) return;
+    refreshed.current.add(period);
+    loadActivity(period)
+      .then((data) => { if (data) setStats((prev) => ({ ...prev, [period]: data })); })
+      .catch((e: Error) => {
+        refreshed.current.delete(period);
+        console.warn('[progress] activity failed:', e.message);
+      });
+  }, [period]);
 
   const view = useMemo(() => {
     const data = stats[period];
