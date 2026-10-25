@@ -10,12 +10,14 @@
 
 import type { Rating } from './srs';
 
-export type DeckId = 'vocab' | 'kanji';
+export type DeckId = 'vocab' | 'kanji' | 'grammar';
 
 const STORAGE_KEY = 'yugen-think-times';
 const KEEP = 50;            // recent samples per deck
 const MIN_SAMPLES = 10;     // below this, use the fallback median
 const FALLBACK_MEDIAN_MS = 6_000;
+// A grammar card is a sentence to read and a choice to make, not a word to recognise.
+const FALLBACK_BY_DECK: Partial<Record<DeckId, number>> = { grammar: 12_000 };
 const CAP_MS = 60_000;      // a card left open while distracted shouldn't skew the median
 
 export function median(xs: number[]): number {
@@ -26,8 +28,8 @@ export function median(xs: number[]): number {
 }
 
 /** Pure: the starting grade for a think time, given the deck's recent samples. */
-export function defaultGrade(thinkMs: number, history: number[]): Rating {
-  const m = history.length >= MIN_SAMPLES ? median(history) : FALLBACK_MEDIAN_MS;
+export function defaultGrade(thinkMs: number, history: number[], fallbackMs = FALLBACK_MEDIAN_MS): Rating {
+  const m = history.length >= MIN_SAMPLES ? median(history) : fallbackMs;
   if (thinkMs <= m * 0.5) return 4;
   if (thinkMs <= m * 2) return 3;
   return 2;
@@ -37,14 +39,19 @@ function readAll(): Record<DeckId, number[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    return { vocab: parsed?.vocab ?? [], kanji: parsed?.kanji ?? [] };
+    return { vocab: parsed?.vocab ?? [], kanji: parsed?.kanji ?? [], grammar: parsed?.grammar ?? [] };
   } catch {
-    return { vocab: [], kanji: [] };
+    return { vocab: [], kanji: [], grammar: [] };
   }
 }
 
 export function thinkHistory(deck: DeckId): number[] {
   return readAll()[deck];
+}
+
+/** The starting grade for a deck's think time, with that deck's own fallback pace. */
+export function deckDefaultGrade(deck: DeckId, thinkMs: number): Rating {
+  return defaultGrade(thinkMs, thinkHistory(deck), FALLBACK_BY_DECK[deck]);
 }
 
 /** Record a think time once the card is graded (only real flips count). */

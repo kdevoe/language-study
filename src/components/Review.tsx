@@ -4,6 +4,7 @@ import { Flashcards } from './Flashcards';
 import { KanjiFlashcards } from './KanjiFlashcards';
 import { buildDeck, dueDeckSize } from '../services/dueDeck';
 import { buildKanjiDeck, useKanjiStore } from '../services/kanjiStore';
+import { useGrammarStore } from '../services/grammarStore';
 import { Progress } from './Progress';
 import { useAppStore } from '../services/store';
 import { PageHeading } from './PageHeading';
@@ -64,7 +65,8 @@ export function Review({
   const wordDatabase = useAppStore((s) => s.wordDatabase);
 
   // Live counts for the deck rows (recomputed when a sync or a grade lands).
-  const vocabDeck = useMemo(() => buildDeck(), [wordDatabase]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grammarCards = useGrammarStore((s) => s.cards);
+  const vocabDeck = useMemo(() => buildDeck(), [wordDatabase, grammarCards]); // eslint-disable-line react-hooks/exhaustive-deps
   const kanjiDeck = useMemo(() => buildKanjiDeck(), [kanjiProgress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFocus = useCallback(
