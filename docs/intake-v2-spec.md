@@ -103,6 +103,8 @@ Every eligible word gets one score, and the top N win. N is `new_words_per_day`,
 
 **Dry run (Oct 18, real queue):** the top picks are the words you keep looking up: 機関, 逮捕, 流行, 組織, 権利, 治療. These have 4–7 lookups each, 10–18 encounters, and are mostly N3. Of the next 63 picks, about 4 are N4. The N4 words still queued are ones you read past without looking up, i.e. likely known. If N4 should get more weight, change the level-fit numbers.
 
+**Working-level floor (added 2026-10-24).** The first week bore the dry run out: 17 of 21 promotions were N3 and none were N4, though N4 was the working level. Now, when two or more slots are open, the best working-level word gets one of them if none made the cut on score. It displaces the lowest-scoring pick that isn't chosen. Single-slot top-ups stay pure score. Simulated on the Oct 24 queue over 7 nights: N4 went from 1 to 7 and N3 from 14 to 10. Once the working level moves to N3, the floor is a no-op.
+
 ### 1a: Lookup counting
 
 **As built:** no new column. `intake_queue_signals()` (migration 39) counts lookups straight from `study_history`, and also returns each queued word's dictionary level and frequency band. Nothing new to keep in sync, and no rehydrate path to extend. `intake_level_progress()` gives the per-level totals for W, counted over all of a level's words, the same numbers 進捗 will show.
