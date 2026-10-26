@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronDown, X } from 'lucide-react';
 import { useAppStore, WordData, MasteryLevel } from '../services/store';
 import { buildDeck, type Card } from '../services/dueDeck';
-import { useGrammarStore } from '../services/grammarStore';
+import { nextGrammarSentence, useGrammarStore } from '../services/grammarStore';
 import type { GrammarCard } from '../services/grammarDeck';
 import { mergeArrivals, queueRepeat, type SessionCard } from '../services/deck';
 import type { Rating } from '../services/srs';
@@ -85,6 +85,7 @@ export function Flashcards({
 }) {
   const reviewWord = useAppStore((s) => s.reviewWord);
   const reviewGrammar = useGrammarStore((s) => s.review);
+  const markGrammarShown = useGrammarStore((s) => s.markShown);
   const gradeDiscoverWord = useAppStore((s) => s.gradeDiscoverWord);
   const jlptLevel = useAppStore((s) => s.jlptLevel);
 
@@ -177,7 +178,7 @@ export function Flashcards({
       const g = card.card;
       const blank = `${g.before}＿＿${g.after}`;
       return revealed
-        ? { screen: 'flashcard', chip: `文法カード · ${g.pattern}`, detail: `They are on a grammar card (${g.pattern}), flipped: ${blank}, choices ${g.answer} / ${g.wrong}. The answer is ${g.answer}${picked && picked !== g.answer ? `; they picked ${picked}` : ''}. Explanation shown: ${g.explain}` }
+        ? { screen: 'flashcard', chip: `文法カード · ${g.pattern}`, detail: `They are on a grammar card (${g.pattern}), flipped: ${blank}, choices ${g.answer} / ${g.wrong}. The answer is ${g.answer}${picked && picked !== g.answer ? `; they picked ${picked}` : ''}. The rule: ${g.rule}. Explanation shown: ${g.explain}` }
         : { screen: 'flashcard', chip: '文法カード · 表だけ見えています', detail: `They are on a grammar card (${g.pattern}), NOT yet answered: ${blank}, choosing between ${g.answer} and ${g.wrong}. Give hints about the rule, never which choice is right.` };
     }
     const front = card.word.surface ?? card.key;
@@ -253,14 +254,20 @@ export function Flashcards({
       if (card.type === 'grammar') {
         // Only right answers say how fast they read; a miss isn't a pace.
         if (thinkMs.current != null && picked === card.card.answer) recordThinkTime('grammar', thinkMs.current);
-        reviewGrammar(card.card.id, rating, picked ?? '', thinkMs.current, Date.now());
+        reviewGrammar(card.card, rating, picked ?? '', thinkMs.current, Date.now());
       } else {
         if (thinkMs.current != null) recordThinkTime('vocab', thinkMs.current);
         reviewWord(card.key, rating, Date.now());
       }
     }
-    // もう一度 brings the card back a few cards later in this run.
-    if (rating === 1) setCards((cur) => queueRepeat(cur, index));
+    else if (card.type === 'grammar') markGrammarShown(card.card.id, card.card.sentenceId, Date.now());
+    // もう一度 brings the card back a few cards later in this run; a grammar card
+    // on another sentence from its pool, so the repeat tests the rule.
+    if (rating === 1) {
+      setCards((cur) => queueRepeat(cur, index).map((c, i) =>
+        c.repeat && i > index && c.key === card.key && c.type === 'grammar' && c.card.sentenceId === (card.type === 'grammar' ? card.card.sentenceId : null)
+          ? { ...c, card: nextGrammarSentence(c.card) } : c));
+    }
     setRevealed(false);
     setIndex((i) => i + 1);
   }
@@ -666,8 +673,8 @@ function GrammarSurface({ cardKey, index, total, card, picked, revealed, tall, o
   onAdvance: () => void;
   footer: React.ReactNode;
 }) {
-  // Same card, same order; across cards the right one is first about half the time.
-  const answerFirst = [...card.id].reduce((n, ch) => n + ch.charCodeAt(0), 0) % 2 === 0;
+  // Same sentence, same order; across sentences the right one is first about half the time.
+  const answerFirst = [...(card.sentenceId ?? card.id)].reduce((n, ch) => n + ch.charCodeAt(0), 0) % 2 === 0;
   const choices = answerFirst ? [card.answer, card.wrong] : [card.wrong, card.answer];
   const wrong = picked != null && picked !== card.answer;
   return (

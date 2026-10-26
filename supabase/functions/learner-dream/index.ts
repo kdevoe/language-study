@@ -29,7 +29,7 @@ import { lookup } from '../_shared/lookup.ts';
 import { hasContact } from '../_shared/researchFilter.ts';
 import { dataRule, fence } from '../_shared/untrusted.ts';
 import { writeRecap } from './recap.ts';
-import { writeGrammarCards } from './grammarCards.ts';
+import { topUpGrammarCards, writeGrammarCards } from './grammarCards.ts';
 import { callTool, emptyUsage, type Usage } from '../_shared/claude.ts';
 import {
   type LearnerBrief, type LearnerProfile, type ProfileItem,
@@ -131,6 +131,15 @@ How to keep the profile healthy (it must stay useful for months):
 - Associations (Kyoto trip + food → a Kyoto food story) go in the brief as ideas, never into the profile as facts.
 - Use absolute dates (YYYY-MM-DD), never "yesterday".`;
 
+/** A recap's grammar cards, then fresh sentences for pools the learner has seen
+ *  through (grammarCards.ts). Either failing is logged and never fails the run. */
+async function grammarCards(admin: SupabaseClient, userId: string, recapId?: string) {
+  const err = (e: unknown) => ({ error: e instanceof Error ? e.message : String(e) });
+  const written = await writeGrammarCards(admin, userId, recapId).catch(err);
+  const topUp = await topUpGrammarCards(admin, userId).catch(err);
+  return { ...written, topUp };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const json = (body: unknown, status = 200) =>
@@ -150,7 +159,7 @@ Deno.serve(async (req) => {
     // Cards for an existing recap (a backfill, or a retry): internal callers only.
     if (mode === 'cards') {
       if (caller.kind === 'user') return json({ error: 'forbidden' }, 403);
-      const cards = await writeGrammarCards(admin, userId, typeof body.recapId === 'string' ? body.recapId : undefined);
+      const cards = await grammarCards(admin, userId, typeof body.recapId === 'string' ? body.recapId : undefined);
       console.log(JSON.stringify({ fn: 'learner-dream', userId, mode, cards }));
       return json({ ok: true, mode, cards });
     }
@@ -163,7 +172,7 @@ Deno.serve(async (req) => {
         writeRecap(admin, userId)
           // The recap's grammar cards (grammarCards.ts) follow it; their failure keeps the recap.
           .then(async (recap) => ('id' in recap && recap.id
-            ? { ...recap, cards: await writeGrammarCards(admin, userId, recap.id).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })) }
+            ? { ...recap, cards: await grammarCards(admin, userId, recap.id) }
             : recap))
           .catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
       ]).then(([profile, recap]) => ({ ...profile, recap }))

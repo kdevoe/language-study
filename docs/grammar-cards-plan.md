@@ -81,3 +81,14 @@ Next Sunday the recap also reads the week's grammar card misses ("still picked �
 2. **A bad card:** nothing in v1. Grading it 簡単 sends it far out.
 3. **進捗:** no NEW tag on an unopened recap.
 4. **Old cards** stay; FSRS spaces them out.
+
+## Rotation (2026-10-25, migration 44)
+
+With only two choices, a fixed sentence is remembered after a few reviews and the rule stops being checked. So a card is now **one rule with a pool of sentences**:
+
+- **One card = one rule** (one contrast: "に for where you stay, で for where something happens"), not a recap pattern: "だ / な / で" holds several rules. The card has one FSRS schedule and one explanation, written to fit every sentence (`grammar_cards.rule`, `explain`).
+- **The pool** (`grammar_sentences`): 4-5 sentences per new rule, at least one built on the learner's slip. Each review shows the one seen least recently (unseen first, the slip first among those; `withNextSentence` in `grammarDeck.ts`). A もう一度 repeat in the same run takes another sentence; it marks that sentence shown but doesn't touch the schedule. The learner can only update `shown_at`.
+- **Top-up**: each Sunday run (and `mode: 'cards'`), pools under 4 or seen all the way through get 3 new sentences (≤6 cards a run, pool max 12), checked and judged like the first ones (`topUpGrammarCards`).
+- **Repeat slips**: the generator sees the learner's existing rules, and a rule they already have gets 3 more sentences on that card instead of a second card.
+- **Compatibility**: `grammar_cards` keeps its sentence columns filled with the first sentence, so an app that hasn't updated still shows that one. The review log records `sentence_id`; the recap reads misses per rule with the missed sentences.
+- **Regrouped on launch**: the 8 first cards became 6 rules (旅館に + レストランで; 作ること + 食べるとき), schedules kept, then topped up to 4-5 sentences each.
