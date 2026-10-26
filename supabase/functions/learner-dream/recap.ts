@@ -43,7 +43,7 @@ export async function writeRecap(admin: SupabaseClient, userId: string) {
       .order('day').limit(7),
     admin.from('user_preferences').select('jlpt_level, grammar_progress').eq('user_id', userId).maybeSingle(),
     // Last week's grammar cards (grammarCards.ts): what they picked on each.
-    admin.from('grammar_review_log').select('picked, correct, card:grammar_cards(pattern, before, answer, after)')
+    admin.from('grammar_review_log').select('picked, correct, card:grammar_cards(pattern, rule, before, answer, after), sentence:grammar_sentences(before, answer, after)')
       .eq('user_id', userId).gt('reviewed_at', since).limit(500),
   ]);
 
@@ -171,19 +171,22 @@ Only use what's above. Don't count a typo as a pattern.`;
   return { id: row.id as string, patterns: report.patterns.length, words: report.words.length, costUsd: +usage.costUsd.toFixed(5) };
 }
 
-/** One line per grammar card reviewed this week: right/wrong counts, and the wrong picks. */
-function grammarCardLines(rows: { picked: string | null; correct: boolean; card: { pattern: string; before: string; answer: string; after: string } | null }[]): string {
-  const by = new Map<string, { pattern: string; right: number; wrong: string[] }>();
+/** One line per grammar card (one rule) reviewed this week: right/wrong counts,
+ *  and the sentences missed with what was picked. Old log rows have no sentence. */
+type Shown = { before: string; answer: string; after: string };
+function grammarCardLines(rows: { picked: string | null; correct: boolean; card: (Shown & { pattern: string; rule: string | null }) | null; sentence: Shown | null }[]): string {
+  const by = new Map<string, { pattern: string; rule: string; right: number; wrong: string[] }>();
   for (const r of rows) {
     if (!r.card) continue;
-    const key = `${r.card.before}＿${r.card.after}`;
-    const c = by.get(key) ?? { pattern: r.card.pattern, right: 0, wrong: [] };
+    const s = r.sentence ?? r.card;
+    const key = r.card.rule ?? `${r.card.before}＿${r.card.after}`;
+    const c = by.get(key) ?? { pattern: r.card.pattern, rule: key, right: 0, wrong: [] };
     if (r.correct) c.right++;
-    else c.wrong.push(r.picked ?? '?');
+    else c.wrong.push(`${s.before}＿${s.after} (picked ${r.picked ?? '?'}, answer ${s.answer})`);
     by.set(key, c);
   }
-  return [...by.entries()].sort((a, b) => b[1].wrong.length - a[1].wrong.length).slice(0, 30)
-    .map(([s, c]) => `- [${c.pattern}] ${s}: right ×${c.right}${c.wrong.length ? `, wrong ×${c.wrong.length} (picked ${[...new Set(c.wrong)].join(', ')})` : ''}`)
+  return [...by.values()].sort((a, b) => b.wrong.length - a.wrong.length).slice(0, 30)
+    .map((c) => `- [${c.pattern}] ${c.rule}: right ×${c.right}${c.wrong.length ? `, wrong ×${c.wrong.length}: ${[...new Set(c.wrong)].slice(0, 4).join('; ')}` : ''}`)
     .join('\n');
 }
 
