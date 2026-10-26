@@ -2,6 +2,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from '
 import { CheckCircle2, Trash2, Bookmark, FileText } from 'lucide-react';
 import { NewsArticle } from '../services/api';
 import { useState, forwardRef } from 'react';
+import { useOnline } from '../hooks/useOnline';
 
 interface Props {
   articles: NewsArticle[];
@@ -259,6 +260,7 @@ const NewsCard = forwardRef<HTMLDivElement, {
 });
 
 export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing, processingIds, cachedIds, onManualFetch, isManualFetching }: Props) {
+  const online = useOnline();
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
 
   const container = {
@@ -276,6 +278,16 @@ export function Feed({ articles, onSelect, onDismiss, isLoading, isReplenishing,
           <div key={i} className="skeleton-shimmer" style={{ width: '100%', height: '140px', borderRadius: '24px' }} />
         ))}
       </div>
+    );
+  }
+
+  if (articles.length === 0 && !isLoading && !online) {
+    // Offline with nothing (left) in the offline pack: say why, offer nothing to press.
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+        <h2 className="serif" lang="ja" style={{ fontSize: '1.6rem', marginBottom: '1rem', color: 'var(--text-main)' }}>オフライン</h2>
+        <p lang="ja" style={{ fontSize: '0.95rem', lineHeight: 1.6 }}>新しい記事は接続後に。</p>
+      </motion.div>
     );
   }
 

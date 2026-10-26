@@ -3,12 +3,28 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CLAUDE_HAIKU } from '../_shared/models.ts';
 import { parseJsonObject, quickHaiku, withGeminiFallback } from '../_shared/claude.ts';
 import { buildFuriganaMap } from '../_shared/furiganaMap.ts';
-import { resolveCaller } from '../_shared/auth.ts';
-import { dataRule, fenceInline } from '../_shared/untrusted.ts';
+import { actingUserId, resolveCaller } from '../_shared/auth.ts';
+import { dataRule, fence, fenceInline } from '../_shared/untrusted.ts';
 
 // Article sentences are untrusted (CLAUDE.md › Security › Prompt injection).
 const sentence = (v: unknown) => fenceInline('sentence', String(v ?? ''));
 const RULE = dataRule(['sentence', 'text']);
+
+// Offline pack pre-translation (docs/offline-mode-plan.md, phase 6): all of one
+// article's sentences in one call, at most this many articles a day per user.
+const BATCH_ARTICLES_PER_DAY = 10;
+const BATCH_SENTENCES = 80;
+const BATCH_SENTENCE_CHARS = 300;
+
+type Json = Record<string, unknown>;
+
+/** The article's Japanese text as the Reader shows it (tokens joined, else raw text). */
+function articleText(content: Json): string {
+  const blocks = Array.isArray(content.blocks) ? content.blocks as Json[] : [];
+  return blocks.map((b) => Array.isArray(b.content)
+    ? (b.content as Json[]).map((t) => String(t.text ?? '')).join('')
+    : String(b.text ?? '')).join('\n');
+}
 
 // Reads ANTHROPIC_API_KEY from the function's secrets.
 const anthropic = new Anthropic();
@@ -163,6 +179,59 @@ ${lines}`;
       return new Response(JSON.stringify({ readings }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // The offline pack's sentence translations for one of the caller's own
+    // articles. Only sentences found in that article's stored text are
+    // translated (the action can't be used as a general translator), the result
+    // is saved on the article row and returned from there next time, and a
+    // per-user daily cap bounds the spend.
+    if (type === 'translate_batch') {
+      const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), {
+        status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+      const userId = actingUserId(caller, body.userId);
+      const articleId = typeof body.articleId === 'string' ? body.articleId : '';
+      if (!userId || !articleId) return json({ error: 'articleId is required' }, 400);
+      const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
+      const { data: row, error } = await admin.from('processed_news').select('content')
+        .eq('id', articleId).eq('user_id', userId).maybeSingle();
+      if (error) throw error;
+      if (!row?.content) return json({ error: 'article not found' }, 404);
+      const content = row.content as Json;
+      const saved = (content.translations ?? {}) as Record<string, string>;
+
+      const text = articleText(content);
+      const asked: string[] = Array.isArray(body.sentences) ? body.sentences : [];
+      const wanted = [...new Set(asked.map((x) => String(x ?? '').trim()))]
+        .filter((x) => x && x.length <= BATCH_SENTENCE_CHARS && /[\u3040-\u30ff\u4e00-\u9fff]/.test(x) && text.includes(x))
+        .slice(0, BATCH_SENTENCES);
+      const missing = wanted.filter((x) => !saved[x]);
+      if (missing.length === 0) return json({ translations: saved });
+
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const { count } = await admin.from('processed_news').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).gte('content->>translatedAt', startOfDay.toISOString());
+      if ((count ?? 0) >= BATCH_ARTICLES_PER_DAY) return json({ translations: saved, errorKind: 'cap' }, 429);
+
+      const prompt = `Translate each numbered Japanese sentence into natural, elegant English. The sentences come from one article, in order, so use the earlier ones as context.
+Return ONLY JSON: {"translations": ["…", "…"]} with exactly ${missing.length} entries, one per sentence, in the same order. Plain text, no notes.
+${dataRule(['sentences'])}
+
+${fence('sentences', missing.map((x, i) => `${i + 1}. ${x}`).join('\n'))}`;
+      const reply = parseJsonObject<{ translations?: unknown }>(await quickHaiku(prompt, 8192));
+      const list = Array.isArray(reply.translations) ? reply.translations : [];
+      // Output check: plain short strings, nothing to follow (no links or addresses).
+      const next = { ...saved };
+      missing.forEach((x, i) => {
+        const t = String(list[i] ?? '').trim();
+        if (t && t.length <= 600 && !/https?:|www\.|\S+@\S+\.\w/.test(t)) next[x] = t;
+      });
+      await admin.from('processed_news')
+        .update({ content: { ...content, translations: next, translatedAt: new Date().toISOString() } })
+        .eq('id', articleId).eq('user_id', userId);
+      return json({ translations: next });
     }
 
     if (!word) {

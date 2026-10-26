@@ -136,6 +136,8 @@ Source of truth: Settings (JLPT, Article Intensity, Vocab Use, Kanji Use).
   
 - Not black, not green, not full width.
   
+- **Offline:** stays in the resting look; a tap swaps the label to 接続が必要です (0.9rem) for 2.5 s instead of starting a request. The same quiet wording is used elsewhere offline: the word panel's insight and a sentence translation show 接続が必要です in `--text-muted` (0.95rem), ハルカ's input placeholder reads オフライン — 接続後に話せます, the import button reads 接続が必要です, and an empty feed says オフライン / 新しい記事は接続後に。 with no button. No banners or new UI (`hooks/useOnline.ts`).
+  
 ### 6.4 Text inputs
 - **Hero input** (the one thing a sheet asks for): no box, transparent, bottom hairline `--border-light` that darkens to `--text-muted` on focus, serif about 1.35rem.
   

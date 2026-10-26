@@ -1,6 +1,6 @@
 # Offline mode (機内モード): investigation and plan
 
-*Oct 25, 2026. Status: phases 1 (offline launch, #232), 2 (offline dictionary, #231), 3 (outbox, #233) and 4 (offline pack, `feat/offline-pack`) built; the rest is a proposal.*
+*Oct 25, 2026. Status: phases 1 (offline launch, #232), 2 (offline dictionary, #231), 3 (outbox, #233), 4 (offline pack, #235), 5 (offline states) and 6 (pre-translated sentences) built (`feat/offline-states`).*
 
 ## Goal
 
@@ -140,8 +140,8 @@ This also fixes the grades that are lost today on a weak signal.
    - Loaders: `fetchProcessedArticleById`, `fetchWorkParts`, `fetchEpisode` and `fetchSong` read the pack first offline and fall back to it when the server fails (`offlineFirst`). `fetchReadyBufferArticles` returns the packed news offline, and `loadHub` skips the headline fetch and filters it by local read/dismissed marks.
    - Settings: オフライン after 表示, "Keep for offline" Off/On, status in the label's small text (size, `done / total` while saving, 再保存待ち when the OS cleared it). Mockup `docs/mockups/offline-pack.html` variant 1.
    - Open question 1 settled for now: only parts that already exist are packed, so packing never spends on generation.
-5. **Offline UI states.** WordModal insight line, translation, create buttons, ハルカ, feed end state.
-6. **Optional: pre-translated sentences.** One Haiku call per packed article returns all sentence translations together, cached with the article and capped server-side.
+5. **Offline UI states** (built). `hooks/useOnline.ts`. Offline, the grammar insights and sentence translation return `NEEDS_CONNECTION` (接続が必要です) at once, shown muted and never saved as the word's note; `CreateButton` stays flat and a tap explains; the import button and ハルカ's input say they need a connection (her send is blocked, the draft kept); the feed's empty state reads オフライン / 新しい記事は接続後に。 and stops replenishing; tapping an unpacked article says it isn't saved for offline.
+6. **Pre-translated sentences** (built). While packing, each article's sentences (grouped as the Reader groups them for a sentence tap) go to `dictionary-lookup` `type: 'translate_batch'` with the article id. The server translates only sentences found in that user's stored article, in one Haiku call (fenced, output checked for links and length), saves them on the row (`content.translations`, `content.translatedAt`) so later builds cost nothing, and caps it at 10 articles a day per user. The pack keeps one sentence → English map (`translations`); `fetchSentenceTranslation` reads it first, online and offline.
 
 ## Verifying it
 
@@ -151,5 +151,5 @@ This also fixes the grades that are lost today on a weak signal.
 ## Open questions
 
 1. **Long-read parts that haven't been generated yet.** Should the pack ask the server to write the next 1–2 parts of each in-progress work? It costs a rewrite each, but a flight is exactly when you'd read ahead. My suggestion: yes, the next 2 parts of the single most recent work, under the existing caps.
-2. **Pre-translated sentences** (phase 5): worth one Haiku call per article, or is offline reading fine without translation?
+2. **Pre-translated sentences:** built (phase 6), capped at 10 articles a day.
 3. **Pack size defaults:** about 10 articles, 5 episodes and about 150 MB of songs. Or one "small / large" choice in the status line?

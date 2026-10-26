@@ -9,6 +9,11 @@ import { useEffect, useRef } from 'react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTutorMaybe } from './tutor/TutorProvider';
 import type { ScreenContext } from '../services/tutor';
+import { NEEDS_CONNECTION } from '../services/api';
+
+
+/** An insight or translation that needs the network, offline: a quiet line, not content. */
+const offlineNote: React.CSSProperties = { color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.55 };
 
 export interface WordDetails {
   word: string;
@@ -235,7 +240,7 @@ export function WordModal({
         <div key="insight" style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: `5px solid ${OLIVE}`, marginBottom: '0.3rem' }}>
           <div style={{ ...kickerStyle, marginBottom: '0.55rem' }}><BookOpen size={13} /> GRAMMAR INSIGHT</div>
           {grammar.insight ? (
-            <motion.p key={grammar.insight} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="serif" style={{ color: 'var(--text-main)', fontSize: '1.05rem', lineHeight: 1.6 }}>{grammar.insight}</motion.p>
+            <motion.p key={grammar.insight} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="serif" style={grammar.insight === NEEDS_CONNECTION ? offlineNote : { color: 'var(--text-main)', fontSize: '1.05rem', lineHeight: 1.6 }}>{grammar.insight}</motion.p>
           ) : (
             <><Skeleton width="100%" height="1rem" /><Skeleton width="70%" height="1rem" /></>
           )}
@@ -320,7 +325,7 @@ export function WordModal({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
               className="sans" 
-              style={{ fontSize: '1.1rem', lineHeight: 1.45, color: 'var(--text-main)', paddingLeft: '0.6rem', borderLeft: '4px solid #4a5d23' }}
+              style={{ fontSize: '1.1rem', lineHeight: 1.45, color: 'var(--text-main)', paddingLeft: '0.6rem', borderLeft: '4px solid #4a5d23', ...(sentenceTranslation === NEEDS_CONNECTION && offlineNote) }}
             >
               {sentenceTranslation}
             </motion.p>
@@ -500,7 +505,7 @@ export function WordModal({
           style={{ backgroundColor: 'var(--bg-card)', padding: '1rem', borderRadius: '14px', borderLeft: '5px solid #4a5d23', marginBottom: '2.5rem' }}
         >
           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#4a5d23', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', letterSpacing: '0.05em' }}><BookOpen size={13} /> INSIGHT</div>
-          <p className="serif" style={{ color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
+          <p className="serif" style={wordData.grammarNote === NEEDS_CONNECTION ? offlineNote : { color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.55 }}>{wordData.grammarNote}</p>
           {patternRows}
         </motion.div>
       ),

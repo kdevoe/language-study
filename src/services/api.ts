@@ -98,7 +98,7 @@ import type { SearchCorpus } from './archiveSearch'
 import { writeListCache } from './listCache'
 import { addActivity } from './activity'
 import { registerReplay, send, type SendResult } from './outbox'
-import { isOffline, offlineFirst, packed } from './packStore'
+import { isOffline, offlineFirst, packed, packedTranslation } from './packStore'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -707,12 +707,17 @@ export async function fetchHeteronymReadings(
   }
 }
 
+/** What an insight or translation says when it can't be fetched offline. The
+ *  word panel shows it muted, and it's never saved as the word's note. */
+export const NEEDS_CONNECTION = '接続が必要です';
+
 /** A grammar point named to the insight prompt (#43): the catalogue's pattern and meaning. */
 export interface InsightPoint { pattern: string; meaning: string }
 
 /** `points`: the grammar points this word takes part in, so the AI names them the
  *  same way the panel's PATTERNS rows do. */
 export async function fetchWordGrammarInsight(word: string, contextSentence: string, points?: InsightPoint[]): Promise<string> {
+  if (isOffline()) return NEEDS_CONNECTION;
   try {
     console.log(`🌐 Edge Fn (dictionary-lookup grammar) for "${word}"`);
     const { insight } = await invokeEdgeFn<{ insight: string }>('dictionary-lookup', {
@@ -721,13 +726,14 @@ export async function fetchWordGrammarInsight(word: string, contextSentence: str
     return insight || 'Grammar analysis unavailable.';
   } catch (e) {
     console.error('Grammar insight Edge Fn failed:', e);
-    return 'Grammar analysis unavailable.';
+    return isOffline() ? NEEDS_CONNECTION : 'Grammar analysis unavailable.';
   }
 }
 
 /** The grammar panel's insight (#43): what `point` does in this sentence. `span`
  *  is the matched text (なければなりません). */
 export async function fetchGrammarPointInsight(span: string, contextSentence: string, point: InsightPoint): Promise<string> {
+  if (isOffline()) return NEEDS_CONNECTION;
   try {
     const { insight } = await invokeEdgeFn<{ insight: string }>('dictionary-lookup', {
       word: span, contextSentence, type: 'grammar', point,
@@ -735,7 +741,7 @@ export async function fetchGrammarPointInsight(span: string, contextSentence: st
     return insight || 'Grammar analysis unavailable.';
   } catch (e) {
     console.error('Grammar point insight Edge Fn failed:', e);
-    return 'Grammar analysis unavailable.';
+    return isOffline() ? NEEDS_CONNECTION : 'Grammar analysis unavailable.';
   }
 }
 
@@ -750,7 +756,25 @@ export async function fetchWordDefinition(word: string, contextSentence: string)
   }
 }
 
+/** The offline pack's translations for one of the user's articles: the server
+ *  translates the sentences found in it (one call, capped per day) and keeps
+ *  them on the row. Empty on any failure, including the daily cap. */
+export async function fetchArticleTranslations(articleId: string, sentences: string[]): Promise<Record<string, string>> {
+  try {
+    const { translations } = await invokeEdgeFn<{ translations?: Record<string, string> }>('dictionary-lookup', {
+      type: 'translate_batch', articleId, sentences,
+    }, 60000);
+    return translations ?? {};
+  } catch (e) {
+    console.warn('[api] article translations failed:', e instanceof Error ? e.message : e);
+    return {};
+  }
+}
+
 export async function fetchSentenceTranslation(sentence: string, contextArticle: string): Promise<string> {
+  const saved = await packedTranslation(sentence); // made with the offline pack, used online too
+  if (saved) return saved;
+  if (isOffline()) return NEEDS_CONNECTION;
   try {
     console.log(`🌐 Edge Fn (dictionary-lookup translation)`);
     const { translation } = await invokeEdgeFn<{ translation: string }>('dictionary-lookup', {
@@ -759,7 +783,7 @@ export async function fetchSentenceTranslation(sentence: string, contextArticle:
     return translation || 'Translation unavailable.';
   } catch (e) {
     console.error('Translation Edge Fn failed:', e);
-    return 'Translation unavailable.';
+    return isOffline() ? NEEDS_CONNECTION : 'Translation unavailable.';
   }
 }
 

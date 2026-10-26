@@ -5,7 +5,7 @@
 
 import { done, openDb, req } from './idb';
 
-export type PackKey = `article:${string}` | `parts:${string}` | `episode:${string}` | `song:${string}` | 'news';
+export type PackKey = `article:${string}` | `parts:${string}` | `episode:${string}` | `song:${string}` | 'news' | 'translations';
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 export const packDb = () => (dbPromise ??= openDb('yugen-pack', 1, (d) => d.createObjectStore('items')));
@@ -66,3 +66,16 @@ export async function offlineFirst<T>(key: PackKey, loader: () => Promise<T>): P
     throw e;
   }
 }
+
+// Sentence translations made for packed articles (phase 6), sentence → English.
+// Read once per session; the pack writes a fresh map on each build.
+let translations: Promise<Record<string, string>> | null = null;
+
+/** A packed translation of this sentence, if the pack has one. */
+export async function packedTranslation(sentence: string): Promise<string | null> {
+  translations ??= packed<Record<string, string>>('translations').then((m) => m ?? {});
+  return (await translations)[sentence.trim()] ?? null;
+}
+
+/** After a build (or a clear): read the map again on next use. */
+export const forgetTranslations = () => { translations = null; };

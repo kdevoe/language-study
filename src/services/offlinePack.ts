@@ -19,8 +19,8 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  ensureBuffer, fetchProcessedArticleById, fetchReadyBufferArticles, fetchWorkParts, fetchWorks,
-  workPartArticleId, type NewsArticle,
+  ensureBuffer, fetchArticleTranslations, fetchProcessedArticleById, fetchReadyBufferArticles, fetchWorkParts, fetchWorks,
+  workPartArticleId, type ArticleBlock, type NewsArticle,
 } from './api';
 import { enrichArticle, isEnriched } from './enrich';
 import { ensureLocalDict } from './localDict';
@@ -30,7 +30,7 @@ import { fetchSong, fetchSongs, keepCovers, songFileUrl } from './songs';
 import { loadPlaylists, type Playlist } from './playlists';
 import { readListCache } from './listCache';
 import { getTokenizer } from './tokenizer';
-import { dropPacked, isOffline, packedKeys, putPacked, type PackKey } from './packStore';
+import { dropPacked, forgetTranslations, isOffline, packedKeys, putPacked, type PackKey } from './packStore';
 
 const NEWS = 10;
 const WORKS = 3;
@@ -76,6 +76,29 @@ async function settle(): Promise<void> {
 // ── Build ────────────────────────────────────────────────────────────────────
 const sizeOf = (v: unknown) => new Blob([JSON.stringify(v)]).size;
 
+/** The article's sentences as the Reader groups them for a sentence tap (a token with 。！？ or a line break ends one). */
+function sentencesOf(blocks: ArticleBlock[]): string[] {
+  const out: string[] = [];
+  for (const b of blocks) {
+    if (b.type !== 'paragraph' || !b.content) continue;
+    let cur = '';
+    for (const t of b.content) {
+      cur += t.text;
+      if (/[。！？\n]/.test(t.text)) { out.push(cur.trim()); cur = ''; }
+    }
+    if (cur.trim()) out.push(cur.trim());
+  }
+  return out.filter(Boolean);
+}
+
+/** Sentence translations for a packed article: those already on its row, else one capped server call. */
+async function translationsFor(article: NewsArticle): Promise<Record<string, string>> {
+  const sentences = sentencesOf(article.blocks ?? []);
+  const saved = ((article as NewsArticle & { translations?: Record<string, string> }).translations) ?? {};
+  if (sentences.every((x) => saved[x])) return saved;
+  return { ...saved, ...(await fetchArticleTranslations(article.id, sentences)) };
+}
+
 async function enriched(article: NewsArticle): Promise<NewsArticle> {
   if (!article.blocks || isEnriched(article.blocks)) return article;
   return { ...article, blocks: await enrichArticle(article.blocks) };
@@ -92,6 +115,12 @@ export function buildPack(userId: string): Promise<void> {
     let done = 0;
     let total = 0;
     const tick = () => setStatus({ phase: 'saving', done, total, bytes: 0 });
+    const translations: Record<string, string> = {};
+    const putArticle = async (a: NewsArticle) => {
+      const e = await enriched(a);
+      await put(`article:${a.id}`, e);
+      Object.assign(translations, await translationsFor(e));
+    };
     const put = async (key: PackKey, value: unknown) => {
       await putPacked(key, value);
       written.add(key);
@@ -141,7 +170,7 @@ export function buildPack(userId: string): Promise<void> {
       // News: the feed's list, and each article ready to open.
       await put('news', news);
       for (const a of news) {
-        await put(`article:${a.id}`, await enriched(a));
+        await putArticle(a);
         done++; tick();
       }
 
@@ -150,7 +179,7 @@ export function buildPack(userId: string): Promise<void> {
         await put(`parts:${w.id}`, await fetchWorkParts(w.id, userId));
         for (const id of partIds[i]) {
           const a = await fetchProcessedArticleById(id, userId).catch(() => null);
-          if (a) await put(`article:${id}`, await enriched(a));
+          if (a) await putArticle({ ...a, id });
           done++; tick();
         }
       }
@@ -189,6 +218,9 @@ export function buildPack(userId: string): Promise<void> {
       await getTokenizer().catch(() => {});
       await dict;
 
+      await put('translations', translations);
+      forgetTranslations();
+
       const stale = (await packedKeys()).filter((k) => !written.has(k));
       await dropPacked(stale);
       writeMeta({ userId, builtAt: Date.now(), bytes });
@@ -208,6 +240,7 @@ export async function clearPack(): Promise<void> {
   await building?.catch(() => {});
   writeMeta(null);
   await dropPacked();
+  forgetTranslations();
   const none = () => Promise.reject(new Error('unused'));
   await Promise.all([pinAudio('podcast', [], none), pinAudio('music', [], none)]);
   setStatus({ phase: 'none', done: 0, total: 0, bytes: 0 });

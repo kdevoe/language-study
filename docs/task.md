@@ -709,4 +709,6 @@
   - [x] Phase 3 (`feat/offline-sync`): `services/outbox.ts` queues writes that can't reach the server (IndexedDB), and replays them in order on reconnect, before the progress sync pulls. `sessionUserId()` keeps writers working offline.
   - [ ] Pre-existing, seen while testing: the App start-up sync chain reruns on every session object change (TOKEN_REFRESHED and the like)
   - [x] Phase 4 (`feat/offline-pack`): Settings → オフライン → Keep for offline. `services/offlinePack.ts` packs news, next long-read parts, unfinished episodes and songs (audio pinned); loaders read it offline via `offlineFirst` (`services/packStore.ts`).
-  - [ ] Phases 5–6: offline UI states, optional pre-translated sentences
+  - [x] Phase 5 (`feat/offline-states`): offline states in existing UI (`hooks/useOnline.ts`, `NEEDS_CONNECTION`), no new UI.
+  - [x] Phase 6 (`feat/offline-states`): pack pre-translates sentences via `dictionary-lookup` `translate_batch` (own articles only, 10 articles/day, saved on the row).
+  - [ ] Real iPhone airplane-mode check (cold launch >1 h after last online use)
