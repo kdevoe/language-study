@@ -708,4 +708,5 @@
   - [x] Phase 1 (#232): opens offline. It uses the saved session when an expired token can't refresh (`storedSession()`), and remembers approval (`services/approval.ts`).
   - [x] Phase 3 (`feat/offline-sync`): `services/outbox.ts` queues writes that can't reach the server (IndexedDB), and replays them in order on reconnect, before the progress sync pulls. `sessionUserId()` keeps writers working offline.
   - [ ] Pre-existing, seen while testing: the App start-up sync chain reruns on every session object change (TOKEN_REFRESHED and the like)
-  - [ ] Phases 4–6: offline pack + Settings toggle, offline UI states, optional pre-translated sentences
+  - [x] Phase 4 (`feat/offline-pack`): Settings → オフライン → Keep for offline. `services/offlinePack.ts` packs news, next long-read parts, unfinished episodes and songs (audio pinned); loaders read it offline via `offlineFirst` (`services/packStore.ts`).
+  - [ ] Phases 5–6: offline UI states, optional pre-translated sentences

@@ -16,7 +16,7 @@ import { LandingPage } from './components/LandingPage'
 import { useAppStore } from './services/store'
 import { useKanjiStore, hasKanjiDeck } from './services/kanjiStore'
 import { useGrammarStore } from './services/grammarStore'
-import { supabase, storedSession } from './services/supabase'
+import { supabase, storedSession, sessionUserId } from './services/supabase'
 import { checkApproval, forgetApproval } from './services/approval'
 import { clearOutbox, flushOutbox } from './services/outbox'
 import { clearListCaches, readListCache, writeListCache } from './services/listCache'
@@ -35,6 +35,8 @@ import { TutorPanel, OPEN_WORK_EVENT } from './components/tutor/TutorPanel'
 import { TutorEdge } from './components/tutor/TutorEdge'
 import { startActivityTracking } from './services/activity'
 import { ensureLocalDict } from './services/localDict'
+import { clearPack, refreshPackIfStale } from './services/offlinePack'
+import { isOffline } from './services/packStore'
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 if (DEV_MODE) console.log('%c🛠 DEV MODE ACTIVE', 'color: #4a5d23; font-weight: bold; font-size: 14px');
@@ -197,20 +199,17 @@ function App() {
     try {
       // Who are we? The ready buffer + ensureBuffer are per-user (skipped in dev,
       // which has no real session / server rows).
-      let userId: string | null = null;
-      if (DEV_MODE) {
-        userId = 'dev-user';
-      } else {
-        const { data: { session } } = await supabase.auth.getSession();
-        userId = session?.user?.id ?? null;
-      }
+      const userId = DEV_MODE ? 'dev-user' : await sessionUserId();
+      const offline = isOffline();
 
       // App-open trigger: idempotent safety net so a new/drained user gets a
       // buffer even if no cron/read fired. Fire-and-forget — never blocks the feed.
-      if (userId && !DEV_MODE) ensureBuffer(userId);
+      if (userId && !DEV_MODE && !offline) ensureBuffer(userId);
 
-      const [feed, readyBuffer] = await Promise.all([
-        fetchNewsFeed(1, useAppStore.getState().feedTopics),
+      // Offline, the feed is the offline pack's articles (fetchReadyBufferArticles
+      // reads it); there are no fresh headlines to fetch.
+      const [feed, packedOrReady] = await Promise.all([
+        offline ? Promise.resolve([] as NewsArticle[]) : fetchNewsFeed(1, useAppStore.getState().feedTopics),
         userId && !DEV_MODE ? fetchReadyBufferArticles(userId) : Promise.resolve([] as NewsArticle[]),
       ]);
 
@@ -232,6 +231,9 @@ function App() {
       // touched localStorage, leaving no DB row, so the buffer later re-produced
       // it). Filtering it here hid the article AND wedged the buffer full of
       // invisible rows so nothing new ever loaded (issue #31 deadlock).
+      // The pack's copy predates this session, though: what was read or
+      // dismissed since is still in it, so offline the local marks do filter.
+      const readyBuffer = offline ? packedOrReady.filter(a => a && !seen.has(a.id)) : packedOrReady;
       const readyFresh = readyBuffer.filter(a => a && a.id);
       const readyIds = new Set(readyFresh.map(a => a.id));
 
@@ -369,7 +371,7 @@ function App() {
       // INITIAL_SESSION arrives null when an expired token can't be refreshed offline.
       const session = reported ?? (event === 'INITIAL_SESSION' ? storedSession() : null);
       setSession(session);
-      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); forgetApproval(); void clearOutbox(); }
+      if (event === 'SIGNED_OUT') { clearListCaches(); clearCoverCache(); resetPlaylists(); forgetApproval(); void clearOutbox(); void clearPack(); }
       // IMPORTANT: this callback runs while GoTrue still holds its navigator
       // auth lock. Calling another auth-dependent Supabase fn (rpc, getUser…)
       // inside it would re-enter the lock and deadlock — hanging every later
@@ -448,7 +450,10 @@ function App() {
         .catch((e) => console.warn('[app] progress warm-up failed:', e))
         // Last, so it never queues ahead of start-up: the on-device dictionary for
         // offline word lookups (a one-time ~7.5 MB download, then only on a new build).
-        .then(() => ensureLocalDict());
+        .then(() => ensureLocalDict())
+        // Then the offline pack, when it's on and due a refresh.
+        .then(() => refreshPackIfStale(uid, useAppStore.getState().offlinePack))
+        .catch((e) => console.warn('[app] offline pack refresh failed:', e));
     }
   }, [isOnboarded, session, checkDailyKanji, checkMidnightReset]);
 
@@ -465,8 +470,21 @@ function App() {
       const uid = session?.user?.id;
       if (uid) flushOutbox().then(() => useAppStore.getState().syncSrsWithSupabase(uid));
     };
+    // Back online or back in the app: refresh the offline pack if it's due.
+    const refreshPack = () => {
+      const uid = session?.user?.id;
+      if (uid && document.visibilityState === 'visible') {
+        void refreshPackIfStale(uid, useAppStore.getState().offlinePack).catch(() => {});
+      }
+    };
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    window.addEventListener('online', refreshPack);
+    document.addEventListener('visibilitychange', refreshPack);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('online', refreshPack);
+      document.removeEventListener('visibilitychange', refreshPack);
+    };
   }, [session]);
 
   // THE SENTINEL: Ensure we always have at least 5 visible articles
@@ -533,12 +551,12 @@ function App() {
       // while the app was closed — pull it down before starting a fresh run.
       let userId = 'dev-user';
       if (!DEV_MODE) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
+        const id = await sessionUserId();
+        if (!id) {
           setActionError('You appear to be signed out. Refresh and try again.');
           return;
         }
-        userId = session.user.id;
+        userId = id;
       }
       const { fetchProcessedArticleById } = await import('./services/api');
       const fromServer = await fetchProcessedArticleById(article.id, userId);

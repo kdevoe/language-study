@@ -8,6 +8,7 @@ import type { SearchCorpus } from './archiveSearch';
 import { writeListCache } from './listCache';
 import { forgetAudio } from './audioCache';
 import { send } from './outbox';
+import { offlineFirst } from './packStore';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -141,6 +142,10 @@ export async function deleteEpisodes(ids: string[]): Promise<void> {
 }
 
 export async function fetchEpisode(id: string): Promise<PodcastEpisodeFull> {
+  return offlineFirst(`episode:${id}`, () => fetchEpisodeRemote(id));
+}
+
+async function fetchEpisodeRemote(id: string): Promise<PodcastEpisodeFull> {
   if (DEV_MODE) {
     const ep = await devEpisode();
     if (ep && ep.id === id) return ep;

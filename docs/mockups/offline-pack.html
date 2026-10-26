@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Offline</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Shippori+Mincho:wght@400;500;600;700&display=swap');
+:root {
+  --bg-color: #f5f5f0; --bg-pure: #ffffff; --bg-card: #f0f0e8; --text-main: #2d2d2d; --text-muted: #666666;
+  --accent-primary: #d4e0e8; --accent-progress: #8fb0c4; --border-light: #e0e0d8; --olive: #4a5d23;
+  --font-serif: 'Shippori Mincho', serif; --font-sans: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: #e9e9e2; color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; padding: 2.5rem 1rem 4rem; }
+.mock-header { max-width: 900px; margin: 0 auto 1.4rem; text-align: center; }
+.mock-header .kicker { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.2em; color: var(--olive); }
+.mock-header h1 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 500; margin: 0.4rem 0 0.6rem; }
+.mock-header p { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 0.6rem; align-items: center; margin: 0 auto 2rem; flex-wrap: wrap; }
+.controls .k { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); margin-right: 0.3rem; }
+.seg { display: inline-flex; background: var(--border-light); border-radius: 100px; padding: 4px; }
+.seg button { border: none; background: none; padding: 0.4rem 1rem; border-radius: 100px; font: 600 0.8rem var(--font-sans); color: var(--text-muted); cursor: pointer; }
+.seg button.on { background: var(--bg-pure); color: var(--text-main); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.stage { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.phone-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); }
+.phone-note { font-size: 0.75rem; color: var(--text-muted); max-width: 360px; text-align: center; }
+.phone { width: 390px; height: 844px; max-width: 100%; background: var(--bg-color); border-radius: 44px; border: 10px solid #1c1c1c; box-shadow: 0 30px 60px rgba(0,0,0,0.25); overflow: hidden; position: relative; }
+.scroll { height: 100%; overflow-y: auto; padding: 2.4rem 1.25rem 7rem; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.nav { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; background: var(--bg-color); border-top: 1px solid var(--border-light); display: flex; justify-content: space-around; padding-top: 12px; }
+.nav span { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.nav i { width: 22px; height: 22px; border: 1.6px solid var(--text-muted); border-radius: 6px; display: block; }
+
+.fade { opacity: 0.35; }
+.section { margin-bottom: 3rem; }
+.section > h3 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 600; margin-bottom: 1.2rem; }
+.setting { margin-bottom: 1.6rem; }
+.lbl { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: baseline; }
+.lbl small { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.45rem; line-height: 1.5; }
+.slider { position: relative; display: flex; background: var(--border-light); border-radius: 100px; padding: 4px; height: 45px; }
+.slider span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); position: relative; z-index: 1; }
+.slider span.on { color: var(--text-main); font-weight: 700; }
+.slider .thumb { position: absolute; top: 4px; bottom: 4px; background: var(--bg-pure); border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.bar { height: 3px; border-radius: 3px; background: var(--border-light); margin-top: 0.6rem; overflow: hidden; }
+.bar b { display: block; height: 100%; background: var(--accent-progress); border-radius: 3px; }
+.kept { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin-top: 0.55rem; font-size: 0.75rem; color: var(--text-muted); }
+.kept b { font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.link { font-family: var(--font-serif); font-size: 0.8rem; color: var(--text-muted); }
+input[type=range] { width: 100%; accent-color: var(--text-main); }
+.more { font-family: var(--font-serif); font-size: 0.9rem; color: var(--text-muted); text-align: center; margin-top: 1rem; }
+.annot { outline: 2px dashed rgba(200,60,60,0.45); outline-offset: 8px; border-radius: 12px; }
+.notes { max-width: 900px; margin: 2.5rem auto 0; background: var(--bg-pure); border-radius: 16px; padding: 1.4rem 1.6rem; font-size: 0.85rem; color: var(--text-main); }
+.notes h4 { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 0.6rem; }
+.notes ol { padding-left: 1.2rem; display: grid; gap: 0.45rem; }
+.notes li { line-height: 1.55; }
+</style>
+</head>
+<body>
+<header class="mock-header">
+  <div class="kicker">MOCKUP · EXPLORATION</div>
+  <h1>Offline, in Settings</h1>
+  <p>One setting keeps a pack on the phone for flights: unread news, the next parts of what you're reading, recent episodes, your songs and the dictionary. It refreshes itself while it's on. The app behaves offline whenever there's no signal, pack or not, so this is the only control. Use the switch to see each state.</p>
+</header>
+<div class="controls">
+  <span class="k">STATE</span>
+  <div class="seg" id="state">
+    <button data-v="off">Off</button>
+    <button data-v="saving" class="on">Saving</button>
+    <button data-v="ready">Ready</button>
+    <button data-v="cleared">Cleared by iOS</button>
+  </div>
+</div>
+<div class="stage" id="stage"></div>
+<div class="notes">
+  <h4>NOTES</h4>
+  <ol>
+    <li><b>Where.</b> Its own section, オフライン, after 表示 and before 詳細: it's about the device, not about studying or reading. One label, one control, like every other setting.</li>
+    <li><b>1 · Minimal.</b> An Off / On slider (compact, like a secondary choice). The only status is the small text at the right of the label, where Text size shows its 18px: the size when ready, "4 / 12" while saving, nothing when off. No hint line.</li>
+    <li><b>2 · With contents.</b> The same, plus one muted line of what's kept (counts), so you can check before boarding that your podcast made it. A thin progress line while saving.</li>
+    <li><b>3 · Small / Large.</b> Off · Small · Large instead of a switch. Small ≈ 100 MB (8 articles, 3 episodes, songs in your lists); Large ≈ 350 MB (15 articles, 6 episodes, 30 most played songs too). Answers "how much" without a separate setting.</li>
+    <li><b>Cleared by iOS.</b> iOS can delete a web app's storage when the phone is short of space. The setting stays on and refetches on the next launch with signal; until then the label says 再保存待ち (waiting to save again) rather than a size, so a missing pack is never a surprise mid-flight.</li>
+    <li><b>Not shown:</b> nothing anywhere else. No badge on Home, no banner. Offline states inside the app (feed end, grammar note, dimmed create buttons) are the next phase.</li>
+  </ol>
+</div>
+<script>
+const slider = (opts, on, w) => `<div class="slider"${w ? ` style="width:${w}"` : ''}><div class="thumb" style="left:calc(4px + ${on} * (100% - 8px) / ${opts.length});width:calc((100% - 8px) / ${opts.length})"></div>${opts.map((o, i) => `<span class="${i === on ? 'on' : ''}">${o}</span>`).join('')}</div>`;
+const before = `<div class="fade">
+  <div class="section"><h3>表示</h3>
+    <div class="setting"><div class="lbl">Interface</div>${slider(['English', 'Adaptive', '日本語'], 1)}</div>
+    <div class="setting"><div class="lbl">Text size <small>18px</small></div><input type="range" min="14" max="32" value="18"></div>
+    <div class="setting"><div class="lbl">Weight <small>400</small></div><input type="range" min="300" max="700" step="100" value="400"></div>
+  </div></div>`;
+const after = `<div class="more fade">詳細 ⌄</div>`;
+
+const COUNTS = { articles: 12, parts: 4, episodes: 5, songs: 38 };
+const kept = (st) => st === 'ready'
+  ? `<div class="kept"><span><b>${COUNTS.articles}</b> articles</span><span><b>${COUNTS.parts}</b> parts</span><span><b>${COUNTS.episodes}</b> episodes</span><span><b>${COUNTS.songs}</b> songs</span><span>dictionary</span></div>`
+  : st === 'saving'
+  ? `<div class="kept"><span><b>12</b> articles</span><span><b>4</b> parts</span><span><b>2</b> of 5 episodes</span><span>songs next</span></div>`
+  : '';
+const status = (st, size) => ({ off: '', saving: '4 / 12', ready: size, cleared: '再保存待ち' })[st];
+const onIdx = (st) => (st === 'off' ? 0 : 1);
+
+const v1 = (st) => `<div class="section annot"><h3>オフライン</h3>
+  <div class="setting"><div class="row"><div class="lbl" style="margin:0">Keep for offline <small>&nbsp;${status(st, '310 MB')}</small></div>${slider(['Off', 'On'], onIdx(st), '140px')}</div></div>
+</div>`;
+const v2 = (st) => `<div class="section annot"><h3>オフライン</h3>
+  <div class="setting"><div class="row"><div class="lbl" style="margin:0">Keep for offline <small>&nbsp;${status(st, '310 MB')}</small></div>${slider(['Off', 'On'], onIdx(st), '140px')}</div>
+  ${st === 'saving' ? '<div class="bar"><b style="width:38%"></b></div>' : ''}${kept(st)}</div>
+</div>`;
+const v3 = (st) => `<div class="section annot"><h3>オフライン</h3>
+  <div class="setting"><div class="lbl">Keep for offline <small>${status(st, '310 MB')}</small></div>${slider(['Off', 'Small', 'Large'], st === 'off' ? 0 : 2)}
+  ${st === 'saving' ? '<div class="bar"><b style="width:38%"></b></div>' : ''}</div>
+</div>`;
+
+const phones = [
+  { label: '1 · MINIMAL (BUILT)', note: 'Off / On, and the state in the small text after the label. Nothing else.', make: v1 },
+  { label: '2 · WITH CONTENTS', note: 'Adds one muted line of what is kept, and a thin progress line while saving.', make: v2 },
+  { label: '3 · SMALL / LARGE', note: 'How much, as the choice itself: Off · Small · Large. Size after the label.', make: v3 },
+];
+const render = (st) => {
+  document.getElementById('stage').innerHTML = phones.map((p) => `<div class="phone-wrap"><div class="phone-label">${p.label}</div><div class="phone"><div class="scroll"><div style="height:0.5rem"></div>${before}${p.make(st)}${after}</div><div class="nav">${['HOME', 'READ', 'LISTEN', 'REVIEW'].map((n) => `<span><i></i>${n}</span>`).join('')}</div></div><div class="phone-note">${p.note}</div></div>`).join('');
+};
+document.querySelectorAll('#state button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('#state button').forEach((x) => x.classList.toggle('on', x === b));
+  render(b.dataset.v);
+}));
+render('saving');
+</script>
+</body>
+</html>
