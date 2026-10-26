@@ -13,6 +13,7 @@
 // not counted toward the caps.
 
 import { cleanJoinedMp3 } from './mp3';
+import { interruptible } from './foreground';
 
 export type AudioKind = 'podcast' | 'music';
 
@@ -77,14 +78,14 @@ export async function cachedAudioUrl(kind: AudioKind, path: string): Promise<str
 }
 
 /** Fetch the whole file from `url` and keep it under `path`. Fire and forget. */
-export async function saveAudio(kind: AudioKind, path: string, url: string): Promise<void> {
+export async function saveAudio(kind: AudioKind, path: string, url: string, signal?: AbortSignal): Promise<void> {
   const id = `${kind}:${path}`;
   if (saving.has(id)) return;
   saving.add(id);
   try {
     const cache = await open(kind);
     if (!cache || (await cache.match(keyFor(path)))) return;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal });
     if (!res.ok) return;
     const fetched = await res.blob();
     const blob = kind === 'podcast' ? await cleanPodcastBlob(fetched) : fetched;
@@ -119,7 +120,9 @@ export async function saveAudio(kind: AudioKind, path: string, url: string): Pro
  * `urlFor`); every other file of the kind goes back to normal LRU. Returns the
  * pinned files' total size. A file that can't be fetched is left out.
  * `before` runs ahead of each download: it may wait (for the app to go quiet)
- * and returns false to stop.
+ * and returns false to stop. With it, a download gives way mid-file when the
+ * app makes a request of its own, and is tried again (up to 5 times) once
+ * `before` lets it.
  */
 export async function pinAudio(kind: AudioKind, paths: string[], urlFor: (path: string) => Promise<string>, before?: () => Promise<boolean>): Promise<number> {
   const cache = await open(kind);
@@ -130,12 +133,19 @@ export async function pinAudio(kind: AudioKind, paths: string[], urlFor: (path: 
   const index = await readIndex(cache);
   for (const [p, e] of Object.entries(index)) e.pinned = want.has(p) || undefined;
   await writeIndex(cache, index);
-  for (const path of paths) {
+  files: for (const path of paths) {
     if (index[path]) continue;
-    if (before && !(await before())) break;
-    try { await saveAudio(kind, path, await urlFor(path)); } catch (e) { console.warn('[audioCache] pin fetch failed:', e); }
-    const now = await readIndex(cache);
-    if (now[path]) { now[path].pinned = true; await writeIndex(cache, now); }
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (before && !(await before())) break files;
+      let url: string;
+      try { url = await urlFor(path); } catch (e) { console.warn('[audioCache] pin fetch failed:', e); break; }
+      const turn = before ? interruptible() : null;
+      await saveAudio(kind, path, url, turn?.signal);
+      turn?.done();
+      const now = await readIndex(cache);
+      if (now[path]) { now[path].pinned = true; await writeIndex(cache, now); break; }
+      if (!turn?.signal.aborted) break; // a real failure: leave it out
+    }
   }
   const final = await readIndex(cache);
   return Object.values(final).reduce((n, e) => n + (e.pinned ? e.bytes : 0), 0);
