@@ -19,7 +19,7 @@ The default was chosen against ink-wash (sumi-e) and shin-hanga woodblock candid
 
 ## Styles and custom requests
 
-`SONG_STYLES` in `_shared/songPrompt.ts` (labels in `src/data/songStyles.ts`) has 8 presets: アニメ主題歌, シティポップ, バラード, アコースティック, ロック, ローファイ, エレクトロ, and 童謡 (N4 and easier only). Each preset is a seed of plain style words and names no artist. With 自分で, the reader describes a song in their own words. The songwriter turns any real artist or track named there into plain style words, then saves the cleaned text as `request_clean` in place of the original. No real names are ever sent to ElevenLabs or stored.
+`SONG_STYLES` in `_shared/songPrompt.ts` (labels in `src/data/songStyles.ts`) has 9 presets: アニメ主題歌, シティポップ, バラード, アコースティック, ロック, ローファイ, エレクトロ, 映画 (a film-climax duet with strings and choir, from the reader's 雪のない冬), and 童謡 (N4 and easier only). Each preset is a seed of plain style words and names no artist. With 自分で, the reader describes a song in their own words. The songwriter turns any real artist or track named there into plain style words, then saves the cleaned text as `request_clean` in place of the original. No real names are ever sent to ElevenLabs or stored.
 
 ## Vocabulary: the article mechanism (`_shared/readerVocab.ts`)
 

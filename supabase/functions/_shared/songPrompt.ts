@@ -42,6 +42,7 @@ export const SONG_STYLES: SongStyle[] = [
   { id: 'rock', label: 'ロック', seed: 'Driving Japanese guitar rock: crunchy rhythm guitars, punchy bass and drums, an energetic, confident vocal and a big shout-along chorus.' },
   { id: 'lofi', label: 'ローファイ', seed: 'Chill lo-fi pop: dusty boom-bap drums, mellow electric piano, soft bass, vinyl warmth, a soft, breathy sung vocal, calm and late-night.' },
   { id: 'electro', label: 'エレクトロ', seed: 'Bright Japanese electro-pop: sparkling synths, four-on-the-floor beat, a catchy synth hook, a clear, playful female vocal, upbeat and danceable.' },
+  { id: 'cinematic', label: '映画', seed: 'A soaring, cinematic Japanese pop-rock anthem for the climax of an animated feature film, part rock song and part film score: a driving piano-and-band foundation with sweeping orchestral strings and a full choir. A male-female duet: a bright, earnest male tenor trades lines with a clear, airy female voice, and the two blend in the big refrains. It opens open and spacious, then keeps stacking drums, strings and choral layers until the final choruses feel enormous; long, anthemic vocal lines climb on key words.' },
   { id: 'kids', label: '童謡', seed: 'A simple, cheerful Japanese children\'s song: bouncy piano and glockenspiel, light percussion, a clear, slow, friendly vocal, short repeated phrases that are easy to sing along to.', minLevel: 4 },
 ];
 

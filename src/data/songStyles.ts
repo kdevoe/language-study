@@ -16,6 +16,7 @@ export const SONG_STYLES: SongStyleInfo[] = [
   { id: 'rock', label: 'ロック', blurb: 'Driving guitar rock with a big shout-along chorus.' },
   { id: 'lofi', label: 'ローファイ', blurb: 'Chill lo-fi: dusty drums, mellow keys, a soft breathy voice.' },
   { id: 'electro', label: 'エレクトロ', blurb: 'Bright electro-pop, sparkling synths, four-on-the-floor.' },
+  { id: 'cinematic', label: '映画', blurb: 'Film-climax pop-rock duet: piano and band, sweeping strings, a full choir.' },
   { id: 'kids', label: '童謡', blurb: "Simple, cheerful children's song; slow and easy to sing along to." },
 ];
 
