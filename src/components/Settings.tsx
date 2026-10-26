@@ -9,9 +9,12 @@ import { PODCAST_CAST } from '../data/podcastCast';
 import { SliderToggle } from './SliderToggle';
 import { PageHeading } from './PageHeading';
 import { TutorSettings } from './tutor/TutorSettings';
+import { buildPack, clearPack, usePackStatus, type PackStatus } from '../services/offlinePack';
+import { sessionUserId } from '../services/supabase';
 
 // Settings (mockup docs/mockups/settings.html; design-system §6.12): four plain
-// sections — 学習, 読む, 聞く, 表示 — grouped by serif titles and space, no
+// sections — 学習, 読む, 聞く, 表示 (then オフライン, mockup
+// docs/mockups/offline-pack.html variant 1) — grouped by serif titles and space, no
 // boxes. Each setting gets one short hint at most. 聞く holds the auto-song
 // frequency and two pick lists (song styles, podcast hosts): a white row is in
 // the rotation, a faded one is left out. The one-off maintenance tools sit
@@ -52,6 +55,23 @@ const SONG_FREQUENCY_OPTIONS: readonly { value: SongFrequency; label: string }[]
   { value: 'every_other_day', label: 'Every other day' },
   { value: 'daily', label: 'Daily' },
 ];
+
+const OFFLINE_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'on', label: 'On' },
+] as const;
+
+/** The pack's state, after the label: its size, progress while saving, or waiting to save again after the OS cleared it. */
+function packNote(on: boolean, st: PackStatus): string {
+  if (!on) return '';
+  if (st.phase === 'saving') return st.total ? `${st.done} / ${st.total}` : '…';
+  if (st.phase === 'cleared') return '再保存待ち';
+  if (st.phase === 'ready') {
+    const mb = st.bytes / 1e6;
+    return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.max(1, Math.round(mb))} MB`;
+  }
+  return '';
+}
 
 const ALL_STYLE_IDS = SONG_STYLES.map((s) => s.id);
 const ALL_HOST_IDS = Object.keys(PODCAST_CAST);
@@ -438,6 +458,9 @@ export function Settings() {
         </div>
       </section>
 
+      {/* ── オフライン ── */}
+      <OfflineSetting />
+
       <style>{`
         details[open] .advanced-chevron { transform: rotate(-180deg); }
         details summary::-webkit-details-marker { display: none; }
@@ -608,5 +631,32 @@ export function Settings() {
         </div>
       </details>
     </div>
+  );
+}
+
+/** Keep for offline: a pack of articles, episodes and songs on the device (services/offlinePack.ts). */
+function OfflineSetting() {
+  const on = useAppStore((s) => s.offlinePack);
+  const setOn = useAppStore((s) => s.setOfflinePack);
+  const pack = usePackStatus();
+  const change = async (value: 'off' | 'on') => {
+    setOn(value === 'on');
+    if (value === 'off') { await clearPack(); return; }
+    const uid = await sessionUserId();
+    if (uid) void buildPack(uid);
+  };
+  const note = packNote(on, pack);
+  return (
+    <section style={{ marginBottom: '2.5rem' }}>
+      <h3 lang="ja" style={sectionTitle}>オフライン</h3>
+      <div style={settingStyle}>
+        <div style={rowStyle}>
+          <div style={{ ...labelStyle, margin: 0 }}>
+            Keep for offline{note && <small lang={note === '再保存待ち' ? 'ja' : undefined} style={{ ...smallStyle, marginLeft: '0.5rem' }}>{note}</small>}
+          </div>
+          <SliderToggle options={OFFLINE_OPTIONS} value={on ? 'on' : 'off'} onChange={change} width="140px" fontSize="0.8rem" ariaLabel="Keep for offline" />
+        </div>
+      </div>
+    </section>
   );
 }

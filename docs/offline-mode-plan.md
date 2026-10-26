@@ -1,6 +1,6 @@
 # Offline mode (機内モード): investigation and plan
 
-*Oct 25, 2026. Status: phases 1 (offline launch, #232), 2 (offline dictionary, #231) and 3 (outbox, `feat/offline-sync`) built; the rest is a proposal.*
+*Oct 25, 2026. Status: phases 1 (offline launch, #232), 2 (offline dictionary, #231), 3 (outbox, #233) and 4 (offline pack, `feat/offline-pack`) built; the rest is a proposal.*
 
 ## Goal
 
@@ -133,7 +133,13 @@ This also fixes the grades that are lost today on a weak signal.
 1. **Survive an offline launch** (built, #232). Cache the approval status, confirm session behaviour, warm kuromoji and the reading tables. Small, and valuable even without the rest.
 2. **Offline dictionary** (built). A build script for the shards, a local backend in `jmdict.ts`, and a `pickBestEntry` fallback for choosing between candidates. This is independent of the pack and could ship first.
 3. **Outbox and reconnect reconcile** (built). Fixes lost grades and positions today. Do this before the pack, so offline study can't lose data.
-4. **Offline pack and the Settings toggle.** Articles (enriched), long-read parts, episodes, songs, audio pinning, `offlineFirst` readers.
+4. **Offline pack and the Settings toggle** (built). Articles (enriched), long-read parts, episodes, songs, audio pinning, `offlineFirst` readers.
+   **As built:** `services/offlinePack.ts` builds it, `services/packStore.ts` stores it (IndexedDB `yugen-pack`, keys `article:<id>`, `parts:<workId>`, `episode:<id>`, `song:<id>`, `news`).
+   - Contents: up to 10 ready news articles (enriched), up to 6 existing parts from the reading position of the 3 newest active works, the 5 newest unfinished episodes, and songs in lists then by plays up to about 150 minutes (at most 40). Audio is pinned in the audio cache (`pinAudio`), covers stored (`keepCovers`), kuromoji and the dictionary warmed.
+   - Built when the toggle goes on; refreshed after start-up, on return to the app and on reconnect once it's over 6 hours old or another account's (not on cellular or Data Saver). New records land first and stale ones go last, so a failed refresh keeps the last pack. Cleared on toggle off and sign-out.
+   - Loaders: `fetchProcessedArticleById`, `fetchWorkParts`, `fetchEpisode` and `fetchSong` read the pack first offline and fall back to it when the server fails (`offlineFirst`). `fetchReadyBufferArticles` returns the packed news offline, and `loadHub` skips the headline fetch and filters it by local read/dismissed marks.
+   - Settings: オフライン after 表示, "Keep for offline" Off/On, status in the label's small text (size, `done / total` while saving, 再保存待ち when the OS cleared it). Mockup `docs/mockups/offline-pack.html` variant 1.
+   - Open question 1 settled for now: only parts that already exist are packed, so packing never spends on generation.
 5. **Offline UI states.** WordModal insight line, translation, create buttons, ハルカ, feed end state.
 6. **Optional: pre-translated sentences.** One Haiku call per packed article returns all sentence translations together, cached with the article and capped server-side.
 

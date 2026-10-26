@@ -260,7 +260,7 @@ Source of truth: `src/components/Music.tsx`, `SongSheet.tsx`, `SongPlayer.tsx`, 
 ### 6.14 Settings
 Source of truth: `src/components/Settings.tsx`, mockup `docs/mockups/settings.html`.
 
-- **Four plain sections,** no boxes: 学習 (JLPT, new words/day, RTK), 読む (topics, intensity, length, vocabulary, kanji), 聞く (songs, song styles, podcast hosts), 表示 (interface, text size, weight). Section titles are serif 1.3rem 600, 3rem apart; spacing does the grouping.
+- **Plain sections,** no boxes: 学習 (JLPT, new words/day, RTK), 読む (topics, intensity, length, vocabulary, kanji), 聞く (songs, song styles, podcast hosts), 表示 (interface, text size, weight), オフライン (Keep for offline: a compact 140px Off/On slider on the label's row, its state in the muted `small` after the label, no hint; mockup `docs/mockups/offline-pack.html`). Section titles are serif 1.3rem 600, 3rem apart; spacing does the grouping.
   
 - **A setting** is a label (sans 0.85rem 600, value or unit in a muted `small` on the right) over its control, with at most one hint line (0.75rem muted). Numbers use the round −/+ stepper; a long range (RTK) also takes a typed number.
   

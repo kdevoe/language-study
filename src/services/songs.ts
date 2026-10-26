@@ -7,6 +7,7 @@ import { invokeEdgeFn, isServerBusyError } from './api';
 import { writeListCache } from './listCache';
 import { forgetAudio } from './audioCache';
 import { send } from './outbox';
+import { offlineFirst } from './packStore';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -81,6 +82,10 @@ export async function fetchSongs(): Promise<Song[]> {
 }
 
 export async function fetchSong(id: string): Promise<SongFull> {
+  return offlineFirst(`song:${id}`, () => fetchSongRemote(id));
+}
+
+async function fetchSongRemote(id: string): Promise<SongFull> {
   if (DEV_MODE) {
     const s = await devSong();
     if (s && s.id === id) return s;
@@ -185,6 +190,12 @@ async function storeCovers(signed: Record<string, string>): Promise<void> {
       if (res.ok && (res.headers.get('content-type') ?? '').startsWith('image/')) await cache.put(coverKey(p), res);
     } catch { /* offline or blocked: the signed URL still shows it */ }
   }));
+}
+
+/** Make sure these covers are on the device (the offline pack). Resolves once they're stored. */
+export async function keepCovers(paths: string[]): Promise<void> {
+  const urls = await coverUrls(paths);
+  await storeCovers(Object.fromEntries(Object.entries(urls).filter(([, u]) => !u.startsWith('blob:'))));
 }
 
 /** Sign-out: another account must never see these covers. */

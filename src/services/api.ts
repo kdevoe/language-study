@@ -98,6 +98,7 @@ import type { SearchCorpus } from './archiveSearch'
 import { writeListCache } from './listCache'
 import { addActivity } from './activity'
 import { registerReplay, send, type SendResult } from './outbox'
+import { isOffline, offlineFirst, packed } from './packStore'
 
 // ── Edge Function helper ──────────────────────────────────────────────────────
 /** True when the error looks like an expired/invalid auth token (HTTP 401 / JWT). */
@@ -274,6 +275,10 @@ export async function saveProcessedArticleToSupabase(article: NewsArticle, userI
  * a stale connection.
  */
 export async function fetchProcessedArticleById(articleId: string, userId: string): Promise<NewsArticle | null> {
+  return offlineFirst(`article:${articleId}`, () => fetchProcessedArticleRemote(articleId, userId));
+}
+
+async function fetchProcessedArticleRemote(articleId: string, userId: string): Promise<NewsArticle | null> {
   for (let attempt = 0; ; attempt++) {
     const { data, error } = await supabase
       .from('processed_news')
@@ -328,6 +333,8 @@ export async function fetchCachedArticlesFromSupabase(userId: string): Promise<R
  *  isn't in today's raw NewsAPI fetch (the original "invisible cached article"
  *  bug). Bounded and tiny (≤ buffer depth), newest first. */
 export async function fetchReadyBufferArticles(userId: string, limit = 10): Promise<NewsArticle[]> {
+  // Offline, or the fetch failed: the offline pack's copy, when there is one.
+  if (isOffline()) return (await packed<NewsArticle[]>('news')) ?? [];
   const { data, error } = await supabase
     .from('processed_news')
     .select('content')
@@ -338,7 +345,7 @@ export async function fetchReadyBufferArticles(userId: string, limit = 10): Prom
     .limit(limit);
   if (error) {
     console.error('[api] fetchReadyBufferArticles failed:', error);
-    return [];
+    return (await packed<NewsArticle[]>('news')) ?? [];
   }
   return (data ?? []).map((r) => r.content as NewsArticle).filter(Boolean);
 }
@@ -516,6 +523,10 @@ export interface WorkPartSummary extends WorkPartState {
 
 /** Every existing part row of one work, in order, with each part's opening line. */
 export async function fetchWorkParts(workId: string, userId: string): Promise<WorkPartSummary[]> {
+  return offlineFirst(`parts:${workId}`, () => fetchWorkPartsRemote(workId, userId));
+}
+
+async function fetchWorkPartsRemote(workId: string, userId: string): Promise<WorkPartSummary[]> {
   const { data, error } = await supabase
     .from('processed_news')
     .select('id, part_index, status, first:content->blocks->0')

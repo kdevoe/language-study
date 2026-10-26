@@ -311,6 +311,9 @@ interface AppState {
    *  reader grades, lookups, flashcard reviews, manual sets — are skipped
    *  entirely (local AND server), so testing doesn't pollute real SRS state. */
   sandboxMode: boolean;
+  /** Keep a pack of content on the device for use without a connection (offlinePack.ts). Per device. */
+  offlinePack: boolean;
+  setOfflinePack: (on: boolean) => void;
   setSandboxMode: (on: boolean) => void;
   setCurrentArticle: (article: NewsArticle | null) => void;
   saveProcessedArticle: (id: string, article: NewsArticle) => void;
@@ -392,6 +395,7 @@ export const useAppStore = create<AppState>()(
       podcastPersonas: {},
       songCoverStyle: null,
       sandboxMode: false,
+      offlinePack: false,
       lastIntakePromotionTs: null,
       intakeRefunds: null,
       reviewsByDay: {},
@@ -517,6 +521,7 @@ export const useAppStore = create<AppState>()(
       },
 
       setSandboxMode: (on) => set({ sandboxMode: on }),
+      setOfflinePack: (on) => set({ offlinePack: on }),
 
       setFuriganaMode: (mode) => set({ furiganaMode: mode }),
       setCurrentArticle: (article) => set({ currentArticle: article }),
@@ -2084,6 +2089,7 @@ export const useAppStore = create<AppState>()(
         // Persisted so a mid-test reload (PWA testing) doesn't silently drop the
         // guard; the Settings toggle shows a clear warning while it's on.
         sandboxMode: state.sandboxMode,
+        offlinePack: state.offlinePack,
         lastIntakePromotionTs: state.lastIntakePromotionTs,
         intakeRefunds: state.intakeRefunds,
         reviewsByDay: state.reviewsByDay,
