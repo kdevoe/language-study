@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { touchLock } from '../services/touchLock';
 
@@ -28,7 +28,10 @@ interface Props {
 
 export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', lit, onClick }: Props) {
   const [isPeeking, setIsPeeking] = useState(false);
-  const [peekPos, setPeekPos] = useState({ top: 0, left: 0 });
+  // The word's box when the peek opened; the bubble is placed from it once it
+  // has a size (see below).
+  const [peekAt, setPeekAt] = useState<DOMRect | null>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   const startTime = useRef(0);
   const startPos = useRef({ x: 0, y: 0 });
@@ -42,10 +45,7 @@ export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', li
     timerRef.current = window.setTimeout(() => {
       const curRect = spanRef.current?.getBoundingClientRect();
       if (curRect && furigana && furigana.trim() !== '') {
-        setPeekPos({
-          top: curRect.top - 70,
-          left: curRect.left + curRect.width / 2
-        });
+        setPeekAt(curRect);
         setIsPeeking(true);
         if (navigator.vibrate) navigator.vibrate(40);
       }
@@ -89,6 +89,23 @@ export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', li
     if (isPeeking) setIsPeeking(false);
   };
 
+  // Centred over the word, but kept on screen: a word at the edge of a line
+  // used to push half the reading off the side, and one on the top line pushed
+  // it above the screen (then it goes under the word instead).
+  useLayoutEffect(() => {
+    const el = bubbleRef.current;
+    if (!isPeeking || !peekAt || !el) return;
+    const margin = 12;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const centre = peekAt.left + peekAt.width / 2;
+    const left = Math.min(Math.max(centre - w / 2, margin), window.innerWidth - w - margin);
+    const above = peekAt.top - h - 14;
+    el.style.left = `${Math.max(margin, left)}px`;
+    el.style.top = `${above >= margin ? above : peekAt.bottom + 14}px`;
+    el.style.visibility = 'visible';
+  }, [isPeeking, peekAt]);
+
   return (
     <>
       <span 
@@ -118,11 +135,12 @@ export function FuriganaText({ word, furigana, isSelected, hitWeight = 'mid', li
       </span>
 
       {isPeeking && furigana && createPortal(
-        <div style={{
+        <div ref={bubbleRef} style={{
           position: 'fixed',
-          top: peekPos.top,
-          left: peekPos.left,
-          transform: 'translateX(-50%)',
+          top: 0,
+          left: 0,
+          visibility: 'hidden', // until placed
+          maxWidth: 'calc(100vw - 24px)',
           backgroundColor: 'var(--bg-pure)',
           boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
           color: 'var(--text-main)',

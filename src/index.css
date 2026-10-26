@@ -292,8 +292,9 @@ body.song-mode {
 }
 
 @keyframes peekFadeIn {
-  0% { transform: translateX(-50%) translateY(10px) scale(0.85); opacity: 0; }
-  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+  /* No horizontal shift: FuriganaText places the bubble itself, kept on screen. */
+  0% { transform: translateY(10px) scale(0.85); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 /* English placeholder in the sans face, as English copy is elsewhere. */
