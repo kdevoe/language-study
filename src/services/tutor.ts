@@ -2,6 +2,7 @@
 // edge function. Replies stream as server-sent events; history, the recap and
 // the Home card's opener are plain requests.
 import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
+import { foreground } from './foreground';
 import { invokeEdgeFn } from './api';
 import type { PhotoUpload } from './tutorPhotos';
 
@@ -105,14 +106,19 @@ export async function pollResearch(threadId: string, ids: string[]): Promise<str
  * landed while the chat was quiet) and stream the reply. Resolves when the
  * stream ends; a skipped followup ends with no events.
  */
-export async function streamTutor(
+/** ハルカ's reply stream. Counted as foreground for its whole length, so the offline pack waits for it. */
+export function streamTutor(...args: Parameters<typeof streamTutorRaw>): Promise<void> {
+  return foreground(streamTutorRaw(...args));
+}
+
+async function streamTutorRaw(
   input:
     | { action?: 'send'; message: string; context?: ScreenContext; opener?: string; recapId?: string; workId?: string; newThread?: boolean; image?: PhotoUpload }
     | { action: 'followup'; threadId: string; researchId: string },
   onEvent: (e: TutorEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (DEV_MODE) return devReply(input, onEvent);
+  if (DEV_MODE) return devReply(input as Parameters<typeof devReply>[0], onEvent);
   // Watchdog: no response within 25 s, or 60 s without a byte once streaming (the
   // server pings every 15 s), means a dead connection, often a stale one after
   // iOS resumes the PWA. Give up and say so instead of showing dots for minutes.

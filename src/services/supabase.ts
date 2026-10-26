@@ -1,4 +1,5 @@
 import { createClient, processLock, type Session } from '@supabase/supabase-js';
+import { countedFetch } from './foreground';
 
 // The env values may carry literal quotes (the production ones do): use these, not import.meta.env.
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/['"]/g, '') || 'https://placeholder.supabase.co';
@@ -26,6 +27,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // single window — correct for a one-window PWA — and cannot deadlock that way.
     lock: processLock,
   },
+  // Counted, so the offline pack's downloads wait while the reader waits on these.
+  global: { fetch: countedFetch },
 });
 
 /**

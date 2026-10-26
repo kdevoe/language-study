@@ -118,8 +118,10 @@ export async function saveAudio(kind: AudioKind, path: string, url: string): Pro
  * Pin exactly these paths for the offline pack (fetching any not saved yet from
  * `urlFor`); every other file of the kind goes back to normal LRU. Returns the
  * pinned files' total size. A file that can't be fetched is left out.
+ * `before` runs ahead of each download: it may wait (for the app to go quiet)
+ * and returns false to stop.
  */
-export async function pinAudio(kind: AudioKind, paths: string[], urlFor: (path: string) => Promise<string>): Promise<number> {
+export async function pinAudio(kind: AudioKind, paths: string[], urlFor: (path: string) => Promise<string>, before?: () => Promise<boolean>): Promise<number> {
   const cache = await open(kind);
   if (!cache) return 0;
   const want = new Set(paths);
@@ -130,6 +132,7 @@ export async function pinAudio(kind: AudioKind, paths: string[], urlFor: (path: 
   await writeIndex(cache, index);
   for (const path of paths) {
     if (index[path]) continue;
+    if (before && !(await before())) break;
     try { await saveAudio(kind, path, await urlFor(path)); } catch (e) { console.warn('[audioCache] pin fetch failed:', e); }
     const now = await readIndex(cache);
     if (now[path]) { now[path].pinned = true; await writeIndex(cache, now); }
