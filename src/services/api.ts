@@ -822,16 +822,57 @@ export async function requestArticleProcessing(
   meta?: { topic?: string; category?: string },
 ): Promise<ArticleBlock[]> {
   onProgress?.('Processing article on server...');
-  const result = await invokeEdgeFn<{ blocks: ArticleBlock[] }>('process-article', {
+  // The rewrite takes a minute or more, and iOS often drops a request that long
+  // (the app went to the background, a stale connection): the server still
+  // finishes and saves the article, but the call never answers, so the tap
+  // showed nothing and a second tap hit the in-flight guard. Watch the row as
+  // well and take whichever answers first; a dropped call keeps the watch going.
+  let callFailed = false;
+  const call = invokeEdgeFn<{ blocks: ArticleBlock[] }>('process-article', {
     userId,
     articleId,
     title,
     snippet,
     sources,
     ...meta,
+  }).then((r) => r.blocks).catch((e) => {
+    callFailed = true;
+    if (isDroppedCall(e)) return new Promise<never>(() => {});
+    throw e;
   });
+  let callDone = false;
+  call.then(() => { callDone = true; }, () => { callDone = true; });
+  const watch = (async (): Promise<ArticleBlock[]> => {
+    const started = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, PROCESS_POLL_MS));
+      if (callDone) return new Promise<never>(() => {}); // the call answered: it wins
+      const { data } = await supabase.from('processed_news').select('status, content')
+        .eq('id', articleId).eq('user_id', userId).maybeSingle();
+      const blocks = (data?.content as NewsArticle | null)?.blocks;
+      if (data && data.status !== 'pending' && data.status !== 'failed' && blocks?.length) return blocks;
+      // A failed row only counts once the call is gone (an old failure is reset by a new run).
+      if (data?.status === 'failed' && callFailed) throw new Error('process-article failed');
+      if (Date.now() - started > PROCESS_GIVE_UP_MS) throw new Error('process-article timed out');
+    }
+  })();
+  const blocks = await Promise.race([call, watch]);
   onProgress?.('Done.');
-  return result.blocks;
+  return blocks;
+}
+
+const PROCESS_POLL_MS = 5000;
+const PROCESS_GIVE_UP_MS = 4 * 60_000;
+
+/** The request itself was lost (no response), as opposed to the server answering with an error. */
+function isDroppedCall(e: unknown): boolean {
+  const name = (e as { name?: string })?.name ?? '';
+  const msg = e instanceof Error ? e.message : String(e);
+  // A gateway timeout (504, or 546 for the function's wall clock) cuts the
+  // response but not necessarily the work: the article may still land.
+  const status = (e as { context?: { status?: number } })?.context?.status;
+  return name === 'FunctionsFetchError' || status === 504 || status === 546
+    || /Failed to fetch|Load failed|network|NetworkError/i.test(msg);
 }
 
 

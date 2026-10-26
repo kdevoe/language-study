@@ -13,9 +13,14 @@
 //
 // Records live in IndexedDB (packStore.ts, which the loaders read); audio is
 // pinned in the audio cache so normal eviction leaves it alone. Built when the
-// toggle goes on, then refreshed on launch or return to the app once it's over
-// 6 hours old (not on a metered or Data Saver connection). Cleared when the
-// toggle goes off and on sign-out.
+// toggle goes on, then refreshed a minute after launch or return to the app
+// once it's over 6 hours old (not on a metered or Data Saver connection).
+// Cleared when the toggle goes off and on sign-out, which also stops a build.
+//
+// It works in the background and gives way: before each step it waits until
+// none of the app's own requests are in flight (foreground.ts), so the first
+// build (well over 100 MB) can't starve articles, episodes or ハルカ, and a
+// refresh reuses what the last pack already holds.
 
 import { useSyncExternalStore } from 'react';
 import {
@@ -26,11 +31,12 @@ import { enrichArticle, isEnriched } from './enrich';
 import { ensureLocalDict } from './localDict';
 import { pinAudio } from './audioCache';
 import { episodeAudioUrl, fetchEpisode, fetchEpisodes, type PodcastEpisodeFull } from './podcasts';
-import { fetchSong, fetchSongs, keepCovers, songFileUrl } from './songs';
+import { fetchSong, fetchSongs, keepCovers, songFileUrl, type SongFull } from './songs';
 import { loadPlaylists, type Playlist } from './playlists';
 import { readListCache } from './listCache';
 import { getTokenizer } from './tokenizer';
-import { dropPacked, forgetTranslations, isOffline, packedKeys, putPacked, type PackKey } from './packStore';
+import { dropPacked, forgetTranslations, isOffline, packed, packedKeys, putPacked, type PackKey } from './packStore';
+import { whenQuiet } from './foreground';
 
 const NEWS = 10;
 const WORKS = 3;
@@ -39,6 +45,8 @@ const EPISODES = 5;
 const SONG_MINUTES = 150;
 const SONGS = 40;
 const STALE_MS = 6 * 3600_000;
+const AUTO_DELAY_MS = 60_000;
+let scheduled: ReturnType<typeof setTimeout> | null = null;
 
 export type PackPhase = 'none' | 'saving' | 'ready' | 'cleared';
 export interface PackStatus { phase: PackPhase; done: number; total: number; bytes: number }
@@ -91,10 +99,11 @@ function sentencesOf(blocks: ArticleBlock[]): string[] {
   return out.filter(Boolean);
 }
 
-/** Sentence translations for a packed article: those already on its row, else one capped server call. */
-async function translationsFor(article: NewsArticle): Promise<Record<string, string>> {
+/** Sentence translations for a packed article: the last pack's, those on its row, else one capped server call. */
+async function translationsFor(article: NewsArticle, kept: Record<string, string>): Promise<Record<string, string>> {
   const sentences = sentencesOf(article.blocks ?? []);
-  const saved = ((article as NewsArticle & { translations?: Record<string, string> }).translations) ?? {};
+  const saved = { ...((article as NewsArticle & { translations?: Record<string, string> }).translations ?? {}) };
+  for (const x of sentences) if (kept[x]) saved[x] = kept[x];
   if (sentences.every((x) => saved[x])) return saved;
   return { ...saved, ...(await fetchArticleTranslations(article.id, sentences)) };
 }
@@ -105,10 +114,26 @@ async function enriched(article: NewsArticle): Promise<NewsArticle> {
 }
 
 let building: Promise<void> | null = null;
+// Bumped by clearPack: a build from an older generation stops at its next step.
+let generation = 0;
+class Stopped extends Error {}
 
 /** Build or refresh the pack now (single-flight). New records land before stale ones go, so a failed refresh keeps the last pack. */
 export function buildPack(userId: string): Promise<void> {
   if (building) return building;
+  const gen = generation;
+  // Before each step: stop if the pack was switched off, and let the reader's
+  // own requests go first (the first build moves well over 100 MB).
+  const yieldTurn = async () => {
+    if (gen !== generation) throw new Stopped();
+    await whenQuiet();
+    if (gen !== generation) throw new Stopped();
+  };
+  const mayDownload = async () => {
+    if (gen !== generation) return false;
+    await whenQuiet();
+    return gen === generation;
+  };
   building = (async () => {
     const written = new Set<string>();
     let bytes = 0;
@@ -116,10 +141,15 @@ export function buildPack(userId: string): Promise<void> {
     let total = 0;
     const tick = () => setStatus({ phase: 'saving', done, total, bytes: 0 });
     const translations: Record<string, string> = {};
+    let kept: Record<string, string> = {};
+    // An article doesn't change once written: reuse the last pack's enriched
+    // copy and translations, so a refresh only works on what's new.
     const putArticle = async (a: NewsArticle) => {
-      const e = await enriched(a);
+      const prev = await packed<NewsArticle>(`article:${a.id}`);
+      const e = prev?.blocks && isEnriched(prev.blocks) ? prev : (await yieldTurn(), await enriched(a));
       await put(`article:${a.id}`, e);
-      Object.assign(translations, await translationsFor(e));
+      if (!sentencesOf(e.blocks ?? []).every((x) => kept[x])) await yieldTurn();
+      Object.assign(translations, await translationsFor(e, kept));
     };
     const put = async (key: PackKey, value: unknown) => {
       await putPacked(key, value);
@@ -129,6 +159,8 @@ export function buildPack(userId: string): Promise<void> {
     tick();
     try {
       void navigator.storage?.persist?.().catch(() => {});
+      kept = (await packed<Record<string, string>>('translations')) ?? {};
+      await yieldTurn();
       // The dictionary (one-time, large) downloads alongside; online
       // enrichment below doesn't need it.
       const dict = ensureLocalDict();
@@ -176,9 +208,11 @@ export function buildPack(userId: string): Promise<void> {
 
       // 本棚: each work's part list (for 目次) and its next parts.
       for (const [i, w] of activeWorks.entries()) {
+        await yieldTurn();
         await put(`parts:${w.id}`, await fetchWorkParts(w.id, userId));
         for (const id of partIds[i]) {
-          const a = await fetchProcessedArticleById(id, userId).catch(() => null);
+          const prev = await packed<NewsArticle>(`article:${id}`);
+          const a = prev ?? await fetchProcessedArticleById(id, userId).catch(() => null);
           if (a) await putArticle({ ...a, id });
           done++; tick();
         }
@@ -187,6 +221,7 @@ export function buildPack(userId: string): Promise<void> {
       // 番組: script now, audio pinned below.
       const fullEpisodes: PodcastEpisodeFull[] = [];
       for (const e of freshEpisodes) {
+        await yieldTurn();
         const full = await fetchEpisode(e.id).catch(() => null);
         if (full) { await put(`episode:${e.id}`, full); fullEpisodes.push(full); }
       }
@@ -194,14 +229,17 @@ export function buildPack(userId: string): Promise<void> {
       bytes += await pinAudio('podcast', [...byPath.keys()], (path) => {
         done++; tick();
         return episodeAudioUrl(byPath.get(path)!);
-      });
+      }, mayDownload);
+      await yieldTurn();
       done = news.length + partIds.flat().length + freshEpisodes.length; tick();
 
       // 音楽: lyrics and timing, audio, covers.
       const audioPaths: string[] = [];
       const covers: string[] = [];
       for (const s of pickedSongs) {
-        const full = await fetchSong(s.id).catch(() => null);
+        const prev = await packed<SongFull>(`song:${s.id}`);
+        if (!prev) await yieldTurn();
+        const full = prev ?? await fetchSong(s.id).catch(() => null);
         if (!full) continue;
         await put(`song:${s.id}`, full);
         if (full.audio_path) audioPaths.push(full.audio_path);
@@ -211,7 +249,8 @@ export function buildPack(userId: string): Promise<void> {
       bytes += await pinAudio('music', audioPaths, (path) => {
         done++; tick();
         return songFileUrl(path);
-      });
+      }, mayDownload);
+      await yieldTurn();
 
       // Japanese text in the players is tokenized on the device: keep the
       // tokenizer's dictionary in the service worker's cache.
@@ -226,6 +265,7 @@ export function buildPack(userId: string): Promise<void> {
       writeMeta({ userId, builtAt: Date.now(), bytes });
       setStatus({ phase: 'ready', done: total, total, bytes });
     } catch (e) {
+      if (e instanceof Stopped) return; // switched off: clearPack has the rest
       console.warn('[offlinePack] build failed:', e);
       await settle();
     } finally {
@@ -237,6 +277,7 @@ export function buildPack(userId: string): Promise<void> {
 
 /** Toggle off, sign-out: drop the records and let the audio go back to normal eviction. */
 export async function clearPack(): Promise<void> {
+  generation++; // a build in progress stops at its next step instead of finishing first
   await building?.catch(() => {});
   writeMeta(null);
   await dropPacked();
@@ -253,8 +294,8 @@ function metered(): boolean {
 }
 
 /**
- * Launch and return to the app: show the pack's status, and refresh it when it
- * is missing, older than 6 hours, or another account's.
+ * Launch and return to the app: show the pack's status, and schedule a refresh
+ * (a minute out) when it is missing, older than 6 hours, or another account's.
  */
 export async function refreshPackIfStale(userId: string, enabled: boolean): Promise<void> {
   if (!enabled) return;
@@ -263,5 +304,12 @@ export async function refreshPackIfStale(userId: string, enabled: boolean): Prom
   const meta = readMeta();
   if (meta && meta.userId !== userId) { writeMeta(null); await dropPacked(); }
   const fresh = meta && meta.userId === userId && Date.now() - meta.builtAt < STALE_MS && status.phase === 'ready';
-  if (!fresh) await buildPack(userId);
+  if (fresh || building || scheduled) return;
+  // Not right at launch or on return, when the app makes its own requests: a
+  // minute later (and the build still gives way to them as it goes).
+  const gen = generation;
+  scheduled = setTimeout(() => {
+    scheduled = null;
+    if (gen === generation && !isOffline()) void buildPack(userId);
+  }, AUTO_DELAY_MS);
 }
