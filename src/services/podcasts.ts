@@ -7,6 +7,7 @@ import { invokeEdgeFn, isServerBusyError } from './api';
 import type { SearchCorpus } from './archiveSearch';
 import { writeListCache } from './listCache';
 import { forgetAudio } from './audioCache';
+import { send } from './outbox';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -178,7 +179,8 @@ export async function saveListenPosition(id: string, positionMs: number, finishe
   if (DEV_MODE) return;
   const patch: Record<string, unknown> = { listen_position_ms: Math.max(0, Math.round(positionMs)) };
   if (finished) patch.listened_at = new Date().toISOString();
-  const { error } = await supabase.from('podcast_episodes').update(patch).eq('id', id);
+  // A finishing save isn't coalesced, so a later position can't drop its listened_at.
+  const { error } = await send({ t: 'update', table: 'podcast_episodes', patch, match: { id }, key: finished ? undefined : `listen_position:${id}` });
   if (error) console.error('[podcasts] saveListenPosition failed:', error);
 }
 

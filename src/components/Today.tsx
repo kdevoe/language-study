@@ -15,7 +15,7 @@ import { fetchWorkResumeArticle, fetchWorks } from '../services/api';
 import type { LongFormWork, NewsArticle } from '../services/api';
 import { fetchEpisodes } from '../services/podcasts';
 import type { PodcastEpisode } from '../services/podcasts';
-import { supabase } from '../services/supabase';
+import { sessionUserId } from '../services/supabase';
 import { readListCache } from '../services/listCache';
 import { fetchSongs } from '../services/songs';
 import type { Song } from '../services/songs';
@@ -46,8 +46,7 @@ export function markWorkOpened(id: string) {
 
 async function resolveUserId(): Promise<string | null> {
   if (DEV_MODE) return 'dev-user';
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  return sessionUserId();
 }
 
 /** A long read ハルカ wrote that hasn't been opened yet (for a week), else the

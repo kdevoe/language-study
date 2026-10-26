@@ -7,7 +7,8 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { supabase } from './supabase';
+import { sessionUserId, supabase } from './supabase';
+import { send } from './outbox';
 import { useAppStore } from './store';
 import { schedule, type Rating } from './srs';
 import { grammarSrsState, selectGrammarCards, type GrammarCard } from './grammarDeck';
@@ -85,13 +86,14 @@ function scheduleRow(c: GrammarCard) {
 }
 
 async function pushSchedule(userId: string, c: GrammarCard) {
-  const { error } = await supabase.from('grammar_cards').update(scheduleRow(c)).eq('id', c.id).eq('user_id', userId);
+  const { error } = await send({
+    t: 'update', table: 'grammar_cards', patch: scheduleRow(c), match: { id: c.id, user_id: userId }, key: `grammar_cards:${c.id}`,
+  });
   if (error) console.warn('[grammar] update failed:', error.message);
 }
 
 async function currentUserId(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  return sessionUserId();
 }
 
 export const useGrammarStore = create<GrammarState>()(
@@ -144,10 +146,10 @@ export const useGrammarStore = create<GrammarState>()(
         currentUserId().then(async (uid) => {
           if (!uid) return;
           await pushSchedule(uid, updated);
-          const { error } = await supabase.from('grammar_review_log').insert({
+          const { error } = await send({ t: 'insert', table: 'grammar_review_log', row: {
             user_id: uid, card_id: id, rating, picked, correct: picked === c.answer,
             interval_days: sched.intervalDays, stability_after: sched.stability, think_ms: thinkMs, reviewed_at: iso(now),
-          });
+          } });
           if (error) console.warn('[grammar] review log failed:', error.message);
         });
       },

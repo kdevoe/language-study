@@ -16,7 +16,7 @@ import {
   NewsArticle,
   type WorkReadingPosition,
 } from '../services/api';
-import { supabase } from '../services/supabase';
+import { sessionUserId } from '../services/supabase';
 import { enrichArticle, isEnriched } from '../services/enrich';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
@@ -49,8 +49,7 @@ const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 async function resolveUserId(): Promise<string | null> {
   if (DEV_MODE) return 'dev-user';
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  return sessionUserId();
 }
 
 // Minimal shape needed to grade a word: definition details (for a never-seen word)

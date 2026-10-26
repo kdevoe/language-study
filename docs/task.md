@@ -705,6 +705,7 @@
     - Offline disambiguation uses pickBestEntry, narrowed to the word's own reading for kana taps.
     - `scripts/test-local-dict.mjs` checks it.
     - Rerun the build after a JMDict import or a JLPT retag.
-  - [ ] Phase 1: survive an offline launch (the beta gate's `check_is_approved` shows the waitlist when offline)
-  - [ ] Phase 3: outbox + reconnect reconcile (word progress, review logs, positions)
+  - [x] Phase 1 (#232): opens offline. It uses the saved session when an expired token can't refresh (`storedSession()`), and remembers approval (`services/approval.ts`).
+  - [x] Phase 3 (`feat/offline-sync`): `services/outbox.ts` queues writes that can't reach the server (IndexedDB), and replays them in order on reconnect, before the progress sync pulls. `sessionUserId()` keeps writers working offline.
+  - [ ] Pre-existing, seen while testing: the App start-up sync chain reruns on every session object change (TOKEN_REFRESHED and the like)
   - [ ] Phases 4–6: offline pack + Settings toggle, offline UI states, optional pre-translated sentences

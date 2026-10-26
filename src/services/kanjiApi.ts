@@ -3,6 +3,7 @@
 // append-only history (the Anki import plus every grade), kept server-side only.
 
 import { supabase } from './supabase';
+import { send } from './outbox';
 import type { KanjiProgress } from './kanjiDeck';
 
 const iso = (ms: number | null) => (ms == null ? null : new Date(ms).toISOString());
@@ -88,7 +89,7 @@ export async function fetchKanjiProgress(userId: string): Promise<KanjiProgress[
 
 export async function upsertKanjiProgress(userId: string, rows: KanjiProgress[]): Promise<void> {
   if (rows.length === 0) return;
-  const { error } = await supabase.from('user_kanji_progress').upsert(rows.map((p) => toRow(userId, p)));
+  const { error } = await send({ t: 'upsert', table: 'user_kanji_progress', rows: rows.map((p) => toRow(userId, p)) });
   if (error) console.warn('[kanji] upsert failed:', error.message);
 }
 
@@ -96,7 +97,7 @@ export async function logKanjiReview(
   userId: string,
   entry: { kanji: string; rating: number; intervalDays: number; stabilityAfter: number; thinkMs: number | null; reviewedAt: number },
 ): Promise<void> {
-  const { error } = await supabase.from('kanji_review_log').insert({
+  const { error } = await send({ t: 'insert', table: 'kanji_review_log', row: {
     user_id: userId,
     kanji: entry.kanji,
     rating: entry.rating,
@@ -105,6 +106,6 @@ export async function logKanjiReview(
     stability_after: entry.stabilityAfter,
     think_ms: entry.thinkMs,
     reviewed_at: iso(entry.reviewedAt),
-  });
+  } });
   if (error) console.warn('[kanji] review log failed:', error.message);
 }

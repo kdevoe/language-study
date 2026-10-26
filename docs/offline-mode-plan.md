@@ -1,6 +1,6 @@
 # Offline mode (機内モード): investigation and plan
 
-*Oct 25, 2026. Status: phase 2 (offline dictionary) built on `feat/offline-dictionary`; the rest is a proposal.*
+*Oct 25, 2026. Status: phases 1 (offline launch, #232), 2 (offline dictionary, #231) and 3 (outbox, `feat/offline-sync`) built; the rest is a proposal.*
 
 ## Goal
 
@@ -103,6 +103,16 @@ Add a **write outbox** (`services/outbox.ts`), stored in the Cache API or Indexe
 
 This also fixes the grades that are lost today on a weak signal.
 
+**As built (`services/outbox.ts`):**
+- **What goes through it:** `send(op)` is called by word progress (single, batch and pacing reset), the SRS / kanji / grammar review logs, kanji progress, the grammar schedule, `study_history`, `record_article_reading`, `bump_daily_activity`, reading positions, work status, preferences, podcast listen positions, and song plays and counts. `markArticleConsumed` replays as a `call` op, because it has logic.
+- **What gets queued:** a write made while offline, or one that fails with status 0, 401, 408, 429 or 5xx. While anything is queued, new writes queue behind it.
+- **Inserts:** each carries a client UUID and replays as `on conflict (id) do nothing`. Checked under RLS against the real tables in a rolled-back transaction.
+- **Coalescing:** keyed ops replace one another (reading and listen positions, grammar schedule).
+- **Server failures:** an op is dropped after 5 server-side failures. Network failures don't count toward that.
+- **Sign-out:** clears the queue.
+- **User id offline:** `sessionUserId()` (supabase.ts) replaces `getSession()` where writers need the id. Offline with an expired token, `getSession()` reports null, which skipped every write on a long flight.
+- **Not queued, still online-only:** playlist edits (they roll back in the UI on failure), ハルカ, creating content.
+
 ### Offline states in existing UI
 
 - **WordModal:** meaning, reading and JLPT tag come from the token as now. The grammar insight line reads "接続が必要です" in muted text, with no spinner that never ends. The grammar panel's static catalogue text still works.
@@ -120,9 +130,9 @@ This also fixes the grades that are lost today on a weak signal.
 
 ## Phases
 
-1. **Survive an offline launch.** Cache the approval status, confirm session behaviour, warm kuromoji and the reading tables. Small, and valuable even without the rest.
+1. **Survive an offline launch** (built, #232). Cache the approval status, confirm session behaviour, warm kuromoji and the reading tables. Small, and valuable even without the rest.
 2. **Offline dictionary** (built). A build script for the shards, a local backend in `jmdict.ts`, and a `pickBestEntry` fallback for choosing between candidates. This is independent of the pack and could ship first.
-3. **Outbox and reconnect reconcile.** Fixes lost grades and positions today. Do this before the pack, so offline study can't lose data.
+3. **Outbox and reconnect reconcile** (built). Fixes lost grades and positions today. Do this before the pack, so offline study can't lose data.
 4. **Offline pack and the Settings toggle.** Articles (enriched), long-read parts, episodes, songs, audio pinning, `offlineFirst` readers.
 5. **Offline UI states.** WordModal insight line, translation, create buttons, ハルカ, feed end state.
 6. **Optional: pre-translated sentences.** One Haiku call per packed article returns all sentence translations together, cached with the article and capped server-side.

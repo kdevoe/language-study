@@ -2,10 +2,11 @@
 // and advanced by the generate-song edge function; the client lists its own
 // rows (RLS), polls in-flight ones, plays audio and shows covers from the
 // private `music` bucket via signed URLs, and writes back play stats.
-import { supabase } from './supabase';
+import { sessionUserId, supabase } from './supabase';
 import { invokeEdgeFn, isServerBusyError } from './api';
 import { writeListCache } from './listCache';
 import { forgetAudio } from './audioCache';
+import { send } from './outbox';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -232,14 +233,14 @@ export async function coverUrls(paths: string[]): Promise<Record<string, string>
 /** Count a play (opening the song). */
 export async function recordPlay(song: Pick<Song, 'id' | 'play_count'>): Promise<void> {
   if (DEV_MODE) return;
-  const { error } = await supabase.from('songs')
-    .update({ play_count: song.play_count + 1, last_played_at: new Date().toISOString() })
-    .eq('id', song.id);
+  const { error } = await send({
+    t: 'update', table: 'songs', patch: { play_count: song.play_count + 1, last_played_at: new Date().toISOString() }, match: { id: song.id },
+  });
   if (error) console.error('[songs] recordPlay failed:', error);
   // Play log for learner memory (database/36): the counter alone has no "when".
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) {
-    const { error: logErr } = await supabase.from('song_plays').insert({ user_id: session.user.id, song_id: song.id });
+  const uid = await sessionUserId();
+  if (uid) {
+    const { error: logErr } = await send({ t: 'insert', table: 'song_plays', row: { user_id: uid, song_id: song.id } });
     if (logErr) console.warn('[songs] play log failed:', logErr.message);
   }
 }

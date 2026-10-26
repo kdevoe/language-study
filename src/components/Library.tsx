@@ -16,7 +16,7 @@ import {
   importPastedText,
   retryWorkPartInBackground,
 } from '../services/api';
-import { supabase } from '../services/supabase';
+import { sessionUserId } from '../services/supabase';
 import { readListCache, writeListCache } from '../services/listCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -54,8 +54,7 @@ interface Props {
 
 async function resolveUserId(): Promise<string | null> {
   if (DEV_MODE) return 'dev-user';
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  return sessionUserId();
 }
 
 /** Top-right of a work's card: the number of parts inside a ring that fills as the
