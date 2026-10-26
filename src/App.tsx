@@ -148,7 +148,7 @@ function App() {
   }, [articlesCache, processingArticles, setProcessing, saveProcessedArticle]);
 
   const replenishFeedAtBottom = useCallback(async () => {
-    if (isReplenishing || isLoadingFeed || isEndOfFeed) return;
+    if (isReplenishing || isLoadingFeed || isEndOfFeed || isOffline()) return;
     
     setIsReplenishing(true);
     try {
@@ -577,7 +577,9 @@ function App() {
       console.error('[select] Failed to open article:', article.id, e);
       const busy = isServerBusyError(e);
       setActionError(
-        busy
+        isOffline()
+          ? "This article isn't saved for offline. It opens once you're connected."
+          : busy
           ? "The server's busy right now — give it a moment and tap again."
           : "Couldn't load this article. Please try again, or pick another."
       );

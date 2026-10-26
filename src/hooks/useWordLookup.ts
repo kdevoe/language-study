@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { WordDetails, GrammarView } from '../components/WordModal';
-import { fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchGrammarPointInsight, fetchSentenceTranslation, type InsightPoint } from '../services/api';
+import { fetchWordDefinitionQuick, fetchWordGrammarInsight, fetchGrammarPointInsight, fetchSentenceTranslation, NEEDS_CONNECTION, type InsightPoint } from '../services/api';
 import { useAppStore } from '../services/store';
 import { canonicalWordKey } from '../services/wordKey';
 import { touchLock } from '../services/touchLock';
@@ -79,7 +79,8 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
         if (!prev || prev.word !== word) return prev;
         return { ...prev, grammarNote: insight };
       });
-      saveWordDefinition(key, { ...extra, grammarNote: insight });
+      // Offline there's no note: keep the last real one for the flashcard back.
+      if (insight !== NEEDS_CONNECTION) saveWordDefinition(key, { ...extra, grammarNote: insight });
     });
   };
 
@@ -93,7 +94,7 @@ export function useWordLookup({ onWordTouched }: { onWordTouched?: (key: string)
     if (cached) { view.insight = cached; return; }
     fetchGrammarPointInsight(hit.sentence.slice(hit.start, hit.end), hit.sentence, { pattern: point.pattern, meaning: point.meaning })
       .then((insight) => {
-        grammarInsights.current.set(cacheKey, insight);
+        if (insight !== NEEDS_CONNECTION) grammarInsights.current.set(cacheKey, insight);
         setGrammarStack((prev) => prev.map((v) => (v.hit === hit && v.id === view.id ? { ...v, insight } : v)));
       });
   };

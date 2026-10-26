@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SliderToggle } from './SliderToggle';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useOnline } from '../hooks/useOnline';
 import {
   PodcastEpisode,
   EpisodeSource,
@@ -239,13 +240,22 @@ export function PodcastSheet({ open, onClose, onCreated, article }: Props) {
 }
 
 /** Primary action (design-system §6.3): flat on the track colour until it can
- *  be pressed, then it becomes the slider thumb and lifts. */
-export function CreateButton({ ready, busy, onClick, label = '作る' }: { ready: boolean; busy: boolean; onClick: () => void; label?: string }) {
+ *  be pressed, then it becomes the slider thumb and lifts. Everything it starts
+ *  needs the server, so offline it stays flat and a tap says why. */
+export function CreateButton({ ready: canPress, busy, onClick, label = '作る' }: { ready: boolean; busy: boolean; onClick: () => void; label?: string }) {
   const [pressed, setPressed] = useState(false);
+  const online = useOnline();
+  const [explain, setExplain] = useState(false);
+  useEffect(() => {
+    if (!explain) return;
+    const t = setTimeout(() => setExplain(false), 2500);
+    return () => clearTimeout(t);
+  }, [explain]);
+  const ready = canPress && online;
   return (
     <button
-      onClick={onClick}
-      disabled={!ready}
+      onClick={online ? onClick : () => setExplain(true)}
+      disabled={online ? !ready : false}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
@@ -256,7 +266,7 @@ export function CreateButton({ ready, busy, onClick, label = '作る' }: { ready
         border: 'none',
         borderRadius: '100px',
         cursor: ready ? 'pointer' : 'default',
-        fontSize: '1.05rem',
+        fontSize: explain ? '0.9rem' : '1.05rem',
         letterSpacing: '0.08em',
         fontWeight: ready ? 700 : 500,
         backgroundColor: ready ? 'var(--bg-pure)' : 'var(--border-light)',
@@ -270,7 +280,7 @@ export function CreateButton({ ready, busy, onClick, label = '作る' }: { ready
         flexShrink: 0,
       }}
     >
-      {busy ? '…' : label}
+      {explain && !online ? '接続が必要です' : busy ? '…' : label}
     </button>
   );
 }

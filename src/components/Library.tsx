@@ -17,6 +17,7 @@ import {
   retryWorkPartInBackground,
 } from '../services/api';
 import { sessionUserId } from '../services/supabase';
+import { useOnline } from '../hooks/useOnline';
 import { readListCache, writeListCache } from '../services/listCache';
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
@@ -79,6 +80,7 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   useScrollLock(sheetOpen);
   const [importTab, setImportTab] = useState<'paste' | 'url'>('paste');
+  const online = useOnline();
   const [pasteText, setPasteText] = useState('');
   const [urlText, setUrlText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -456,14 +458,14 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
               )}
               <button
                 onClick={handleImport}
-                disabled={!importable}
+                disabled={!importable || !online}
                 style={{
                   width: '100%',
                   marginTop: '1rem',
                   border: 'none',
-                  cursor: importable ? 'pointer' : 'default',
-                  backgroundColor: importable ? 'var(--text-main)' : 'var(--border-light)',
-                  color: importable ? 'var(--bg-pure)' : 'var(--text-muted)',
+                  cursor: importable && online ? 'pointer' : 'default',
+                  backgroundColor: importable && online ? 'var(--text-main)' : 'var(--border-light)',
+                  color: importable && online ? 'var(--bg-pure)' : 'var(--text-muted)',
                   fontFamily: 'var(--font-sans)',
                   fontSize: '0.72rem',
                   fontWeight: 800,
@@ -473,7 +475,7 @@ export function Library({ onOpenWork, titleSwitch }: Props) {
                   transition: 'all 0.2s',
                 }}
               >
-                {isImporting ? '準備中…' : 'インポートして読む'}
+                {isImporting ? '準備中…' : online ? 'インポートして読む' : '接続が必要です'}
               </button>
             </motion.div>
           </>

@@ -16,6 +16,7 @@ import {
 import { addActivity, useActivityWhile } from '../../services/activity';
 import { createEpisode, episodeErrorMessage } from '../../services/podcasts';
 import { keepThumb, preparePhoto, thumbsFor, type PreparedPhoto } from '../../services/tutorPhotos';
+import { useOnline } from '../../hooks/useOnline';
 
 // ハルカ's side panel (docs/mockups/tutor.html, design-system §6.17). Slides in
 // from the hand side over any screen; the screen stays visible beside it. One
@@ -60,6 +61,7 @@ export function TutorPanel() {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState<PreparedPhoto | null>(null);   // attached, not sent yet
   const fileRef = useRef<HTMLInputElement>(null);
+  const online = useOnline(); // offline she can't reply: the input says so and holds the draft
   const [busy, setBusy] = useState<string | null>(null);   // null idle · '' replying · tool label
   // Offers under her latest reply, keyed so dropping one keeps the others' state.
   const [actions, setActions] = useState<{ key: number; action: TutorAction }[]>([]);
@@ -247,7 +249,7 @@ export function TutorPanel() {
   const sendText = useCallback(async (raw: string) => {
     const message = raw.trim();
     const sentPhoto = photo;
-    if ((!message && !sentPhoto) || busy !== null) return;
+    if ((!message && !sentPhoto) || busy !== null || !navigator.onLine) return;
     addActivity('turns', 1);
     setDraft('');
     setPhoto(null);
@@ -410,12 +412,12 @@ export function TutorPanel() {
             {/* The wrapper's ::after holds a hidden copy of the draft and sizes the
                 textarea to it; with the keyboard up that also fits its width, so the
                 draft reads as the outgoing bubble forming at the end of the thread. */}
-            <div className="tutor-draft" data-value={draft || 'ハルカに話しかける…'}>
+            <div className="tutor-draft" data-value={draft || (online ? 'ハルカに話しかける…' : 'オフライン — 接続後に話せます')}>
               <textarea
                 ref={inputRef}
                 rows={1}
                 value={draft}
-                placeholder="ハルカに話しかける…"
+                placeholder={online ? 'ハルカに話しかける…' : 'オフライン — 接続後に話せます'}
                 enterKeyHint="send"
                 onFocus={() => setTyping(true)}
                 onBlur={() => setTyping(false)}
@@ -438,7 +440,7 @@ export function TutorPanel() {
             <button onClick={() => fileRef.current?.click()} aria-label="写真">
               <Camera size={21} strokeWidth={1.6} />
             </button>
-            <button onClick={() => sendText(draft)} disabled={(!draft.trim() && !photo) || busy !== null} aria-label="送る">
+            <button onClick={() => sendText(draft)} disabled={(!draft.trim() && !photo) || busy !== null || !online} aria-label="送る">
               <ArrowUp size={21} strokeWidth={1.6} />
             </button>
           </div>
