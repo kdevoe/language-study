@@ -226,8 +226,9 @@ export function buildPack(userId: string): Promise<void> {
         if (full) { await put(`episode:${e.id}`, full); fullEpisodes.push(full); }
       }
       const byPath = new Map(fullEpisodes.filter((e) => e.audio_path).map((e) => [e.audio_path!, e]));
+      const counted = new Set<string>(); // a download given way to is tried again: count it once
       bytes += await pinAudio('podcast', [...byPath.keys()], (path) => {
-        done++; tick();
+        if (!counted.has(path)) { counted.add(path); done++; tick(); }
         return episodeAudioUrl(byPath.get(path)!);
       }, mayDownload);
       await yieldTurn();
@@ -247,7 +248,7 @@ export function buildPack(userId: string): Promise<void> {
       }
       await keepCovers(covers).catch(() => {});
       bytes += await pinAudio('music', audioPaths, (path) => {
-        done++; tick();
+        if (!counted.has(path)) { counted.add(path); done++; tick(); }
         return songFileUrl(path);
       }, mayDownload);
       await yieldTurn();
