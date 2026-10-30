@@ -10,10 +10,42 @@ let lastDone = 0;
 const onStart = new Set<() => void>();
 const started = () => { busy++; onStart.forEach((fn) => fn()); };
 
-export const countedFetch: typeof fetch = async (...args) => {
+// How long a Supabase request may take before it's given up. iOS can leave a
+// request that was in flight when it suspended the app pending forever after
+// it resumes; when that request is a token refresh, auth-js holds its lock
+// across it and queues every later request behind it with no timeout, so
+// nothing reaches the server again until the app is killed (Oct 29: episodes,
+// songs and progress writes all stuck on a grey screen). A timed-out request
+// fails like a dropped connection: the lock is released, the outbox keeps the
+// write, the loader falls back to the offline pack. Edge functions are left
+// alone: some run long by design, and ハルカ's chat stream has its own watchdog.
+const TIMEOUT_MS: [RegExp, number][] = [
+  [/\/auth\/v1\//, 20_000],
+  [/\/rest\/v1\//, 45_000],
+  [/\/storage\/v1\//, 60_000],
+];
+
+function urlOf(input: RequestInfo | URL): string {
+  return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+}
+
+/** A signal that aborts after the path's timeout; none when the caller set its own or the path has none. */
+function timeoutSignal(input: RequestInfo | URL, init?: RequestInit): AbortSignal | undefined {
+  // The caller's own signal (or a Request carrying one) stands.
+  if (init?.signal || (typeof Request !== 'undefined' && input instanceof Request)) return undefined;
+  const ms = TIMEOUT_MS.find(([re]) => re.test(urlOf(input)))?.[1];
+  if (!ms) return undefined;
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  const ac = new AbortController();
+  setTimeout(() => ac.abort(new DOMException('The request timed out.', 'TimeoutError')), ms);
+  return ac.signal;
+}
+
+export const countedFetch: typeof fetch = async (input, init) => {
   started();
   try {
-    return await fetch(...args);
+    const signal = timeoutSignal(input, init);
+    return await fetch(input, signal ? { ...init, signal } : init);
   } finally {
     busy--;
     lastDone = Date.now();
