@@ -12,14 +12,29 @@ export const packDb = () => (dbPromise ??= openDb('yugen-pack', 1, (d) => d.crea
 
 export const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
+/** Resolves `fallback` if `work` hasn't settled in `ms`. */
+function within<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([work, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+}
+
 export async function packed<T>(key: PackKey): Promise<T | null> {
-  const d = await packDb();
-  if (!d) return null;
-  try {
-    return ((await req(d.transaction('items').objectStore('items').get(key))) as T | undefined) ?? null;
-  } catch {
-    return null;
-  }
+  // An IndexedDB connection can stop answering after iOS suspends the app: a
+  // read that hangs counts as a miss, and the next one opens a fresh connection.
+  let answered = false;
+  const read = (async () => {
+    const d = await packDb();
+    if (!d) return null;
+    try {
+      return ((await req(d.transaction('items').objectStore('items').get(key))) as T | undefined) ?? null;
+    } catch {
+      return null;
+    } finally {
+      answered = true;
+    }
+  })();
+  const hit = await within(read, 3000, null);
+  if (!answered) dbPromise = null;
+  return hit;
 }
 
 export async function putPacked(key: PackKey, value: unknown): Promise<void> {
@@ -47,10 +62,14 @@ export async function dropPacked(keys?: string[]): Promise<void> {
   await done(tx).catch(() => {});
 }
 
+/** How long a load may take before the packed copy is used instead. */
+const LOAD_TIMEOUT_MS = 15_000;
+
 /**
  * Load from the server, or from the pack: first when the device is offline,
- * and as the fallback when the load fails. Without a packed copy the loader's
- * own result or error stands.
+ * and as the fallback when the load fails or hasn't answered in 15 seconds.
+ * Without a packed copy the loader's own result or error stands, so a screen
+ * never waits on a load that won't come back (Oct 29: players stuck on grey).
  */
 export async function offlineFirst<T>(key: PackKey, loader: () => Promise<T>): Promise<T> {
   if (isOffline()) {
@@ -59,7 +78,10 @@ export async function offlineFirst<T>(key: PackKey, loader: () => Promise<T>): P
     return loader();
   }
   try {
-    return await loader();
+    return await Promise.race([
+      loader(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('The load timed out.')), LOAD_TIMEOUT_MS)),
+    ]);
   } catch (e) {
     const hit = await packed<T>(key);
     if (hit != null) return hit;
